@@ -16,12 +16,12 @@ import { cn } from "@/lib/utils"
 import { useCommand } from "@/hooks/use-command"
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/", label: "Dash", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/files", label: "Files", icon: FolderOpen },
-  { href: "/workspaces", label: "Workspaces", icon: GitBranch },
   { href: "/review", label: "Review", icon: ClipboardCheck },
-  { href: "/commands", label: "Commands", icon: Terminal },
+  { href: "/files", label: "Files", icon: FolderOpen },
+  { href: "/commands", label: "Cmds", icon: Terminal },
+  { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
@@ -46,12 +46,9 @@ export function AppSidebar() {
   useCommand(navCommands)
 
   return (
-    <aside className="hidden md:flex h-screen w-60 flex-col border-r bg-sidebar">
-      <div className="flex h-14 items-center gap-2 border-b px-4">
+    <aside className="hidden md:flex h-screen w-16 flex-col border-r bg-sidebar">
+      <div className="flex h-12 items-center justify-center border-b">
         <Terminal className="h-5 w-5 text-sidebar-primary" />
-        <span className="text-lg font-semibold text-sidebar-foreground">
-          Dev Hub
-        </span>
       </div>
       <nav className="flex flex-1 flex-col gap-1 p-2">
         {navItems.map((item) => {
@@ -65,13 +62,13 @@ export function AppSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "flex flex-col items-center gap-0.5 rounded-md py-2 text-[10px] font-medium transition-colors",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className="h-5 w-5" />
               {item.label}
             </Link>
           )

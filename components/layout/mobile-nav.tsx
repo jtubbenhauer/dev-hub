@@ -14,12 +14,12 @@ import {
 import { cn } from "@/lib/utils"
 
 const mobileNavItems = [
-  { href: "/", label: "Home", icon: LayoutDashboard },
+  { href: "/", label: "Dash", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/files", label: "Files", icon: FolderOpen },
-  { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/review", label: "Review", icon: ClipboardCheck },
+  { href: "/files", label: "Files", icon: FolderOpen },
   { href: "/commands", label: "Cmds", icon: Terminal },
+  { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 

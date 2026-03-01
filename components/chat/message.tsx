@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useCallback } from "react"
+import { memo, useMemo, useState, useCallback } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeHighlight from "rehype-highlight"
@@ -25,7 +25,6 @@ import type {
   ToolPart,
   TextPart,
   ReasoningPart,
-  StepFinishPart,
 } from "@/lib/opencode/types"
 
 // Inline subtask type — not a named export in the SDK
@@ -35,8 +34,9 @@ interface ChatMessageProps {
   message: MessageWithParts
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
-  const { info, parts } = message
+export const ChatMessage = memo(
+  function ChatMessage({ message }: ChatMessageProps) {
+    const { info, parts } = message
   const isUser = info.role === "user"
   const isAssistant = info.role === "assistant"
 
@@ -62,8 +62,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
     [parts]
   )
 
-  const stepFinishParts = useMemo(
-    () => parts.filter((p): p is StepFinishPart => p.type === "step-finish"),
+  const compactionParts = useMemo(
+    () => parts.filter((p) => p.type === "compaction"),
     [parts]
   )
 
@@ -107,14 +107,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
             ))}
 
             {textContent && (
-              <div className="prose prose-sm dark:prose-invert max-w-none overflow-hidden">
+              <div className="prose prose-sm dark:prose-invert max-w-none overflow-x-auto">
                 <MarkdownContent content={textContent} />
               </div>
             )}
 
-            {stepFinishParts.length > 0 && (
-              <StepFinishSummary parts={stepFinishParts} />
-            )}
+            {compactionParts.length > 0 && <CompactionDivider />}
 
             {hasError && (
               <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -146,7 +144,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
     </div>
   )
-}
+},
+(prev, next) =>
+  prev.message.parts === next.message.parts &&
+  prev.message.info === next.message.info
+)
 
 function ReasoningBlock({ part }: { part: ReasoningPart }) {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -198,22 +200,14 @@ function SubtaskCard({ part }: { part: SubtaskPart }) {
   )
 }
 
-function StepFinishSummary({ parts }: { parts: StepFinishPart[] }) {
-  const totals = parts.reduce(
-    (acc, p) => ({
-      input: acc.input + p.tokens.input,
-      output: acc.output + p.tokens.output,
-      cost: acc.cost + p.cost,
-    }),
-    { input: 0, output: 0, cost: 0 }
-  )
-
-  if (totals.input === 0 && totals.output === 0) return null
-
+function CompactionDivider() {
   return (
-    <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
-      <span>{totals.input + totals.output} step tokens</span>
-      {totals.cost > 0 && <span>· ${totals.cost.toFixed(4)}</span>}
+    <div className="flex items-center gap-2 py-1">
+      <div className="h-px flex-1 border-t border-dashed border-muted-foreground/25" />
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40">
+        Context compacted
+      </span>
+      <div className="h-px flex-1 border-t border-dashed border-muted-foreground/25" />
     </div>
   )
 }

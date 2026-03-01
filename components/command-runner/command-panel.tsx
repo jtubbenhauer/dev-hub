@@ -1,83 +1,46 @@
 "use client"
 
-import { useState, useCallback, useId } from "react"
+import { useState, useCallback } from "react"
 import { X, Maximize2, Minimize2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CommandInput } from "./command-input"
 import { CommandOutput } from "./command-output"
-import { useCommandWebSocket } from "@/hooks/use-websocket"
-import type { ServerMessage } from "@/lib/commands/types"
+import { useCommandStore } from "@/stores/command-store"
 import { cn } from "@/lib/utils"
 
 interface CommandPanelProps {
   workspaceId: string | null
+  initialSessionId?: string
   onClose?: () => void
   className?: string
 }
 
-interface PanelState {
-  sessionId: string
-  command: string
-  lines: string[]
-  isRunning: boolean
-  exitCode: number | null
-}
-
-function createPanelState(sessionId: string): PanelState {
-  return { sessionId, command: "", lines: [], isRunning: false, exitCode: null }
-}
-
-export function CommandPanel({ workspaceId, onClose, className }: CommandPanelProps) {
-  const generatedId = useId()
-  const [state, setState] = useState<PanelState>(() =>
-    createPanelState(generatedId.replace(/:/g, ""))
-  )
+export function CommandPanel({ workspaceId, initialSessionId, onClose, className }: CommandPanelProps) {
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId ?? null)
+  const session = useCommandStore((s) => currentSessionId ? s.sessions[currentSessionId] : null)
+  const runCommand = useCommandStore((s) => s.runCommand)
+  const killCommand = useCommandStore((s) => s.killCommand)
   const [isExpanded, setIsExpanded] = useState(false)
 
-  const handleMessage = useCallback((message: ServerMessage) => {
-    if (message.sessionId !== state.sessionId) return
-
-    switch (message.type) {
-      case "started":
-        setState((prev) => ({ ...prev, isRunning: true, lines: [], exitCode: null }))
-        break
-      case "data":
-        setState((prev) => ({ ...prev, lines: [...prev.lines, message.data] }))
-        break
-      case "exit":
-        setState((prev) => ({
-          ...prev,
-          isRunning: false,
-          exitCode: message.exitCode,
-        }))
-        break
-      case "error":
-        setState((prev) => ({
-          ...prev,
-          isRunning: false,
-          lines: [...prev.lines, `\x1b[31mError: ${message.message}\x1b[0m\n`],
-        }))
-        break
-    }
-  }, [state.sessionId])
-
-  const { runCommand, killCommand } = useCommandWebSocket({
-    onMessage: handleMessage,
-    workspaceId: workspaceId ?? undefined,
-  })
+  const lines = session?.lines ?? []
+  const isRunning = session?.isRunning ?? false
+  const exitCode = session?.exitCode ?? null
+  const command = session?.command ?? ""
 
   const handleRun = useCallback(
-    (command: string) => {
-      setState((prev) => ({ ...prev, command, lines: [], exitCode: null }))
-      runCommand(state.sessionId, command)
+    (cmd: string) => {
+      if (!workspaceId) return
+      const newSessionId = runCommand(cmd, workspaceId)
+      setCurrentSessionId(newSessionId)
     },
-    [runCommand, state.sessionId]
+    [workspaceId, runCommand]
   )
 
   const handleKill = useCallback(() => {
-    killCommand(state.sessionId)
-  }, [killCommand, state.sessionId])
+    if (!currentSessionId) return
+    killCommand(currentSessionId)
+  }, [currentSessionId, killCommand])
 
   return (
     <div
@@ -90,18 +53,18 @@ export function CommandPanel({ workspaceId, onClose, className }: CommandPanelPr
       {/* Header */}
       <div className="flex items-center gap-2">
         <div className="flex-1 truncate">
-          {state.command ? (
+          {command ? (
             <span className="font-mono text-xs text-muted-foreground">
-              {state.command}
+              {command}
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">New command</span>
           )}
         </div>
 
-        {state.exitCode !== null && (
-          <Badge variant={state.exitCode === 0 ? "default" : "destructive"} className="text-[10px]">
-            exit {state.exitCode}
+        {exitCode !== null && (
+          <Badge variant={exitCode === 0 ? "default" : "destructive"} className="text-[10px]">
+            exit {exitCode}
           </Badge>
         )}
 
@@ -133,15 +96,15 @@ export function CommandPanel({ workspaceId, onClose, className }: CommandPanelPr
       {/* Input */}
       <CommandInput
         workspaceId={workspaceId}
-        isRunning={state.isRunning}
+        isRunning={isRunning}
         onRun={handleRun}
         onKill={handleKill}
       />
 
       {/* Output */}
       <CommandOutput
-        lines={state.lines}
-        isRunning={state.isRunning}
+        lines={lines}
+        isRunning={isRunning}
         className={cn("min-h-32", isExpanded ? "flex-1" : "max-h-80")}
       />
     </div>

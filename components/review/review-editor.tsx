@@ -23,16 +23,27 @@ import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search"
 import { lintKeymap } from "@codemirror/lint"
 import { githubDark } from "@fsegurai/codemirror-theme-github-dark"
-import { unifiedMergeView } from "@codemirror/merge"
-import { vim } from "@replit/codemirror-vim"
+import { unifiedMergeView, goToNextChunk, goToPreviousChunk } from "@codemirror/merge"
+import { vim, Vim } from "@replit/codemirror-vim"
 import { Check, ChevronRight, Loader2, Save, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VimToggle } from "@/components/editor/vim-toggle"
 import { useEditorStore } from "@/stores/editor-store"
+import { useFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
 import { toast } from "sonner"
 import type { ReviewFile } from "@/types"
+
+// Register ]c / [c vim bindings for chunk navigation — runs once at module load
+Vim.defineAction("goToNextChunk", (cm) => {
+  goToNextChunk({ state: cm.cm6.state, dispatch: cm.cm6.dispatch.bind(cm.cm6) })
+})
+Vim.defineAction("goToPreviousChunk", (cm) => {
+  goToPreviousChunk({ state: cm.cm6.state, dispatch: cm.cm6.dispatch.bind(cm.cm6) })
+})
+Vim.mapCommand("]c", "action", "goToNextChunk", {}, { context: "normal" })
+Vim.mapCommand("[c", "action", "goToPreviousChunk", {}, { context: "normal" })
 
 interface ReviewEditorProps {
   fileContent: {
@@ -61,6 +72,8 @@ export function ReviewEditor({
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const isVimMode = useEditorStore((s) => s.isVimMode)
+  const { fontSize } = useFontSizeSetting()
+  const { tabSize } = useTabSizeSetting()
   const isMobile = useIsMobile()
   const [isSaving, setIsSaving] = useState(false)
 
@@ -140,7 +153,7 @@ export function ReviewEditor({
           mergeControls: false,
         }),
         EditorView.theme({
-          "&": { height: "100%", fontSize: isMobile ? "10px" : "13px" },
+          "&": { height: "100%", fontSize: isMobile ? "10px" : `${fontSize}px` },
           ".cm-scroller": { overflow: "auto" },
           ".cm-content": {
             fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
@@ -150,20 +163,59 @@ export function ReviewEditor({
             ...(isMobile ? { fontSize: "9px" } : {}),
           },
         }),
-        // Override @codemirror/merge's default diff decorations with subtler background tints.
-        // Must include .cm-merge-b to match the specificity of the library's baseTheme.
-        // Browser default line-through on <del> tags is handled by globals.css.
-        // Override @codemirror/merge's baseTheme diff decorations (dark mode)
+        EditorState.tabSize.of(tabSize),
+        // Override @codemirror/merge and @fsegurai/codemirror-theme-github-dark diff decorations.
+        // The fsegurai theme applies heavy line-level backgrounds, bright text color changes,
+        // strikethrough, and borders — all with !important on <ins>/<del> selectors.
+        // We match that specificity here to produce subtle, readable diff indicators.
         EditorView.theme({
-          "&.cm-merge-b .cm-changedText": { background: "rgba(46, 160, 67, 0.05)" },
-          "&.cm-merge-b .cm-deletedText": { background: "rgba(248, 81, 73, 0.06)" },
-          ".cm-deletedChunk .cm-deletedText": { background: "rgba(248, 81, 73, 0.06)" },
-        }, { dark: true }),
-        // Light mode overrides (fallback)
-        EditorView.theme({
-          "&.cm-merge-b .cm-changedText": { background: "rgba(46, 160, 67, 0.08)" },
-          "&.cm-merge-b .cm-deletedText": { background: "rgba(248, 81, 73, 0.08)" },
-          ".cm-deletedChunk .cm-deletedText": { background: "rgba(248, 81, 73, 0.08)" },
+          // Kill strikethrough on all <del> elements and their children
+          "del, del *": { textDecoration: "none !important" },
+          // Line-level backgrounds: very subtle tints, no text color change
+          ".cm-insertedLine": {
+            backgroundColor: "rgba(46, 160, 67, 0.03)",
+            color: "inherit",
+            textDecoration: "none",
+            padding: "0",
+            borderRadius: "0",
+          },
+          "ins.cm-insertedLine, ins.cm-insertedLine:not(:has(.cm-changedText))": {
+            backgroundColor: "rgba(46, 160, 67, 0.03) !important",
+            color: "inherit !important",
+            textDecoration: "none !important",
+            border: "none !important",
+            padding: "0 !important",
+            borderRadius: "0 !important",
+          },
+          ".cm-deletedLine": {
+            backgroundColor: "rgba(248, 81, 73, 0.03)",
+            color: "inherit",
+            textDecoration: "none",
+            padding: "0",
+            borderRadius: "0",
+          },
+          // The fsegurai `del, del:not(:has(.cm-deletedText))` selector is very broad — match it
+          "del.cm-deletedLine, del, del:not(:has(.cm-deletedText))": {
+            backgroundColor: "rgba(248, 81, 73, 0.03) !important",
+            color: "inherit !important",
+            textDecoration: "none !important",
+            border: "none !important",
+            padding: "0 !important",
+            borderRadius: "0 !important",
+          },
+          // Changed lines (modified but not purely added/removed)
+          "&.cm-merge-b .cm-changedLine": { backgroundColor: "rgba(46, 160, 67, 0.02)" },
+          "&.cm-merge-a .cm-changedLine": { backgroundColor: "rgba(248, 81, 73, 0.02)" },
+          ".cm-deletedChunk": { backgroundColor: "rgba(248, 81, 73, 0.02)" },
+          // Word-level inline highlights: slightly more visible than line backgrounds
+          "&.cm-merge-b .cm-changedText": { background: "rgba(46, 160, 67, 0.10)" },
+          "ins.cm-insertedLine .cm-changedText": { background: "rgba(46, 160, 67, 0.10) !important" },
+          "&.cm-merge-b .cm-deletedText": { background: "rgba(248, 81, 73, 0.10)" },
+          ".cm-deletedChunk .cm-deletedText": { background: "rgba(248, 81, 73, 0.10)" },
+          "del .cm-deletedText, del .cm-changedText": { background: "rgba(248, 81, 73, 0.10) !important" },
+          // Gutter change indicators: keep colored but toned down
+          ".cm-changedLineGutter": { background: "rgba(46, 160, 67, 0.5)" },
+          ".cm-deletedLineGutter": { background: "rgba(248, 81, 73, 0.5)" },
         }),
       ]
 
@@ -178,7 +230,7 @@ export function ReviewEditor({
 
       return extensions
     },
-    [isVimMode, isMobile, handleSave]
+    [isVimMode, isMobile, fontSize, tabSize, handleSave]
   )
 
   // Rebuild editor when file changes or vim mode toggles

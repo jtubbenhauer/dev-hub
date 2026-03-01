@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { Header } from "@/components/layout/header"
 import { useWorkspaceStore } from "@/stores/workspace-store"
+import { useDefaultWorkspaceSetting } from "@/hooks/use-settings"
 import type { Workspace } from "@/types"
 
 export function AuthenticatedLayout({
@@ -19,6 +20,7 @@ export function AuthenticatedLayout({
   const router = useRouter()
   const { setWorkspaces, setIsLoadingWorkspaces, activeWorkspaceId, setActiveWorkspaceId } =
     useWorkspaceStore()
+  const { defaultWorkspaceId } = useDefaultWorkspaceSetting()
 
   const { data, isFetching } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
@@ -39,9 +41,12 @@ export function AuthenticatedLayout({
     if (!data) return
     setWorkspaces(data)
     if (!activeWorkspaceId && data.length > 0) {
-      setActiveWorkspaceId(data[0].id)
+      const preferred = defaultWorkspaceId && data.some((w) => w.id === defaultWorkspaceId)
+        ? defaultWorkspaceId
+        : data[0].id
+      setActiveWorkspaceId(preferred)
     }
-  }, [data, activeWorkspaceId, setWorkspaces, setActiveWorkspaceId])
+  }, [data, activeWorkspaceId, defaultWorkspaceId, setWorkspaces, setActiveWorkspaceId])
 
   useEffect(() => {
     if (status === "unauthenticated") {

@@ -11,6 +11,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,7 @@ export default function WorkspacesPage() {
   const [newName, setNewName] = useState("")
   const [browseMode, setBrowseMode] = useState(true)
 
-  const { data: workspaces = [] } = useQuery<Workspace[]>({
+  const { data: workspaces = [], isLoading } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
     queryFn: async () => {
       const res = await fetch("/api/workspaces")
@@ -183,7 +184,30 @@ export default function WorkspacesPage() {
           </div>
         </div>
 
-        {workspaces.length === 0 ? (
+        {isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="overflow-hidden">
+                <CardContent className="space-y-3 pt-4">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-5 w-14 rounded-full" />
+                  </div>
+                  <Skeleton className="h-3.5 w-48" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-3.5 w-28" />
+                    <Skeleton className="h-3.5 w-44" />
+                  </div>
+                  <div className="flex gap-4 pt-1">
+                    <Skeleton className="h-3.5 w-10" />
+                    <Skeleton className="h-3.5 w-10" />
+                    <Skeleton className="h-3.5 w-10" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : workspaces.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center gap-4 py-12">
               <FolderGit2 className="h-16 w-16 text-muted-foreground" />

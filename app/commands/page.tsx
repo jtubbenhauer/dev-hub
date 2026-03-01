@@ -31,7 +31,7 @@ export default function CommandsPage() {
             <h1 className="text-lg font-semibold">Command Runner</h1>
             {!activeWorkspaceId && (
               <p className="text-xs text-muted-foreground">
-                Select a workspace from the sidebar to run commands in its directory
+                Select a workspace from the header to run commands in its directory
               </p>
             )}
           </div>

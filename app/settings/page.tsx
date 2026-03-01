@@ -1,12 +1,14 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -18,13 +20,26 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { useWorkspaceStore } from "@/stores/workspace-store"
+import { useEditorStore } from "@/stores/editor-store"
 import { useAgents } from "@/components/chat/agent-selector"
 import {
   useModelAllowlist,
   useModelAgentBindings,
+  useVimModeSetting,
+  useFontSizeSetting,
+  useTabSizeSetting,
+  useShellRcPathSetting,
+  useDefaultWorkspaceSetting,
+  useWorktreeBaseDirSetting,
+  useCloneBaseDirSetting,
   useSettingsMutation,
   SETTINGS_KEYS,
+  FONT_SIZE_OPTIONS,
+  TAB_SIZE_OPTIONS,
+  DEFAULT_FONT_SIZE,
+  DEFAULT_TAB_SIZE,
 } from "@/hooks/use-settings"
+import type { FontSize, TabSize } from "@/hooks/use-settings"
 import type { Provider, Model, Agent } from "@/lib/opencode/types"
 
 interface ProviderWithModels {
@@ -42,12 +57,18 @@ interface SelectedModel {
   modelID: string
 }
 
+interface SystemInfo {
+  os: string
+  nodeVersion: string
+  gitVersion: string
+}
+
 export default function SettingsPage() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId)
 
   return (
     <AuthenticatedLayout>
-      <div className="h-full overflow-y-auto p-6">
+        <div className="h-full overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-2xl space-y-6">
           <div>
             <h1 className="text-2xl font-bold">Settings</h1>
@@ -55,6 +76,8 @@ export default function SettingsPage() {
               Configure models, agent bindings, and preferences.
             </p>
           </div>
+
+          <EditorSettingsCard />
 
           {activeWorkspaceId ? (
             <ModelSettings workspaceId={activeWorkspaceId} />
@@ -67,9 +90,397 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           )}
+
+          <WorkspaceSettingsCard />
+
+          <CommandSettingsCard />
+
+          <AboutCard />
         </div>
       </div>
     </AuthenticatedLayout>
+  )
+}
+
+function EditorSettingsCard() {
+  const { isVimMode, isLoading: isLoadingVim } = useVimModeSetting()
+  const { fontSize, isLoading: isLoadingFont } = useFontSizeSetting()
+  const { tabSize, isLoading: isLoadingTab } = useTabSizeSetting()
+  const setVimMode = useEditorStore((s) => s.setVimMode)
+  const mutation = useSettingsMutation()
+
+  const isLoading = isLoadingVim || isLoadingFont || isLoadingTab
+
+  // Sync DB vim mode into editor store on load
+  useEffect(() => {
+    if (!isLoadingVim) {
+      setVimMode(isVimMode)
+    }
+  }, [isVimMode, isLoadingVim, setVimMode])
+
+  const handleVimToggle = (checked: boolean) => {
+    setVimMode(checked)
+    mutation.mutate(
+      { key: SETTINGS_KEYS.VIM_MODE, value: checked },
+      { onSuccess: () => toast.success(checked ? "Vim mode enabled" : "Vim mode disabled") }
+    )
+  }
+
+  const handleFontSizeChange = (value: string) => {
+    const next = Number(value) as FontSize
+    mutation.mutate(
+      { key: SETTINGS_KEYS.FONT_SIZE, value: next },
+      { onSuccess: () => toast.success(`Font size set to ${next}px`) }
+    )
+  }
+
+  const handleTabSizeChange = (value: string) => {
+    const next = Number(value) as TabSize
+    mutation.mutate(
+      { key: SETTINGS_KEYS.TAB_SIZE, value: next },
+      { onSuccess: () => toast.success(`Tab size set to ${next} spaces`) }
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Editor</CardTitle>
+        <CardDescription>
+          Configure the code editor behavior and appearance.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="vim-mode">Vim mode</Label>
+            <p className="text-xs text-muted-foreground">
+              Enable Vim keybindings in the code editor
+            </p>
+          </div>
+          <Switch
+            id="vim-mode"
+            checked={isVimMode}
+            onCheckedChange={handleVimToggle}
+            disabled={mutation.isPending}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="font-size">Font size</Label>
+            <p className="text-xs text-muted-foreground">
+              Editor font size in pixels
+            </p>
+          </div>
+          <Select
+            value={String(fontSize)}
+            onValueChange={handleFontSizeChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="font-size" className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FONT_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}px{size === DEFAULT_FONT_SIZE ? " (default)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="tab-size">Tab size</Label>
+            <p className="text-xs text-muted-foreground">
+              Number of spaces per tab
+            </p>
+          </div>
+          <Select
+            value={String(tabSize)}
+            onValueChange={handleTabSizeChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="tab-size" className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TAB_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size} spaces{size === DEFAULT_TAB_SIZE ? " (default)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function WorkspaceSettingsCard() {
+  const workspaces = useWorkspaceStore((s) => s.workspaces)
+  const { defaultWorkspaceId, isLoading: isLoadingDefault } = useDefaultWorkspaceSetting()
+  const { worktreeBaseDir, isLoading: isLoadingWorktree } = useWorktreeBaseDirSetting()
+  const { cloneBaseDir, isLoading: isLoadingClone } = useCloneBaseDirSetting()
+  const mutation = useSettingsMutation()
+
+  const [localWorktreeDir, setLocalWorktreeDir] = useState("")
+  const [localCloneDir, setLocalCloneDir] = useState("")
+
+  const isLoading = isLoadingDefault || isLoadingWorktree || isLoadingClone
+
+  useEffect(() => {
+    if (!isLoadingWorktree) setLocalWorktreeDir(worktreeBaseDir)
+  }, [worktreeBaseDir, isLoadingWorktree])
+
+  useEffect(() => {
+    if (!isLoadingClone) setLocalCloneDir(cloneBaseDir)
+  }, [cloneBaseDir, isLoadingClone])
+
+  const handleDefaultWorkspaceChange = (value: string) => {
+    const next = value === "__none__" ? null : value
+    mutation.mutate(
+      { key: SETTINGS_KEYS.DEFAULT_WORKSPACE, value: next },
+      { onSuccess: () => toast.success(next ? "Default workspace set" : "Default workspace cleared") }
+    )
+  }
+
+  const handleWorktreeDirSave = () => {
+    mutation.mutate(
+      { key: SETTINGS_KEYS.WORKTREE_BASE_DIR, value: localWorktreeDir },
+      { onSuccess: () => toast.success("Worktree base directory updated") }
+    )
+  }
+
+  const handleCloneDirSave = () => {
+    mutation.mutate(
+      { key: SETTINGS_KEYS.CLONE_BASE_DIR, value: localCloneDir },
+      { onSuccess: () => toast.success("Clone base directory updated") }
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Workspace</CardTitle>
+        <CardDescription>
+          Default workspace and directory preferences.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="default-workspace">Default workspace</Label>
+          <p className="text-xs text-muted-foreground">
+            Automatically selected when you open the app
+          </p>
+          <Select
+            value={defaultWorkspaceId ?? "__none__"}
+            onValueChange={handleDefaultWorkspaceChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="default-workspace">
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None</SelectItem>
+              {workspaces.map((w) => (
+                <SelectItem key={w.id} value={w.id}>
+                  {w.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="worktree-base-dir">Worktree base directory</Label>
+          <p className="text-xs text-muted-foreground">
+            Base path for new worktrees. Leave empty for repo-relative default.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              id="worktree-base-dir"
+              value={localWorktreeDir}
+              onChange={(e) => setLocalWorktreeDir(e.target.value)}
+              placeholder="e.g. ~/worktrees/"
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleWorktreeDirSave}
+              disabled={localWorktreeDir === worktreeBaseDir || mutation.isPending}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="clone-base-dir">Clone base directory</Label>
+          <p className="text-xs text-muted-foreground">
+            Default directory for cloning new repositories
+          </p>
+          <div className="flex gap-2">
+            <Input
+              id="clone-base-dir"
+              value={localCloneDir}
+              onChange={(e) => setLocalCloneDir(e.target.value)}
+              placeholder="~/dev/"
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleCloneDirSave}
+              disabled={localCloneDir === cloneBaseDir || mutation.isPending}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function CommandSettingsCard() {
+  const { shellRcPath, isLoading } = useShellRcPathSetting()
+  const mutation = useSettingsMutation()
+  const [localPath, setLocalPath] = useState("")
+
+  useEffect(() => {
+    if (!isLoading) setLocalPath(shellRcPath)
+  }, [shellRcPath, isLoading])
+
+  const handleSave = () => {
+    mutation.mutate(
+      { key: SETTINGS_KEYS.SHELL_RC_PATH, value: localPath },
+      { onSuccess: () => toast.success("Shell RC path updated") }
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Commands</CardTitle>
+        <CardDescription>
+          Configure command runner and shell integration.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="shell-rc-path">Shell RC file path</Label>
+          <p className="text-xs text-muted-foreground">
+            Path to your shell config file for alias parsing in command autocomplete
+          </p>
+          <div className="flex gap-2">
+            <Input
+              id="shell-rc-path"
+              value={localPath}
+              onChange={(e) => setLocalPath(e.target.value)}
+              placeholder="~/.zshrc"
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleSave}
+              disabled={localPath === shellRcPath || mutation.isPending}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function AboutCard() {
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
+
+  useEffect(() => {
+    fetch("/api/settings/about")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: SystemInfo | null) => {
+        if (data) setSystemInfo(data)
+      })
+      .catch(() => {})
+  }, [])
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>About</CardTitle>
+        <CardDescription>
+          Application and system information.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">App version</span>
+          <span className="font-mono">0.1.0</span>
+        </div>
+        {systemInfo && (
+          <>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">OS</span>
+              <span className="font-mono">{systemInfo.os}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Node.js</span>
+              <span className="font-mono">{systemInfo.nodeVersion}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Git</span>
+              <span className="font-mono">{systemInfo.gitVersion}</span>
+            </div>
+          </>
+        )}
+        <div className="pt-2">
+          <a
+            href="https://github.com/jackharrhy/dev-hub"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ExternalLink className="size-3.5" />
+            View on GitHub
+          </a>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

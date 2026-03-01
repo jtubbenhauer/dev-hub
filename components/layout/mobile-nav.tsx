@@ -8,6 +8,8 @@ import {
   FolderOpen,
   GitBranch,
   ClipboardCheck,
+  Terminal,
+  Settings,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -17,6 +19,8 @@ const mobileNavItems = [
   { href: "/files", label: "Files", icon: FolderOpen },
   { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/review", label: "Review", icon: ClipboardCheck },
+  { href: "/commands", label: "Cmds", icon: Terminal },
+  { href: "/settings", label: "Settings", icon: Settings },
 ]
 
 export function MobileNav() {
@@ -35,7 +39,7 @@ export function MobileNav() {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex flex-col items-center gap-1 px-3 py-1 text-xs transition-colors",
+              "flex flex-col items-center gap-1 px-1 py-1 text-[10px] transition-colors",
               isActive
                 ? "text-primary"
                 : "text-muted-foreground"

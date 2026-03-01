@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react"
-import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, FileText, Plus, MessageSquare } from "lucide-react"
+import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, FileText, Plus, MessageSquare, ArrowDown } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,7 +16,7 @@ import { useAgents, AgentSelector } from "@/components/chat/agent-selector"
 import { PlanPanel } from "@/components/chat/plan-panel"
 import { useModelAgentBindings } from "@/hooks/use-settings"
 import { useCommand } from "@/hooks/use-command"
-import type { Permission, QuestionRequest, QuestionInfo, QuestionAnswer, MessageWithParts } from "@/lib/opencode/types"
+import type { Permission, QuestionRequest, QuestionInfo, QuestionAnswer, MessageWithParts, SessionStatus } from "@/lib/opencode/types"
 
 interface SelectedModel {
   providerID: string
@@ -33,6 +33,8 @@ export function ChatInterface() {
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false)
   const [hasPlanFiles, setHasPlanFiles] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const isNearBottom = useRef(true)
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false)
 
   const activeWorkspaceId = useWorkspaceStore(
     (state) => state.activeWorkspaceId
@@ -65,6 +67,7 @@ export function ChatInterface() {
     messages,
     streamingStatus,
     streamingError,
+    sessionStatus,
     permissions,
     questions,
     setActiveSession,
@@ -101,11 +104,10 @@ export function ChatInterface() {
     fetchMessages(activeSessionId, activeWorkspaceId)
   }, [activeSessionId, activeWorkspaceId, fetchMessages])
 
-  // Auto-scroll to bottom on new messages or when returning from the plan panel
+  // Auto-scroll to bottom only when the user is already near the bottom
   const activeMessages = activeSessionId ? messages[activeSessionId] ?? [] : []
   useEffect(() => {
-    if (isPlanPanelOpen) return
-    // rAF lets the ScrollArea finish mounting before we measure scrollHeight
+    if (isPlanPanelOpen || !isNearBottom.current) return
     const frame = requestAnimationFrame(() => {
       const viewport = scrollAreaRef.current?.querySelector("[data-slot='scroll-area-viewport']")
       if (viewport) {
@@ -115,9 +117,44 @@ export function ChatInterface() {
     return () => cancelAnimationFrame(frame)
   }, [activeMessages, isPlanPanelOpen])
 
+  // Detect when the user scrolls away from the bottom and show the jump button
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector("[data-slot='scroll-area-viewport']")
+    if (!viewport) return
+
+    let rafHandle: number | null = null
+    const handleScroll = () => {
+      if (rafHandle !== null) return
+      rafHandle = requestAnimationFrame(() => {
+        rafHandle = null
+        const atBottom = viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 80
+        if (atBottom !== isNearBottom.current) {
+          isNearBottom.current = atBottom
+          setShowJumpToBottom(!atBottom)
+        }
+      })
+    }
+
+    viewport.addEventListener("scroll", handleScroll, { passive: true })
+    return () => {
+      viewport.removeEventListener("scroll", handleScroll)
+      if (rafHandle !== null) cancelAnimationFrame(rafHandle)
+    }
+  }, [])
+
+  // Reset scroll state when switching sessions
+  useEffect(() => {
+    isNearBottom.current = true
+    setShowJumpToBottom(false)
+  }, [activeSessionId])
+
   const handleSendMessage = useCallback(
     async (text: string) => {
       if (!activeWorkspaceId) return
+
+      // Always scroll to bottom when the user sends a message
+      isNearBottom.current = true
+      setShowJumpToBottom(false)
 
       let sessionId = activeSessionId
       if (!sessionId) {
@@ -138,8 +175,16 @@ export function ChatInterface() {
     ]
   )
 
-  const handleAbort = useCallback(() => {
-    if (!activeSessionId || !activeWorkspaceId) return
+  const handleJumpToBottom = useCallback(() => {
+    isNearBottom.current = true
+    setShowJumpToBottom(false)
+    const viewport = scrollAreaRef.current?.querySelector("[data-slot='scroll-area-viewport']")
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight
+    }
+  }, [])
+
+  const handleAbort = useCallback(() => {    if (!activeSessionId || !activeWorkspaceId) return
     abortSession(activeSessionId, activeWorkspaceId)
   }, [activeSessionId, activeWorkspaceId, abortSession])
 
@@ -259,7 +304,7 @@ export function ChatInterface() {
       {/* Main chat area */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Chat toolbar */}
-        <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
           {/* Mobile: open session sheet */}
           <Button
             size="icon-xs"
@@ -331,11 +376,24 @@ export function ChatInterface() {
                     <ChatMessage key={msg.info.id} message={msg} />
                   ))}
                   {streamingStatus === "streaming" && (
-                    <StreamingIndicator messages={activeMessages} />
+                    <StreamingIndicator messages={activeMessages} sessionStatus={sessionStatus} />
                   )}
                 </div>
               )}
             </ScrollArea>
+          )}
+
+          {/* Jump-to-bottom pill — shown when user has scrolled up during streaming or after */}
+          {showJumpToBottom && activeMessages.length > 0 && !isPlanPanelOpen && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+              <button
+                onClick={handleJumpToBottom}
+                className="pointer-events-auto flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium shadow-md transition-opacity hover:bg-muted"
+              >
+                <ArrowDown className="size-3" />
+                Jump to bottom
+              </button>
+            </div>
           )}
         </div>
 
@@ -408,13 +466,29 @@ export function ChatInterface() {
   )
 }
 
-function StreamingIndicator({ messages }: { messages: MessageWithParts[] }) {
+function StreamingIndicator({
+  messages,
+  sessionStatus,
+}: {
+  messages: MessageWithParts[]
+  sessionStatus: SessionStatus | null
+}) {
   const label = useMemo(() => {
+    // Session-level status takes priority
+    if (sessionStatus?.type === "retry") {
+      const secondsUntilRetry = Math.max(0, Math.ceil((sessionStatus.next - Date.now()) / 1000))
+      return `Retrying... attempt ${sessionStatus.attempt}${secondsUntilRetry > 0 ? ` · ${secondsUntilRetry}s` : ""}`
+    }
+
     // Walk parts of the last assistant message to find the most recent activity
     const lastAssistant = [...messages].reverse().find((m) => m.info.role === "assistant")
     if (!lastAssistant) return "Thinking..."
 
     const { parts } = lastAssistant
+
+    // Compaction in progress
+    const hasCompaction = parts.some((p) => p.type === "compaction")
+    if (hasCompaction) return "Compacting context..."
 
     // Running tool → most informative signal
     const runningTool = [...parts]
@@ -431,7 +505,7 @@ function StreamingIndicator({ messages }: { messages: MessageWithParts[] }) {
     }
 
     return "Thinking..."
-  }, [messages])
+  }, [messages, sessionStatus])
 
   return (
     <div className="flex items-center gap-3 px-4 py-3">

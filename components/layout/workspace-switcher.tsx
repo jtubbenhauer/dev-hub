@@ -16,7 +16,7 @@ export function WorkspaceSwitcher() {
     useWorkspaceStore()
 
   if (isLoadingWorkspaces) {
-    return <Skeleton className="h-9 w-48" />
+    return <Skeleton className="h-9 w-36 sm:w-48" />
   }
 
   if (workspaces.length === 0) {
@@ -33,7 +33,7 @@ export function WorkspaceSwitcher() {
       value={activeWorkspaceId ?? undefined}
       onValueChange={setActiveWorkspaceId}
     >
-      <SelectTrigger className="w-48">
+      <SelectTrigger className="w-36 sm:w-48">
         <FolderGit2 className="mr-2 h-4 w-4" />
         <SelectValue placeholder="Select workspace" />
       </SelectTrigger>

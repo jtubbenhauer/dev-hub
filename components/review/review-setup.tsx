@@ -23,6 +23,7 @@ import { useReviewStore } from "@/stores/review-store"
 import type { ReviewMode, Review, AllBranch } from "@/types"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export function ReviewSetup() {
   const { workspaces, activeWorkspaceId } = useWorkspaceStore()
@@ -34,7 +35,7 @@ export function ReviewSetup() {
   const [branchFilter, setBranchFilter] = useState("")
 
   const { data: branches = [], isLoading: branchesLoading } = useReviewBranches(activeWorkspaceId)
-  const { data: existingReviews = [] } = useReviewList(activeWorkspaceId)
+  const { data: existingReviews = [], isLoading: reviewsLoading } = useReviewList(activeWorkspaceId)
   const createReview = useCreateReview()
   const deleteReview = useDeleteReview(activeWorkspaceId)
 
@@ -183,7 +184,20 @@ export function ReviewSetup() {
         <Card>
           <CardContent className="pt-6">
             <h2 className="mb-4 text-lg font-semibold">Existing Reviews</h2>
-            {existingReviews.length === 0 ? (
+            {reviewsLoading ? (
+              <div className="space-y-2">
+                {[1, 2].map((i) => (
+                  <div key={i} className="rounded-md border p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-5 w-16" />
+                      <Skeleton className="h-3.5 w-24" />
+                    </div>
+                    <Skeleton className="h-3 w-32" />
+                    <Skeleton className="h-1.5 w-full rounded-full" />
+                  </div>
+                ))}
+              </div>
+            ) : existingReviews.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No active reviews for this workspace
               </p>

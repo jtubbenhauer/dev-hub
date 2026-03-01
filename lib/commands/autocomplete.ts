@@ -2,8 +2,8 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { db } from "@/lib/db"
-import { commandHistory } from "@/drizzle/schema"
-import { eq, desc, sql } from "drizzle-orm"
+import { commandHistory, settings } from "@/drizzle/schema"
+import { eq, desc, sql, and } from "drizzle-orm"
 import type { AutocompleteSuggestion } from "./types"
 
 export type { AutocompleteSuggestion }
@@ -16,12 +16,14 @@ async function readFileOrNull(filePath: string): Promise<string | null> {
   }
 }
 
-async function parseShellAliases(): Promise<AutocompleteSuggestion[]> {
-  const rcPaths = [
-    path.join(os.homedir(), ".zshrc"),
-    path.join(os.homedir(), ".bashrc"),
-    path.join(os.homedir(), ".bash_aliases"),
-  ]
+async function parseShellAliases(customRcPath?: string): Promise<AutocompleteSuggestion[]> {
+  const rcPaths = customRcPath
+    ? [customRcPath.replace(/^~/, os.homedir())]
+    : [
+        path.join(os.homedir(), ".zshrc"),
+        path.join(os.homedir(), ".bashrc"),
+        path.join(os.homedir(), ".bash_aliases"),
+      ]
 
   const suggestions: AutocompleteSuggestion[] = []
   const aliasPattern = /^alias\s+([^=]+)=['"](.+)['"]\s*$/
@@ -151,12 +153,25 @@ async function getRecentHistory(workspaceId: string): Promise<AutocompleteSugges
 export async function getSuggestions(
   workspaceId: string,
   workspacePath: string,
-  query: string
+  query: string,
+  userId?: string
 ): Promise<AutocompleteSuggestion[]> {
+  let shellRcPath: string | undefined
+  if (userId) {
+    const [row] = await db
+      .select({ value: settings.value })
+      .from(settings)
+      .where(and(eq(settings.userId, userId), eq(settings.key, "shell-rc-path")))
+      .limit(1)
+    if (row?.value && typeof row.value === "string") {
+      shellRcPath = row.value
+    }
+  }
+
   const [history, aliases, scripts, makeTargets, cargoTargets, freqMap] =
     await Promise.all([
       getRecentHistory(workspaceId),
-      parseShellAliases(),
+      parseShellAliases(shellRcPath),
       parsePackageScripts(workspacePath),
       parseMakeTargets(workspacePath),
       parseCargoTargets(workspacePath),
@@ -202,14 +217,4 @@ export async function getSuggestions(
   return filtered.slice(0, 20)
 }
 
-export async function recordCommand(
-  workspaceId: string,
-  command: string,
-  exitCode: number | null
-): Promise<void> {
-  await db.insert(commandHistory).values({
-    workspaceId,
-    command,
-    exitCode,
-  })
-}
+

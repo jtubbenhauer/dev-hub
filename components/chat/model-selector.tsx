@@ -197,7 +197,7 @@ export function ModelSelector({
           size="sm"
           role="combobox"
           aria-expanded={isOpen}
-          className="max-w-[260px] gap-1.5 text-xs"
+          className="max-w-[160px] gap-1.5 text-xs sm:max-w-[260px]"
         >
           <span className="truncate">
             {currentOption

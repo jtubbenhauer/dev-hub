@@ -10,6 +10,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   GitBranch,
   ArrowUp,
@@ -52,7 +53,7 @@ export function WorkspaceOverview() {
 
 function WorkspaceCard({ workspace }: { workspace: Workspace }) {
   const { setActiveWorkspaceId } = useWorkspaceStore()
-  const { data: gitStatus } = useGitStatus(workspace.id)
+  const { data: gitStatus, isLoading } = useGitStatus(workspace.id)
 
   const totalChanges = gitStatus
     ? gitStatus.staged.length + gitStatus.unstaged.length + gitStatus.untracked.length
@@ -75,7 +76,12 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
         </div>
       </CardHeader>
       <CardContent className="px-3 pb-3 space-y-2">
-        {gitStatus?.isRepo && (
+        {isLoading ? (
+          <div className="space-y-1.5">
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-3.5 w-44" />
+          </div>
+        ) : gitStatus?.isRepo ? (
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-xs">
               <div className="flex items-center gap-1 text-foreground min-w-0">
@@ -139,7 +145,7 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
               </div>
             )}
           </div>
-        )}
+        ) : null}
 
         <div className="flex items-center gap-3 pt-0.5">
           <Link

@@ -151,9 +151,13 @@ pre code.hljs {
   content: none;
 }
 
-/* Override browser default line-through on <del> elements inside CodeMirror merge views.
-   @codemirror/merge uses <del> tags for deleted text (InlineDeletion widget, deletionWidget lines).
-   The library's own textDecoration:none only covers .cm-deletedLine del, missing inline <del>s. */
-.cm-editor del {
+/* Kill strikethrough on <del> elements inside CodeMirror merge views.
+   Covers: InlineDeletion widgets, deletionWidget block lines, and any nested children.
+   High-specificity selectors needed because @fsegurai theme uses !important on del. */
+.cm-editor del,
+.cm-editor del *,
+.cm-editor .cm-deletedLine,
+.cm-editor .cm-deletedChunk del,
+.cm-editor .cm-deletedChunk .cm-deletedLine {
   text-decoration: none !important;
 }

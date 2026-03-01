@@ -8,9 +8,10 @@ import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatchi
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search"
 import { lintKeymap } from "@codemirror/lint"
-import { oneDark } from "@codemirror/theme-one-dark"
+import { githubDark } from "@fsegurai/codemirror-theme-github-dark"
 import { vim, Vim } from "@replit/codemirror-vim"
 import { useEditorStore } from "@/stores/editor-store"
+import { useFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
 import { getLanguageExtension } from "@/lib/editor/language"
 
 // Global vim config — runs once
@@ -32,6 +33,8 @@ export function CodeEditor({
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const isVimMode = useEditorStore((s) => s.isVimMode)
+  const { fontSize } = useFontSizeSetting()
+  const { tabSize } = useTabSizeSetting()
 
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -52,7 +55,7 @@ export function CodeEditor({
       highlightActiveLine(),
       highlightSelectionMatches(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-      oneDark,
+      githubDark,
       keymap.of([
         ...closeBracketsKeymap,
         ...defaultKeymap,
@@ -79,18 +82,19 @@ export function CodeEditor({
       EditorView.theme({
         "&": {
           height: "100%",
-          fontSize: "13px",
+          fontSize: `${fontSize}px`,
         },
         ".cm-scroller": {
           overflow: "auto",
         },
         ".cm-content": {
-          fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+          fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
         },
         ".cm-gutters": {
-          fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+          fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
         },
       }),
+      EditorState.tabSize.of(tabSize),
     ]
 
     if (isVimMode) {
@@ -103,7 +107,7 @@ export function CodeEditor({
     }
 
     return extensions
-  }, [isVimMode, language])
+  }, [isVimMode, language, fontSize, tabSize])
 
   // Create or recreate the editor when vim mode or language changes
   useEffect(() => {

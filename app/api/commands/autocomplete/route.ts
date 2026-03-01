@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
   }
 
-  const suggestions = await getSuggestions(workspaceId, workspace.path, query)
+  const suggestions = await getSuggestions(workspaceId, workspace.path, query, session.user.id)
 
   return NextResponse.json({ suggestions })
 }

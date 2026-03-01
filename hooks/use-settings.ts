@@ -12,7 +12,22 @@ interface SelectedModel {
 export const SETTINGS_KEYS = {
   MODEL_ALLOWLIST: "model-allowlist",
   MODEL_AGENT_BINDINGS: "model-agent-bindings",
+  VIM_MODE: "vim-mode",
+  FONT_SIZE: "font-size",
+  TAB_SIZE: "tab-size",
+  DEFAULT_WORKSPACE: "default-workspace",
+  WORKTREE_BASE_DIR: "worktree-base-dir",
+  CLONE_BASE_DIR: "clone-base-dir",
+  SHELL_RC_PATH: "shell-rc-path",
 } as const
+
+export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
+export type FontSize = (typeof FONT_SIZE_OPTIONS)[number]
+export const DEFAULT_FONT_SIZE: FontSize = 13
+
+export const TAB_SIZE_OPTIONS = [2, 4] as const
+export type TabSize = (typeof TAB_SIZE_OPTIONS)[number]
+export const DEFAULT_TAB_SIZE: TabSize = 2
 
 // "providerID::modelID" format
 export type ModelAllowlist = string[]
@@ -84,4 +99,69 @@ export function useModelAgentBindings(): {
       ? (raw as ModelAgentBindings)
       : {}
   return { bindings, isLoading }
+}
+
+export function useVimModeSetting(): {
+  isVimMode: boolean
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.VIM_MODE]
+  return { isVimMode: raw === true, isLoading }
+}
+
+export function useFontSizeSetting(): {
+  fontSize: FontSize
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.FONT_SIZE]
+  const isValid = typeof raw === "number" && (FONT_SIZE_OPTIONS as readonly number[]).includes(raw)
+  return { fontSize: isValid ? (raw as FontSize) : DEFAULT_FONT_SIZE, isLoading }
+}
+
+export function useTabSizeSetting(): {
+  tabSize: TabSize
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.TAB_SIZE]
+  const isValid = typeof raw === "number" && (TAB_SIZE_OPTIONS as readonly number[]).includes(raw)
+  return { tabSize: isValid ? (raw as TabSize) : DEFAULT_TAB_SIZE, isLoading }
+}
+
+export function useDefaultWorkspaceSetting(): {
+  defaultWorkspaceId: string | null
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.DEFAULT_WORKSPACE]
+  return { defaultWorkspaceId: typeof raw === "string" ? raw : null, isLoading }
+}
+
+export function useWorktreeBaseDirSetting(): {
+  worktreeBaseDir: string
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.WORKTREE_BASE_DIR]
+  return { worktreeBaseDir: typeof raw === "string" ? raw : "", isLoading }
+}
+
+export function useCloneBaseDirSetting(): {
+  cloneBaseDir: string
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.CLONE_BASE_DIR]
+  return { cloneBaseDir: typeof raw === "string" ? raw : "~/dev/", isLoading }
+}
+
+export function useShellRcPathSetting(): {
+  shellRcPath: string
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.SHELL_RC_PATH]
+  return { shellRcPath: typeof raw === "string" ? raw : "~/.zshrc", isLoading }
 }

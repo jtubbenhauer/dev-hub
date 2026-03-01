@@ -112,18 +112,43 @@ export function useToggleReviewFile(reviewId: string | null) {
   return useMutation<
     { ok: boolean; reviewedFiles: number },
     Error,
-    { fileId: number; reviewed: boolean }
+    { fileId: number; reviewed: boolean },
+    { previous: ReviewWithFiles | undefined }
   >({
     mutationFn: (body) =>
       reviewPost<{ ok: boolean; reviewedFiles: number }>(
         `/api/reviews/${reviewId}/files`,
         body
       ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["review", reviewId] })
+    onMutate: async (body) => {
+      await queryClient.cancelQueries({ queryKey: ["review", reviewId] })
+      const previous = queryClient.getQueryData<ReviewWithFiles>(["review", reviewId])
+
+      if (previous) {
+        const updatedFiles = previous.files.map((f) =>
+          f.id === body.fileId
+            ? { ...f, reviewed: body.reviewed, reviewedAt: body.reviewed ? new Date() : null }
+            : f
+        )
+        const reviewedCount = updatedFiles.filter((f) => f.reviewed).length
+
+        queryClient.setQueryData<ReviewWithFiles>(["review", reviewId], {
+          ...previous,
+          files: updatedFiles,
+          reviewedFiles: reviewedCount,
+        })
+      }
+
+      return { previous }
     },
-    onError: (err) => {
+    onError: (err, _body, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["review", reviewId], context.previous)
+      }
       toast.error(err.message)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["review", reviewId] })
     },
   })
 }

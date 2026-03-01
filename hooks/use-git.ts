@@ -113,17 +113,106 @@ function useGitMutation<TBody extends Record<string, unknown>>(
 }
 
 export function useGitStage(workspaceId: string | null) {
-  return useGitMutation<{ action: string; files: string[] }>(
-    workspaceId,
-    ["git-status"]
-  )
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (body: { action: string; files: string[] }) =>
+      gitPost(workspaceId!, body),
+    onMutate: async (body) => {
+      await queryClient.cancelQueries({ queryKey: ["git-status", workspaceId] })
+      const previous = queryClient.getQueryData<GitStatusResult>(["git-status", workspaceId])
+
+      if (previous) {
+        const filesToStage = new Set(body.files)
+        const newStaged = [...previous.staged]
+        const newUnstaged = previous.unstaged.filter((f) => {
+          if (filesToStage.has(f.path)) {
+            newStaged.push(f)
+            return false
+          }
+          return true
+        })
+        const newUntracked = previous.untracked.filter((path) => {
+          if (filesToStage.has(path)) {
+            newStaged.push({ path, index: "A", workingDir: " " })
+            return false
+          }
+          return true
+        })
+
+        queryClient.setQueryData<GitStatusResult>(["git-status", workspaceId], {
+          ...previous,
+          staged: newStaged,
+          unstaged: newUnstaged,
+          untracked: newUntracked,
+        })
+      }
+
+      return { previous }
+    },
+    onError: (_err, _body, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["git-status", workspaceId], context.previous)
+      }
+      toast.error(_err.message)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["git-status", workspaceId] })
+    },
+  })
 }
 
 export function useGitUnstage(workspaceId: string | null) {
-  return useGitMutation<{ action: string; files: string[] }>(
-    workspaceId,
-    ["git-status"]
-  )
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (body: { action: string; files: string[] }) =>
+      gitPost(workspaceId!, body),
+    onMutate: async (body) => {
+      await queryClient.cancelQueries({ queryKey: ["git-status", workspaceId] })
+      const previous = queryClient.getQueryData<GitStatusResult>(["git-status", workspaceId])
+
+      if (previous) {
+        const filesToUnstage = new Set(body.files)
+        const newUnstaged = [...previous.unstaged]
+        const newStaged = previous.staged.filter((f) => {
+          if (filesToUnstage.has(f.path)) {
+            // "A" (added) files go back to untracked, others go to unstaged
+            if (f.index !== "A") {
+              newUnstaged.push(f)
+            }
+            return false
+          }
+          return true
+        })
+        const newUntracked = [...previous.untracked]
+        // Files that were "A" (newly added) go back to untracked
+        for (const f of previous.staged) {
+          if (filesToUnstage.has(f.path) && f.index === "A") {
+            newUntracked.push(f.path)
+          }
+        }
+
+        queryClient.setQueryData<GitStatusResult>(["git-status", workspaceId], {
+          ...previous,
+          staged: newStaged,
+          unstaged: newUnstaged,
+          untracked: newUntracked,
+        })
+      }
+
+      return { previous }
+    },
+    onError: (_err, _body, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["git-status", workspaceId], context.previous)
+      }
+      toast.error(_err.message)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["git-status", workspaceId] })
+    },
+  })
 }
 
 export function useGitDiscard(workspaceId: string | null) {

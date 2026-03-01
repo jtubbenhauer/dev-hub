@@ -74,7 +74,7 @@ export function MessageToolUse({ part }: MessageToolUseProps) {
               <span className="font-medium text-muted-foreground">
                 Output:
               </span>
-              <pre className="mt-1 max-h-60 overflow-auto rounded bg-muted p-2 text-xs">
+              <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 text-xs">
                 {truncateOutput(state.output)}
               </pre>
             </div>

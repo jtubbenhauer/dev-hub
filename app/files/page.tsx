@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout"
 import { FileTree } from "@/components/editor/file-tree"
 import { CodeEditor } from "@/components/editor/code-editor"
@@ -8,7 +8,9 @@ import { FileTabs } from "@/components/editor/file-tabs"
 import { VimToggle } from "@/components/editor/vim-toggle"
 import { useEditorStore } from "@/stores/editor-store"
 import { useWorkspaceStore } from "@/stores/workspace-store"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { PanelLeftClose, PanelLeft, FileCode2 } from "lucide-react"
 import { toast } from "sonner"
@@ -23,6 +25,8 @@ export default function FilesPage() {
     markFileSaved,
   } = useEditorStore()
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
+  const isMobile = useIsMobile()
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath)
 
@@ -64,15 +68,29 @@ export default function FilesPage() {
   return (
     <AuthenticatedLayout>
       <div className="flex h-full min-h-0">
-        {/* File tree sidebar */}
-        <div
-          className={cn(
-            "border-r bg-muted/30 transition-all duration-200",
-            isFileTreeOpen ? "w-60 min-w-[240px]" : "w-0 min-w-0 overflow-hidden"
-          )}
-        >
-          <FileTree />
-        </div>
+        {/* File tree sidebar - desktop */}
+        {!isMobile && (
+          <div
+            className={cn(
+              "border-r bg-muted/30 transition-all duration-200",
+              isFileTreeOpen ? "w-60 min-w-[240px]" : "w-0 min-w-0 overflow-hidden"
+            )}
+          >
+            <FileTree />
+          </div>
+        )}
+
+        {/* File tree sidebar - mobile sheet */}
+        {isMobile && (
+          <Sheet open={mobileTreeOpen} onOpenChange={setMobileTreeOpen}>
+            <SheetContent side="left" className="w-[280px] p-0" showCloseButton={false}>
+              <SheetHeader className="sr-only">
+                <SheetTitle>Files</SheetTitle>
+              </SheetHeader>
+              <FileTree />
+            </SheetContent>
+          </Sheet>
+        )}
 
         {/* Editor area */}
         <div className="flex min-h-0 flex-1 flex-col">
@@ -83,9 +101,9 @@ export default function FilesPage() {
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
-                onClick={toggleFileTree}
+                onClick={isMobile ? () => setMobileTreeOpen(true) : toggleFileTree}
               >
-                {isFileTreeOpen ? (
+                {!isMobile && isFileTreeOpen ? (
                   <PanelLeftClose className="h-3.5 w-3.5" />
                 ) : (
                   <PanelLeft className="h-3.5 w-3.5" />

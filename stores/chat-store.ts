@@ -13,6 +13,69 @@ import type {
 
 type StreamingStatus = "idle" | "connecting" | "streaming" | "waiting" | "error"
 
+// RAF-batched buffer for message.part.updated events.
+// Keyed: sessionId → messageId → partId → Part
+// A null Part means "pending flush, no part stored yet" — never actually stored.
+// We keep the outer maps around between flushes to avoid GC churn.
+const pendingPartUpdates = new Map<string, Map<string, Map<string, Part>>>()
+let partUpdateRafHandle: number | null = null
+
+function schedulePendingPartFlush(set: (fn: (state: ChatState) => Partial<ChatState>) => void): void {
+  if (partUpdateRafHandle !== null) return
+  partUpdateRafHandle = requestAnimationFrame(() => {
+    partUpdateRafHandle = null
+    if (pendingPartUpdates.size === 0) return
+
+    // Snapshot and clear before calling set() to avoid re-entrancy issues
+    const snapshot = new Map(
+      [...pendingPartUpdates.entries()].map(([sessionId, byMessage]) => [
+        sessionId,
+        new Map(
+          [...byMessage.entries()].map(([messageId, byPart]) => [
+            messageId,
+            new Map(byPart),
+          ])
+        ),
+      ])
+    )
+    pendingPartUpdates.clear()
+
+    set((state) => {
+      const nextMessages = { ...state.messages }
+
+      for (const [sessionId, byMessage] of snapshot) {
+        const sessionMessages = nextMessages[sessionId]
+        if (!sessionMessages) continue
+
+        let updatedSession = sessionMessages
+        for (const [messageId, byPart] of byMessage) {
+          const messageIndex = updatedSession.findIndex((m) => m.info.id === messageId)
+          if (messageIndex < 0) continue
+
+          const message = updatedSession[messageIndex]
+          let updatedParts = message.parts
+
+          for (const [partId, part] of byPart) {
+            const partIndex = updatedParts.findIndex((p) => p.id === partId)
+            updatedParts =
+              partIndex >= 0
+                ? updatedParts.map((p, i) => (i === partIndex ? part : p))
+                : [...updatedParts, part]
+          }
+
+          updatedSession = updatedSession.map((m, i) =>
+            i === messageIndex ? { ...m, parts: updatedParts } : m
+          )
+        }
+
+        nextMessages[sessionId] = updatedSession
+      }
+
+      return { messages: nextMessages }
+    })
+  })
+}
+
 interface ChatState {
   sessions: Record<string, Session>
   activeSessionId: string | null
@@ -196,9 +259,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       if (!response.ok) return
 
       const data: MessageWithParts[] = await response.json()
-      set((state) => ({
-        messages: { ...state.messages, [sessionId]: data },
-      }))
+      set((state) => {
+        const { [sessionId]: _, ...remainingOptimistic } = state.optimisticMessageIds
+        return {
+          optimisticMessageIds: remainingOptimistic,
+          messages: { ...state.messages, [sessionId]: data },
+        }
+      })
     } catch {
       // Silently fail
     }
@@ -206,6 +273,37 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   sendMessage: async (sessionId, text, workspaceId, model, agent) => {
     set({ streamingStatus: "streaming", streamingError: null })
+
+    // Insert the optimistic message BEFORE the fetch so the SSE handler
+    // can find and replace it even if the event arrives before the fetch resolves.
+    const optimisticId = `optimistic-${Date.now()}`
+    const optimisticMessage: MessageWithParts = {
+      info: {
+        id: optimisticId,
+        sessionID: sessionId,
+        role: "user",
+        time: { created: Date.now() },
+        agent: agent ?? "",
+        model: model ?? { providerID: "", modelID: "" },
+      },
+      parts: [
+        {
+          id: `${optimisticId}-part`,
+          sessionID: sessionId,
+          messageID: optimisticId,
+          type: "text",
+          text,
+        },
+      ],
+    }
+    set((state) => ({
+      streamingError: null,
+      optimisticMessageIds: { ...state.optimisticMessageIds, [sessionId]: optimisticId },
+      messages: {
+        ...state.messages,
+        [sessionId]: [...(state.messages[sessionId] ?? []), optimisticMessage],
+      },
+    }))
 
     try {
       const body: Record<string, unknown> = {
@@ -225,47 +323,42 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: "Failed to send message" }))
-        set({
-          streamingStatus: "error",
-          streamingError: error.error || error.detail || "Failed to send message",
+        // Remove the optimistic message on failure
+        set((state) => {
+          const { [sessionId]: _, ...remainingOptimistic } = state.optimisticMessageIds
+          return {
+            streamingStatus: "error",
+            streamingError: error.error || error.detail || "Failed to send message",
+            optimisticMessageIds: remainingOptimistic,
+            messages: {
+              ...state.messages,
+              [sessionId]: (state.messages[sessionId] ?? []).filter(
+                (m) => m.info.id !== optimisticId
+              ),
+            },
+          }
         })
         return
       }
-      // 204 response means accepted — events come via SSE.
-      // Insert an optimistic user message immediately so the UI doesn't feel frozen.
-      const optimisticId = `optimistic-${Date.now()}`
-      const optimisticMessage: MessageWithParts = {
-        info: {
-          id: optimisticId,
-          sessionID: sessionId,
-          role: "user",
-          time: { created: Date.now() },
-          agent: agent ?? "",
-          model: model ?? { providerID: "", modelID: "" },
-        },
-        parts: [
-          {
-            id: `${optimisticId}-part`,
-            sessionID: sessionId,
-            messageID: optimisticId,
-            type: "text",
-            text,
-          },
-        ],
-      }
-      set((state) => ({
-        streamingError: null,
-        optimisticMessageIds: { ...state.optimisticMessageIds, [sessionId]: optimisticId },
-        messages: {
-          ...state.messages,
-          [sessionId]: [...(state.messages[sessionId] ?? []), optimisticMessage],
-        },
-      }))
       get().startStreamingPoll(workspaceId)
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to send message"
-      set({ streamingStatus: "error", streamingError: message })
+      // Remove the optimistic message on failure
+      set((state) => {
+        const { [sessionId]: _, ...remainingOptimistic } = state.optimisticMessageIds
+        return {
+          streamingStatus: "error",
+          streamingError: message,
+          optimisticMessageIds: remainingOptimistic,
+          messages: {
+            ...state.messages,
+            [sessionId]: (state.messages[sessionId] ?? []).filter(
+              (m) => m.info.id !== optimisticId
+            ),
+          },
+        }
+      })
     }
   },
 
@@ -502,30 +595,21 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       case "message.part.updated": {
         const part = properties.part as Part
         if (!part) return
-        set((state) => {
-          const sessionMessages = state.messages[part.sessionID] ?? []
-          const messageIndex = sessionMessages.findIndex(
-            (m) => m.info.id === part.messageID
-          )
-          if (messageIndex < 0) return state
 
-          const message = sessionMessages[messageIndex]
-          const partIndex = message.parts.findIndex((p) => p.id === part.id)
-          const updatedParts =
-            partIndex >= 0
-              ? message.parts.map((p, i) => (i === partIndex ? part : p))
-              : [...message.parts, part]
+        // Buffer this update — a single set() will apply all parts in the next RAF frame
+        let byMessage = pendingPartUpdates.get(part.sessionID)
+        if (!byMessage) {
+          byMessage = new Map()
+          pendingPartUpdates.set(part.sessionID, byMessage)
+        }
+        let byPart = byMessage.get(part.messageID)
+        if (!byPart) {
+          byPart = new Map()
+          byMessage.set(part.messageID, byPart)
+        }
+        byPart.set(part.id, part)
 
-          const updatedMessages = sessionMessages.map((m, i) =>
-            i === messageIndex ? { ...m, parts: updatedParts } : m
-          )
-          return {
-            messages: {
-              ...state.messages,
-              [part.sessionID]: updatedMessages,
-            },
-          }
-        })
+        schedulePendingPartFlush(set)
         break
       }
 
@@ -599,6 +683,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             sessionStatus: { type: "idle" },
             streamingStatus: "idle",
           })
+        }
+        break
+      }
+
+      case "session.compacted": {
+        const sessionID = properties.sessionID as string
+        const { activeWorkspaceId } = get()
+        if (activeWorkspaceId) {
+          get().fetchMessages(sessionID, activeWorkspaceId)
         }
         break
       }

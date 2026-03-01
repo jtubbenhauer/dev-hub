@@ -27,6 +27,7 @@ import {
   stashPop,
   stashDrop,
 } from "@/lib/git/operations"
+import { listWorktrees } from "@/lib/git/worktrees"
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -97,6 +98,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       case "stash-list": {
         const stashes = await stashList(workspacePath)
         return NextResponse.json(stashes)
+      }
+
+      case "worktree-list": {
+        const worktrees = await listWorktrees(workspacePath)
+        return NextResponse.json(worktrees)
       }
 
       default:

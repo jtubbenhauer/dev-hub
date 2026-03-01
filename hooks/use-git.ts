@@ -7,6 +7,7 @@ import type {
   GitLogEntry,
   GitBranch,
   GitStashEntry,
+  WorktreeInfo,
 } from "@/types"
 
 async function gitGet<T>(workspaceId: string, action: string, params?: Record<string, string>): Promise<T> {
@@ -218,4 +219,78 @@ export function useGitStashDrop(workspaceId: string | null) {
     ["git-stash-list"],
     "Stash dropped"
   )
+}
+
+// Worktree hooks
+
+export function useWorktreeList(workspaceId: string | null) {
+  return useQuery<WorktreeInfo[]>({
+    queryKey: ["worktree-list", workspaceId],
+    queryFn: () => gitGet<WorktreeInfo[]>(workspaceId!, "worktree-list"),
+    enabled: !!workspaceId,
+  })
+}
+
+export function useCloneRepo() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (body: {
+      url: string
+      targetDir?: string
+      name?: string
+      depth?: number
+    }) => {
+      const res = await fetch("/api/workspaces/clone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to clone repository")
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
+      toast.success("Repository cloned")
+    },
+    onError: (err: Error) => {
+      toast.error(err.message)
+    },
+  })
+}
+
+export function useCreateWorktree() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (body: {
+      parentRepoPath: string
+      branch: string
+      newBranch: boolean
+      basePath?: string
+      startPoint?: string
+      name?: string
+    }) => {
+      const res = await fetch("/api/workspaces/worktrees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to create worktree")
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
+      toast.success("Worktree created")
+    },
+    onError: (err: Error) => {
+      toast.error(err.message)
+    },
+  })
 }

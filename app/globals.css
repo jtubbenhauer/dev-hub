@@ -150,3 +150,10 @@ pre code.hljs {
 .prose :where(code)::after {
   content: none;
 }
+
+/* Override browser default line-through on <del> elements inside CodeMirror merge views.
+   @codemirror/merge uses <del> tags for deleted text (InlineDeletion widget, deletionWidget lines).
+   The library's own textDecoration:none only covers .cm-deletedLine del, missing inline <del>s. */
+.cm-editor del {
+  text-decoration: none !important;
+}

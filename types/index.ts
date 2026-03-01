@@ -203,3 +203,42 @@ export interface ReviewFileContent {
   path: string
   language: string
 }
+
+// Worktree types
+
+export interface WorktreeInfo {
+  path: string
+  branch: string
+  head: string
+  isMain: boolean
+  isBare: boolean
+  isDetached: boolean
+}
+
+export interface WorktreeCreateInput {
+  parentRepoPath: string
+  branch: string
+  newBranch: boolean
+  basePath?: string // override default sibling dir location
+  startPoint?: string // for new branches, which commit/branch to start from
+}
+
+export interface WorktreeCreateResult {
+  worktreePath: string
+  branch: string
+  workspace: Workspace
+}
+
+// Clone types
+
+export interface CloneRepoInput {
+  url: string
+  targetDir?: string // override clone destination (defaults to ~/dev/<repo-name>)
+  name?: string // display name for the workspace
+  depth?: number // shallow clone depth (omit for full clone)
+}
+
+export interface CloneRepoResult {
+  clonePath: string
+  workspace: Workspace
+}

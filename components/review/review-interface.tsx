@@ -6,6 +6,7 @@ import { useReviewStore } from "@/stores/review-store"
 import { ReviewToolbar } from "@/components/review/review-toolbar"
 import { ReviewFileList } from "@/components/review/review-file-list"
 import { ReviewEditor } from "@/components/review/review-editor"
+import { ReviewCommitPanel } from "@/components/review/review-commit-panel"
 import { useCommand } from "@/hooks/use-command"
 import { RefreshCw } from "lucide-react"
 import { Loader2 } from "lucide-react"
@@ -112,7 +113,8 @@ export function ReviewInterface() {
     function handleKeyDown(e: KeyboardEvent) {
       if (
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.closest(".cm-editor"))
       ) {
         return
       }
@@ -159,6 +161,7 @@ export function ReviewInterface() {
             onToggleReviewed={handleToggleReviewed}
             onMarkAndNext={handleMarkAndNext}
           />
+          <ReviewCommitPanel workspaceId={review.workspaceId} />
         </div>
 
         {/* Editor with unified diff view */}

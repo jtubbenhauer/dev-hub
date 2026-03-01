@@ -74,10 +74,11 @@ export function ReviewFileList({
 
   const handleKeyboard = useCallback(
     (e: KeyboardEvent) => {
-      // Skip if user is typing in an input
+      // Skip if user is typing in an input or inside the CodeMirror editor
       if (
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.closest(".cm-editor"))
       ) {
         return
       }

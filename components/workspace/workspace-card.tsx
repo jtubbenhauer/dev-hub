@@ -33,16 +33,12 @@ import type { Workspace } from "@/types"
 interface WorkspaceCardProps {
   workspace: Workspace
   onDelete: (id: string) => void
-  onSelect: (id: string) => void
-  isSelected: boolean
   isDeleting: boolean
 }
 
 export function WorkspaceCard({
   workspace,
   onDelete,
-  onSelect,
-  isSelected,
   isDeleting,
 }: WorkspaceCardProps) {
   const { setActiveWorkspaceId } = useWorkspaceStore()
@@ -57,10 +53,7 @@ export function WorkspaceCard({
     : null
 
   return (
-    <Card
-      className={isSelected ? "ring-2 ring-primary" : "cursor-pointer hover:border-primary/50"}
-      onClick={() => onSelect(workspace.id)}
-    >
+    <Card className="hover:border-primary/50">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base truncate">{workspace.name}</CardTitle>

@@ -2,6 +2,7 @@ import { createServer } from "node:http"
 import { parse } from "node:url"
 import next from "next"
 import { WebSocketServer } from "ws"
+import { handleCommandWebSocket } from "./lib/commands/handler"
 
 const dev = process.env.NODE_ENV !== "production"
 const hostname = process.env.HOSTNAME || "0.0.0.0"
@@ -24,16 +25,8 @@ app.prepare().then(() => {
 
   const wss = new WebSocketServer({ noServer: true })
 
-  wss.on("connection", (ws, _req) => {
-    // WebSocket connections will be handled by the command runner in Phase 5
-    ws.on("message", (message) => {
-      const data = JSON.parse(message.toString())
-      ws.send(JSON.stringify({ type: "echo", data }))
-    })
-
-    ws.on("close", () => {
-      // cleanup
-    })
+  wss.on("connection", (ws, req) => {
+    handleCommandWebSocket(ws, req)
   })
 
   server.on("upgrade", (req, socket, head) => {

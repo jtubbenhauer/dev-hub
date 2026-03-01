@@ -291,7 +291,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ response }),
+          body: JSON.stringify({
+            response: response === "allow" ? "once" : "reject",
+          }),
         }
       )
       set((state) => ({
@@ -600,8 +602,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         break
       }
 
-      case "permission.updated":
-      case "permission.asked": {
+      case "permission.updated": {
         const permission = properties as unknown as Permission
         const activeId = get().activeSessionId
         set((state) => {

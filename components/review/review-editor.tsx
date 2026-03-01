@@ -22,7 +22,7 @@ import {
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search"
 import { lintKeymap } from "@codemirror/lint"
-import { oneDark } from "@codemirror/theme-one-dark"
+import { githubDark } from "@fsegurai/codemirror-theme-github-dark"
 import { unifiedMergeView } from "@codemirror/merge"
 import { vim } from "@replit/codemirror-vim"
 import { Check, ChevronRight, Loader2, Save } from "lucide-react"
@@ -75,14 +75,15 @@ export function ReviewEditor({
     const content = view.state.doc.toString()
     setIsSaving(true)
     try {
-      const res = await fetch(
-        `/api/files/content?workspaceId=${encodeURIComponent(workspaceIdRef.current)}&path=${encodeURIComponent(filePathRef.current)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
-        }
-      )
+      const res = await fetch("/api/files/content", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId: workspaceIdRef.current,
+          path: filePathRef.current,
+          content,
+        }),
+      })
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.error || "Save failed")
@@ -109,7 +110,7 @@ export function ReviewEditor({
         closeBrackets(),
         highlightSelectionMatches(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        oneDark,
+        githubDark,
         keymap.of([
           ...closeBracketsKeymap,
           ...defaultKeymap,
@@ -137,11 +138,26 @@ export function ReviewEditor({
           "&": { height: "100%", fontSize: "13px" },
           ".cm-scroller": { overflow: "auto" },
           ".cm-content": {
-            fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+            fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
           },
           ".cm-gutters": {
-            fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+            fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
           },
+        }),
+        // Override @codemirror/merge's default diff decorations with subtler background tints.
+        // Must include .cm-merge-b to match the specificity of the library's baseTheme.
+        // Browser default line-through on <del> tags is handled by globals.css.
+        // Override @codemirror/merge's baseTheme diff decorations (dark mode)
+        EditorView.theme({
+          "&.cm-merge-b .cm-changedText": { background: "rgba(46, 160, 67, 0.05)" },
+          "&.cm-merge-b .cm-deletedText": { background: "rgba(248, 81, 73, 0.06)" },
+          ".cm-deletedChunk .cm-deletedText": { background: "rgba(248, 81, 73, 0.06)" },
+        }, { dark: true }),
+        // Light mode overrides (fallback)
+        EditorView.theme({
+          "&.cm-merge-b .cm-changedText": { background: "rgba(46, 160, 67, 0.08)" },
+          "&.cm-merge-b .cm-deletedText": { background: "rgba(248, 81, 73, 0.08)" },
+          ".cm-deletedChunk .cm-deletedText": { background: "rgba(248, 81, 73, 0.08)" },
         }),
       ]
 
@@ -163,7 +179,7 @@ export function ReviewEditor({
   useEffect(() => {
     if (!editorRef.current) return
 
-    viewRef.current?.destroy()
+    try { viewRef.current?.destroy() } catch { /* vim cleanup race */ }
 
     const state = EditorState.create({
       doc: fileContent.current,
@@ -178,7 +194,9 @@ export function ReviewEditor({
     viewRef.current = view
 
     return () => {
-      view.destroy()
+      // Wrap destroy in try/catch — @replit/codemirror-vim has a known bug where
+      // leaveVimMode nulls cm.state.vim then getOnPasteFn dereferences it.
+      try { view.destroy() } catch { /* vim cleanup race */ }
       viewRef.current = null
     }
     // Intentionally depend on path+language as stable identifiers; content changes

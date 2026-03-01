@@ -128,9 +128,9 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline">
-          <GitFork className="mr-2 h-4 w-4" />
-          Create Worktree
+        <Button variant="outline" size="icon" className="sm:size-auto sm:px-3 sm:py-2">
+          <GitFork className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Create Worktree</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[550px]">

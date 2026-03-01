@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useReview, useReviewDiff, useToggleReviewFile, useRefreshReview } from "@/hooks/use-review"
 import { useReviewStore } from "@/stores/review-store"
 import { ReviewToolbar } from "@/components/review/review-toolbar"
@@ -8,6 +8,8 @@ import { ReviewFileList } from "@/components/review/review-file-list"
 import { ReviewEditor } from "@/components/review/review-editor"
 import { ReviewCommitPanel } from "@/components/review/review-commit-panel"
 import { useCommand } from "@/hooks/use-command"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { RefreshCw } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import type { ReviewFile } from "@/types"
@@ -18,6 +20,8 @@ export function ReviewInterface() {
   const { data: fileContent, isLoading: diffLoading } = useReviewDiff(activeReviewId, selectedFileId)
   const toggleFile = useToggleReviewFile(activeReviewId)
   const refreshReview = useRefreshReview(activeReviewId)
+  const isMobile = useIsMobile()
+  const [fileListOpen, setFileListOpen] = useState(false)
 
   const selectedFile = review?.files.find((f) => f.id === selectedFileId) ?? null
 
@@ -53,8 +57,9 @@ export function ReviewInterface() {
   const handleSelectFile = useCallback(
     (file: ReviewFile) => {
       selectFile(file.id, file.path)
+      if (isMobile) setFileListOpen(false)
     },
-    [selectFile]
+    [selectFile, isMobile]
   )
 
   const handleToggleReviewed = useCallback(
@@ -144,25 +149,51 @@ export function ReviewInterface() {
         isRefreshing={refreshReview.isPending}
         onRefresh={() => refreshReview.mutate()}
         onBack={clearReview}
+        onOpenFileList={isMobile ? () => setFileListOpen(true) : undefined}
       />
 
       <div className="flex min-h-0 flex-1">
-        {/* File list sidebar */}
-        <div className="flex w-64 shrink-0 flex-col border-r lg:w-72">
-          <div className="shrink-0 border-b px-3 py-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              {review.files.filter((f) => !f.reviewed).length} unreviewed
-            </span>
+        {/* File list sidebar - desktop */}
+        {!isMobile && (
+          <div className="flex w-64 shrink-0 flex-col border-r lg:w-72">
+            <div className="shrink-0 border-b px-3 py-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                {review.files.filter((f) => !f.reviewed).length} unreviewed
+              </span>
+            </div>
+            <ReviewFileList
+              files={review.files}
+              selectedFileId={selectedFileId}
+              onSelectFile={handleSelectFile}
+              onToggleReviewed={handleToggleReviewed}
+              onMarkAndNext={handleMarkAndNext}
+            />
+            <ReviewCommitPanel workspaceId={review.workspaceId} />
           </div>
-          <ReviewFileList
-            files={review.files}
-            selectedFileId={selectedFileId}
-            onSelectFile={handleSelectFile}
-            onToggleReviewed={handleToggleReviewed}
-            onMarkAndNext={handleMarkAndNext}
-          />
-          <ReviewCommitPanel workspaceId={review.workspaceId} />
-        </div>
+        )}
+
+        {/* File list sidebar - mobile sheet */}
+        {isMobile && (
+          <Sheet open={fileListOpen} onOpenChange={setFileListOpen}>
+            <SheetContent side="left" className="w-[280px] p-0" showCloseButton={false}>
+              <SheetHeader className="border-b px-3 py-2">
+                <SheetTitle className="text-xs font-medium text-muted-foreground">
+                  {review.files.filter((f) => !f.reviewed).length} unreviewed
+                </SheetTitle>
+              </SheetHeader>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <ReviewFileList
+                  files={review.files}
+                  selectedFileId={selectedFileId}
+                  onSelectFile={handleSelectFile}
+                  onToggleReviewed={handleToggleReviewed}
+                  onMarkAndNext={handleMarkAndNext}
+                />
+                <ReviewCommitPanel workspaceId={review.workspaceId} />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
 
         {/* Editor with unified diff view */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -174,6 +205,7 @@ export function ReviewInterface() {
               isLoading={diffLoading}
               onToggleReviewed={handleToggleReviewed}
               onMarkAndNext={handleMarkAndNext}
+              onOpenFileList={isMobile ? () => setFileListOpen(true) : undefined}
             />
           ) : (
             <div className="flex h-full items-center justify-center">

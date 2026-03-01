@@ -122,9 +122,9 @@ export function CloneRepoDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline">
-          <Download className="mr-2 h-4 w-4" />
-          Clone Repo
+        <Button variant="outline" size="icon" className="sm:size-auto sm:px-3 sm:py-2">
+          <Download className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Clone Repo</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">

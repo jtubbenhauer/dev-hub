@@ -107,7 +107,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             ))}
 
             {textContent && (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
+              <div className="prose prose-sm dark:prose-invert max-w-none overflow-hidden">
                 <MarkdownContent content={textContent} />
               </div>
             )}
@@ -226,12 +226,19 @@ function MarkdownContent({ content }: { content: string }) {
       components={{
         pre({ children, ...props }) {
           return (
-            <div className="relative group/code">
+            <div className="relative group/code overflow-x-auto">
               <CopyButton
                 content={extractCodeFromPre(children)}
                 className="absolute right-2 top-2"
               />
               <pre {...props}>{children}</pre>
+            </div>
+          )
+        },
+        table({ children, ...props }) {
+          return (
+            <div className="overflow-x-auto">
+              <table {...props}>{children}</table>
             </div>
           )
         },

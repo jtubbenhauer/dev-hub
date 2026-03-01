@@ -31,6 +31,7 @@ interface ChatState {
 
   eventSource: EventSource | null
   sseReconnectAttempts: number
+  streamingPollInterval: ReturnType<typeof setInterval> | null
 
   setActiveSession: (sessionId: string | null) => void
   setActiveWorkspaceId: (workspaceId: string | null) => void
@@ -70,6 +71,8 @@ interface ChatState {
 
   handleEvent: (event: Record<string, unknown>) => void
   clearChat: () => void
+  startStreamingPoll: (workspaceId: string) => void
+  clearStreamingPoll: () => void
 }
 
 function buildProxyUrl(
@@ -105,6 +108,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   eventSource: null,
   sseReconnectAttempts: 0,
+  streamingPollInterval: null,
 
   setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
   setActiveWorkspaceId: (workspaceId) => {
@@ -257,6 +261,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           [sessionId]: [...(state.messages[sessionId] ?? []), optimisticMessage],
         },
       }))
+      get().startStreamingPoll(workspaceId)
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to send message"
@@ -271,6 +276,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         { method: "POST" }
       )
       set({ streamingStatus: "idle" })
+      get().clearStreamingPoll()
     } catch {
       // Best effort
     }
@@ -420,6 +426,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const statusMap = (await response.json()) as Record<string, SessionStatus>
       const status = statusMap[activeSessionId]
       if (status && status.type === "idle") {
+        get().clearStreamingPoll()
         set({ streamingStatus: "idle", sessionStatus: status })
       } else if (status) {
         set({ sessionStatus: status })
@@ -465,6 +472,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             messages: { ...state.messages, [sessionId]: updated },
           }
         })
+        // Completion detection: when an assistant message has a finish reason, check session status
+        if (info.role === "assistant" && "finish" in info && info.finish) {
+          const { activeWorkspaceId } = get()
+          if (activeWorkspaceId) {
+            get().refreshActiveSessionStatus(activeWorkspaceId)
+          }
+        }
         break
       }
 
@@ -567,6 +581,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const activeId = get().activeSessionId
         if (sessionID === activeId) {
           const isIdle = status.type === "idle"
+          if (isIdle) get().clearStreamingPoll()
           set({
             sessionStatus: status,
             streamingStatus: isIdle ? "idle" : "streaming",
@@ -579,6 +594,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const sessionID = properties.sessionID as string
         const activeId = get().activeSessionId
         if (sessionID === activeId) {
+          get().clearStreamingPoll()
           set({
             sessionStatus: { type: "idle" },
             streamingStatus: "idle",
@@ -591,6 +607,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const sessionID = properties.sessionID as string | undefined
         const activeId = get().activeSessionId
         if (!sessionID || sessionID === activeId) {
+          get().clearStreamingPoll()
           const errorObj = properties.error as
             | { data?: { message?: string } }
             | undefined
@@ -668,8 +685,30 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
-  clearChat: () =>
-    set({
+  startStreamingPoll: (workspaceId) => {
+    get().clearStreamingPoll()
+    const interval = setInterval(() => {
+      const { streamingStatus } = get()
+      if (streamingStatus !== "streaming" && streamingStatus !== "connecting") {
+        get().clearStreamingPoll()
+        return
+      }
+      get().refreshActiveSessionStatus(workspaceId)
+    }, 4000)
+    set({ streamingPollInterval: interval })
+  },
+
+  clearStreamingPoll: () => {
+    const interval = get().streamingPollInterval
+    if (interval) {
+      clearInterval(interval)
+      set({ streamingPollInterval: null })
+    }
+  },
+
+  clearChat: () => {
+    get().clearStreamingPoll()
+    return set({
       activeSessionId: null,
       messages: {},
       optimisticMessageIds: {},
@@ -680,5 +719,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       questions: [],
       todos: [],
       sseReconnectAttempts: 0,
-    }),
+    })
+  },
 }))

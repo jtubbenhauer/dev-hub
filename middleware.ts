@@ -2,10 +2,13 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
 
+const secureCookie = process.env.AUTH_URL?.startsWith("https:") ?? false
+
 export async function middleware(request: NextRequest) {
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
+    secureCookie,
   })
 
   const isAuthPage = request.nextUrl.pathname.startsWith("/login")

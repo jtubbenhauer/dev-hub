@@ -99,7 +99,7 @@ export default function WorkspacesPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4 md:p-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto p-4 md:p-6">
         <div className="flex shrink-0 items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Workspaces</h1>
           <div className="flex items-center gap-2">
@@ -114,9 +114,9 @@ export default function WorkspacesPage() {
               }
             }}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Workspace
+              <Button size="icon" className="sm:size-auto sm:px-3 sm:py-2">
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Add Workspace</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[550px]">

@@ -51,7 +51,7 @@ export function AuthenticatedLayout({
 
   if (status === "loading") {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     )
@@ -60,7 +60,7 @@ export function AuthenticatedLayout({
   if (status === "unauthenticated") return null
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-dvh">
       <AppSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />

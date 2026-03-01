@@ -53,10 +53,10 @@ export function WorkspaceCard({
     : null
 
   return (
-    <Card className="hover:border-primary/50">
+    <Card className="overflow-hidden hover:border-primary/50">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base truncate">{workspace.name}</CardTitle>
+        <div className="flex min-w-0 items-center justify-between">
+          <CardTitle className="min-w-0 text-base truncate">{workspace.name}</CardTitle>
           <div className="flex items-center gap-1.5 shrink-0">
             <Badge variant="secondary" className="text-xs">
               {workspace.type}

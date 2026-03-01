@@ -25,9 +25,11 @@ import { lintKeymap } from "@codemirror/lint"
 import { githubDark } from "@fsegurai/codemirror-theme-github-dark"
 import { unifiedMergeView } from "@codemirror/merge"
 import { vim } from "@replit/codemirror-vim"
-import { Check, ChevronRight, Loader2, Save } from "lucide-react"
+import { Check, ChevronRight, Loader2, Save, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { VimToggle } from "@/components/editor/vim-toggle"
 import { useEditorStore } from "@/stores/editor-store"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
 import { toast } from "sonner"
 import type { ReviewFile } from "@/types"
@@ -44,6 +46,7 @@ interface ReviewEditorProps {
   isLoading: boolean
   onToggleReviewed: (file: ReviewFile) => void
   onMarkAndNext: (file: ReviewFile) => void
+  onOpenFileList?: () => void
 }
 
 export function ReviewEditor({
@@ -53,10 +56,12 @@ export function ReviewEditor({
   isLoading,
   onToggleReviewed,
   onMarkAndNext,
+  onOpenFileList,
 }: ReviewEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const isVimMode = useEditorStore((s) => s.isVimMode)
+  const isMobile = useIsMobile()
   const [isSaving, setIsSaving] = useState(false)
 
   const currentContentRef = useRef(fileContent.current)
@@ -135,7 +140,7 @@ export function ReviewEditor({
           mergeControls: false,
         }),
         EditorView.theme({
-          "&": { height: "100%", fontSize: "13px" },
+          "&": { height: "100%", fontSize: isMobile ? "11px" : "13px" },
           ".cm-scroller": { overflow: "auto" },
           ".cm-content": {
             fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
@@ -172,7 +177,7 @@ export function ReviewEditor({
 
       return extensions
     },
-    [isVimMode, handleSave]
+    [isVimMode, isMobile, handleSave]
   )
 
   // Rebuild editor when file changes or vim mode toggles
@@ -230,15 +235,29 @@ export function ReviewEditor({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Editor header */}
-      <div className="flex shrink-0 items-center gap-2 border-b bg-muted/30 px-3 py-1.5">
+      <div className="flex shrink-0 items-center gap-1.5 border-b bg-muted/30 px-2 py-1.5 md:gap-2 md:px-3">
+        {/* File list toggle - mobile only */}
+        {onOpenFileList && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 md:hidden"
+            onClick={onOpenFileList}
+          >
+            <PanelLeft className="h-3.5 w-3.5" />
+          </Button>
+        )}
+
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
           {fileName}
         </span>
 
+        <VimToggle />
+
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1.5 px-2 text-xs"
+          className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
           onClick={() => void handleSave()}
           disabled={isSaving}
         >
@@ -247,27 +266,27 @@ export function ReviewEditor({
           ) : (
             <Save className="h-3.5 w-3.5" />
           )}
-          Save
+          <span className="hidden md:inline">Save</span>
         </Button>
 
         <Button
           variant={file.reviewed ? "secondary" : "ghost"}
           size="sm"
-          className="h-7 gap-1.5 px-2 text-xs"
+          className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
           onClick={() => onToggleReviewed(file)}
         >
           <Check className="h-3.5 w-3.5" />
-          {file.reviewed ? "Reviewed" : "Mark reviewed"}
+          <span className="hidden md:inline">{file.reviewed ? "Reviewed" : "Mark reviewed"}</span>
         </Button>
 
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1.5 px-2 text-xs"
+          className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
           onClick={() => onMarkAndNext(file)}
         >
           <ChevronRight className="h-3.5 w-3.5" />
-          Next
+          <span className="hidden md:inline">Next</span>
         </Button>
       </div>
 

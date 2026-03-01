@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react"
-import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, FileText, Plus } from "lucide-react"
+import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, FileText, Plus, MessageSquare } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useChatStore } from "@/stores/chat-store"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { ChatMessage } from "@/components/chat/message"
@@ -28,6 +29,7 @@ export function ChatInterface() {
   )
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [isSessionListOpen, setIsSessionListOpen] = useState(true)
+  const [isMobileSessionsOpen, setIsMobileSessionsOpen] = useState(false)
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false)
   const [hasPlanFiles, setHasPlanFiles] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
@@ -161,6 +163,20 @@ export function ChatInterface() {
     [setActiveSession]
   )
 
+  const handleMobileSelectSession = useCallback(
+    (sessionId: string) => {
+      setActiveSession(sessionId)
+      setIsMobileSessionsOpen(false)
+    },
+    [setActiveSession]
+  )
+
+  const handleMobileCreateSession = useCallback(() => {
+    if (!activeWorkspaceId) return
+    createSession(activeWorkspaceId)
+    setIsMobileSessionsOpen(false)
+  }, [activeWorkspaceId, createSession])
+
   // Use refs so command closures stay stable but always call latest handlers
   const handleCreateSessionRef = useRef(handleCreateSession)
   handleCreateSessionRef.current = handleCreateSession
@@ -211,6 +227,22 @@ export function ChatInterface() {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 w-full">
+      {/* Mobile session sheet */}
+      <Sheet open={isMobileSessionsOpen} onOpenChange={setIsMobileSessionsOpen}>
+        <SheetContent side="left" className="w-72 p-0" showCloseButton={false}>
+          <SheetHeader className="sr-only">
+            <SheetTitle>Sessions</SheetTitle>
+          </SheetHeader>
+          <SessionList
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSelectSession={handleMobileSelectSession}
+            onCreateSession={handleMobileCreateSession}
+            onDeleteSession={handleDeleteSession}
+          />
+        </SheetContent>
+      </Sheet>
+
       {/* Session sidebar — hidden on mobile by default */}
       {isSessionListOpen && (
         <div className="hidden w-60 shrink-0 md:block">
@@ -228,6 +260,16 @@ export function ChatInterface() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Chat toolbar */}
         <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
+          {/* Mobile: open session sheet */}
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            onClick={() => setIsMobileSessionsOpen(true)}
+            className="md:hidden"
+          >
+            <MessageSquare className="size-4" />
+          </Button>
+          {/* Desktop: toggle session sidebar */}
           <Button
             size="icon-xs"
             variant="ghost"

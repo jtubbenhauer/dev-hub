@@ -549,7 +549,7 @@ audit_log
 - [x] File tabs for multiple open files
 - [x] Git status indicators on file tree (modified/untracked/staged)
 
-### Phase 3: OpenCode Chat 🔶
+### Phase 3: OpenCode Chat ✅
 
 - [x] OpenCode server manager: single shared server (not per-workspace pool), spawns `opencode serve` on port 4096, health checks, auto-restart
 - [x] API proxy at `/api/opencode/[...path]` with auth + workspace-to-directory routing
@@ -563,11 +563,10 @@ audit_log
 - [x] Permission request handling (allow/deny banners)
 - [x] Chat page wired up (placeholder replaced with ChatInterface)
 - [x] Independent scroll areas (session list, messages, file tree all scroll independently)
-- [ ] End-to-end testing of full flow (server startup → session → message → SSE → rendering)
-- [ ] Inline diff viewer for file changes
-- [ ] "New Chat" without a pre-existing workspace
+- [x] End-to-end testing of full flow (server startup → session → message → SSE → rendering)
+- ~~Inline diff viewer for file changes~~ — cancelled (review page handles this)
 
-### Phase 4: Workspaces + Git 🔶
+### Phase 4: Workspaces + Git ✅
 
 - [x] Git operations library (`lib/git/operations.ts`) — status, stage, unstage, discard, commit, log, diff, branches, push, pull, fetch, stash
 - [x] Git API routes (`app/api/workspaces/[id]/git/route.ts`) — GET + POST
@@ -580,12 +579,12 @@ audit_log
 - [x] Branch selector component (`components/git/branch-selector.tsx`)
 - [x] Commit log component (`components/git/commit-log.tsx`)
 - [x] Git panel component (`components/git/git-panel.tsx`) — lazygit-inspired tabs (Status, Branches, Log, Stash)
-- [x] Workspaces page updated to use WorkspaceCard + GitPanel side panel
-- [ ] End-to-end testing of git flow (status → stage → commit → push)
-- [ ] Create worktree flow (configurable setup scripts per parent repo)
-- [ ] Clone repo flow
-- [ ] Push/pull/fetch status indicators on workspace cards (remote ops work in git panel)
-
+- [x] Workspaces page simplified to workspace management only (git panel removed)
+- [x] Global git status bar in header — branch, dirty count, ahead/behind, quick commit/push popover (`components/layout/git-status-bar.tsx`)
+- [x] Review page commit panel — stage all & commit + push directly from review sidebar (`components/review/review-commit-panel.tsx`)
+- [x] Create worktree flow — parent repo selector, branch picker (new/existing), sibling directory convention (`<repo>-worktrees/<branch>/`), auto-registers as workspace (`lib/git/worktrees.ts`, `app/api/workspaces/worktrees/route.ts`, `components/workspace/create-worktree-dialog.tsx`)
+- [ ] Create worktree flow: configurable setup scripts per parent repo (deferred to Settings page)
+- [x] Clone repo flow — URL input dialog with target dir override, shallow clone option, auto-registers as workspace (`lib/git/clone.ts`, `app/api/workspaces/clone/route.ts`, `components/workspace/clone-repo-dialog.tsx`)o
 ### Phase 4.5: Code Review ✅
 
 Port of the user's `code-review.nvim` Neovim plugin to a browser-based code review workflow.
@@ -612,17 +611,19 @@ Port of the user's `code-review.nvim` Neovim plugin to a browser-based code revi
 
 ### Phase 5: Command Runner
 
-- [ ] Command execution API with `node-pty`
-- [ ] WebSocket streaming for output
-- [ ] Command input with smart autocomplete:
-  - [ ] Parse `~/.zshrc` (or configured rc file) for aliases
-  - [ ] Read `package.json` scripts from active workspace
-  - [ ] Detect `Makefile`, `Cargo.toml`, etc. for available commands
-  - [ ] Rank by history frequency
-- [ ] ANSI-colored output rendering
+- [x] Command execution API with `node-pty` (`lib/commands/runner.ts`)
+- [x] WebSocket streaming for output (`lib/commands/handler.ts`, `server.ts` wired)
+- [x] Command input with smart autocomplete (`components/command-runner/command-input.tsx`):
+  - [x] Parse `~/.zshrc` / `.bashrc` / `.bash_aliases` for aliases
+  - [x] Read `package.json` scripts from active workspace
+  - [x] Detect `Makefile`, `Cargo.toml` for available commands
+  - [x] Rank by history frequency
+- [x] ANSI-colored output rendering (`components/command-runner/command-output.tsx`, `ansi-to-html`)
 - [ ] Quick command buttons (global + per-workspace)
-- [ ] Multiple concurrent command panels
-- [ ] Command history in SQLite
+- [x] Multiple concurrent command panels (`app/commands/page.tsx`, `command-panel.tsx`)
+- [x] Command history in SQLite (recorded on exit via `recordCommand`)
+- [x] Autocomplete REST endpoint (`app/api/commands/autocomplete/route.ts`)
+- [x] Typed WebSocket hook (`hooks/use-websocket.ts`)
 
 ### Phase 6: Dashboard + System Monitoring
 

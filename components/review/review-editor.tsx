@@ -140,13 +140,14 @@ export function ReviewEditor({
           mergeControls: false,
         }),
         EditorView.theme({
-          "&": { height: "100%", fontSize: isMobile ? "11px" : "13px" },
+          "&": { height: "100%", fontSize: isMobile ? "10px" : "13px" },
           ".cm-scroller": { overflow: "auto" },
           ".cm-content": {
             fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
           },
           ".cm-gutters": {
             fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
+            ...(isMobile ? { fontSize: "9px" } : {}),
           },
         }),
         // Override @codemirror/merge's default diff decorations with subtler background tints.

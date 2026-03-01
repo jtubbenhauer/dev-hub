@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useReview, useReviewDiff, useToggleReviewFile, useRefreshReview } from "@/hooks/use-review"
+import { useGitStage } from "@/hooks/use-git"
 import { useReviewStore } from "@/stores/review-store"
 import { ReviewToolbar } from "@/components/review/review-toolbar"
 import { ReviewFileList } from "@/components/review/review-file-list"
@@ -20,6 +21,7 @@ export function ReviewInterface() {
   const { data: fileContent, isLoading: diffLoading } = useReviewDiff(activeReviewId, selectedFileId)
   const toggleFile = useToggleReviewFile(activeReviewId)
   const refreshReview = useRefreshReview(activeReviewId)
+  const stageFile = useGitStage(review?.workspaceId ?? null)
   const isMobile = useIsMobile()
   const [fileListOpen, setFileListOpen] = useState(false)
 
@@ -64,9 +66,28 @@ export function ReviewInterface() {
 
   const handleToggleReviewed = useCallback(
     (file: ReviewFile) => {
-      toggleFile.mutate({ fileId: file.id, reviewed: !file.reviewed })
+      const willBeReviewed = !file.reviewed
+      toggleFile.mutate({ fileId: file.id, reviewed: willBeReviewed })
+
+      // Auto-advance when marking as reviewed (not when un-marking)
+      if (willBeReviewed && review) {
+        const sorted = [...review.files].sort((a, b) => {
+          if (a.reviewed !== b.reviewed) return a.reviewed ? 1 : -1
+          return a.path.localeCompare(b.path)
+        })
+        const currentIdx = sorted.findIndex((f) => f.id === file.id)
+        const nextUnreviewed = sorted.find(
+          (f, i) => !f.reviewed && i > currentIdx && f.id !== file.id
+        )
+        if (nextUnreviewed) {
+          selectFile(nextUnreviewed.id, nextUnreviewed.path)
+        }
+
+        // Auto-stage the file
+        stageFile.mutate({ action: "stage", files: [file.path] })
+      }
     },
-    [toggleFile]
+    [toggleFile, review, selectFile, stageFile]
   )
 
   const handleMarkAndNext = useCallback(
@@ -85,13 +106,15 @@ export function ReviewInterface() {
 
       if (!file.reviewed) {
         toggleFile.mutate({ fileId: file.id, reviewed: true })
+        // Auto-stage the file
+        stageFile.mutate({ action: "stage", files: [file.path] })
       }
 
       if (nextUnreviewed) {
         selectFile(nextUnreviewed.id, nextUnreviewed.path)
       }
     },
-    [review, toggleFile, selectFile]
+    [review, toggleFile, selectFile, stageFile]
   )
 
   // Keep a ref so the command closure stays stable but always calls the latest mutate

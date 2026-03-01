@@ -101,7 +101,7 @@ function SessionItem({
     >
       <MessageSquare className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
       <div className="flex-1 overflow-hidden">
-        <p className="truncate font-medium">
+        <p className="truncate font-medium" title={session.title || "Untitled"}>
           {session.title || "Untitled"}
         </p>
         <p className="text-xs text-muted-foreground">{formattedTime}</p>

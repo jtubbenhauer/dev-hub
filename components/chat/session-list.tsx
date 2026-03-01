@@ -37,7 +37,7 @@ export function SessionList({
         </Button>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea className="min-h-0 min-w-0 flex-1">
         {sortedSessions.length === 0 ? (
           <div className="flex flex-col items-center gap-2 p-4 text-center">
             <MessageSquare className="size-8 text-muted-foreground/50" />
@@ -94,13 +94,13 @@ function SessionItem({
         }
       }}
       className={cn(
-        "group flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-left text-sm",
+        "group flex min-w-0 w-full cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-left text-sm",
         "hover:bg-muted transition-colors",
         isActive && "bg-muted"
       )}
     >
       <MessageSquare className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-      <div className="flex-1 overflow-hidden">
+      <div className="min-w-0 w-0 flex-1 overflow-hidden">
         <p className="truncate font-medium" title={session.title || "Untitled"}>
           {session.title || "Untitled"}
         </p>

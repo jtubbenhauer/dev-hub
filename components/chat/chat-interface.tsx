@@ -245,7 +245,7 @@ export function ChatInterface() {
 
       {/* Session sidebar — hidden on mobile by default */}
       {isSessionListOpen && (
-        <div className="hidden w-60 shrink-0 md:block">
+        <div className="hidden w-60 shrink-0 overflow-hidden md:block">
           <SessionList
             sessions={sessions}
             activeSessionId={activeSessionId}

@@ -23,25 +23,78 @@ export interface WorkspaceCreateInput {
   parentRepoPath?: string
 }
 
+export interface CpuStats {
+  usage: number
+  cores: number
+  model: string
+  speed: number // GHz
+  temperature?: number // °C, if available
+}
+
+export interface MemoryStats {
+  total: number // bytes
+  used: number
+  free: number
+  usagePercent: number
+  swapTotal: number
+  swapUsed: number
+  swapPercent: number
+}
+
+export interface DiskStats {
+  mount: string
+  type: string
+  size: number // bytes
+  used: number
+  available: number
+  usagePercent: number
+}
+
+export interface NetworkStats {
+  iface: string
+  rxSec: number // bytes/sec
+  txSec: number // bytes/sec
+}
+
+export interface ProcessInfo {
+  pid: number
+  name: string
+  cpu: number // % of total
+  memory: number // % of total
+  memRss: number // bytes
+  user: string
+  command: string
+}
+
 export interface SystemStats {
-  cpu: {
-    usage: number
-    cores: number
-    model: string
-  }
-  memory: {
-    total: number
-    used: number
-    free: number
-    usagePercent: number
-  }
-  disk: {
-    total: number
-    used: number
-    free: number
-    usagePercent: number
-  }
-  uptime: number
+  cpu: CpuStats
+  memory: MemoryStats
+  disks: DiskStats[]
+  network: NetworkStats[]
+  processes: ProcessInfo[]
+  uptime: number // seconds
+  timestamp: number // Date.now()
+}
+
+export interface SystemStatsHistory {
+  timestamps: number[]
+  cpu: number[] // usage % series
+  memory: number[] // usage % series
+  networkRx: number[] // bytes/sec series
+  networkTx: number[] // bytes/sec series
+}
+
+export interface SystemStatsWithHistory {
+  current: SystemStats
+  history: SystemStatsHistory
+}
+
+export interface QuickAction {
+  id: string
+  label: string
+  icon: string // lucide icon name
+  type: "navigate" | "api"
+  target: string // path for navigate, action key for api
 }
 
 export interface GitStatus {

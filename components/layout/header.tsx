@@ -3,6 +3,7 @@
 import { signOut } from "next-auth/react"
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher"
 import { GitStatusBar } from "@/components/layout/git-status-bar"
+import { SystemIndicator } from "@/components/layout/system-indicator"
 import { Button } from "@/components/ui/button"
 import { LogOut, Terminal } from "lucide-react"
 
@@ -18,6 +19,10 @@ export function Header() {
         <div className="hidden sm:block h-4 w-px bg-border" />
         <div className="hidden sm:block">
           <GitStatusBar />
+        </div>
+        <div className="hidden lg:block h-4 w-px bg-border" />
+        <div className="hidden lg:block">
+          <SystemIndicator />
         </div>
       </div>
       <Button

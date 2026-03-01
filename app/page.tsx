@@ -4,27 +4,11 @@ import { AuthenticatedLayout } from "@/components/layout/authenticated-layout"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { FolderGit2, GitBranch, Terminal, MessageSquare } from "lucide-react"
+import { FolderGit2, Terminal, MessageSquare } from "lucide-react"
 import Link from "next/link"
-import { useEffect } from "react"
-import { useQuery } from "@tanstack/react-query"
-import type { Workspace } from "@/types"
 
 export default function DashboardPage() {
-  const { workspaces, setWorkspaces } = useWorkspaceStore()
-
-  const { data } = useQuery<Workspace[]>({
-    queryKey: ["workspaces"],
-    queryFn: async () => {
-      const res = await fetch("/api/workspaces")
-      if (!res.ok) throw new Error("Failed to fetch workspaces")
-      return res.json()
-    },
-  })
-
-  useEffect(() => {
-    if (data) setWorkspaces(data)
-  }, [data, setWorkspaces])
+  const { workspaces } = useWorkspaceStore()
 
   return (
     <AuthenticatedLayout>

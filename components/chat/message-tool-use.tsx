@@ -18,17 +18,31 @@ interface MessageToolUseProps {
 }
 
 export function MessageToolUse({ part }: MessageToolUseProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
   const { state } = part
+  // Auto-expand while running/pending, collapse once done — user toggle overrides
+  const isActiveStatus = state.status === "running" || state.status === "pending"
+  const [userToggled, setUserToggled] = useState(false)
+  const [manualExpanded, setManualExpanded] = useState(false)
+  const isExpanded = userToggled ? manualExpanded : isActiveStatus
 
   const statusIcon = getStatusIcon(state.status)
   const statusColor = getStatusColor(state.status)
   const title = getToolTitle(part)
 
+  const handleToggle = () => {
+    if (userToggled) {
+      setManualExpanded((prev) => !prev)
+    } else {
+      // First manual toggle: take over from auto state, flipping it
+      setUserToggled(true)
+      setManualExpanded(!isActiveStatus)
+    }
+  }
+
   return (
-    <div className="rounded-lg border bg-muted/30">
+    <div className="min-w-0 overflow-hidden rounded-lg border bg-muted/30">
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleToggle}
         className={cn(
           "flex w-full items-center gap-2 px-3 py-2 text-left text-sm",
           "hover:bg-muted/50 transition-colors rounded-lg"
@@ -49,7 +63,7 @@ export function MessageToolUse({ part }: MessageToolUseProps) {
           {state.input && Object.keys(state.input).length > 0 && (
             <div className="mb-2">
               <span className="font-medium text-muted-foreground">Input:</span>
-              <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
+              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs break-all">
                 {formatToolData(state.input)}
               </pre>
             </div>

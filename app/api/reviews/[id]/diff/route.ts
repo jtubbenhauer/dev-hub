@@ -3,13 +3,14 @@ import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { reviews, reviewFiles, workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
-import { getRefDiff, getUncommittedDiff } from "@/lib/git/review"
+import { getOriginalContent, getContentAtRef, getCurrentContent } from "@/lib/git/review"
+import { getLanguageFromFilename } from "@/lib/files/operations"
 
 interface RouteParams {
   params: Promise<{ id: string }>
 }
 
-// GET: fetch diff for a specific file in a review
+// GET: fetch original + current content for a specific file in a review
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const session = await auth()
   if (!session?.user?.id) {
@@ -46,21 +47,26 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    let diff: string
+    let original: string
+    let current: string
 
     if (review.mode === "uncommitted") {
-      diff = await getUncommittedDiff(workspace.path, file.path)
+      original = await getOriginalContent(workspace.path, file.path)
+      current = getCurrentContent(workspace.path, file.path)
     } else {
       const effectiveBase = review.mergeBase ?? review.baseRef
       if (!effectiveBase) {
         return NextResponse.json({ error: "No base ref for review" }, { status: 500 })
       }
-      diff = await getRefDiff(workspace.path, effectiveBase, file.path)
+      original = await getContentAtRef(workspace.path, effectiveBase, file.path)
+      current = getCurrentContent(workspace.path, file.path)
     }
 
-    return NextResponse.json({ diff, path: file.path })
+    const language = getLanguageFromFilename(file.path)
+
+    return NextResponse.json({ original, current, path: file.path, language })
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to get diff"
+    const message = error instanceof Error ? error.message : "Failed to get file content"
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -122,7 +122,7 @@ export interface GitBranch {
   current: boolean
   commit: string
   label: string
-  linkedWorkTree: string
+  linkedWorkTree: boolean
 }
 
 export interface GitStashEntry {
@@ -195,4 +195,11 @@ export interface AllBranch {
   name: string
   isRemote: boolean
   current: boolean
+}
+
+export interface ReviewFileContent {
+  original: string
+  current: string
+  path: string
+  language: string
 }

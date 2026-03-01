@@ -1,17 +1,35 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useCallback } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeHighlight from "rehype-highlight"
-import { User, Bot, AlertCircle, Copy, Check } from "lucide-react"
+import {
+  User,
+  Bot,
+  AlertCircle,
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Brain,
+  GitBranch,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { MessageToolUse } from "@/components/chat/message-tool-use"
-import { useState, useCallback } from "react"
 import type { MessageWithParts } from "@/lib/opencode/types"
-import type { Part, ToolPart, TextPart } from "@/lib/opencode/types"
+import type {
+  Part,
+  ToolPart,
+  TextPart,
+  ReasoningPart,
+  StepFinishPart,
+} from "@/lib/opencode/types"
+
+// Inline subtask type — not a named export in the SDK
+type SubtaskPart = Extract<Part, { type: "subtask" }>
 
 interface ChatMessageProps {
   message: MessageWithParts
@@ -29,9 +47,25 @@ export function ChatMessage({ message }: ChatMessageProps) {
       .join("")
   }, [parts])
 
-  const toolParts = useMemo(() => {
-    return parts.filter((p): p is ToolPart => p.type === "tool")
-  }, [parts])
+  const toolParts = useMemo(
+    () => parts.filter((p): p is ToolPart => p.type === "tool"),
+    [parts]
+  )
+
+  const subtaskParts = useMemo(
+    () => parts.filter((p): p is SubtaskPart => p.type === "subtask"),
+    [parts]
+  )
+
+  const reasoningParts = useMemo(
+    () => parts.filter((p): p is ReasoningPart => p.type === "reasoning"),
+    [parts]
+  )
+
+  const stepFinishParts = useMemo(
+    () => parts.filter((p): p is StepFinishPart => p.type === "step-finish"),
+    [parts]
+  )
 
   const hasError = isAssistant && "error" in info && info.error
 
@@ -51,7 +85,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div
         className={cn(
           "flex flex-col gap-2",
-          isUser ? "max-w-[80%] items-end" : "max-w-[85%] items-start"
+          isUser ? "max-w-[80%] items-end" : "min-w-0 w-full max-w-[85%] items-start"
         )}
       >
         {isUser ? (
@@ -59,15 +93,27 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <p className="whitespace-pre-wrap text-sm">{textContent}</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="min-w-0 w-full space-y-3">
+            {reasoningParts.map((part) => (
+              <ReasoningBlock key={part.id} part={part} />
+            ))}
+
             {toolParts.map((part) => (
               <MessageToolUse key={part.id} part={part} />
+            ))}
+
+            {subtaskParts.map((part) => (
+              <SubtaskCard key={part.id} part={part} />
             ))}
 
             {textContent && (
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <MarkdownContent content={textContent} />
               </div>
+            )}
+
+            {stepFinishParts.length > 0 && (
+              <StepFinishSummary parts={stepFinishParts} />
             )}
 
             {hasError && (
@@ -98,6 +144,76 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <User className="size-4 text-muted-foreground" />
         </div>
       )}
+    </div>
+  )
+}
+
+function ReasoningBlock({ part }: { part: ReasoningPart }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const duration =
+    part.time.end != null
+      ? formatDuration(part.time.end - part.time.start)
+      : null
+
+  return (
+    <div className="rounded-lg border border-dashed bg-muted/20">
+      <button
+        onClick={() => setIsExpanded((prev) => !prev)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/30 transition-colors rounded-lg"
+      >
+        <Brain className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className="flex-1 text-xs font-medium text-muted-foreground">
+          Thinking{duration ? ` · ${duration}` : ""}
+        </span>
+        {isExpanded ? (
+          <ChevronDown className="size-3.5 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="size-3.5 text-muted-foreground" />
+        )}
+      </button>
+      {isExpanded && (
+        <div className="border-t px-3 py-2">
+          <p className="whitespace-pre-wrap text-xs italic text-muted-foreground">
+            {part.text}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SubtaskCard({ part }: { part: SubtaskPart }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-2">
+      <GitBranch className="mt-0.5 size-3.5 shrink-0 text-violet-500" />
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-violet-700 dark:text-violet-300">
+          Subagent · {part.agent}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {part.description || part.prompt}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function StepFinishSummary({ parts }: { parts: StepFinishPart[] }) {
+  const totals = parts.reduce(
+    (acc, p) => ({
+      input: acc.input + p.tokens.input,
+      output: acc.output + p.tokens.output,
+      cost: acc.cost + p.cost,
+    }),
+    { input: 0, output: 0, cost: 0 }
+  )
+
+  if (totals.input === 0 && totals.output === 0) return null
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+      <span>{totals.input + totals.output} step tokens</span>
+      {totals.cost > 0 && <span>· ${totals.cost.toFixed(4)}</span>}
     </div>
   )
 }
@@ -195,10 +311,17 @@ function extractCodeFromPre(children: React.ReactNode): string {
   return ""
 }
 
-function getErrorMessage(
-  error: unknown
-): string {
+function getErrorMessage(error: unknown): string {
   if (!error || typeof error !== "object") return "Unknown error"
   const typed = error as { data?: { message?: string }; name?: string }
   return typed.data?.message ?? typed.name ?? "Unknown error"
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  const seconds = ms / 1000
+  if (seconds < 60) return `${seconds.toFixed(1)}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = Math.round(seconds % 60)
+  return `${minutes}m ${remainingSeconds}s`
 }

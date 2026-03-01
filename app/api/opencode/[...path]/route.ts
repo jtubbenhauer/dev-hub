@@ -118,6 +118,11 @@ async function proxyToOpenCode(
       })
     }
 
+    // 204/304 are null-body statuses — Response constructor throws if given a body
+    if (upstream.status === 204 || upstream.status === 304) {
+      return new Response(null, { status: upstream.status })
+    }
+
     const responseHeaders = new Headers()
     const upstreamContentType = upstream.headers.get("content-type")
     if (upstreamContentType) {

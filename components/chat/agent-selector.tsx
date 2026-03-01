@@ -1,28 +1,30 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Bot } from "lucide-react"
+import { ChevronsUpDown, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { cn } from "@/lib/utils"
 import type { Agent } from "@/lib/opencode/types"
 
-interface AgentSelectorProps {
-  workspaceId: string | null
-  selectedAgent: string | null
-  onAgentChange: (agent: string) => void
+interface UseAgentsResult {
+  agents: Agent[]
+  primaryAgents: Agent[]
+  isLoading: boolean
 }
 
-export function AgentSelector({
-  workspaceId,
-  selectedAgent,
-  onAgentChange,
-}: AgentSelectorProps) {
+export function useAgents(workspaceId: string | null): UseAgentsResult {
   const [agents, setAgents] = useState<Agent[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
@@ -35,20 +37,13 @@ export function AgentSelector({
       if (!response.ok) return
 
       const data: Record<string, Agent> = await response.json()
-      const agentList = Object.values(data)
-      setAgents(agentList)
-
-      if (!selectedAgent && agentList.length > 0) {
-        const defaultAgent =
-          agentList.find((a) => a.name === "code") ?? agentList[0]
-        onAgentChange(defaultAgent.name)
-      }
+      setAgents(Object.values(data))
     } catch {
       // Silently fail
     } finally {
       setIsLoading(false)
     }
-  }, [workspaceId, selectedAgent, onAgentChange])
+  }, [workspaceId])
 
   useEffect(() => {
     fetchAgents()
@@ -58,46 +53,79 @@ export function AgentSelector({
     (a) => a.mode === "primary" || a.mode === "all"
   )
 
-  if (isLoading || primaryAgents.length === 0) {
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        disabled
-        className="gap-1.5 text-xs"
-      >
-        <Bot className="size-3" />
-        {isLoading ? "Loading..." : "No agents"}
-      </Button>
-    )
-  }
+  return { agents, primaryAgents, isLoading }
+}
+
+interface AgentSelectorProps {
+  agents: Agent[]
+  selectedAgent: string | null
+  onAgentChange: (agent: string) => void
+}
+
+export function AgentSelector({
+  agents,
+  selectedAgent,
+  onAgentChange,
+}: AgentSelectorProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const activeAgent = agents.find((a) => a.name === selectedAgent)
+
+  if (agents.length === 0) return null
 
   return (
-    <Select value={selectedAgent ?? undefined} onValueChange={onAgentChange}>
-      <SelectTrigger className="h-8 w-auto gap-1.5 text-xs">
-        <Bot className="size-3" />
-        <SelectValue placeholder="Select agent" />
-      </SelectTrigger>
-      <SelectContent className="max-w-72">
-        {primaryAgents.map((agent) => (
-          <SelectItem key={agent.name} value={agent.name}>
-            <div className="flex items-center gap-2">
-              {agent.color && (
-                <span
-                  className="inline-block size-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: agent.color }}
-                />
-              )}
-              <span className="shrink-0 capitalize">{agent.name}</span>
-              {agent.description && (
-                <span className="truncate text-[10px] text-muted-foreground">
-                  {agent.description}
-                </span>
-              )}
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          role="combobox"
+          aria-expanded={isOpen}
+          className="max-w-[160px] gap-1.5 text-xs"
+        >
+          <span className="flex items-center gap-1.5 truncate">
+            {activeAgent?.color && (
+              <span
+                className="inline-block size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: activeAgent.color }}
+              />
+            )}
+            <span className="truncate capitalize">
+              {activeAgent?.name ?? "Agent"}
+            </span>
+          </span>
+          <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="end">
+        <Command>
+          <CommandInput placeholder="Search agents..." />
+          <CommandList>
+            <CommandEmpty>No agents found.</CommandEmpty>
+            {agents.map((agent) => {
+              const isSelected = agent.name === selectedAgent
+              return (
+                <CommandItem
+                  key={agent.name}
+                  value={agent.name}
+                  onSelect={() => {
+                    onAgentChange(agent.name)
+                    setIsOpen(false)
+                  }}
+                >
+                  <Check className={cn("size-3", isSelected ? "opacity-100" : "opacity-0")} />
+                  {agent.color && (
+                    <span
+                      className="inline-block size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: agent.color }}
+                    />
+                  )}
+                  <span className="truncate capitalize">{agent.name}</span>
+                </CommandItem>
+              )
+            })}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }

@@ -2,6 +2,10 @@ import type {
   Session,
   Message,
   Part,
+  TextPart,
+  ToolPart,
+  ReasoningPart,
+  StepFinishPart,
   Event,
   Provider,
   Model,
@@ -11,7 +15,15 @@ import type {
   Agent,
 } from "@opencode-ai/sdk"
 
-export type { Session, Message, Part, Event, Provider, Model, SessionStatus, Permission, Todo, Agent }
+import type {
+  QuestionRequest,
+  QuestionInfo,
+  QuestionOption,
+  QuestionAnswer,
+} from "@opencode-ai/sdk/v2"
+
+export type { Session, Message, Part, TextPart, ToolPart, ReasoningPart, StepFinishPart, Event, Provider, Model, SessionStatus, Permission, Todo, Agent }
+export type { QuestionRequest, QuestionInfo, QuestionOption, QuestionAnswer }
 
 export interface OpenCodeInstance {
   workspaceId: string

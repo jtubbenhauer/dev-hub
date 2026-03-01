@@ -8,11 +8,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { FolderGit2 } from "lucide-react"
 
 export function WorkspaceSwitcher() {
-  const { workspaces, activeWorkspaceId, setActiveWorkspaceId } =
+  const { workspaces, activeWorkspaceId, isLoadingWorkspaces, setActiveWorkspaceId } =
     useWorkspaceStore()
+
+  if (isLoadingWorkspaces) {
+    return <Skeleton className="h-9 w-48" />
+  }
 
   if (workspaces.length === 0) {
     return (

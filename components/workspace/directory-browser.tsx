@@ -166,7 +166,9 @@ export function DirectoryBrowser({ onSelect, initialPath }: DirectoryBrowserProp
                   <span className="truncate flex-1">{entry.name}</span>
                   <div className="flex items-center gap-1 shrink-0">
                     {entry.hasPackageJson && (
-                      <Package className="h-3 w-3 text-green-500" title="Has package.json" />
+                      <span title="Has package.json">
+                        <Package className="h-3 w-3 text-green-500" />
+                      </span>
                     )}
                     {(entry.isGitRepo || entry.isWorktree) && (
                       <Button

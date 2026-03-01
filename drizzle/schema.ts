@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, blob } from "drizzle-orm/sqlite-core"
+import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core"
 import { sql } from "drizzle-orm"
 
 export const users = sqliteTable("users", {
@@ -8,28 +8,6 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
-})
-
-export const passkeys = sqliteTable("passkeys", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id),
-  publicKey: blob("public_key", { mode: "buffer" }).notNull(),
-  counter: integer("counter").notNull().default(0),
-  deviceType: text("device_type"),
-  transports: text("transports"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-})
-
-export const totpSecrets = sqliteTable("totp_secrets", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => users.id),
-  secret: text("secret").notNull(),
-  verified: integer("verified", { mode: "boolean" }).notNull().default(false),
 })
 
 export const sessions = sqliteTable("sessions", {
@@ -79,7 +57,9 @@ export const settings = sqliteTable("settings", {
     .references(() => users.id),
   key: text("key").notNull(),
   value: text("value", { mode: "json" }),
-})
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.key] }),
+])
 
 export const auditLog = sqliteTable("audit_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),

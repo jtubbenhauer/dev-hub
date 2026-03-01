@@ -12,6 +12,7 @@ import {
   ArrowRight,
   File,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import type { ReviewFile, ReviewFileStatus } from "@/types"
 
 interface ReviewFileListProps {
@@ -153,39 +154,61 @@ export function ReviewFileList({
             : ""
 
           return (
-            <button
+            <div
               key={file.id}
-              onClick={() => onSelectFile(file)}
-              onDoubleClick={() => onToggleReviewed(file)}
               className={cn(
-                "flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm transition-colors",
+                "flex w-full items-center gap-1 pr-1 transition-colors",
                 isSelected
                   ? "bg-accent text-accent-foreground"
                   : "hover:bg-muted/50",
                 file.reviewed && "opacity-50"
               )}
             >
-              <span className="shrink-0 w-4 text-center">
-                {file.reviewed ? (
-                  <Check className="h-3.5 w-3.5 text-green-500" />
-                ) : (
-                  <span className={cn("text-xs font-mono font-bold", statusColors[file.status])}>
-                    {statusLetters[file.status]}
-                  </span>
-                )}
-              </span>
+              <button
+                onClick={() => onSelectFile(file)}
+                onDoubleClick={() => onToggleReviewed(file)}
+                className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
+              >
+                <span className="w-4 shrink-0 text-center">
+                  {file.reviewed ? (
+                    <Check className="h-3.5 w-3.5 text-green-500" />
+                  ) : (
+                    <span className={cn("text-xs font-mono font-bold", statusColors[file.status])}>
+                      {statusLetters[file.status]}
+                    </span>
+                  )}
+                </span>
 
-              <Icon className={cn("h-3.5 w-3.5 shrink-0", statusColors[file.status])} />
+                <Icon className={cn("h-3.5 w-3.5 shrink-0", statusColors[file.status])} />
 
-              <div className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium">{fileName}</span>
-                {dirPath && (
-                  <span className="block truncate text-[10px] text-muted-foreground">
-                    {dirPath}
-                  </span>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium">{fileName}</span>
+                  {dirPath && (
+                    <span className="block truncate text-[10px] text-muted-foreground">
+                      {dirPath}
+                    </span>
+                  )}
+                </div>
+              </button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-6 w-6 shrink-0 rounded",
+                  file.reviewed
+                    ? "text-green-500 hover:text-green-400"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
-              </div>
-            </button>
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleReviewed(file)
+                }}
+                title={file.reviewed ? "Unmark reviewed" : "Mark as reviewed"}
+              >
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           )
         })}
       </div>

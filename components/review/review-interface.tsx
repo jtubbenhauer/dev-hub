@@ -1,20 +1,24 @@
 "use client"
 
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useReview, useReviewDiff, useToggleReviewFile, useRefreshReview } from "@/hooks/use-review"
 import { useReviewStore } from "@/stores/review-store"
 import { ReviewToolbar } from "@/components/review/review-toolbar"
 import { ReviewFileList } from "@/components/review/review-file-list"
-import { DiffViewer } from "@/components/git/diff-viewer"
+import { ReviewEditor } from "@/components/review/review-editor"
+import { useCommand } from "@/hooks/use-command"
+import { RefreshCw } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import type { ReviewFile } from "@/types"
 
 export function ReviewInterface() {
   const { activeReviewId, selectedFileId, selectFile, clearReview } = useReviewStore()
   const { data: review, isLoading: reviewLoading } = useReview(activeReviewId)
-  const { data: diffData, isLoading: diffLoading } = useReviewDiff(activeReviewId, selectedFileId)
+  const { data: fileContent, isLoading: diffLoading } = useReviewDiff(activeReviewId, selectedFileId)
   const toggleFile = useToggleReviewFile(activeReviewId)
   const refreshReview = useRefreshReview(activeReviewId)
+
+  const selectedFile = review?.files.find((f) => f.id === selectedFileId) ?? null
 
   // Auto-select first unreviewed file when review loads or selection is empty
   useEffect(() => {
@@ -84,7 +88,26 @@ export function ReviewInterface() {
     [review, toggleFile, selectFile]
   )
 
-  // Handle Enter key to open selected file diff (already shown, but ensure selection)
+  // Keep a ref so the command closure stays stable but always calls the latest mutate
+  const refreshReviewRef = useRef(refreshReview)
+  refreshReviewRef.current = refreshReview
+
+  const reviewCommands = useMemo(
+    () => [
+      {
+        id: "review:refresh",
+        label: "Refresh Review",
+        group: "Review",
+        icon: RefreshCw,
+        shortcut: "⇧R",
+        onSelect: () => refreshReviewRef.current.mutate(),
+      },
+    ],
+    []
+  )
+
+  useCommand(reviewCommands)
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (
@@ -138,13 +161,26 @@ export function ReviewInterface() {
           />
         </div>
 
-        {/* Diff viewer */}
+        {/* Editor with unified diff view */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <DiffViewer
-            diff={diffData?.diff ?? ""}
-            fileName={diffData?.path}
-            isLoading={diffLoading}
-          />
+          {selectedFile && fileContent ? (
+            <ReviewEditor
+              fileContent={fileContent}
+              file={selectedFile}
+              workspaceId={review.workspaceId}
+              isLoading={diffLoading}
+              onToggleReviewed={handleToggleReviewed}
+              onMarkAndNext={handleMarkAndNext}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              {diffLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <span className="text-sm text-muted-foreground">Select a file to review</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

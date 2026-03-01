@@ -1,5 +1,6 @@
 import simpleGit from "simple-git"
 import { createHash } from "node:crypto"
+import { readFileContent } from "@/lib/files/operations"
 import type { ReviewChangedFile, ReviewFileStatus, AllBranch } from "@/types"
 
 function createGit(workspacePath: string) {
@@ -109,13 +110,47 @@ export async function getUncommittedDiff(
     // Show both staged and unstaged changes combined vs HEAD
     return await git.raw(["diff", "HEAD", "--", filePath])
   } catch {
-    // File may be untracked — show the file content as an addition
-    try {
-      const content = await git.raw(["show", `:${filePath}`])
-      return content
-    } catch {
-      return ""
-    }
+    return ""
+  }
+}
+
+// Returns the committed version of a file from HEAD, or "" if untracked/new
+export async function getOriginalContent(
+  workspacePath: string,
+  filePath: string
+): Promise<string> {
+  const git = createGit(workspacePath)
+  try {
+    return await git.raw(["show", `HEAD:${filePath}`])
+  } catch {
+    return ""
+  }
+}
+
+// Returns the version of a file at a specific git ref, or "" if it didn't exist there
+export async function getContentAtRef(
+  workspacePath: string,
+  ref: string,
+  filePath: string
+): Promise<string> {
+  const git = createGit(workspacePath)
+  try {
+    return await git.raw(["show", `${ref}:${filePath}`])
+  } catch {
+    return ""
+  }
+}
+
+// Returns current on-disk content of a file, or "" if it doesn't exist (deleted)
+export function getCurrentContent(
+  workspacePath: string,
+  filePath: string
+): string {
+  try {
+    const { content } = readFileContent(workspacePath, filePath)
+    return content
+  } catch {
+    return ""
   }
 }
 
@@ -140,7 +175,12 @@ export async function computeUncommittedDiffHash(
   const git = createGit(workspacePath)
   try {
     const diff = await git.raw(["diff", "HEAD", "--", filePath])
-    return createHash("md5").update(diff).digest("hex")
+    if (diff) {
+      return createHash("md5").update(diff).digest("hex")
+    }
+    // No diff from HEAD means file is untracked/new — hash its current content
+    const current = getCurrentContent(workspacePath, filePath)
+    return createHash("md5").update(current).digest("hex")
   } catch {
     return createHash("md5").update("").digest("hex")
   }

@@ -15,6 +15,13 @@
       "when": 1772282559597,
       "tag": "0001_cold_runaways",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1772319842424,
+      "tag": "0002_colorful_dagger",
+      "breakpoints": true
     }
   ]
 }

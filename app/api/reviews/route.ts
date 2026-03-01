@@ -13,6 +13,8 @@ import {
   computeDiffHash,
   computeUncommittedDiffHash,
   getAllBranches,
+  getOriginalContent,
+  getCurrentContent,
 } from "@/lib/git/review"
 
 // GET: list reviews for a workspace, or get all branches
@@ -101,7 +103,18 @@ export async function POST(request: NextRequest) {
       }
       case "uncommitted": {
         baseRef = "HEAD"
-        changedFiles = await getUncommittedFiles(workspace.path)
+        const allUncommitted = await getUncommittedFiles(workspace.path)
+        // Filter out files with no actual content on either side (phantom git status entries)
+        const hasContent = await Promise.all(
+          allUncommitted.map(async (file) => {
+            const [original, current] = await Promise.all([
+              getOriginalContent(workspace.path, file.path),
+              Promise.resolve(getCurrentContent(workspace.path, file.path)),
+            ])
+            return original !== "" || current !== ""
+          })
+        )
+        changedFiles = allUncommitted.filter((_, i) => hasContent[i])
         break
       }
       case "last-commit": {

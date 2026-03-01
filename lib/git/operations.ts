@@ -131,8 +131,8 @@ export async function getLog(
       abbrevHash: entry.abbrevHash ?? entry.hash.slice(0, 7),
       message: entry.message,
       body: entry.body,
-      author: entry.author ?? entry.author_name ?? "",
-      authorEmail: entry.authorEmail ?? entry.author_email ?? "",
+      author: entry.author ?? "",
+      authorEmail: entry.authorEmail ?? "",
       date: entry.date,
       refs: entry.refs ?? "",
     }))
@@ -190,7 +190,7 @@ export async function getBranches(workspacePath: string): Promise<GitBranch[]> {
     current: info.current,
     commit: info.commit,
     label: info.label,
-    linkedWorkTree: info.linkedWorkTree ?? "",
+    linkedWorkTree: info.linkedWorkTree ?? false,
   }))
 }
 
@@ -232,8 +232,8 @@ export async function push(
   if (setUpstream) args.push("-u")
   args.push(remote)
   if (branch) args.push(branch)
-  const result = await git.push(args)
-  return result?.pushed?.[0]?.status ?? "ok"
+  await git.push(args)
+  return "ok"
 }
 
 export async function pull(

@@ -23,9 +23,9 @@ export function SessionList({
   onDeleteSession,
 }: SessionListProps) {
   const sortedSessions = useMemo(() => {
-    return Object.values(sessions).sort(
-      (a, b) => b.time.updated - a.time.updated
-    )
+    return Object.values(sessions)
+      .filter((s) => !s.parentID)
+      .sort((a, b) => b.time.updated - a.time.updated)
   }, [sessions])
 
   return (
@@ -83,10 +83,18 @@ function SessionItem({
   }, [session.time.updated])
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onSelect()
+        }
+      }}
       className={cn(
-        "group flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm",
+        "group flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-left text-sm",
         "hover:bg-muted transition-colors",
         isActive && "bg-muted"
       )}
@@ -109,7 +117,7 @@ function SessionItem({
       >
         <Trash2 className="size-3 text-muted-foreground" />
       </Button>
-    </button>
+    </div>
   )
 }
 

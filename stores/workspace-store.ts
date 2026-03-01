@@ -6,8 +6,10 @@ interface WorkspaceState {
   workspaces: Workspace[]
   activeWorkspaceId: string | null
   activeWorkspace: Workspace | null
+  isLoadingWorkspaces: boolean
   setWorkspaces: (workspaces: Workspace[]) => void
   setActiveWorkspaceId: (id: string | null) => void
+  setIsLoadingWorkspaces: (isLoading: boolean) => void
   addWorkspace: (workspace: Workspace) => void
   removeWorkspace: (id: string) => void
   updateWorkspace: (id: string, updates: Partial<Workspace>) => void
@@ -18,6 +20,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     (set, get) => ({
       workspaces: [],
       activeWorkspaceId: null,
+      isLoadingWorkspaces: true,
       get activeWorkspace() {
         const state = get()
         return (
@@ -26,6 +29,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
       setWorkspaces: (workspaces) => set({ workspaces }),
       setActiveWorkspaceId: (id) => set({ activeWorkspaceId: id }),
+      setIsLoadingWorkspaces: (isLoading) =>
+        set({ isLoadingWorkspaces: isLoading }),
       addWorkspace: (workspace) =>
         set((state) => ({ workspaces: [...state.workspaces, workspace] })),
       removeWorkspace: (id) =>
@@ -41,6 +46,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           ),
         })),
     }),
-    { name: "dev-hub-workspace" }
+    { name: "dev-hub-workspace", partialize: (state) => ({
+      workspaces: state.workspaces,
+      activeWorkspaceId: state.activeWorkspaceId,
+    }) }
   )
 )

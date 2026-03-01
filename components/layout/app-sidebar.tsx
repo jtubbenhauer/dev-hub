@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   MessageSquare,
@@ -11,7 +11,9 @@ import {
   Settings,
   ClipboardCheck,
 } from "lucide-react"
+import { useMemo } from "react"
 import { cn } from "@/lib/utils"
+import { useCommand } from "@/hooks/use-command"
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -25,6 +27,23 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const navCommands = useMemo(
+    () =>
+      navItems.map((item) => ({
+        id: `nav:${item.href}`,
+        label: `Go to ${item.label}`,
+        group: "Navigation",
+        icon: item.icon,
+        onSelect: () => router.push(item.href),
+      })),
+    // router is stable; navItems is module-level constant
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
+
+  useCommand(navCommands)
 
   return (
     <aside className="hidden md:flex h-screen w-60 flex-col border-r bg-sidebar">

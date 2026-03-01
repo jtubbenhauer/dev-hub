@@ -7,6 +7,7 @@ import type {
   Review,
   ReviewCreateInput,
   AllBranch,
+  ReviewFileContent,
 } from "@/types"
 
 async function reviewGet<T>(url: string): Promise<T> {
@@ -18,7 +19,7 @@ async function reviewGet<T>(url: string): Promise<T> {
   return res.json()
 }
 
-async function reviewPost<T>(url: string, body: Record<string, unknown>): Promise<T> {
+async function reviewPost<T>(url: string, body: object): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -64,10 +65,10 @@ export function useReviewBranches(workspaceId: string | null) {
 }
 
 export function useReviewDiff(reviewId: string | null, fileId: number | null) {
-  return useQuery<{ diff: string; path: string }>({
+  return useQuery<ReviewFileContent>({
     queryKey: ["review-diff", reviewId, fileId],
     queryFn: () =>
-      reviewGet<{ diff: string; path: string }>(
+      reviewGet<ReviewFileContent>(
         `/api/reviews/${reviewId}/diff?fileId=${fileId}`
       ),
     enabled: !!reviewId && fileId !== null,

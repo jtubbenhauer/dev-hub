@@ -7,9 +7,11 @@ import type {
   Todo,
   SessionStatus,
   MessageWithParts,
+  QuestionRequest,
+  QuestionAnswer,
 } from "@/lib/opencode/types"
 
-type StreamingStatus = "idle" | "connecting" | "streaming" | "error"
+type StreamingStatus = "idle" | "connecting" | "streaming" | "waiting" | "error"
 
 interface ChatState {
   sessions: Record<string, Session>
@@ -17,11 +19,14 @@ interface ChatState {
   activeWorkspaceId: string | null
 
   messages: Record<string, MessageWithParts[]>
+  // Tracks optimistic message IDs per session so they can be replaced on SSE arrival
+  optimisticMessageIds: Record<string, string>
   streamingStatus: StreamingStatus
   streamingError: string | null
 
   sessionStatus: SessionStatus | null
   permissions: Permission[]
+  questions: QuestionRequest[]
   todos: Todo[]
 
   eventSource: EventSource | null
@@ -47,6 +52,15 @@ interface ChatState {
     sessionId: string,
     permissionId: string,
     response: string,
+    workspaceId: string
+  ) => Promise<void>
+  replyToQuestion: (
+    requestId: string,
+    answers: QuestionAnswer[],
+    workspaceId: string
+  ) => Promise<void>
+  rejectQuestion: (
+    requestId: string,
     workspaceId: string
   ) => Promise<void>
 
@@ -80,11 +94,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   activeWorkspaceId: null,
 
   messages: {},
+  optimisticMessageIds: {},
   streamingStatus: "idle",
   streamingError: null,
 
   sessionStatus: null,
   permissions: [],
+  questions: [],
   todos: [],
 
   eventSource: null,
@@ -99,7 +115,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       activeSessionId: null,
       sessions: {},
       messages: {},
+      optimisticMessageIds: {},
       permissions: [],
+      questions: [],
       todos: [],
       sseReconnectAttempts: 0,
     })
@@ -209,8 +227,36 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         })
         return
       }
-      // 204 response means accepted — events come via SSE
-      set({ streamingError: null })
+      // 204 response means accepted — events come via SSE.
+      // Insert an optimistic user message immediately so the UI doesn't feel frozen.
+      const optimisticId = `optimistic-${Date.now()}`
+      const optimisticMessage: MessageWithParts = {
+        info: {
+          id: optimisticId,
+          sessionID: sessionId,
+          role: "user",
+          time: { created: Date.now() },
+          agent: agent ?? "",
+          model: model ?? { providerID: "", modelID: "" },
+        },
+        parts: [
+          {
+            id: `${optimisticId}-part`,
+            sessionID: sessionId,
+            messageID: optimisticId,
+            type: "text",
+            text,
+          },
+        ],
+      }
+      set((state) => ({
+        streamingError: null,
+        optimisticMessageIds: { ...state.optimisticMessageIds, [sessionId]: optimisticId },
+        messages: {
+          ...state.messages,
+          [sessionId]: [...(state.messages[sessionId] ?? []), optimisticMessage],
+        },
+      }))
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to send message"
@@ -250,6 +296,38 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       )
       set((state) => ({
         permissions: state.permissions.filter((p) => p.id !== permissionId),
+      }))
+    } catch {
+      // Best effort
+    }
+  },
+
+  replyToQuestion: async (requestId, answers, workspaceId) => {
+    try {
+      await fetch(
+        buildProxyUrl(`question/${requestId}/reply`, workspaceId),
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ answers }),
+        }
+      )
+      set((state) => ({
+        questions: state.questions.filter((q) => q.id !== requestId),
+      }))
+    } catch {
+      // Best effort
+    }
+  },
+
+  rejectQuestion: async (requestId, workspaceId) => {
+    try {
+      await fetch(
+        buildProxyUrl(`question/${requestId}/reject`, workspaceId),
+        { method: "POST" }
+      )
+      set((state) => ({
+        questions: state.questions.filter((q) => q.id !== requestId),
       }))
     } catch {
       // Best effort
@@ -301,12 +379,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const backoffMs = Math.min(1000 * 2 ** Math.min(attempts, 5), 30000)
 
       if (attempts >= MAX_RECONNECT_ATTEMPTS) {
-        console.error("[chat] SSE reconnect limit reached, giving up")
-        set({
-          streamingStatus: "error",
-          streamingError: "Lost connection to OpenCode server",
-          eventSource: null,
-        })
+        console.warn("[chat] SSE reconnect limit reached, giving up")
+        set({ eventSource: null })
         return
       }
 
@@ -365,17 +439,29 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         if (!info) return
         set((state) => {
           const sessionId = info.sessionID
-          const sessionMessages = state.messages[sessionId] ?? []
-          const existingIndex = sessionMessages.findIndex(
-            (m) => m.info.id === info.id
+          const optimisticId = state.optimisticMessageIds[sessionId]
+
+          // Strip the optimistic placeholder when the real user message arrives
+          const sessionMessages = (state.messages[sessionId] ?? []).filter(
+            (m) => !(info.role === "user" && optimisticId && m.info.id === optimisticId)
           )
+          const optimisticMessageIds =
+            info.role === "user" && optimisticId
+              ? Object.fromEntries(
+                  Object.entries(state.optimisticMessageIds).filter(([k]) => k !== sessionId)
+                )
+              : state.optimisticMessageIds
+
+          const existingIndex = sessionMessages.findIndex((m) => m.info.id === info.id)
           const updated =
             existingIndex >= 0
-              ? sessionMessages.map((m, i) =>
-                  i === existingIndex ? { ...m, info } : m
-                )
+              ? sessionMessages.map((m, i) => (i === existingIndex ? { ...m, info } : m))
               : [...sessionMessages, { info, parts: [] }]
-          return { messages: { ...state.messages, [sessionId]: updated } }
+
+          return {
+            optimisticMessageIds,
+            messages: { ...state.messages, [sessionId]: updated },
+          }
         })
         break
       }
@@ -514,11 +600,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         break
       }
 
-      case "permission.updated": {
+      case "permission.updated":
+      case "permission.asked": {
         const permission = properties as unknown as Permission
-        set((state) => ({
-          permissions: [...state.permissions, permission],
-        }))
+        const activeId = get().activeSessionId
+        set((state) => {
+          const updated = [...state.permissions, permission]
+          const isActiveSession = permission.sessionID === activeId
+          return {
+            permissions: updated,
+            streamingStatus: isActiveSession ? "waiting" : state.streamingStatus,
+          }
+        })
         break
       }
 
@@ -528,6 +621,36 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           permissions: state.permissions.filter(
             (p) => p.id !== permissionID
           ),
+        }))
+        break
+      }
+
+      case "question.asked": {
+        const question = properties as unknown as QuestionRequest
+        const activeId = get().activeSessionId
+        set((state) => {
+          const updated = [...state.questions, question]
+          const isActiveSession = question.sessionID === activeId
+          return {
+            questions: updated,
+            streamingStatus: isActiveSession ? "waiting" : state.streamingStatus,
+          }
+        })
+        break
+      }
+
+      case "question.replied": {
+        const requestID = properties.requestID as string
+        set((state) => ({
+          questions: state.questions.filter((q) => q.id !== requestID),
+        }))
+        break
+      }
+
+      case "question.rejected": {
+        const requestID = properties.requestID as string
+        set((state) => ({
+          questions: state.questions.filter((q) => q.id !== requestID),
         }))
         break
       }
@@ -548,10 +671,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     set({
       activeSessionId: null,
       messages: {},
+      optimisticMessageIds: {},
       streamingStatus: "idle",
       streamingError: null,
       sessionStatus: null,
       permissions: [],
+      questions: [],
       todos: [],
       sseReconnectAttempts: 0,
     }),

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import { Plus, X } from "lucide-react"
 import {
   Sheet,
@@ -15,7 +15,6 @@ import { CommandInput } from "./command-input"
 import { CommandOutput } from "./command-output"
 import { useCommandStore } from "@/stores/command-store"
 import { useWorkspaceStore } from "@/stores/workspace-store"
-import { useShallow } from "zustand/react/shallow"
 import { cn } from "@/lib/utils"
 
 interface SessionTab {
@@ -36,23 +35,23 @@ export function CommandDrawer() {
   const fetchActiveProcesses = useCommandStore((s) => s.fetchActiveProcesses)
   const workspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
 
-  // Only tab metadata — re-renders when tabs are added/removed or running state changes,
-  // NOT on every line of output.
-  const sessionTabs = useCommandStore(
-    useShallow((s): SessionTab[] =>
-      Object.values(s.sessions).map((session) => ({
-        sessionId: session.sessionId,
-        command: session.command,
-        isRunning: session.isRunning,
-        exitCode: session.exitCode,
-      }))
-    )
+  // Stable reference — Zustand only notifies when the sessions object is replaced.
+  const sessions = useCommandStore((s) => s.sessions)
+
+  // Derived from sessions — only recomputes when sessions reference changes,
+  // NOT on every line of output for unrelated tabs.
+  const sessionTabs = useMemo((): SessionTab[] =>
+    Object.values(sessions).map((session) => ({
+      sessionId: session.sessionId,
+      command: session.command,
+      isRunning: session.isRunning,
+      exitCode: session.exitCode,
+    })),
+    [sessions]
   )
 
-  // Only the active session — re-renders when output flushes, but only for this tab.
-  const activeSession = useCommandStore((s) =>
-    activeSessionId ? s.sessions[activeSessionId] ?? null : null
-  )
+  // Derived from the already-selected sessions — no extra subscription needed.
+  const activeSession = activeSessionId ? sessions[activeSessionId] ?? null : null
 
   // Poll for active processes when drawer opens
   useEffect(() => {
@@ -66,8 +65,7 @@ export function CommandDrawer() {
 
   const handleRun = (command: string) => {
     if (!workspaceId) return
-    const newSessionId = runCommand(command, workspaceId)
-    setActiveSessionId(newSessionId)
+    runCommand(command, workspaceId)
   }
 
   const handleKill = () => {

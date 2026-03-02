@@ -19,6 +19,9 @@ export const SETTINGS_KEYS = {
   WORKTREE_BASE_DIR: "worktree-base-dir",
   CLONE_BASE_DIR: "clone-base-dir",
   SHELL_RC_PATH: "shell-rc-path",
+  CLICKUP_API_TOKEN: "clickup-api-token",
+  CLICKUP_TEAM_ID: "clickup-team-id",
+  CLICKUP_USER_ID: "clickup-user-id",
 } as const
 
 export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
@@ -164,4 +167,30 @@ export function useShellRcPathSetting(): {
   const { data, isLoading } = useSettings()
   const raw = data?.[SETTINGS_KEYS.SHELL_RC_PATH]
   return { shellRcPath: typeof raw === "string" ? raw : "~/.zshrc", isLoading }
+}
+
+export function useClickUpSettings(): {
+  apiToken: string | null
+  teamId: string | null
+  userId: string | null
+  isConfigured: boolean
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const apiToken = typeof data?.[SETTINGS_KEYS.CLICKUP_API_TOKEN] === "string"
+    ? (data[SETTINGS_KEYS.CLICKUP_API_TOKEN] as string)
+    : null
+  const teamId = typeof data?.[SETTINGS_KEYS.CLICKUP_TEAM_ID] === "string"
+    ? (data[SETTINGS_KEYS.CLICKUP_TEAM_ID] as string)
+    : null
+  const userId = data?.[SETTINGS_KEYS.CLICKUP_USER_ID] != null
+    ? String(data[SETTINGS_KEYS.CLICKUP_USER_ID])
+    : null
+  return {
+    apiToken,
+    teamId,
+    userId,
+    isConfigured: !!(apiToken && teamId),
+    isLoading,
+  }
 }

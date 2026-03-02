@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useCallback, useState, useMemo } from "react"
+import { useEffect, useRef, useCallback, useState, useMemo, Component } from "react"
+import type { ReactNode } from "react"
 import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, FileText, Plus, MessageSquare, ArrowDown } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,29 @@ import type { Permission, QuestionRequest, QuestionInfo, QuestionAnswer, Message
 interface SelectedModel {
   providerID: string
   modelID: string
+}
+
+class QuestionErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("[chat] QuestionBanner render error:", error)
+  }
+
+  render() {
+    if (this.state.hasError) return null
+    return this.props.children
+  }
 }
 
 export function ChatInterface() {
@@ -62,14 +86,9 @@ export function ChatInterface() {
     setSelectedModel(bound)
   }, [selectedAgent, agentModelBindings])
   const {
-    sessions,
     activeSessionId,
-    messages,
     streamingStatus,
     streamingError,
-    sessionStatus,
-    permissions,
-    questions,
     setActiveSession,
     setActiveWorkspaceId,
     fetchSessions,
@@ -82,21 +101,33 @@ export function ChatInterface() {
     replyToQuestion,
     rejectQuestion,
     connectSSE,
-    disconnectSSE,
+    getActiveWorkspaceSessions,
+    getActiveSessionMessages,
+    getActiveSessionStatus,
+    getActivePermissions,
+    getActiveQuestions,
+    getActiveSessionStatuses,
   } = useChatStore()
+
+  const sessions = useChatStore(getActiveWorkspaceSessions)
+  const sessionStatus = useChatStore(getActiveSessionStatus)
+  const permissions = useChatStore(getActivePermissions)
+  const questions = useChatStore(getActiveQuestions)
+  const sessionStatuses = useChatStore(getActiveSessionStatuses)
 
   // Sync workspace from global workspace store
   useEffect(() => {
     setActiveWorkspaceId(activeWorkspaceId)
   }, [activeWorkspaceId, setActiveWorkspaceId])
 
-  // Fetch sessions + connect SSE when workspace changes
+  // Connect SSE when workspace changes (state switch + SSE happen inside setActiveWorkspaceId,
+  // but we also need to fetch sessions if the workspace is being visited for the first time)
   useEffect(() => {
     if (!activeWorkspaceId) return
     fetchSessions(activeWorkspaceId)
     connectSSE(activeWorkspaceId)
-    return () => disconnectSSE()
-  }, [activeWorkspaceId, fetchSessions, connectSSE, disconnectSSE])
+    // SSE connections now live per-workspace and are not torn down on unmount
+  }, [activeWorkspaceId, fetchSessions, connectSSE])
 
   // Fetch messages when active session changes
   useEffect(() => {
@@ -104,8 +135,9 @@ export function ChatInterface() {
     fetchMessages(activeSessionId, activeWorkspaceId)
   }, [activeSessionId, activeWorkspaceId, fetchMessages])
 
+  const activeMessages = useChatStore(getActiveSessionMessages)
+
   // Auto-scroll to bottom only when the user is already near the bottom
-  const activeMessages = activeSessionId ? messages[activeSessionId] ?? [] : []
   useEffect(() => {
     if (isPlanPanelOpen || !isNearBottom.current) return
     const frame = requestAnimationFrame(() => {
@@ -281,6 +313,7 @@ export function ChatInterface() {
           <SessionList
             sessions={sessions}
             activeSessionId={activeSessionId}
+            sessionStatuses={sessionStatuses}
             onSelectSession={handleMobileSelectSession}
             onCreateSession={handleMobileCreateSession}
             onDeleteSession={handleDeleteSession}
@@ -294,6 +327,7 @@ export function ChatInterface() {
           <SessionList
             sessions={sessions}
             activeSessionId={activeSessionId}
+            sessionStatuses={sessionStatuses}
             onSelectSession={handleSelectSession}
             onCreateSession={handleCreateSession}
             onDeleteSession={handleDeleteSession}
@@ -421,20 +455,22 @@ export function ChatInterface() {
         {/* Question requests */}
         {activeQuestions.length > 0 && (
           <div className="shrink-0 border-t bg-indigo-500/10 px-4 py-2 space-y-2">
-            {activeQuestions.map((question) => (
-              <QuestionBanner
-                key={question.id}
-                request={question}
-                onReply={(answers) => {
-                  if (!activeWorkspaceId) return
-                  replyToQuestion(question.id, answers, activeWorkspaceId)
-                }}
-                onReject={() => {
-                  if (!activeWorkspaceId) return
-                  rejectQuestion(question.id, activeWorkspaceId)
-                }}
-              />
-            ))}
+            <QuestionErrorBoundary>
+              {activeQuestions.map((question) => (
+                <QuestionBanner
+                  key={question.id}
+                  request={question}
+                  onReply={(answers) => {
+                    if (!activeWorkspaceId) return
+                    replyToQuestion(question.id, answers, activeWorkspaceId)
+                  }}
+                  onReject={() => {
+                    if (!activeWorkspaceId) return
+                    rejectQuestion(question.id, activeWorkspaceId)
+                  }}
+                />
+              ))}
+            </QuestionErrorBoundary>
           </div>
         )}
 
@@ -603,12 +639,14 @@ function QuestionBanner({
   onReply: (answers: QuestionAnswer[]) => void
   onReject: () => void
 }) {
+  const questionList = request.questions ?? []
+
   // One selection state per question in the request
   const [selections, setSelections] = useState<string[][]>(
-    () => request.questions.map(() => [])
+    () => questionList.map(() => [])
   )
   const [customInputs, setCustomInputs] = useState<string[]>(
-    () => request.questions.map(() => "")
+    () => questionList.map(() => "")
   )
 
   const toggleOption = (questionIndex: number, label: string, isMultiple: boolean) => {
@@ -627,7 +665,7 @@ function QuestionBanner({
   }
 
   const handleSubmit = () => {
-    const answers: QuestionAnswer[] = request.questions.map((q, i) => {
+    const answers: QuestionAnswer[] = questionList.map((q, i) => {
       const selected = selections[i]
       const custom = customInputs[i].trim()
       if (custom && selected.length === 0) return [custom]
@@ -642,7 +680,7 @@ function QuestionBanner({
 
   return (
     <div className="rounded-lg border border-indigo-500/50 bg-indigo-500/5 px-3 py-2 space-y-3">
-      {request.questions.map((q, questionIndex) => (
+      {questionList.map((q, questionIndex) => (
         <QuestionItem
           key={questionIndex}
           question={q}
@@ -693,6 +731,7 @@ function QuestionItem({
   onCustomInputChange: (value: string) => void
 }) {
   const allowCustom = question.custom !== false
+  const options = question.options ?? []
 
   return (
     <div className="space-y-2">
@@ -704,9 +743,9 @@ function QuestionItem({
         </div>
       </div>
 
-      {question.options.length > 0 && (
+      {options.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pl-7">
-          {question.options.map((option) => {
+          {options.map((option) => {
             const isSelected = selected.includes(option.label)
             return (
               <button

@@ -5,6 +5,7 @@ import { SystemStatsCards } from "@/components/dashboard/system-stats"
 import { ProcessList } from "@/components/dashboard/process-list"
 import { WorkspaceOverview } from "@/components/dashboard/workspace-overview"
 import { QuickActions } from "@/components/dashboard/quick-actions"
+import { ClickUpTasks } from "@/components/dashboard/clickup-tasks"
 
 export default function DashboardPage() {
   return (
@@ -23,7 +24,7 @@ export default function DashboardPage() {
           <QuickActions />
         </section>
 
-        {/* Workspaces + process list side by side on large screens */}
+        {/* Workspaces + ClickUp tasks side by side on large screens */}
         <div className="grid gap-6 lg:grid-cols-2">
           <section>
             <h2 className="text-sm font-medium text-muted-foreground mb-3">Workspaces</h2>
@@ -31,9 +32,15 @@ export default function DashboardPage() {
           </section>
 
           <section>
-            <ProcessList />
+            <h2 className="text-sm font-medium text-muted-foreground mb-3">My Tasks</h2>
+            <ClickUpTasks />
           </section>
         </div>
+
+        {/* Process list below */}
+        <section>
+          <ProcessList />
+        </section>
       </div>
     </AuthenticatedLayout>
   )

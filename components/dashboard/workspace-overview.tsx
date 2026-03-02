@@ -2,6 +2,9 @@
 
 import Link from "next/link"
 import { useWorkspaceStore } from "@/stores/workspace-store"
+import { useChatStore } from "@/stores/chat-store"
+import type { WorkspaceActivity } from "@/stores/chat-store"
+import { useShallow } from "zustand/react/shallow"
 import { useGitStatus } from "@/hooks/use-git"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +26,7 @@ import {
   Clock,
   FolderGit2,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import type { Workspace } from "@/types"
 
 export function WorkspaceOverview() {
@@ -51,9 +55,35 @@ export function WorkspaceOverview() {
   )
 }
 
+function useWorkspaceActivityInfo(workspaceId: string): {
+  activity: WorkspaceActivity
+  activeSessionCount: number
+} {
+  return useChatStore(
+    useShallow((state) => {
+      const ws = state.workspaceStates[workspaceId]
+      if (!ws) return { activity: "idle" as const, activeSessionCount: 0 }
+
+      if (ws.permissions.length > 0 || ws.questions.length > 0) {
+        return { activity: "waiting" as const, activeSessionCount: 0 }
+      }
+
+      const activeSessionCount = Object.values(ws.sessionStatuses).filter(
+        (s) => s.type !== "idle"
+      ).length
+
+      return {
+        activity: (activeSessionCount > 0 ? "active" : "idle") as WorkspaceActivity,
+        activeSessionCount,
+      }
+    })
+  )
+}
+
 function WorkspaceCard({ workspace }: { workspace: Workspace }) {
   const { setActiveWorkspaceId } = useWorkspaceStore()
   const { data: gitStatus, isLoading } = useGitStatus(workspace.id)
+  const { activity, activeSessionCount } = useWorkspaceActivityInfo(workspace.id)
 
   const totalChanges = gitStatus
     ? gitStatus.staged.length + gitStatus.unstaged.length + gitStatus.untracked.length
@@ -147,6 +177,29 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
           </div>
         ) : null}
 
+        {activity !== "idle" && (
+          <div
+            className={cn(
+              "flex items-center gap-1.5 text-xs",
+              activity === "active" && "text-emerald-600 dark:text-emerald-400",
+              activity === "waiting" && "text-amber-600 dark:text-amber-400"
+            )}
+          >
+            <span
+              className={cn(
+                "size-1.5 rounded-full shrink-0",
+                activity === "active" && "bg-emerald-500 animate-pulse",
+                activity === "waiting" && "bg-amber-500"
+              )}
+            />
+            {activity === "active" &&
+              (activeSessionCount === 1
+                ? "1 session active"
+                : `${activeSessionCount} sessions active`)}
+            {activity === "waiting" && "Waiting for input"}
+          </div>
+        )}
+
         <div className="flex items-center gap-3 pt-0.5">
           <Link
             href="/chat"
@@ -191,3 +244,4 @@ function formatRelativeDate(dateString: string): string {
   if (diffDays < 30) return `${diffDays}d ago`
   return date.toLocaleDateString()
 }
+

@@ -40,7 +40,7 @@ export function MessageToolUse({ part }: MessageToolUseProps) {
   }
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-lg border bg-muted/30">
+    <div className="min-w-0 w-full overflow-hidden rounded-lg border bg-muted/30">
       <button
         onClick={handleToggle}
         className={cn(
@@ -59,11 +59,11 @@ export function MessageToolUse({ part }: MessageToolUseProps) {
       </button>
 
       {isExpanded && (
-        <div className="border-t px-3 py-2 text-xs">
+        <div className="border-t px-3 py-2 text-xs overflow-hidden">
           {state.input && Object.keys(state.input).length > 0 && (
             <div className="mb-2">
               <span className="font-medium text-muted-foreground">Input:</span>
-              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs break-all">
+              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs break-all max-w-full">
                 {formatToolData(state.input)}
               </pre>
             </div>
@@ -74,7 +74,7 @@ export function MessageToolUse({ part }: MessageToolUseProps) {
               <span className="font-medium text-muted-foreground">
                 Output:
               </span>
-              <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 text-xs">
+              <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 text-xs max-w-full">
                 {truncateOutput(state.output)}
               </pre>
             </div>

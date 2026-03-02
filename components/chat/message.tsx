@@ -82,18 +82,18 @@ export const ChatMessage = memo(
         </div>
       )}
 
-      <div
-        className={cn(
-          "flex flex-col gap-2",
-          isUser ? "max-w-[80%] items-end" : "min-w-0 w-full max-w-[85%] items-start"
-        )}
-      >
+        <div
+          className={cn(
+            "flex flex-col gap-2",
+            isUser ? "max-w-[80%] items-end" : "min-w-0 max-w-full items-start overflow-hidden md:max-w-[85%]"
+          )}
+        >
         {isUser ? (
           <div className="rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-primary-foreground">
             <p className="whitespace-pre-wrap text-sm">{textContent}</p>
           </div>
         ) : (
-          <div className="min-w-0 w-full space-y-3">
+          <div className="min-w-0 w-full space-y-3 overflow-hidden">
             {reasoningParts.map((part) => (
               <ReasoningBlock key={part.id} part={part} />
             ))}
@@ -107,7 +107,7 @@ export const ChatMessage = memo(
             ))}
 
             {textContent && (
-              <div className="prose prose-sm dark:prose-invert max-w-none overflow-x-auto">
+              <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
                 <MarkdownContent content={textContent} />
               </div>
             )}
@@ -186,10 +186,10 @@ function ReasoningBlock({ part }: { part: ReasoningPart }) {
 
 function SubtaskCard({ part }: { part: SubtaskPart }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-2">
+    <div className="flex items-start gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-2 overflow-hidden">
       <GitBranch className="mt-0.5 size-3.5 shrink-0 text-violet-500" />
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-violet-700 dark:text-violet-300">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-violet-700 dark:text-violet-300 truncate">
           Subagent · {part.agent}
         </p>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">

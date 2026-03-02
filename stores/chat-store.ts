@@ -1,3 +1,5 @@
+"use client"
+
 import { create } from "zustand"
 import type {
   Session,
@@ -11,22 +13,62 @@ import type {
   QuestionAnswer,
 } from "@/lib/opencode/types"
 
-type StreamingStatus = "idle" | "connecting" | "streaming" | "waiting" | "error"
+export type StreamingStatus = "idle" | "connecting" | "streaming" | "waiting" | "error"
+
+// Activity level for a workspace — used by UI indicators
+export type WorkspaceActivity = "idle" | "active" | "waiting"
+
+// Per-workspace state bucket
+export interface WorkspaceState {
+  sessions: Record<string, Session>
+  messages: Record<string, MessageWithParts[]>
+  optimisticMessageIds: Record<string, string>
+  // Status tracked per session ID, not a single scalar
+  sessionStatuses: Record<string, SessionStatus>
+  permissions: Permission[]
+  questions: QuestionRequest[]
+  // Todos keyed by session ID
+  todos: Record<string, Todo[]>
+  eventSource: EventSource | null
+  sseReconnectAttempts: number
+}
+
+function emptyWorkspaceState(): WorkspaceState {
+  return {
+    sessions: {},
+    messages: {},
+    optimisticMessageIds: {},
+    sessionStatuses: {},
+    permissions: [],
+    questions: [],
+    todos: {},
+    eventSource: null,
+    sseReconnectAttempts: 0,
+  }
+}
+
+// Stable empty references to avoid infinite re-render loops with Zustand selectors.
+// Returning `{}` or `[]` inline creates a new reference each call, breaking Object.is equality.
+const EMPTY_SESSIONS: Record<string, Session> = {}
+const EMPTY_MESSAGES: MessageWithParts[] = []
+const EMPTY_PERMISSIONS: Permission[] = []
+const EMPTY_QUESTIONS: QuestionRequest[] = []
+const EMPTY_TODOS: Todo[] = []
+const EMPTY_SESSION_STATUSES: Record<string, SessionStatus> = {}
 
 // RAF-batched buffer for message.part.updated events.
 // Keyed: sessionId → messageId → partId → Part
-// A null Part means "pending flush, no part stored yet" — never actually stored.
-// We keep the outer maps around between flushes to avoid GC churn.
 const pendingPartUpdates = new Map<string, Map<string, Map<string, Part>>>()
 let partUpdateRafHandle: number | null = null
 
-function schedulePendingPartFlush(set: (fn: (state: ChatState) => Partial<ChatState>) => void): void {
+function schedulePendingPartFlush(
+  set: (fn: (state: ChatState) => Partial<ChatState>) => void
+): void {
   if (partUpdateRafHandle !== null) return
   partUpdateRafHandle = requestAnimationFrame(() => {
     partUpdateRafHandle = null
     if (pendingPartUpdates.size === 0) return
 
-    // Snapshot and clear before calling set() to avoid re-entrancy issues
     const snapshot = new Map(
       [...pendingPartUpdates.entries()].map(([sessionId, byMessage]) => [
         sessionId,
@@ -41,10 +83,15 @@ function schedulePendingPartFlush(set: (fn: (state: ChatState) => Partial<ChatSt
     pendingPartUpdates.clear()
 
     set((state) => {
-      const nextMessages = { ...state.messages }
+      // Find which workspace owns each session and update its messages
+      const nextWorkspaceStates = { ...state.workspaceStates }
 
       for (const [sessionId, byMessage] of snapshot) {
-        const sessionMessages = nextMessages[sessionId]
+        const wsId = findWorkspaceForSession(state.workspaceStates, sessionId)
+        if (!wsId) continue
+
+        const ws = nextWorkspaceStates[wsId]
+        const sessionMessages = ws.messages[sessionId]
         if (!sessionMessages) continue
 
         let updatedSession = sessionMessages
@@ -68,42 +115,50 @@ function schedulePendingPartFlush(set: (fn: (state: ChatState) => Partial<ChatSt
           )
         }
 
-        nextMessages[sessionId] = updatedSession
+        nextWorkspaceStates[wsId] = {
+          ...ws,
+          messages: { ...ws.messages, [sessionId]: updatedSession },
+        }
       }
 
-      return { messages: nextMessages }
+      return { workspaceStates: nextWorkspaceStates }
     })
   })
 }
 
-interface ChatState {
-  sessions: Record<string, Session>
-  activeSessionId: string | null
-  activeWorkspaceId: string | null
+function findWorkspaceForSession(
+  workspaceStates: Record<string, WorkspaceState>,
+  sessionId: string
+): string | null {
+  for (const [wsId, ws] of Object.entries(workspaceStates)) {
+    if (sessionId in ws.sessions) return wsId
+  }
+  return null
+}
 
-  messages: Record<string, MessageWithParts[]>
-  // Tracks optimistic message IDs per session so they can be replaced on SSE arrival
-  optimisticMessageIds: Record<string, string>
+interface ChatState {
+  workspaceStates: Record<string, WorkspaceState>
+
+  // UI focus
+  activeWorkspaceId: string | null
+  activeSessionId: string | null
+
+  // Derived streaming state for the focused session (kept flat for easy reading in chat UI)
   streamingStatus: StreamingStatus
   streamingError: string | null
-
-  sessionStatus: SessionStatus | null
-  permissions: Permission[]
-  questions: QuestionRequest[]
-  todos: Todo[]
-
-  eventSource: EventSource | null
-  sseReconnectAttempts: number
   streamingPollInterval: ReturnType<typeof setInterval> | null
 
+  // Workspace/session setters
   setActiveSession: (sessionId: string | null) => void
   setActiveWorkspaceId: (workspaceId: string | null) => void
 
+  // Session CRUD
   fetchSessions: (workspaceId: string) => Promise<void>
   createSession: (workspaceId: string) => Promise<Session | null>
   deleteSession: (sessionId: string, workspaceId: string) => Promise<void>
   fetchMessages: (sessionId: string, workspaceId: string) => Promise<void>
 
+  // Messaging
   sendMessage: (
     sessionId: string,
     text: string,
@@ -123,19 +178,29 @@ interface ChatState {
     answers: QuestionAnswer[],
     workspaceId: string
   ) => Promise<void>
-  rejectQuestion: (
-    requestId: string,
-    workspaceId: string
-  ) => Promise<void>
+  rejectQuestion: (requestId: string, workspaceId: string) => Promise<void>
 
+  // SSE management — per-workspace
   connectSSE: (workspaceId: string) => void
-  disconnectSSE: () => void
+  disconnectSSE: (workspaceId: string) => void
+  disconnectAllSSE: () => void
   refreshActiveSessionStatus: (workspaceId: string) => Promise<void>
 
-  handleEvent: (event: Record<string, unknown>) => void
+  // Internal
+  handleEvent: (event: Record<string, unknown>, sourceWorkspaceId: string) => void
   clearChat: () => void
   startStreamingPoll: (workspaceId: string) => void
   clearStreamingPoll: () => void
+
+  // Selectors used by UI
+  getWorkspaceActivity: (workspaceId: string) => WorkspaceActivity
+  getActiveWorkspaceSessions: () => Record<string, Session>
+  getActiveSessionMessages: () => MessageWithParts[]
+  getActiveSessionStatus: () => SessionStatus | null
+  getActivePermissions: () => Permission[]
+  getActiveQuestions: () => QuestionRequest[]
+  getActiveSessionStatuses: () => Record<string, SessionStatus>
+  getActiveTodos: () => Todo[]
 }
 
 function buildProxyUrl(
@@ -154,40 +219,66 @@ function buildProxyUrl(
   return `/api/opencode/${path}${query ? `?${query}` : ""}`
 }
 
-export const useChatStore = create<ChatState>()((set, get) => ({
-  sessions: {},
-  activeSessionId: null,
-  activeWorkspaceId: null,
+function updateWorkspace(
+  state: ChatState,
+  workspaceId: string,
+  updater: (ws: WorkspaceState) => Partial<WorkspaceState>
+): Partial<ChatState> {
+  const existing = state.workspaceStates[workspaceId] ?? emptyWorkspaceState()
+  return {
+    workspaceStates: {
+      ...state.workspaceStates,
+      [workspaceId]: { ...existing, ...updater(existing) },
+    },
+  }
+}
 
-  messages: {},
-  optimisticMessageIds: {},
+export const useChatStore = create<ChatState>()((set, get) => ({
+  workspaceStates: {},
+  activeWorkspaceId: null,
+  activeSessionId: null,
   streamingStatus: "idle",
   streamingError: null,
-
-  sessionStatus: null,
-  permissions: [],
-  questions: [],
-  todos: [],
-
-  eventSource: null,
-  sseReconnectAttempts: 0,
   streamingPollInterval: null,
 
-  setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+  setActiveSession: (sessionId) => {
+    set({ activeSessionId: sessionId })
+    // Sync the streaming status scalar to reflect the new session's status
+    const { activeWorkspaceId, workspaceStates } = get()
+    if (!activeWorkspaceId || !sessionId) {
+      set({ streamingStatus: "idle", streamingError: null })
+      return
+    }
+    const ws = workspaceStates[activeWorkspaceId]
+    const status = ws?.sessionStatuses[sessionId]
+    set({
+      streamingStatus: status && status.type !== "idle" ? "streaming" : "idle",
+      streamingError: null,
+    })
+  },
+
   setActiveWorkspaceId: (workspaceId) => {
     const current = get().activeWorkspaceId
     if (current === workspaceId) return
+
     set({
       activeWorkspaceId: workspaceId,
       activeSessionId: null,
-      sessions: {},
-      messages: {},
-      optimisticMessageIds: {},
-      permissions: [],
-      questions: [],
-      todos: [],
-      sseReconnectAttempts: 0,
+      streamingStatus: "idle",
+      streamingError: null,
     })
+
+    // Connect SSE for this workspace if not already connected
+    if (workspaceId) {
+      const ws = get().workspaceStates[workspaceId]
+      if (!ws?.eventSource) {
+        get().connectSSE(workspaceId)
+      }
+      // Fetch sessions if we don't have them yet
+      if (!ws || Object.keys(ws.sessions).length === 0) {
+        get().fetchSessions(workspaceId)
+      }
+    }
   },
 
   fetchSessions: async (workspaceId) => {
@@ -203,7 +294,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       for (const session of data) {
         sessionsMap[session.id] = session
       }
-      set({ sessions: sessionsMap })
+      set((state) => updateWorkspace(state, workspaceId, () => ({ sessions: sessionsMap })))
+
+      // Auto-select the most recently updated session if none is selected for this workspace
+      const { activeWorkspaceId, activeSessionId } = get()
+      if (activeWorkspaceId === workspaceId && !activeSessionId) {
+        const mostRecent = data
+          .filter((s) => !s.parentID)
+          .sort((a, b) => b.time.updated - a.time.updated)[0]
+        if (mostRecent) {
+          get().setActiveSession(mostRecent.id)
+        }
+      }
     } catch (error) {
       console.warn("[chat] fetchSessions error:", error)
     }
@@ -220,8 +322,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       const session: Session = await response.json()
       set((state) => ({
-        sessions: { ...state.sessions, [session.id]: session },
         activeSessionId: session.id,
+        ...updateWorkspace(state, workspaceId, (ws) => ({
+          sessions: { ...ws.sessions, [session.id]: session },
+        })),
       }))
       return session
     } catch {
@@ -235,15 +339,26 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         method: "DELETE",
       })
       set((state) => {
-        const { [sessionId]: _, ...remainingSessions } = state.sessions
-        const { [sessionId]: __, ...remainingMessages } = state.messages
+        const ws = state.workspaceStates[workspaceId] ?? emptyWorkspaceState()
+        const { [sessionId]: _s, ...remainingSessions } = ws.sessions
+        const { [sessionId]: _m, ...remainingMessages } = ws.messages
+        const { [sessionId]: _o, ...remainingOptimistic } = ws.optimisticMessageIds
+        const { [sessionId]: _st, ...remainingStatuses } = ws.sessionStatuses
+        const { [sessionId]: _t, ...remainingTodos } = ws.todos
         return {
-          sessions: remainingSessions,
-          messages: remainingMessages,
           activeSessionId:
-            state.activeSessionId === sessionId
-              ? null
-              : state.activeSessionId,
+            state.activeSessionId === sessionId ? null : state.activeSessionId,
+          workspaceStates: {
+            ...state.workspaceStates,
+            [workspaceId]: {
+              ...ws,
+              sessions: remainingSessions,
+              messages: remainingMessages,
+              optimisticMessageIds: remainingOptimistic,
+              sessionStatuses: remainingStatuses,
+              todos: remainingTodos,
+            },
+          },
         }
       })
     } catch {
@@ -259,13 +374,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       if (!response.ok) return
 
       const data: MessageWithParts[] = await response.json()
-      set((state) => {
-        const { [sessionId]: _, ...remainingOptimistic } = state.optimisticMessageIds
-        return {
-          optimisticMessageIds: remainingOptimistic,
-          messages: { ...state.messages, [sessionId]: data },
-        }
-      })
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => {
+          const { [sessionId]: _, ...remainingOptimistic } = ws.optimisticMessageIds
+          return {
+            optimisticMessageIds: remainingOptimistic,
+            messages: { ...ws.messages, [sessionId]: data },
+          }
+        })
+      )
     } catch {
       // Silently fail
     }
@@ -274,8 +391,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   sendMessage: async (sessionId, text, workspaceId, model, agent) => {
     set({ streamingStatus: "streaming", streamingError: null })
 
-    // Insert the optimistic message BEFORE the fetch so the SSE handler
-    // can find and replace it even if the event arrives before the fetch resolves.
     const optimisticId = `optimistic-${Date.now()}`
     const optimisticMessage: MessageWithParts = {
       info: {
@@ -296,14 +411,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         },
       ],
     }
-    set((state) => ({
-      streamingError: null,
-      optimisticMessageIds: { ...state.optimisticMessageIds, [sessionId]: optimisticId },
-      messages: {
-        ...state.messages,
-        [sessionId]: [...(state.messages[sessionId] ?? []), optimisticMessage],
-      },
-    }))
+
+    set((state) =>
+      updateWorkspace(state, workspaceId, (ws) => ({
+        optimisticMessageIds: { ...ws.optimisticMessageIds, [sessionId]: optimisticId },
+        messages: {
+          ...ws.messages,
+          [sessionId]: [...(ws.messages[sessionId] ?? []), optimisticMessage],
+        },
+      }))
+    )
 
     try {
       const body: Record<string, unknown> = {
@@ -323,42 +440,44 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: "Failed to send message" }))
-        // Remove the optimistic message on failure
-        set((state) => {
-          const { [sessionId]: _, ...remainingOptimistic } = state.optimisticMessageIds
-          return {
-            streamingStatus: "error",
-            streamingError: error.error || error.detail || "Failed to send message",
-            optimisticMessageIds: remainingOptimistic,
-            messages: {
-              ...state.messages,
-              [sessionId]: (state.messages[sessionId] ?? []).filter(
-                (m) => m.info.id !== optimisticId
-              ),
-            },
-          }
+        set((state) =>
+          updateWorkspace(state, workspaceId, (ws) => {
+            const { [sessionId]: _, ...remainingOptimistic } = ws.optimisticMessageIds
+            return {
+              optimisticMessageIds: remainingOptimistic,
+              messages: {
+                ...ws.messages,
+                [sessionId]: (ws.messages[sessionId] ?? []).filter(
+                  (m) => m.info.id !== optimisticId
+                ),
+              },
+            }
+          })
+        )
+        set({
+          streamingStatus: "error",
+          streamingError: error.error || error.detail || "Failed to send message",
         })
         return
       }
       get().startStreamingPoll(workspaceId)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to send message"
-      // Remove the optimistic message on failure
-      set((state) => {
-        const { [sessionId]: _, ...remainingOptimistic } = state.optimisticMessageIds
-        return {
-          streamingStatus: "error",
-          streamingError: message,
-          optimisticMessageIds: remainingOptimistic,
-          messages: {
-            ...state.messages,
-            [sessionId]: (state.messages[sessionId] ?? []).filter(
-              (m) => m.info.id !== optimisticId
-            ),
-          },
-        }
-      })
+      const message = error instanceof Error ? error.message : "Failed to send message"
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => {
+          const { [sessionId]: _, ...remainingOptimistic } = ws.optimisticMessageIds
+          return {
+            optimisticMessageIds: remainingOptimistic,
+            messages: {
+              ...ws.messages,
+              [sessionId]: (ws.messages[sessionId] ?? []).filter(
+                (m) => m.info.id !== optimisticId
+              ),
+            },
+          }
+        })
+      )
+      set({ streamingStatus: "error", streamingError: message })
     }
   },
 
@@ -375,18 +494,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
-  respondToPermission: async (
-    sessionId,
-    permissionId,
-    response,
-    workspaceId
-  ) => {
+  respondToPermission: async (sessionId, permissionId, response, workspaceId) => {
     try {
       await fetch(
-        buildProxyUrl(
-          `session/${sessionId}/permissions/${permissionId}`,
-          workspaceId
-        ),
+        buildProxyUrl(`session/${sessionId}/permissions/${permissionId}`, workspaceId),
         {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -395,9 +506,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           }),
         }
       )
-      set((state) => ({
-        permissions: state.permissions.filter((p) => p.id !== permissionId),
-      }))
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => ({
+          permissions: ws.permissions.filter((p) => p.id !== permissionId),
+        }))
+      )
     } catch {
       // Best effort
     }
@@ -405,38 +518,36 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   replyToQuestion: async (requestId, answers, workspaceId) => {
     try {
-      await fetch(
-        buildProxyUrl(`question/${requestId}/reply`, workspaceId),
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ answers }),
-        }
+      await fetch(buildProxyUrl(`question/${requestId}/reply`, workspaceId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ answers }),
+      })
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => ({
+          questions: ws.questions.filter((q) => q.id !== requestId),
+        }))
       )
-      set((state) => ({
-        questions: state.questions.filter((q) => q.id !== requestId),
-      }))
-    } catch {
-      // Best effort
+    } catch (err) {
+      console.warn("[chat] Failed to reply to question:", err)
     }
   },
 
   rejectQuestion: async (requestId, workspaceId) => {
     try {
-      await fetch(
-        buildProxyUrl(`question/${requestId}/reject`, workspaceId),
-        { method: "POST" }
+      await fetch(buildProxyUrl(`question/${requestId}/reject`, workspaceId), { method: "POST" })
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => ({
+          questions: ws.questions.filter((q) => q.id !== requestId),
+        }))
       )
-      set((state) => ({
-        questions: state.questions.filter((q) => q.id !== requestId),
-      }))
-    } catch {
-      // Best effort
+    } catch (err) {
+      console.warn("[chat] Failed to reject question:", err)
     }
   },
 
   connectSSE: (workspaceId) => {
-    const existing = get().eventSource
+    const existing = get().workspaceStates[workspaceId]?.eventSource
     if (existing) {
       existing.close()
     }
@@ -445,28 +556,31 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const eventSource = new EventSource(url)
 
     eventSource.onopen = () => {
-      console.log("[chat] SSE connected")
-      const state = get()
-      set({
-        sseReconnectAttempts: 0,
-        streamingError: null,
-        // If status was stuck on "error" from a previous SSE disconnect, reset to idle
-        streamingStatus: state.streamingStatus === "error" ? "idle" : state.streamingStatus,
-      })
+      console.log(`[chat] SSE connected for workspace ${workspaceId}`)
+      set((state) =>
+        updateWorkspace(state, workspaceId, () => ({
+          sseReconnectAttempts: 0,
+        }))
+      )
 
-      // Re-fetch active session's messages to catch anything missed during disconnect
-      const { activeSessionId, activeWorkspaceId } = get()
-      if (activeSessionId && activeWorkspaceId) {
-        get().fetchMessages(activeSessionId, activeWorkspaceId)
-        // Re-fetch session info to check if it transitioned to idle while disconnected
-        get().refreshActiveSessionStatus(activeWorkspaceId)
+      // Reset streaming error on the active workspace if it was stuck
+      const { activeWorkspaceId, streamingStatus } = get()
+      if (activeWorkspaceId === workspaceId && streamingStatus === "error") {
+        set({ streamingError: null, streamingStatus: "idle" })
+      }
+
+      // Re-fetch active session messages to catch anything missed during disconnect
+      const { activeSessionId } = get()
+      if (activeSessionId) {
+        get().fetchMessages(activeSessionId, workspaceId)
+        get().refreshActiveSessionStatus(workspaceId)
       }
     }
 
     eventSource.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data) as Record<string, unknown>
-        get().handleEvent(parsed)
+        get().handleEvent(parsed, workspaceId)
       } catch {
         // Ignore malformed events
       }
@@ -475,35 +589,62 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     eventSource.onerror = () => {
       eventSource.close()
 
-      const attempts = get().sseReconnectAttempts
+      const ws = get().workspaceStates[workspaceId]
+      const attempts = ws?.sseReconnectAttempts ?? 0
       const MAX_RECONNECT_ATTEMPTS = 20
       const backoffMs = Math.min(1000 * 2 ** Math.min(attempts, 5), 30000)
 
       if (attempts >= MAX_RECONNECT_ATTEMPTS) {
-        console.warn("[chat] SSE reconnect limit reached, giving up")
-        set({ eventSource: null })
+        console.warn(`[chat] SSE reconnect limit reached for workspace ${workspaceId}`)
+        set((state) =>
+          updateWorkspace(state, workspaceId, () => ({ eventSource: null }))
+        )
         return
       }
 
-      set({ sseReconnectAttempts: attempts + 1 })
+      set((state) =>
+        updateWorkspace(state, workspaceId, () => ({
+          sseReconnectAttempts: attempts + 1,
+          eventSource: null,
+        }))
+      )
 
       setTimeout(() => {
-        const current = get().activeWorkspaceId
-        if (current === workspaceId) {
+        // Only reconnect if this workspace is still in state (not removed)
+        const currentWs = get().workspaceStates[workspaceId]
+        if (currentWs && !currentWs.eventSource) {
           get().connectSSE(workspaceId)
         }
       }, backoffMs)
     }
 
-    set({ eventSource })
+    set((state) =>
+      updateWorkspace(state, workspaceId, () => ({ eventSource }))
+    )
   },
 
-  disconnectSSE: () => {
-    const existing = get().eventSource
-    if (existing) {
-      existing.close()
+  disconnectSSE: (workspaceId) => {
+    const ws = get().workspaceStates[workspaceId]
+    if (ws?.eventSource) {
+      ws.eventSource.close()
     }
-    set({ eventSource: null })
+    set((state) =>
+      updateWorkspace(state, workspaceId, () => ({ eventSource: null }))
+    )
+  },
+
+  disconnectAllSSE: () => {
+    const { workspaceStates } = get()
+    for (const ws of Object.values(workspaceStates)) {
+      ws.eventSource?.close()
+    }
+    set((state) => {
+      const updated: Record<string, WorkspaceState> = {}
+      for (const [wsId, ws] of Object.entries(state.workspaceStates)) {
+        updated[wsId] = { ...ws, eventSource: null }
+      }
+      return { workspaceStates: updated }
+    })
   },
 
   refreshActiveSessionStatus: async (workspaceId) => {
@@ -511,25 +652,29 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     if (!activeSessionId || streamingStatus === "idle") return
 
     try {
-      const response = await fetch(
-        buildProxyUrl("session/status", workspaceId)
-      )
+      const response = await fetch(buildProxyUrl("session/status", workspaceId))
       if (!response.ok) return
 
       const statusMap = (await response.json()) as Record<string, SessionStatus>
       const status = statusMap[activeSessionId]
-      if (status && status.type === "idle") {
+      if (!status) return
+
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => ({
+          sessionStatuses: { ...ws.sessionStatuses, [activeSessionId]: status },
+        }))
+      )
+
+      if (status.type === "idle") {
         get().clearStreamingPoll()
-        set({ streamingStatus: "idle", sessionStatus: status })
-      } else if (status) {
-        set({ sessionStatus: status })
+        set({ streamingStatus: "idle" })
       }
     } catch {
       // Best effort — SSE events will catch up
     }
   },
 
-  handleEvent: (event) => {
+  handleEvent: (event, sourceWorkspaceId) => {
     const eventType = event.type as string
     const properties = event.properties as Record<string, unknown> | undefined
 
@@ -539,20 +684,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       case "message.updated": {
         const info = properties.info as Message
         if (!info) return
-        set((state) => {
-          const sessionId = info.sessionID
-          const optimisticId = state.optimisticMessageIds[sessionId]
 
-          // Strip the optimistic placeholder when the real user message arrives
-          const sessionMessages = (state.messages[sessionId] ?? []).filter(
+        // Route to the correct workspace
+        const wsId = findWorkspaceForSession(get().workspaceStates, info.sessionID) ?? sourceWorkspaceId
+
+        set((state) => {
+          const ws = state.workspaceStates[wsId] ?? emptyWorkspaceState()
+          const optimisticId = ws.optimisticMessageIds[info.sessionID]
+          const sessionMessages = (ws.messages[info.sessionID] ?? []).filter(
             (m) => !(info.role === "user" && optimisticId && m.info.id === optimisticId)
           )
           const optimisticMessageIds =
             info.role === "user" && optimisticId
               ? Object.fromEntries(
-                  Object.entries(state.optimisticMessageIds).filter(([k]) => k !== sessionId)
+                  Object.entries(ws.optimisticMessageIds).filter(([k]) => k !== info.sessionID)
                 )
-              : state.optimisticMessageIds
+              : ws.optimisticMessageIds
 
           const existingIndex = sessionMessages.findIndex((m) => m.info.id === info.id)
           const updated =
@@ -561,16 +708,20 @@ export const useChatStore = create<ChatState>()((set, get) => ({
               : [...sessionMessages, { info, parts: [] }]
 
           return {
-            optimisticMessageIds,
-            messages: { ...state.messages, [sessionId]: updated },
+            workspaceStates: {
+              ...state.workspaceStates,
+              [wsId]: {
+                ...ws,
+                optimisticMessageIds,
+                messages: { ...ws.messages, [info.sessionID]: updated },
+              },
+            },
           }
         })
-        // Completion detection: when an assistant message has a finish reason, check session status
+
+        // When assistant message finishes, refresh the session status
         if (info.role === "assistant" && "finish" in info && info.finish) {
-          const { activeWorkspaceId } = get()
-          if (activeWorkspaceId) {
-            get().refreshActiveSessionStatus(activeWorkspaceId)
-          }
+          get().refreshActiveSessionStatus(sourceWorkspaceId)
         }
         break
       }
@@ -578,17 +729,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       case "message.removed": {
         const sessionID = properties.sessionID as string
         const messageID = properties.messageID as string
-        set((state) => {
-          const sessionMessages = state.messages[sessionID] ?? []
-          return {
+        const wsId = findWorkspaceForSession(get().workspaceStates, sessionID) ?? sourceWorkspaceId
+
+        set((state) =>
+          updateWorkspace(state, wsId, (ws) => ({
             messages: {
-              ...state.messages,
-              [sessionID]: sessionMessages.filter(
+              ...ws.messages,
+              [sessionID]: (ws.messages[sessionID] ?? []).filter(
                 (m) => m.info.id !== messageID
               ),
             },
-          }
-        })
+          }))
+        )
         break
       }
 
@@ -596,7 +748,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const part = properties.part as Part
         if (!part) return
 
-        // Buffer this update — a single set() will apply all parts in the next RAF frame
         let byMessage = pendingPartUpdates.get(part.sessionID)
         if (!byMessage) {
           byMessage = new Map()
@@ -617,19 +768,20 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const sessionID = properties.sessionID as string
         const messageID = properties.messageID as string
         const partID = properties.partID as string
-        set((state) => {
-          const sessionMessages = state.messages[sessionID] ?? []
-          return {
+        const wsId = findWorkspaceForSession(get().workspaceStates, sessionID) ?? sourceWorkspaceId
+
+        set((state) =>
+          updateWorkspace(state, wsId, (ws) => ({
             messages: {
-              ...state.messages,
-              [sessionID]: sessionMessages.map((m) =>
+              ...ws.messages,
+              [sessionID]: (ws.messages[sessionID] ?? []).map((m) =>
                 m.info.id === messageID
                   ? { ...m, parts: m.parts.filter((p) => p.id !== partID) }
                   : m
               ),
             },
-          }
-        })
+          }))
+        )
         break
       }
 
@@ -637,9 +789,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       case "session.updated": {
         const info = properties.info as Session
         if (!info) return
-        set((state) => ({
-          sessions: { ...state.sessions, [info.id]: info },
-        }))
+        set((state) =>
+          updateWorkspace(state, sourceWorkspaceId, (ws) => ({
+            sessions: { ...ws.sessions, [info.id]: info },
+          }))
+        )
         break
       }
 
@@ -647,13 +801,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const info = properties.info as Session
         if (!info) return
         set((state) => {
-          const { [info.id]: _, ...remaining } = state.sessions
+          const ws = state.workspaceStates[sourceWorkspaceId] ?? emptyWorkspaceState()
+          const { [info.id]: _s, ...remainingSessions } = ws.sessions
           return {
-            sessions: remaining,
             activeSessionId:
-              state.activeSessionId === info.id
-                ? null
-                : state.activeSessionId,
+              state.activeSessionId === info.id ? null : state.activeSessionId,
+            workspaceStates: {
+              ...state.workspaceStates,
+              [sourceWorkspaceId]: { ...ws, sessions: remainingSessions },
+            },
           }
         })
         break
@@ -662,48 +818,54 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       case "session.status": {
         const sessionID = properties.sessionID as string
         const status = properties.status as SessionStatus
-        const activeId = get().activeSessionId
-        if (sessionID === activeId) {
+        const wsId = findWorkspaceForSession(get().workspaceStates, sessionID) ?? sourceWorkspaceId
+
+        set((state) =>
+          updateWorkspace(state, wsId, (ws) => ({
+            sessionStatuses: { ...ws.sessionStatuses, [sessionID]: status },
+          }))
+        )
+
+        // Sync the flat streaming scalar for the focused session
+        const { activeSessionId, activeWorkspaceId } = get()
+        if (sessionID === activeSessionId && wsId === activeWorkspaceId) {
           const isIdle = status.type === "idle"
           if (isIdle) get().clearStreamingPoll()
-          set({
-            sessionStatus: status,
-            streamingStatus: isIdle ? "idle" : "streaming",
-          })
+          set({ streamingStatus: isIdle ? "idle" : "streaming" })
         }
         break
       }
 
       case "session.idle": {
         const sessionID = properties.sessionID as string
-        const activeId = get().activeSessionId
-        if (sessionID === activeId) {
+        const wsId = findWorkspaceForSession(get().workspaceStates, sessionID) ?? sourceWorkspaceId
+
+        set((state) =>
+          updateWorkspace(state, wsId, (ws) => ({
+            sessionStatuses: { ...ws.sessionStatuses, [sessionID]: { type: "idle" } },
+          }))
+        )
+
+        const { activeSessionId, activeWorkspaceId } = get()
+        if (sessionID === activeSessionId && wsId === activeWorkspaceId) {
           get().clearStreamingPoll()
-          set({
-            sessionStatus: { type: "idle" },
-            streamingStatus: "idle",
-          })
+          set({ streamingStatus: "idle" })
         }
         break
       }
 
       case "session.compacted": {
         const sessionID = properties.sessionID as string
-        const { activeWorkspaceId } = get()
-        if (activeWorkspaceId) {
-          get().fetchMessages(sessionID, activeWorkspaceId)
-        }
+        get().fetchMessages(sessionID, sourceWorkspaceId)
         break
       }
 
       case "session.error": {
         const sessionID = properties.sessionID as string | undefined
-        const activeId = get().activeSessionId
-        if (!sessionID || sessionID === activeId) {
+        const errorObj = properties.error as { data?: { message?: string } } | undefined
+        const { activeSessionId, activeWorkspaceId } = get()
+        if (!sessionID || (sessionID === activeSessionId && sourceWorkspaceId === activeWorkspaceId)) {
           get().clearStreamingPoll()
-          const errorObj = properties.error as
-            | { data?: { message?: string } }
-            | undefined
           set({
             streamingStatus: "error",
             streamingError: errorObj?.data?.message ?? "Session error",
@@ -714,65 +876,100 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       case "permission.updated": {
         const permission = properties as unknown as Permission
-        const activeId = get().activeSessionId
-        set((state) => {
-          const updated = [...state.permissions, permission]
-          const isActiveSession = permission.sessionID === activeId
-          return {
-            permissions: updated,
-            streamingStatus: isActiveSession ? "waiting" : state.streamingStatus,
-          }
-        })
+        const wsId = findWorkspaceForSession(get().workspaceStates, permission.sessionID) ?? sourceWorkspaceId
+
+        set((state) =>
+          updateWorkspace(state, wsId, (ws) => ({
+            permissions: [...ws.permissions, permission],
+          }))
+        )
+
+        // Sync waiting status for focused session
+        const { activeSessionId, activeWorkspaceId } = get()
+        if (permission.sessionID === activeSessionId && wsId === activeWorkspaceId) {
+          set({ streamingStatus: "waiting" })
+        }
         break
       }
 
       case "permission.replied": {
         const permissionID = properties.permissionID as string
-        set((state) => ({
-          permissions: state.permissions.filter(
-            (p) => p.id !== permissionID
-          ),
-        }))
-        break
-      }
-
-      case "question.asked": {
-        const question = properties as unknown as QuestionRequest
-        const activeId = get().activeSessionId
         set((state) => {
-          const updated = [...state.questions, question]
-          const isActiveSession = question.sessionID === activeId
-          return {
-            questions: updated,
-            streamingStatus: isActiveSession ? "waiting" : state.streamingStatus,
+          const updated: Record<string, WorkspaceState> = {}
+          for (const [wsId, ws] of Object.entries(state.workspaceStates)) {
+            updated[wsId] = {
+              ...ws,
+              permissions: ws.permissions.filter((p) => p.id !== permissionID),
+            }
           }
+          return { workspaceStates: updated }
         })
         break
       }
 
-      case "question.replied": {
-        const requestID = properties.requestID as string
-        set((state) => ({
-          questions: state.questions.filter((q) => q.id !== requestID),
-        }))
+      case "question.asked": {
+        const raw = properties as Record<string, unknown>
+        // Validate required fields before storing — malformed payloads crash the UI
+        if (typeof raw.id !== "string" || typeof raw.sessionID !== "string") {
+          console.warn("[chat] Dropping malformed question.asked event:", raw)
+          break
+        }
+        const question: QuestionRequest = {
+          id: raw.id,
+          sessionID: raw.sessionID,
+          tool: raw.tool as QuestionRequest["tool"],
+          // Ensure questions is always a well-formed array — each item must have options as an array
+          questions: Array.isArray(raw.questions)
+            ? (raw.questions as Record<string, unknown>[]).map((q) => ({
+                question: String(q.question ?? ""),
+                header: String(q.header ?? ""),
+                options: Array.isArray(q.options) ? q.options : [],
+                multiple: q.multiple === true,
+                custom: q.custom !== false,
+              }))
+            : [],
+        }
+        const wsId = findWorkspaceForSession(get().workspaceStates, question.sessionID) ?? sourceWorkspaceId
+
+        set((state) =>
+          updateWorkspace(state, wsId, (ws) => ({
+            questions: [...ws.questions, question],
+          }))
+        )
+
+        const { activeSessionId, activeWorkspaceId } = get()
+        if (question.sessionID === activeSessionId && wsId === activeWorkspaceId) {
+          set({ streamingStatus: "waiting" })
+        }
         break
       }
 
+      case "question.replied":
       case "question.rejected": {
         const requestID = properties.requestID as string
-        set((state) => ({
-          questions: state.questions.filter((q) => q.id !== requestID),
-        }))
+        set((state) => {
+          const updated: Record<string, WorkspaceState> = {}
+          for (const [wsId, ws] of Object.entries(state.workspaceStates)) {
+            updated[wsId] = {
+              ...ws,
+              questions: ws.questions.filter((q) => q.id !== requestID),
+            }
+          }
+          return { workspaceStates: updated }
+        })
         break
       }
 
       case "todo.updated": {
         const todos = properties.todos as Todo[]
         const sessionID = properties.sessionID as string
-        const activeId = get().activeSessionId
-        if (sessionID === activeId) {
-          set({ todos })
-        }
+        const wsId = findWorkspaceForSession(get().workspaceStates, sessionID) ?? sourceWorkspaceId
+
+        set((state) =>
+          updateWorkspace(state, wsId, (ws) => ({
+            todos: { ...ws.todos, [sessionID]: todos },
+          }))
+        )
         break
       }
     }
@@ -801,17 +998,69 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   clearChat: () => {
     get().clearStreamingPoll()
-    return set({
+    set({
       activeSessionId: null,
-      messages: {},
-      optimisticMessageIds: {},
       streamingStatus: "idle",
       streamingError: null,
-      sessionStatus: null,
-      permissions: [],
-      questions: [],
-      todos: [],
-      sseReconnectAttempts: 0,
     })
+  },
+
+  // Selectors
+
+  getWorkspaceActivity: (workspaceId) => {
+    const ws = get().workspaceStates[workspaceId]
+    if (!ws) return "idle"
+    if (ws.permissions.length > 0 || ws.questions.length > 0) return "waiting"
+    const statuses = Object.values(ws.sessionStatuses)
+    if (statuses.some((s) => s.type !== "idle")) return "active"
+    return "idle"
+  },
+
+  getActiveWorkspaceSessions: () => {
+    const { activeWorkspaceId, workspaceStates } = get()
+    if (!activeWorkspaceId) return EMPTY_SESSIONS
+    return workspaceStates[activeWorkspaceId]?.sessions ?? EMPTY_SESSIONS
+  },
+
+  getActiveSessionMessages: () => {
+    const { activeSessionId, activeWorkspaceId, workspaceStates } = get()
+    if (!activeSessionId || !activeWorkspaceId) return EMPTY_MESSAGES
+    return workspaceStates[activeWorkspaceId]?.messages[activeSessionId] ?? EMPTY_MESSAGES
+  },
+
+  getActiveSessionStatus: () => {
+    const { activeSessionId, activeWorkspaceId, workspaceStates } = get()
+    if (!activeSessionId || !activeWorkspaceId) return null
+    return workspaceStates[activeWorkspaceId]?.sessionStatuses[activeSessionId] ?? null
+  },
+
+  getActivePermissions: () => {
+    const { activeSessionId, activeWorkspaceId, workspaceStates } = get()
+    if (!activeSessionId || !activeWorkspaceId) return EMPTY_PERMISSIONS
+    const ws = workspaceStates[activeWorkspaceId]
+    if (!ws) return EMPTY_PERMISSIONS
+    const filtered = ws.permissions.filter((p) => p.sessionID === activeSessionId)
+    return filtered.length > 0 ? filtered : EMPTY_PERMISSIONS
+  },
+
+  getActiveQuestions: () => {
+    const { activeSessionId, activeWorkspaceId, workspaceStates } = get()
+    if (!activeSessionId || !activeWorkspaceId) return EMPTY_QUESTIONS
+    const ws = workspaceStates[activeWorkspaceId]
+    if (!ws) return EMPTY_QUESTIONS
+    const filtered = ws.questions.filter((q) => q.sessionID === activeSessionId)
+    return filtered.length > 0 ? filtered : EMPTY_QUESTIONS
+  },
+
+  getActiveSessionStatuses: () => {
+    const { activeWorkspaceId, workspaceStates } = get()
+    if (!activeWorkspaceId) return EMPTY_SESSION_STATUSES
+    return workspaceStates[activeWorkspaceId]?.sessionStatuses ?? EMPTY_SESSION_STATUSES
+  },
+
+  getActiveTodos: () => {
+    const { activeSessionId, activeWorkspaceId, workspaceStates } = get()
+    if (!activeSessionId || !activeWorkspaceId) return EMPTY_TODOS
+    return workspaceStates[activeWorkspaceId]?.todos[activeSessionId] ?? EMPTY_TODOS
   },
 }))

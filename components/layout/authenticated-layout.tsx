@@ -7,7 +7,9 @@ import { useQuery } from "@tanstack/react-query"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { Header } from "@/components/layout/header"
+import { WorkspaceCommands } from "@/components/command-palette/workspace-commands"
 import { useWorkspaceStore } from "@/stores/workspace-store"
+import { useChatStore } from "@/stores/chat-store"
 import { useDefaultWorkspaceSetting } from "@/hooks/use-settings"
 import type { Workspace } from "@/types"
 
@@ -21,6 +23,7 @@ export function AuthenticatedLayout({
   const { setWorkspaces, setIsLoadingWorkspaces, activeWorkspaceId, setActiveWorkspaceId } =
     useWorkspaceStore()
   const { defaultWorkspaceId } = useDefaultWorkspaceSetting()
+  const { connectSSE, disconnectAllSSE } = useChatStore()
 
   const { data, isFetching } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
@@ -46,7 +49,16 @@ export function AuthenticatedLayout({
         : data[0].id
       setActiveWorkspaceId(preferred)
     }
-  }, [data, activeWorkspaceId, defaultWorkspaceId, setWorkspaces, setActiveWorkspaceId])
+    // Open SSE connections for all workspaces so activity is visible globally
+    for (const workspace of data) {
+      connectSSE(workspace.id)
+    }
+  }, [data, activeWorkspaceId, defaultWorkspaceId, setWorkspaces, setActiveWorkspaceId, connectSSE])
+
+  // Clean up all SSE connections when the layout unmounts (page close / sign-out)
+  useEffect(() => {
+    return () => disconnectAllSSE()
+  }, [disconnectAllSSE])
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -72,6 +84,7 @@ export function AuthenticatedLayout({
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden pb-16 md:pb-0">{children}</main>
       </div>
       <MobileNav />
+      <WorkspaceCommands />
     </div>
   )
 }

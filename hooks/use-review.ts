@@ -53,6 +53,7 @@ export function useReview(reviewId: string | null) {
     queryKey: ["review", reviewId],
     queryFn: () => reviewGet<ReviewWithFiles>(`/api/reviews/${reviewId}`),
     enabled: !!reviewId,
+    retry: 1,
   })
 }
 

@@ -31,6 +31,7 @@ export function spawnProcess(
   const child = spawn(command, {
     cwd,
     shell: true,
+    detached: true,
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, FORCE_COLOR: "1", TERM: "xterm-256color" },
   })
@@ -86,11 +87,19 @@ export function killProcess(sessionId: string): boolean {
   const managed = processes.get(sessionId)
   if (!managed) return false
 
-  if (!managed.exited) {
-    managed.process.kill("SIGTERM")
+  if (!managed.exited && managed.process.pid) {
+    try {
+      process.kill(-managed.process.pid, "SIGTERM")
+    } catch {
+      // Process group may have already exited
+    }
     setTimeout(() => {
-      if (!managed.exited) {
-        managed.process.kill("SIGKILL")
+      if (!managed.exited && managed.process.pid) {
+        try {
+          process.kill(-managed.process.pid, "SIGKILL")
+        } catch {
+          // Process group may have already exited
+        }
       }
     }, 3000)
   }

@@ -66,13 +66,15 @@ export const useCommandStore = create<CommandState>()((set, get) => ({
         body: JSON.stringify({ sessionId }),
       })
     } catch {
-      // Best effort — the SSE stream will report exit if connected
+      // Best effort
     }
 
-    // For reconnected sessions there is no SSE stream to report the exit,
-    // so mark it exited locally now.
+    // Always provide immediate UI feedback after kill.
+    // The SSE stream may also deliver an exit event, but markExited is
+    // idempotent so the duplicate is harmless.
     const session = get().sessions[sessionId]
-    if (session && !session.abortController) {
+    if (session && session.isRunning) {
+      appendLines(set, sessionId, "\x1b[90m\n--- process killed ---\x1b[0m\n")
       markExited(set, sessionId, null)
     }
   },

@@ -7,7 +7,7 @@ export interface PaletteCommand {
   id: string
   label: string
   group: string
-  icon?: LucideIcon
+  icon?: LucideIcon | React.ComponentType<{ className?: string }>
   shortcut?: string
   onSelect: () => void
 }

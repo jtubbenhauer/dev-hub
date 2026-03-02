@@ -5,16 +5,18 @@ import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher"
 import { GitStatusBar } from "@/components/layout/git-status-bar"
 import { SystemIndicator } from "@/components/layout/system-indicator"
 import { CommandDrawer } from "@/components/command-runner/command-drawer"
+import { useCommandPalette } from "@/components/providers/command-palette-provider"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useCommandStore } from "@/stores/command-store"
-import { LogOut, Terminal } from "lucide-react"
+import { LogOut, Terminal, Search } from "lucide-react"
 
 export function Header() {
   const setDrawerOpen = useCommandStore((s) => s.setDrawerOpen)
   const runningCount = useCommandStore(
     (s) => Object.values(s.sessions).filter((session) => session.isRunning).length
   )
+  const { toggle: toggleCommandPalette } = useCommandPalette()
 
   return (
     <>
@@ -35,6 +37,14 @@ export function Header() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleCommandPalette}
+            title="Command palette (Ctrl+,)"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"

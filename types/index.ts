@@ -295,3 +295,57 @@ export interface CloneRepoResult {
   clonePath: string
   workspace: Workspace
 }
+
+// ClickUp types
+
+export interface ClickUpUser {
+  id: number
+  username: string
+  email: string
+  color: string
+  profilePicture: string | null
+  initials: string
+}
+
+export interface ClickUpTaskStatus {
+  status: string
+  color: string
+  type: string
+}
+
+export interface ClickUpPriority {
+  id: string
+  priority: "urgent" | "high" | "normal" | "low"
+  color: string
+}
+
+export interface ClickUpTag {
+  name: string
+  tag_fg: string
+  tag_bg: string
+}
+
+export interface ClickUpTask {
+  id: string
+  custom_id: string | null
+  name: string
+  status: ClickUpTaskStatus
+  priority: ClickUpPriority | null
+  assignees: ClickUpUser[]
+  due_date: string | null
+  date_created: string
+  date_updated: string
+  date_closed: string | null
+  url: string
+  list: { id: string; name: string }
+  folder: { id: string; name: string }
+  space: { id: string }
+  tags: ClickUpTag[]
+}
+
+export interface ClickUpTeam {
+  id: string
+  name: string
+  color: string
+  avatar: string | null
+}

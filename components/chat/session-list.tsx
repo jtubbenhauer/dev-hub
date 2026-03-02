@@ -5,11 +5,12 @@ import { Plus, Trash2, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import type { Session } from "@/lib/opencode/types"
+import type { Session, SessionStatus } from "@/lib/opencode/types"
 
 interface SessionListProps {
   sessions: Record<string, Session>
   activeSessionId: string | null
+  sessionStatuses: Record<string, SessionStatus>
   onSelectSession: (sessionId: string) => void
   onCreateSession: () => void
   onDeleteSession: (sessionId: string) => void
@@ -18,6 +19,7 @@ interface SessionListProps {
 export function SessionList({
   sessions,
   activeSessionId,
+  sessionStatuses,
   onSelectSession,
   onCreateSession,
   onDeleteSession,
@@ -54,6 +56,7 @@ export function SessionList({
                 key={session.id}
                 session={session}
                 isActive={session.id === activeSessionId}
+                status={sessionStatuses[session.id] ?? null}
                 onSelect={() => onSelectSession(session.id)}
                 onDelete={() => onDeleteSession(session.id)}
               />
@@ -68,6 +71,7 @@ export function SessionList({
 interface SessionItemProps {
   session: Session
   isActive: boolean
+  status: SessionStatus | null
   onSelect: () => void
   onDelete: () => void
 }
@@ -75,12 +79,15 @@ interface SessionItemProps {
 function SessionItem({
   session,
   isActive,
+  status,
   onSelect,
   onDelete,
 }: SessionItemProps) {
   const formattedTime = useMemo(() => {
     return formatRelativeTime(session.time.updated)
   }, [session.time.updated])
+
+  const isRunning = status !== null && status.type !== "idle"
 
   return (
     <div
@@ -99,7 +106,12 @@ function SessionItem({
         isActive && "bg-muted"
       )}
     >
-      <MessageSquare className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+      <div className="relative mt-0.5 shrink-0">
+        <MessageSquare className="size-3.5 text-muted-foreground" />
+        {isRunning && (
+          <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        )}
+      </div>
       <div className="min-w-0 w-0 flex-1 overflow-hidden">
         <p className="truncate font-medium" title={session.title || "Untitled"}>
           {session.title || "Untitled"}

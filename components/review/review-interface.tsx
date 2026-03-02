@@ -11,13 +11,13 @@ import { ReviewCommitPanel } from "@/components/review/review-commit-panel"
 import { useCommand } from "@/hooks/use-command"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { RefreshCw } from "lucide-react"
-import { Loader2 } from "lucide-react"
+import { AlertCircle, RefreshCw, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import type { ReviewFile } from "@/types"
 
 export function ReviewInterface() {
   const { activeReviewId, selectedFileId, selectFile, clearReview } = useReviewStore()
-  const { data: review, isLoading: reviewLoading } = useReview(activeReviewId)
+  const { data: review, isLoading: reviewLoading, error: reviewError } = useReview(activeReviewId)
   const { data: fileContent, isLoading: diffLoading } = useReviewDiff(activeReviewId, selectedFileId)
   const toggleFile = useToggleReviewFile(activeReviewId)
   const refreshReview = useRefreshReview(activeReviewId)
@@ -157,10 +157,25 @@ export function ReviewInterface() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [refreshReview])
 
-  if (reviewLoading || !review) {
+  if (reviewLoading && !review) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (reviewError || !review) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+        <AlertCircle className="h-12 w-12 text-muted-foreground/50" />
+        <h3 className="text-lg font-medium">Review not found</h3>
+        <p className="max-w-md text-sm text-muted-foreground">
+          This review may have been deleted or is no longer available.
+        </p>
+        <Button variant="outline" onClick={clearReview}>
+          Back to review setup
+        </Button>
       </div>
     )
   }

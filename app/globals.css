@@ -161,3 +161,13 @@ pre code.hljs {
 .cm-editor .cm-deletedChunk .cm-deletedLine {
   text-decoration: none !important;
 }
+
+/* Radix ScrollArea viewport injects an inner div with `display: table; min-width: 100%`.
+   Table layout uses content intrinsic width as the minimum, preventing shrink below that
+   width when the browser window narrows (the ~830px mobile overflow bug in chat).
+   Override to block layout on the chat messages scroll area only so standard
+   overflow/min-width constraints work. Scoped to avoid breaking horizontal-scroll
+   uses elsewhere (e.g. editor file tabs). */
+.chat-scroll-area [data-slot="scroll-area-viewport"] > div {
+  display: block !important;
+}

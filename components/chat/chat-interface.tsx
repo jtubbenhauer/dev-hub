@@ -25,10 +25,10 @@ interface SelectedModel {
 }
 
 class QuestionErrorBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; onDismissAll: () => void },
   { hasError: boolean }
 > {
-  constructor(props: { children: ReactNode }) {
+  constructor(props: { children: ReactNode; onDismissAll: () => void }) {
     super(props)
     this.state = { hasError: false }
   }
@@ -42,7 +42,17 @@ class QuestionErrorBoundary extends Component<
   }
 
   render() {
-    if (this.state.hasError) return null
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>Could not display question.</span>
+          <Button size="sm" variant="outline" onClick={this.props.onDismissAll} className="h-6 gap-1 px-2 text-xs">
+            <X className="size-3" />
+            Dismiss
+          </Button>
+        </div>
+      )
+    }
     return this.props.children
   }
 }
@@ -87,7 +97,6 @@ export function ChatInterface() {
   }, [selectedAgent, agentModelBindings])
   const {
     activeSessionId,
-    streamingStatus,
     streamingError,
     setActiveSession,
     setActiveWorkspaceId,
@@ -107,13 +116,32 @@ export function ChatInterface() {
     getActivePermissions,
     getActiveQuestions,
     getActiveSessionStatuses,
+    getStreamingStatus,
   } = useChatStore()
+
+  // getStreamingStatus must be passed as a stable reference — inline lambdas like
+  // `(s) => s.getStreamingStatus()` create a new function each render, which causes
+  // useSyncExternalStore to see a "new snapshot" every tick → infinite re-render loop.
+  const streamingStatus = useChatStore(getStreamingStatus)
 
   const sessions = useChatStore(getActiveWorkspaceSessions)
   const sessionStatus = useChatStore(getActiveSessionStatus)
-  const permissions = useChatStore(getActivePermissions)
-  const questions = useChatStore(getActiveQuestions)
+  // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
+  // We filter by sessionID here with useMemo so we never create a new array reference
+  // on every render — that would violate useSyncExternalStore's snapshot contract and
+  // cause "Maximum update depth exceeded" via the ScrollArea ref cascade.
+  const allPermissions = useChatStore(getActivePermissions)
+  const allQuestions = useChatStore(getActiveQuestions)
   const sessionStatuses = useChatStore(getActiveSessionStatuses)
+
+  const activePermissions = useMemo(
+    () => allPermissions.filter((p) => p.sessionID === activeSessionId),
+    [allPermissions, activeSessionId]
+  )
+  const activeQuestions = useMemo(
+    () => allQuestions.filter((q) => q.sessionID === activeSessionId),
+    [allQuestions, activeSessionId]
+  )
 
   // Sync workspace from global workspace store
   useEffect(() => {
@@ -282,14 +310,6 @@ export function ChatInterface() {
 
   useCommand(chatCommands)
 
-  const activePermissions = permissions.filter(
-    (p) => p.sessionID === activeSessionId
-  )
-
-  const activeQuestions = questions.filter(
-    (q) => q.sessionID === activeSessionId
-  )
-
   if (!activeWorkspaceId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -391,7 +411,7 @@ export function ChatInterface() {
         </div>
 
         {/* Messages area or plan panel — mutually exclusive */}
-        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div className="chat-scroll-area relative min-h-0 min-w-0 flex-1 overflow-hidden">
           {isPlanPanelOpen && activeWorkspaceId ? (
             <PlanPanel
               workspaceId={activeWorkspaceId}
@@ -405,7 +425,7 @@ export function ChatInterface() {
               {activeMessages.length === 0 ? (
                 <EmptyChat onSend={handleSendMessage} />
               ) : (
-                <div className="pb-4">
+                <div className="min-w-0 overflow-hidden pb-4">
                   {activeMessages.map((msg) => (
                     <ChatMessage key={msg.info.id} message={msg} />
                   ))}
@@ -455,7 +475,13 @@ export function ChatInterface() {
         {/* Question requests */}
         {activeQuestions.length > 0 && (
           <div className="shrink-0 border-t bg-indigo-500/10 px-4 py-2 space-y-2">
-            <QuestionErrorBoundary>
+            <QuestionErrorBoundary
+              key={activeQuestions.map((q) => q.id).join(",")}
+              onDismissAll={() => {
+                if (!activeWorkspaceId) return
+                activeQuestions.forEach((q) => rejectQuestion(q.id, activeWorkspaceId))
+              }}
+            >
               {activeQuestions.map((question) => (
                 <QuestionBanner
                   key={question.id}
@@ -483,7 +509,7 @@ export function ChatInterface() {
               size="icon-xs"
               variant="ghost"
               className="shrink-0 text-destructive hover:text-destructive"
-              onClick={() => useChatStore.setState({ streamingError: null, streamingStatus: "idle" })}
+              onClick={() => useChatStore.setState({ streamingError: null })}
             >
               <X className="size-3" />
             </Button>
@@ -652,7 +678,7 @@ function QuestionBanner({
   const toggleOption = (questionIndex: number, label: string, isMultiple: boolean) => {
     setSelections((prev) => {
       const next = [...prev]
-      const current = next[questionIndex]
+      const current = next[questionIndex] ?? []
       if (isMultiple) {
         next[questionIndex] = current.includes(label)
           ? current.filter((l) => l !== label)
@@ -678,6 +704,13 @@ function QuestionBanner({
   const hasAnySelection = selections.some((s) => s.length > 0) ||
     customInputs.some((c) => c.trim().length > 0)
 
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey && hasAnySelection) {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
+
   return (
     <div className="rounded-lg border border-indigo-500/50 bg-indigo-500/5 px-3 py-2 space-y-3">
       {questionList.map((q, questionIndex) => (
@@ -696,6 +729,7 @@ function QuestionBanner({
               return next
             })
           }}
+          onSubmitOnEnter={handleInputKeyDown}
         />
       ))}
       <div className="flex justify-end gap-1.5">
@@ -723,12 +757,14 @@ function QuestionItem({
   customInput,
   onToggleOption,
   onCustomInputChange,
+  onSubmitOnEnter,
 }: {
   question: QuestionInfo
   selected: string[]
   customInput: string
   onToggleOption: (label: string) => void
   onCustomInputChange: (value: string) => void
+  onSubmitOnEnter: (e: React.KeyboardEvent<HTMLInputElement>) => void
 }) {
   const allowCustom = question.custom !== false
   const options = question.options ?? []
@@ -770,6 +806,7 @@ function QuestionItem({
           <Input
             value={customInput}
             onChange={(e) => onCustomInputChange(e.target.value)}
+            onKeyDown={onSubmitOnEnter}
             placeholder="Type a custom answer..."
             className="h-8 text-xs"
           />

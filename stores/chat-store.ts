@@ -143,10 +143,11 @@ interface ChatState {
   activeWorkspaceId: string | null
   activeSessionId: string | null
 
-  // Derived streaming state for the focused session (kept flat for easy reading in chat UI)
-  streamingStatus: StreamingStatus
+  // Streaming error for the focused session — stored explicitly because it has no other source of truth
   streamingError: string | null
   streamingPollInterval: ReturnType<typeof setInterval> | null
+  // Set to a sessionId when sendMessage fires — gives instant "streaming" feedback before the first SSE arrives
+  optimisticStreamingSessionId: string | null
 
   // Workspace/session setters
   setActiveSession: (sessionId: string | null) => void
@@ -193,6 +194,7 @@ interface ChatState {
   clearStreamingPoll: () => void
 
   // Selectors used by UI
+  getStreamingStatus: () => StreamingStatus
   getWorkspaceActivity: (workspaceId: string) => WorkspaceActivity
   getActiveWorkspaceSessions: () => Record<string, Session>
   getActiveSessionMessages: () => MessageWithParts[]
@@ -237,24 +239,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   workspaceStates: {},
   activeWorkspaceId: null,
   activeSessionId: null,
-  streamingStatus: "idle",
   streamingError: null,
   streamingPollInterval: null,
+  optimisticStreamingSessionId: null,
 
   setActiveSession: (sessionId) => {
     set({ activeSessionId: sessionId })
-    // Sync the streaming status scalar to reflect the new session's status
-    const { activeWorkspaceId, workspaceStates } = get()
-    if (!activeWorkspaceId || !sessionId) {
-      set({ streamingStatus: "idle", streamingError: null })
-      return
-    }
-    const ws = workspaceStates[activeWorkspaceId]
-    const status = ws?.sessionStatuses[sessionId]
-    set({
-      streamingStatus: status && status.type !== "idle" ? "streaming" : "idle",
-      streamingError: null,
-    })
   },
 
   setActiveWorkspaceId: (workspaceId) => {
@@ -264,7 +254,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     set({
       activeWorkspaceId: workspaceId,
       activeSessionId: null,
-      streamingStatus: "idle",
       streamingError: null,
     })
 
@@ -389,7 +378,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   sendMessage: async (sessionId, text, workspaceId, model, agent) => {
-    set({ streamingStatus: "streaming", streamingError: null })
+    set({ optimisticStreamingSessionId: sessionId, streamingError: null })
 
     const optimisticId = `optimistic-${Date.now()}`
     const optimisticMessage: MessageWithParts = {
@@ -455,7 +444,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           })
         )
         set({
-          streamingStatus: "error",
+          optimisticStreamingSessionId: null,
           streamingError: error.error || error.detail || "Failed to send message",
         })
         return
@@ -477,7 +466,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           }
         })
       )
-      set({ streamingStatus: "error", streamingError: message })
+      set({ optimisticStreamingSessionId: null, streamingError: message })
     }
   },
 
@@ -487,7 +476,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         buildProxyUrl(`session/${sessionId}/abort`, workspaceId),
         { method: "POST" }
       )
-      set({ streamingStatus: "idle" })
+      // session.idle SSE will update sessionStatuses; optimistic clear is safe here
+      set({ optimisticStreamingSessionId: null })
       get().clearStreamingPoll()
     } catch {
       // Best effort
@@ -564,16 +554,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       )
 
       // Reset streaming error on the active workspace if it was stuck
-      const { activeWorkspaceId, streamingStatus } = get()
-      if (activeWorkspaceId === workspaceId && streamingStatus === "error") {
-        set({ streamingError: null, streamingStatus: "idle" })
+      const { activeWorkspaceId } = get()
+      if (activeWorkspaceId === workspaceId && get().streamingError) {
+        set({ streamingError: null })
       }
 
       // Re-fetch active session messages to catch anything missed during disconnect
-      const { activeSessionId } = get()
-      if (activeSessionId) {
-        get().fetchMessages(activeSessionId, workspaceId)
-        get().refreshActiveSessionStatus(workspaceId)
+      // Guard: only use activeSessionId if this workspace is still the focused one
+      if (activeWorkspaceId === workspaceId) {
+        const { activeSessionId } = get()
+        if (activeSessionId) {
+          get().fetchMessages(activeSessionId, workspaceId)
+          get().refreshActiveSessionStatus(workspaceId)
+        }
       }
     }
 
@@ -648,8 +641,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   refreshActiveSessionStatus: async (workspaceId) => {
-    const { activeSessionId, streamingStatus } = get()
-    if (!activeSessionId || streamingStatus === "idle") return
+    const { activeSessionId } = get()
+    if (!activeSessionId) return
 
     try {
       const response = await fetch(buildProxyUrl("session/status", workspaceId))
@@ -666,8 +659,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       )
 
       if (status.type === "idle") {
+        // Clear optimistic flag and poll — session is confirmed done
+        set({ optimisticStreamingSessionId: null })
         get().clearStreamingPoll()
-        set({ streamingStatus: "idle" })
       }
     } catch {
       // Best effort — SSE events will catch up
@@ -826,12 +820,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           }))
         )
 
-        // Sync the flat streaming scalar for the focused session
+        // Clear optimistic flag when session status arrives — SSE is now the source of truth
         const { activeSessionId, activeWorkspaceId } = get()
         if (sessionID === activeSessionId && wsId === activeWorkspaceId) {
           const isIdle = status.type === "idle"
-          if (isIdle) get().clearStreamingPoll()
-          set({ streamingStatus: isIdle ? "idle" : "streaming" })
+          if (isIdle) {
+            set({ optimisticStreamingSessionId: null })
+            get().clearStreamingPoll()
+          }
         }
         break
       }
@@ -848,8 +844,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
         const { activeSessionId, activeWorkspaceId } = get()
         if (sessionID === activeSessionId && wsId === activeWorkspaceId) {
+          set({ optimisticStreamingSessionId: null })
           get().clearStreamingPoll()
-          set({ streamingStatus: "idle" })
         }
         break
       }
@@ -867,7 +863,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         if (!sessionID || (sessionID === activeSessionId && sourceWorkspaceId === activeWorkspaceId)) {
           get().clearStreamingPoll()
           set({
-            streamingStatus: "error",
+            optimisticStreamingSessionId: null,
             streamingError: errorObj?.data?.message ?? "Session error",
           })
         }
@@ -883,12 +879,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             permissions: [...ws.permissions, permission],
           }))
         )
-
-        // Sync waiting status for focused session
-        const { activeSessionId, activeWorkspaceId } = get()
-        if (permission.sessionID === activeSessionId && wsId === activeWorkspaceId) {
-          set({ streamingStatus: "waiting" })
-        }
         break
       }
 
@@ -923,7 +913,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             ? (raw.questions as Record<string, unknown>[]).map((q) => ({
                 question: String(q.question ?? ""),
                 header: String(q.header ?? ""),
-                options: Array.isArray(q.options) ? q.options : [],
+                options: Array.isArray(q.options)
+                  ? (q.options as Record<string, unknown>[]).map((o) => ({
+                      label: String(o?.label ?? ""),
+                      description: String(o?.description ?? ""),
+                    }))
+                  : [],
                 multiple: q.multiple === true,
                 custom: q.custom !== false,
               }))
@@ -933,30 +928,28 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
         set((state) =>
           updateWorkspace(state, wsId, (ws) => ({
-            questions: [...ws.questions, question],
+            // Dedup: ignore replayed events from SSE reconnects
+            questions: ws.questions.some((q) => q.id === question.id)
+              ? ws.questions
+              : [...ws.questions, question],
           }))
         )
-
-        const { activeSessionId, activeWorkspaceId } = get()
-        if (question.sessionID === activeSessionId && wsId === activeWorkspaceId) {
-          set({ streamingStatus: "waiting" })
-        }
         break
       }
 
       case "question.replied":
       case "question.rejected": {
         const requestID = properties.requestID as string
-        set((state) => {
-          const updated: Record<string, WorkspaceState> = {}
-          for (const [wsId, ws] of Object.entries(state.workspaceStates)) {
-            updated[wsId] = {
-              ...ws,
-              questions: ws.questions.filter((q) => q.id !== requestID),
-            }
-          }
-          return { workspaceStates: updated }
-        })
+        if (!requestID) break
+        // Only update the workspace that actually owns this question
+        const ownerWsId = Object.entries(get().workspaceStates)
+          .find(([, ws]) => ws.questions.some((q) => q.id === requestID))?.[0]
+        if (!ownerWsId) break
+        set((state) =>
+          updateWorkspace(state, ownerWsId, (ws) => ({
+            questions: ws.questions.filter((q) => q.id !== requestID),
+          }))
+        )
         break
       }
 
@@ -978,8 +971,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   startStreamingPoll: (workspaceId) => {
     get().clearStreamingPoll()
     const interval = setInterval(() => {
-      const { streamingStatus } = get()
-      if (streamingStatus !== "streaming" && streamingStatus !== "connecting") {
+      const status = get().getStreamingStatus()
+      if (status !== "streaming" && status !== "connecting") {
         get().clearStreamingPoll()
         return
       }
@@ -1000,12 +993,37 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     get().clearStreamingPoll()
     set({
       activeSessionId: null,
-      streamingStatus: "idle",
+      optimisticStreamingSessionId: null,
       streamingError: null,
     })
   },
 
   // Selectors
+
+  getStreamingStatus: (): StreamingStatus => {
+    const { activeWorkspaceId, activeSessionId, workspaceStates, optimisticStreamingSessionId, streamingError } = get()
+
+    // Error state takes priority — cleared explicitly when user dismisses or SSE reconnects
+    if (streamingError) return "error"
+
+    if (!activeWorkspaceId || !activeSessionId) return "idle"
+
+    const ws = workspaceStates[activeWorkspaceId]
+    if (!ws) return "idle"
+
+    // Pending question or permission for this session → waiting for user input
+    if (ws.questions.some((q) => q.sessionID === activeSessionId)) return "waiting"
+    if (ws.permissions.some((p) => p.sessionID === activeSessionId)) return "waiting"
+
+    // SSE-confirmed non-idle session status → streaming
+    const sessionStatus = ws.sessionStatuses[activeSessionId]
+    if (sessionStatus && sessionStatus.type !== "idle") return "streaming"
+
+    // Optimistic: sendMessage fired but first SSE hasn't arrived yet
+    if (optimisticStreamingSessionId === activeSessionId) return "streaming"
+
+    return "idle"
+  },
 
   getWorkspaceActivity: (workspaceId) => {
     const ws = get().workspaceStates[workspaceId]
@@ -1035,21 +1053,27 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   getActivePermissions: () => {
-    const { activeSessionId, activeWorkspaceId, workspaceStates } = get()
-    if (!activeSessionId || !activeWorkspaceId) return EMPTY_PERMISSIONS
+    const { activeWorkspaceId, workspaceStates } = get()
+    if (!activeWorkspaceId) return EMPTY_PERMISSIONS
     const ws = workspaceStates[activeWorkspaceId]
     if (!ws) return EMPTY_PERMISSIONS
-    const filtered = ws.permissions.filter((p) => p.sessionID === activeSessionId)
-    return filtered.length > 0 ? filtered : EMPTY_PERMISSIONS
+    // Return the raw array — stable reference that only changes when permissions
+    // are actually added/removed. Callers must filter by sessionID themselves.
+    // Do NOT call .filter() here: it always returns a new reference, which causes
+    // useSyncExternalStore to see a changed snapshot every tick → infinite re-render.
+    return ws.permissions.length > 0 ? ws.permissions : EMPTY_PERMISSIONS
   },
 
   getActiveQuestions: () => {
-    const { activeSessionId, activeWorkspaceId, workspaceStates } = get()
-    if (!activeSessionId || !activeWorkspaceId) return EMPTY_QUESTIONS
+    const { activeWorkspaceId, workspaceStates } = get()
+    if (!activeWorkspaceId) return EMPTY_QUESTIONS
     const ws = workspaceStates[activeWorkspaceId]
     if (!ws) return EMPTY_QUESTIONS
-    const filtered = ws.questions.filter((q) => q.sessionID === activeSessionId)
-    return filtered.length > 0 ? filtered : EMPTY_QUESTIONS
+    // Return the raw array — stable reference that only changes when questions
+    // are actually added/removed. Callers must filter by sessionID themselves.
+    // Do NOT call .filter() here: it always returns a new reference, which causes
+    // useSyncExternalStore to see a changed snapshot every tick → infinite re-render.
+    return ws.questions.length > 0 ? ws.questions : EMPTY_QUESTIONS
   },
 
   getActiveSessionStatuses: () => {

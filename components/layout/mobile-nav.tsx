@@ -5,10 +5,8 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   MessageSquare,
-  FolderOpen,
+  GitMerge,
   GitBranch,
-  ClipboardCheck,
-  Terminal,
   Settings,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -16,9 +14,7 @@ import { cn } from "@/lib/utils"
 const mobileNavItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/review", label: "Review", icon: ClipboardCheck },
-  { href: "/files", label: "Files", icon: FolderOpen },
-  { href: "/commands", label: "Cmds", icon: Terminal },
+  { href: "/git", label: "Git", icon: GitMerge },
   { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/settings", label: "Settings", icon: Settings },
 ]

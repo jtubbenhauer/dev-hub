@@ -34,13 +34,16 @@ import {
   useCloneBaseDirSetting,
   useClickUpSettings,
   useSettingsMutation,
+  useMobileFontSizeSetting,
   SETTINGS_KEYS,
   FONT_SIZE_OPTIONS,
+  MOBILE_FONT_SIZE_OPTIONS,
   TAB_SIZE_OPTIONS,
   DEFAULT_FONT_SIZE,
+  DEFAULT_MOBILE_FONT_SIZE,
   DEFAULT_TAB_SIZE,
 } from "@/hooks/use-settings"
-import type { FontSize, TabSize } from "@/hooks/use-settings"
+import type { FontSize, MobileFontSize, TabSize } from "@/hooks/use-settings"
 import type { Provider, Model, Agent } from "@/lib/opencode/types"
 import type { ClickUpTeam, ClickUpUser } from "@/types"
 
@@ -109,11 +112,12 @@ export default function SettingsPage() {
 function EditorSettingsCard() {
   const { isVimMode, isLoading: isLoadingVim } = useVimModeSetting()
   const { fontSize, isLoading: isLoadingFont } = useFontSizeSetting()
+  const { mobileFontSize, isLoading: isLoadingMobileFont } = useMobileFontSizeSetting()
   const { tabSize, isLoading: isLoadingTab } = useTabSizeSetting()
   const setVimMode = useEditorStore((s) => s.setVimMode)
   const mutation = useSettingsMutation()
 
-  const isLoading = isLoadingVim || isLoadingFont || isLoadingTab
+  const isLoading = isLoadingVim || isLoadingFont || isLoadingMobileFont || isLoadingTab
 
   // Sync DB vim mode into editor store on load
   useEffect(() => {
@@ -135,6 +139,14 @@ function EditorSettingsCard() {
     mutation.mutate(
       { key: SETTINGS_KEYS.FONT_SIZE, value: next },
       { onSuccess: () => toast.success(`Font size set to ${next}px`) }
+    )
+  }
+
+  const handleMobileFontSizeChange = (value: string) => {
+    const next = Number(value) as MobileFontSize
+    mutation.mutate(
+      { key: SETTINGS_KEYS.MOBILE_FONT_SIZE, value: next },
+      { onSuccess: () => toast.success(`Mobile font size set to ${next}px`) }
     )
   }
 
@@ -199,6 +211,31 @@ function EditorSettingsCard() {
               {FONT_SIZE_OPTIONS.map((size) => (
                 <SelectItem key={size} value={String(size)}>
                   {size}px{size === DEFAULT_FONT_SIZE ? " (default)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="mobile-font-size">Mobile font size</Label>
+            <p className="text-xs text-muted-foreground">
+              Editor font size on mobile devices
+            </p>
+          </div>
+          <Select
+            value={String(mobileFontSize)}
+            onValueChange={handleMobileFontSizeChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="mobile-font-size" className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MOBILE_FONT_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}px{size === DEFAULT_MOBILE_FONT_SIZE ? " (default)" : ""}
                 </SelectItem>
               ))}
             </SelectContent>

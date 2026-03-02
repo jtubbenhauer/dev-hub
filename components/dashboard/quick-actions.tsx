@@ -43,17 +43,17 @@ const DEFAULT_ACTIONS: QuickAction[] = [
   },
   {
     id: "default-files",
-    label: "Files",
+    label: "Git",
     icon: "FolderOpen",
     type: "navigate",
-    target: "/files",
+    target: "/git",
   },
   {
     id: "default-commands",
     label: "Run Command",
     icon: "Terminal",
     type: "navigate",
-    target: "/commands",
+    target: "/git",
   },
   {
     id: "default-workspaces",

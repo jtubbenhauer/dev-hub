@@ -522,6 +522,7 @@ export function ChatInterface() {
           onAbort={handleAbort}
           isStreaming={streamingStatus === "streaming"}
           disabled={!activeWorkspaceId}
+          workspaceId={activeWorkspaceId}
         />
       </div>
     </div>

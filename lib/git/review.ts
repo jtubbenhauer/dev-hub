@@ -210,6 +210,19 @@ export async function getAllBranches(
   return branches
 }
 
+// Returns the staged (index) version of a file, or "" if not staged
+export async function getStagedContent(
+  workspacePath: string,
+  filePath: string
+): Promise<string> {
+  const git = createGit(workspacePath)
+  try {
+    return await git.raw(["show", `:${filePath}`])
+  } catch {
+    return ""
+  }
+}
+
 export async function getLastCommitRef(
   workspacePath: string
 ): Promise<string> {

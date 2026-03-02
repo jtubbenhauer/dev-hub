@@ -21,7 +21,6 @@ import {
   FileWarning,
   MessageSquare,
   FolderOpen,
-  Terminal,
   GitCommitHorizontal,
   Clock,
   FolderGit2,
@@ -210,20 +209,12 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
             Chat
           </Link>
           <Link
-            href="/files"
+            href="/git"
             onClick={() => setActiveWorkspaceId(workspace.id)}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <FolderOpen className="size-3" />
-            Files
-          </Link>
-          <Link
-            href="/commands"
-            onClick={() => setActiveWorkspaceId(workspace.id)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <Terminal className="size-3" />
-            Run
+            Git
           </Link>
         </div>
       </CardContent>

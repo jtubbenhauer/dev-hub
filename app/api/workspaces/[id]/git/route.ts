@@ -27,6 +27,14 @@ import {
   stashPop,
   stashDrop,
 } from "@/lib/git/operations"
+import {
+  getOriginalContent,
+  getCurrentContent,
+  getStagedContent,
+  getContentAtRef,
+  getChangedFiles,
+} from "@/lib/git/review"
+import { getLanguageFromFilename } from "@/lib/files/operations"
 import { listWorktrees } from "@/lib/git/worktrees"
 
 interface RouteParams {
@@ -98,6 +106,42 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       case "stash-list": {
         const stashes = await stashList(workspacePath)
         return NextResponse.json(stashes)
+      }
+
+      case "file-content": {
+        const file = url.searchParams.get("file")
+        const staged = url.searchParams.get("staged") === "true"
+        const baseRef = url.searchParams.get("baseRef")
+        const currentRef = url.searchParams.get("currentRef")
+        if (!file) {
+          return NextResponse.json({ error: "file parameter required" }, { status: 400 })
+        }
+        const language = getLanguageFromFilename(file)
+
+        // Ref-based mode (branch comparison or last-commit): baseRef required, currentRef optional
+        if (baseRef) {
+          const original = await getContentAtRef(workspacePath, baseRef, file)
+          const current = currentRef
+            ? await getContentAtRef(workspacePath, currentRef, file)
+            : getCurrentContent(workspacePath, file)
+          return NextResponse.json({ original, current, path: file, language })
+        }
+
+        // Working changes mode: HEAD vs staged index or working tree
+        const original = await getOriginalContent(workspacePath, file)
+        const current = staged
+          ? await getStagedContent(workspacePath, file)
+          : getCurrentContent(workspacePath, file)
+        return NextResponse.json({ original, current, path: file, language })
+      }
+
+      case "changed-files": {
+        const baseRef = url.searchParams.get("baseRef")
+        if (!baseRef) {
+          return NextResponse.json({ error: "baseRef parameter required" }, { status: 400 })
+        }
+        const files = await getChangedFiles(workspacePath, baseRef)
+        return NextResponse.json(files)
       }
 
       case "worktree-list": {

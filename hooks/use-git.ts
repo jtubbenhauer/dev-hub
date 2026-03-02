@@ -7,6 +7,8 @@ import type {
   GitLogEntry,
   GitBranch,
   GitStashEntry,
+  ReviewFileContent,
+  ReviewChangedFile,
   WorktreeInfo,
 } from "@/types"
 
@@ -77,6 +79,49 @@ export function useGitDiff(workspaceId: string | null, file: string | null, stag
       return result.diff
     },
     enabled: !!workspaceId && !!file,
+  })
+}
+
+export function useGitFileContent(workspaceId: string | null, file: string | null, staged: boolean) {
+  return useQuery<ReviewFileContent>({
+    queryKey: ["git-file-content", workspaceId, file, staged],
+    queryFn: () =>
+      gitGet<ReviewFileContent>(workspaceId!, "file-content", {
+        file: file!,
+        staged: String(staged),
+      }),
+    enabled: !!workspaceId && !!file,
+    staleTime: 5_000,
+  })
+}
+
+// Fetches file content for branch comparison / last-commit mode.
+// original = content at baseRef, current = content at currentRef (defaults to working tree via HEAD).
+export function useGitFileContentAtRef(
+  workspaceId: string | null,
+  file: string | null,
+  baseRef: string | null,
+  currentRef: string | null = null
+) {
+  return useQuery<ReviewFileContent>({
+    queryKey: ["git-file-content-ref", workspaceId, file, baseRef, currentRef],
+    queryFn: () =>
+      gitGet<ReviewFileContent>(workspaceId!, "file-content", {
+        file: file!,
+        baseRef: baseRef!,
+        ...(currentRef ? { currentRef } : {}),
+      }),
+    enabled: !!workspaceId && !!file && !!baseRef,
+    staleTime: 5_000,
+  })
+}
+
+export function useGitChangedFiles(workspaceId: string | null, baseRef: string | null) {
+  return useQuery<ReviewChangedFile[]>({
+    queryKey: ["git-changed-files", workspaceId, baseRef],
+    queryFn: () =>
+      gitGet<ReviewChangedFile[]>(workspaceId!, "changed-files", { baseRef: baseRef! }),
+    enabled: !!workspaceId && !!baseRef,
   })
 }
 

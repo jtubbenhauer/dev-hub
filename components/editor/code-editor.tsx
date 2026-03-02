@@ -11,7 +11,8 @@ import { lintKeymap } from "@codemirror/lint"
 import { githubDark } from "@fsegurai/codemirror-theme-github-dark"
 import { vim, Vim } from "@replit/codemirror-vim"
 import { useEditorStore } from "@/stores/editor-store"
-import { useFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
+import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
 
 // Global vim config — runs once
@@ -34,7 +35,9 @@ export function CodeEditor({
   const viewRef = useRef<EditorView | null>(null)
   const isVimMode = useEditorStore((s) => s.isVimMode)
   const { fontSize } = useFontSizeSetting()
+  const { mobileFontSize } = useMobileFontSizeSetting()
   const { tabSize } = useTabSizeSetting()
+  const isMobile = useIsMobile()
 
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -82,16 +85,16 @@ export function CodeEditor({
       EditorView.theme({
         "&": {
           height: "100%",
-          fontSize: `${fontSize}px`,
+          fontSize: `${isMobile ? mobileFontSize : fontSize}px !important`,
         },
         ".cm-scroller": {
           overflow: "auto",
         },
         ".cm-content": {
-          fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
+          fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace !important",
         },
         ".cm-gutters": {
-          fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
+          fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace !important",
         },
       }),
       EditorState.tabSize.of(tabSize),
@@ -107,7 +110,7 @@ export function CodeEditor({
     }
 
     return extensions
-  }, [isVimMode, language, fontSize, tabSize])
+  }, [isVimMode, language, fontSize, mobileFontSize, isMobile, tabSize])
 
   // Create or recreate the editor when vim mode or language changes
   useEffect(() => {

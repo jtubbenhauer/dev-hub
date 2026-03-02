@@ -8,6 +8,7 @@ import {
   useGitCommit,
   useGitPush,
   useGitPull,
+  useGitStashSave,
 } from "@/hooks/use-git"
 import { Button } from "@/components/ui/button"
 import {
@@ -28,6 +29,7 @@ import {
   Circle,
   Loader2,
   Check,
+  Archive,
 } from "lucide-react"
 
 export function GitStatusBar() {
@@ -40,6 +42,7 @@ export function GitStatusBar() {
   const commit = useGitCommit(activeWorkspaceId)
   const push = useGitPush(activeWorkspaceId)
   const pull = useGitPull(activeWorkspaceId)
+  const stashSave = useGitStashSave(activeWorkspaceId)
 
   const dirtyCount = status
     ? status.staged.length + status.unstaged.length + status.untracked.length
@@ -90,6 +93,7 @@ export function GitStatusBar() {
   const isCommitting = stageAll.isPending || commit.isPending
   const isPushing = push.isPending
   const isPulling = pull.isPending
+  const isStashing = stashSave.isPending
 
   return (
     <div className="flex items-center gap-1.5">
@@ -233,6 +237,27 @@ export function GitStatusBar() {
           </div>
         </PopoverContent>
       </Popover>
+
+      {dirtyCount > 0 && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              onClick={() => stashSave.mutate({ action: "stash-save" })}
+              disabled={isStashing}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {isStashing ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Archive className="size-3" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stash changes</TooltipContent>
+        </Tooltip>
+      )}
     </div>
   )
 }

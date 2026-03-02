@@ -29,7 +29,6 @@ import {
   Trash2,
   MessageSquare,
   FolderOpen,
-  Terminal,
   GitBranch,
   ArrowUp,
   ArrowDown,
@@ -208,7 +207,7 @@ export function WorkspaceCard({
               Chat
             </Link>
             <Link
-              href="/files"
+              href="/git"
               onClick={(event) => {
                 event.stopPropagation()
                 setActiveWorkspaceId(workspace.id)
@@ -216,18 +215,7 @@ export function WorkspaceCard({
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <FolderOpen className="size-3" />
-              Files
-            </Link>
-            <Link
-              href="/commands"
-              onClick={(event) => {
-                event.stopPropagation()
-                setActiveWorkspaceId(workspace.id)
-              }}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Terminal className="size-3" />
-              Run
+              Git
             </Link>
           </div>
           <div className="flex items-center gap-1">

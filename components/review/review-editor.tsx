@@ -29,7 +29,7 @@ import { Check, ChevronRight, Loader2, Save, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VimToggle } from "@/components/editor/vim-toggle"
 import { useEditorStore } from "@/stores/editor-store"
-import { useFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
+import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
 import { toast } from "sonner"
@@ -52,11 +52,11 @@ interface ReviewEditorProps {
     path: string
     language: string
   }
-  file: ReviewFile
+  file?: ReviewFile
   workspaceId: string
   isLoading: boolean
-  onToggleReviewed: (file: ReviewFile) => void
-  onMarkAndNext: (file: ReviewFile) => void
+  onToggleReviewed?: (file: ReviewFile) => void
+  onMarkAndNext?: (file: ReviewFile) => void
   onOpenFileList?: () => void
 }
 
@@ -73,6 +73,7 @@ export function ReviewEditor({
   const viewRef = useRef<EditorView | null>(null)
   const isVimMode = useEditorStore((s) => s.isVimMode)
   const { fontSize } = useFontSizeSetting()
+  const { mobileFontSize } = useMobileFontSizeSetting()
   const { tabSize } = useTabSizeSetting()
   const isMobile = useIsMobile()
   const [isSaving, setIsSaving] = useState(false)
@@ -153,14 +154,14 @@ export function ReviewEditor({
           mergeControls: false,
         }),
         EditorView.theme({
-          "&": { height: "100%", fontSize: isMobile ? "10px" : `${fontSize}px` },
+          "&": { height: "100%", fontSize: `${isMobile ? mobileFontSize : fontSize}px !important` },
           ".cm-scroller": { overflow: "auto" },
           ".cm-content": {
-            fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
+            fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace !important",
           },
           ".cm-gutters": {
-            fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace",
-            ...(isMobile ? { fontSize: "9px" } : {}),
+            fontFamily: "var(--font-ibm-plex-mono), 'IBM Plex Mono', monospace !important",
+            ...(isMobile ? { fontSize: `${mobileFontSize - 1}px !important` } : {}),
           },
         }),
         EditorState.tabSize.of(tabSize),
@@ -230,7 +231,7 @@ export function ReviewEditor({
 
       return extensions
     },
-    [isVimMode, isMobile, fontSize, tabSize, handleSave]
+    [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, handleSave]
   )
 
   // Rebuild editor when file changes or vim mode toggles
@@ -322,25 +323,29 @@ export function ReviewEditor({
           <span className="hidden md:inline">Save</span>
         </Button>
 
-        <Button
-          variant={file.reviewed ? "secondary" : "ghost"}
-          size="sm"
-          className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
-          onClick={() => onToggleReviewed(file)}
-        >
-          <Check className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">{file.reviewed ? "Reviewed" : "Mark reviewed"}</span>
-        </Button>
+        {file && onToggleReviewed && (
+          <Button
+            variant={file.reviewed ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
+            onClick={() => onToggleReviewed(file)}
+          >
+            <Check className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">{file.reviewed ? "Reviewed" : "Mark reviewed"}</span>
+          </Button>
+        )}
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
-          onClick={() => onMarkAndNext(file)}
-        >
-          <ChevronRight className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">Next</span>
-        </Button>
+        {file && onMarkAndNext && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
+            onClick={() => onMarkAndNext(file)}
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">Next</span>
+          </Button>
+        )}
       </div>
 
       {/* CodeMirror editor */}

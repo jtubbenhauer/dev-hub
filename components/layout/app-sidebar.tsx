@@ -5,11 +5,10 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   MessageSquare,
-  FolderOpen,
+  GitMerge,
   GitBranch,
   Terminal,
   Settings,
-  ClipboardCheck,
 } from "lucide-react"
 import { useMemo } from "react"
 import { cn } from "@/lib/utils"
@@ -18,9 +17,7 @@ import { useCommand } from "@/hooks/use-command"
 const navItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/review", label: "Review", icon: ClipboardCheck },
-  { href: "/files", label: "Files", icon: FolderOpen },
-  { href: "/commands", label: "Cmds", icon: Terminal },
+  { href: "/git", label: "Git", icon: GitMerge },
   { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/settings", label: "Settings", icon: Settings },
 ]

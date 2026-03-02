@@ -14,6 +14,7 @@ export const SETTINGS_KEYS = {
   MODEL_AGENT_BINDINGS: "model-agent-bindings",
   VIM_MODE: "vim-mode",
   FONT_SIZE: "font-size",
+  MOBILE_FONT_SIZE: "mobile-font-size",
   TAB_SIZE: "tab-size",
   DEFAULT_WORKSPACE: "default-workspace",
   WORKTREE_BASE_DIR: "worktree-base-dir",
@@ -27,6 +28,10 @@ export const SETTINGS_KEYS = {
 export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
 export type FontSize = (typeof FONT_SIZE_OPTIONS)[number]
 export const DEFAULT_FONT_SIZE: FontSize = 13
+
+export const MOBILE_FONT_SIZE_OPTIONS = [8, 9, 10, 12, 13, 14] as const
+export type MobileFontSize = (typeof MOBILE_FONT_SIZE_OPTIONS)[number]
+export const DEFAULT_MOBILE_FONT_SIZE: MobileFontSize = 10
 
 export const TAB_SIZE_OPTIONS = [2, 4] as const
 export type TabSize = (typeof TAB_SIZE_OPTIONS)[number]
@@ -121,6 +126,16 @@ export function useFontSizeSetting(): {
   const raw = data?.[SETTINGS_KEYS.FONT_SIZE]
   const isValid = typeof raw === "number" && (FONT_SIZE_OPTIONS as readonly number[]).includes(raw)
   return { fontSize: isValid ? (raw as FontSize) : DEFAULT_FONT_SIZE, isLoading }
+}
+
+export function useMobileFontSizeSetting(): {
+  mobileFontSize: MobileFontSize
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.MOBILE_FONT_SIZE]
+  const isValid = typeof raw === "number" && (MOBILE_FONT_SIZE_OPTIONS as readonly number[]).includes(raw)
+  return { mobileFontSize: isValid ? (raw as MobileFontSize) : DEFAULT_MOBILE_FONT_SIZE, isLoading }
 }
 
 export function useTabSizeSetting(): {

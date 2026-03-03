@@ -15,6 +15,10 @@ import type {
 
 export type StreamingStatus = "idle" | "connecting" | "streaming" | "waiting" | "error"
 
+export interface SessionWithWorkspace extends Session {
+  workspaceId: string
+}
+
 // Activity level for a workspace — used by UI indicators
 export type WorkspaceActivity = "idle" | "active" | "waiting"
 
@@ -55,75 +59,98 @@ const EMPTY_PERMISSIONS: Permission[] = []
 const EMPTY_QUESTIONS: QuestionRequest[] = []
 const EMPTY_TODOS: Todo[] = []
 const EMPTY_SESSION_STATUSES: Record<string, SessionStatus> = {}
+const EMPTY_UNIFIED_SESSIONS: SessionWithWorkspace[] = []
+
+// Memoization cache for getRecentSessionsAcrossWorkspaces.
+// We compare each workspace's `sessions` record by reference to detect changes.
+let _unifiedSessionsCache: SessionWithWorkspace[] = EMPTY_UNIFIED_SESSIONS
+let _unifiedSessionsCacheRefs = new Map<string, Record<string, Session>>()
+let _unifiedSessionsCacheLimit = 0
 
 // RAF-batched buffer for message.part.updated events.
 // Keyed: sessionId → messageId → partId → Part
 const pendingPartUpdates = new Map<string, Map<string, Map<string, Part>>>()
 let partUpdateRafHandle: number | null = null
 
+function flushPendingPartUpdates(
+  set: (fn: (state: ChatState) => Partial<ChatState>) => void
+): void {
+  if (pendingPartUpdates.size === 0) return
+
+  const snapshot = new Map(
+    [...pendingPartUpdates.entries()].map(([sessionId, byMessage]) => [
+      sessionId,
+      new Map(
+        [...byMessage.entries()].map(([messageId, byPart]) => [
+          messageId,
+          new Map(byPart),
+        ])
+      ),
+    ])
+  )
+  pendingPartUpdates.clear()
+
+  set((state) => {
+    // Find which workspace owns each session and update its messages
+    const nextWorkspaceStates = { ...state.workspaceStates }
+
+    for (const [sessionId, byMessage] of snapshot) {
+      const wsId = findWorkspaceForSession(state.workspaceStates, sessionId)
+      if (!wsId) continue
+
+      const ws = nextWorkspaceStates[wsId]
+      const sessionMessages = ws.messages[sessionId]
+      if (!sessionMessages) continue
+
+      let updatedSession = sessionMessages
+      for (const [messageId, byPart] of byMessage) {
+        const messageIndex = updatedSession.findIndex((m) => m.info.id === messageId)
+        if (messageIndex < 0) continue
+
+        const message = updatedSession[messageIndex]
+        let updatedParts = message.parts
+
+        for (const [partId, part] of byPart) {
+          const partIndex = updatedParts.findIndex((p) => p.id === partId)
+          updatedParts =
+            partIndex >= 0
+              ? updatedParts.map((p, i) => (i === partIndex ? part : p))
+              : [...updatedParts, part]
+        }
+
+        updatedSession = updatedSession.map((m, i) =>
+          i === messageIndex ? { ...m, parts: updatedParts } : m
+        )
+      }
+
+      nextWorkspaceStates[wsId] = {
+        ...ws,
+        messages: { ...ws.messages, [sessionId]: updatedSession },
+      }
+    }
+
+    return { workspaceStates: nextWorkspaceStates }
+  })
+}
+
 function schedulePendingPartFlush(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void
 ): void {
   if (partUpdateRafHandle !== null) return
-  partUpdateRafHandle = requestAnimationFrame(() => {
-    partUpdateRafHandle = null
-    if (pendingPartUpdates.size === 0) return
 
-    const snapshot = new Map(
-      [...pendingPartUpdates.entries()].map(([sessionId, byMessage]) => [
-        sessionId,
-        new Map(
-          [...byMessage.entries()].map(([messageId, byPart]) => [
-            messageId,
-            new Map(byPart),
-          ])
-        ),
-      ])
-    )
-    pendingPartUpdates.clear()
-
-    set((state) => {
-      // Find which workspace owns each session and update its messages
-      const nextWorkspaceStates = { ...state.workspaceStates }
-
-      for (const [sessionId, byMessage] of snapshot) {
-        const wsId = findWorkspaceForSession(state.workspaceStates, sessionId)
-        if (!wsId) continue
-
-        const ws = nextWorkspaceStates[wsId]
-        const sessionMessages = ws.messages[sessionId]
-        if (!sessionMessages) continue
-
-        let updatedSession = sessionMessages
-        for (const [messageId, byPart] of byMessage) {
-          const messageIndex = updatedSession.findIndex((m) => m.info.id === messageId)
-          if (messageIndex < 0) continue
-
-          const message = updatedSession[messageIndex]
-          let updatedParts = message.parts
-
-          for (const [partId, part] of byPart) {
-            const partIndex = updatedParts.findIndex((p) => p.id === partId)
-            updatedParts =
-              partIndex >= 0
-                ? updatedParts.map((p, i) => (i === partIndex ? part : p))
-                : [...updatedParts, part]
-          }
-
-          updatedSession = updatedSession.map((m, i) =>
-            i === messageIndex ? { ...m, parts: updatedParts } : m
-          )
-        }
-
-        nextWorkspaceStates[wsId] = {
-          ...ws,
-          messages: { ...ws.messages, [sessionId]: updatedSession },
-        }
-      }
-
-      return { workspaceStates: nextWorkspaceStates }
+  // When the tab is hidden, RAF is suspended by the browser. Fall back to a
+  // short timeout so part updates still land in the store while backgrounded.
+  if (typeof document !== "undefined" && document.hidden) {
+    partUpdateRafHandle = window.setTimeout(() => {
+      partUpdateRafHandle = null
+      flushPendingPartUpdates(set)
+    }, 500) as unknown as number
+  } else {
+    partUpdateRafHandle = requestAnimationFrame(() => {
+      partUpdateRafHandle = null
+      flushPendingPartUpdates(set)
     })
-  })
+  }
 }
 
 function findWorkspaceForSession(
@@ -186,6 +213,7 @@ interface ChatState {
   disconnectSSE: (workspaceId: string) => void
   disconnectAllSSE: () => void
   refreshActiveSessionStatus: (workspaceId: string) => Promise<void>
+  handleVisibilityRestored: () => void
 
   // Internal
   handleEvent: (event: Record<string, unknown>, sourceWorkspaceId: string) => void
@@ -203,6 +231,7 @@ interface ChatState {
   getActiveQuestions: () => QuestionRequest[]
   getActiveSessionStatuses: () => Record<string, SessionStatus>
   getActiveTodos: () => Todo[]
+  getRecentSessionsAcrossWorkspaces: (limit: number) => SessionWithWorkspace[]
 }
 
 function buildProxyUrl(
@@ -668,6 +697,30 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
+  handleVisibilityRestored: () => {
+    // Cancel any pending scheduled flush (RAF or timeout) and force an immediate
+    // synchronous flush. While the tab was hidden, the RAF-based flush was
+    // suspended by the browser, leaving part updates stranded in the buffer.
+    if (partUpdateRafHandle !== null) {
+      cancelAnimationFrame(partUpdateRafHandle)
+      clearTimeout(partUpdateRafHandle)
+      partUpdateRafHandle = null
+    }
+    flushPendingPartUpdates(set)
+
+    const { activeWorkspaceId, activeSessionId, workspaceStates } = get()
+    if (!activeWorkspaceId || !activeSessionId) return
+
+    // Re-sync session status in case the SSE idle event arrived while backgrounded
+    get().refreshActiveSessionStatus(activeWorkspaceId)
+
+    // If the EventSource was silently dropped while the tab was hidden, reconnect
+    const es = workspaceStates[activeWorkspaceId]?.eventSource
+    if (es && es.readyState === EventSource.CLOSED) {
+      get().connectSSE(activeWorkspaceId)
+    }
+  },
+
   handleEvent: (event, sourceWorkspaceId) => {
     const eventType = event.type as string
     const properties = event.properties as Record<string, unknown> | undefined
@@ -1086,5 +1139,37 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const { activeSessionId, activeWorkspaceId, workspaceStates } = get()
     if (!activeSessionId || !activeWorkspaceId) return EMPTY_TODOS
     return workspaceStates[activeWorkspaceId]?.todos[activeSessionId] ?? EMPTY_TODOS
+  },
+
+  getRecentSessionsAcrossWorkspaces: (limit) => {
+    const { workspaceStates } = get()
+    const entries = Object.entries(workspaceStates)
+
+    if (entries.length === 0) return EMPTY_UNIFIED_SESSIONS
+
+    // Check if all workspace session refs are unchanged and limit is the same
+    if (
+      limit === _unifiedSessionsCacheLimit &&
+      entries.length === _unifiedSessionsCacheRefs.size &&
+      entries.every(([id, ws]) => _unifiedSessionsCacheRefs.get(id) === ws.sessions)
+    ) {
+      return _unifiedSessionsCache
+    }
+
+    const result: SessionWithWorkspace[] = []
+    const newRefs = new Map<string, Record<string, Session>>()
+    for (const [workspaceId, ws] of entries) {
+      newRefs.set(workspaceId, ws.sessions)
+      for (const session of Object.values(ws.sessions)) {
+        if (!session.parentID) {
+          result.push({ ...session, workspaceId })
+        }
+      }
+    }
+
+    _unifiedSessionsCache = result.sort((a, b) => b.time.updated - a.time.updated).slice(0, limit)
+    _unifiedSessionsCacheRefs = newRefs
+    _unifiedSessionsCacheLimit = limit
+    return _unifiedSessionsCache
   },
 }))

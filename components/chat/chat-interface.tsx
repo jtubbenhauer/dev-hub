@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState, useMemo, Component } from "react"
 import type { ReactNode } from "react"
-import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, FileText, Plus, MessageSquare, ArrowDown } from "lucide-react"
+import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, Plus, MessageSquare, ArrowDown, GripVertical } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,6 +17,8 @@ import { useAgents, AgentSelector } from "@/components/chat/agent-selector"
 import { PlanPanel } from "@/components/chat/plan-panel"
 import { useModelAgentBindings } from "@/hooks/use-settings"
 import { useCommand } from "@/hooks/use-command"
+import { useResizablePanel } from "@/hooks/use-resizable-panel"
+import { useLeaderAction } from "@/hooks/use-leader-action"
 import type { Permission, QuestionRequest, QuestionInfo, QuestionAnswer, MessageWithParts, SessionStatus } from "@/lib/opencode/types"
 
 interface SelectedModel {
@@ -64,8 +66,18 @@ export function ChatInterface() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [isSessionListOpen, setIsSessionListOpen] = useState(true)
   const [isMobileSessionsOpen, setIsMobileSessionsOpen] = useState(false)
+  const [isUnifiedMode, setIsUnifiedMode] = useState(false)
+
+  const { width: sessionListWidth, handleDragStart: handleSessionListDragStart } = useResizablePanel({
+    minWidth: 160,
+    maxWidth: 400,
+    defaultWidth: 240,
+    storageKey: "dev-hub:chat-panel-width",
+  })
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false)
   const [hasPlanFiles, setHasPlanFiles] = useState(false)
+  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false)
+  const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const isNearBottom = useRef(true)
   const [showJumpToBottom, setShowJumpToBottom] = useState(false)
@@ -76,6 +88,13 @@ export function ChatInterface() {
   const activeWorkspaceName = useWorkspaceStore(
     (state) => state.activeWorkspace?.name ?? ""
   )
+  const allWorkspaces = useWorkspaceStore((state) => state.workspaces)
+
+  const workspaceNames = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const ws of allWorkspaces) map[ws.id] = ws.name
+    return map
+  }, [allWorkspaces])
 
   const { primaryAgents } = useAgents(activeWorkspaceId)
   const { bindings: agentModelBindings } = useModelAgentBindings()
@@ -117,6 +136,7 @@ export function ChatInterface() {
     getActiveQuestions,
     getActiveSessionStatuses,
     getStreamingStatus,
+    getRecentSessionsAcrossWorkspaces,
   } = useChatStore()
 
   // getStreamingStatus must be passed as a stable reference — inline lambdas like
@@ -125,6 +145,9 @@ export function ChatInterface() {
   const streamingStatus = useChatStore(getStreamingStatus)
 
   const sessions = useChatStore(getActiveWorkspaceSessions)
+  const unifiedSessions = useChatStore((state) =>
+    state.getRecentSessionsAcrossWorkspaces(10)
+  )
   const sessionStatus = useChatStore(getActiveSessionStatus)
   // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
   // We filter by sessionID here with useMemo so we never create a new array reference
@@ -282,11 +305,44 @@ export function ChatInterface() {
     setIsMobileSessionsOpen(false)
   }, [activeWorkspaceId, createSession])
 
+  const handleSelectUnifiedSession = useCallback(
+    (sessionId: string, workspaceId: string) => {
+      setActiveWorkspaceId(workspaceId)
+      setActiveSession(sessionId)
+      setIsMobileSessionsOpen(false)
+    },
+    [setActiveWorkspaceId, setActiveSession]
+  )
+
+  const handleToggleUnifiedMode = useCallback(() => {
+    setIsUnifiedMode((prev) => {
+      const next = !prev
+      if (next) {
+        // Lazy-fetch sessions for workspaces that haven't loaded yet
+        const { workspaceStates } = useChatStore.getState()
+        for (const ws of allWorkspaces) {
+          const state = workspaceStates[ws.id]
+          if (!state || Object.keys(state.sessions).length === 0) {
+            fetchSessions(ws.id)
+            connectSSE(ws.id)
+          }
+        }
+      }
+      return next
+    })
+  }, [allWorkspaces, fetchSessions, connectSSE])
+
   // Use refs so command closures stay stable but always call latest handlers
   const handleCreateSessionRef = useRef(handleCreateSession)
   handleCreateSessionRef.current = handleCreateSession
   const setIsPlanPanelOpenRef = useRef(setIsPlanPanelOpen)
   setIsPlanPanelOpenRef.current = setIsPlanPanelOpen
+  const setIsSessionListOpenRef = useRef(setIsSessionListOpen)
+  setIsSessionListOpenRef.current = setIsSessionListOpen
+  const setIsModelSelectorOpenRef = useRef(setIsModelSelectorOpen)
+  setIsModelSelectorOpenRef.current = setIsModelSelectorOpen
+  const setIsAgentSelectorOpenRef = useRef(setIsAgentSelectorOpen)
+  setIsAgentSelectorOpenRef.current = setIsAgentSelectorOpen
 
   const chatCommands = useMemo(
     () => [
@@ -310,6 +366,34 @@ export function ChatInterface() {
 
   useCommand(chatCommands)
 
+  const chatLeaderActions = useMemo(
+    () => [
+      {
+        action: { id: "chat:switch-model", label: "Switch model", page: "chat" as const },
+        handler: () => setIsModelSelectorOpenRef.current(true),
+      },
+      {
+        action: { id: "chat:switch-agent", label: "Switch agent", page: "chat" as const },
+        handler: () => setIsAgentSelectorOpenRef.current(true),
+      },
+      {
+        action: { id: "chat:new-session", label: "New session", page: "chat" as const },
+        handler: () => handleCreateSessionRef.current(),
+      },
+      {
+        action: { id: "chat:toggle-sessions", label: "Toggle session list", page: "chat" as const },
+        handler: () => setIsSessionListOpenRef.current((prev) => !prev),
+      },
+      {
+        action: { id: "chat:toggle-plan", label: "Toggle plan panel", page: "chat" as const },
+        handler: () => setIsPlanPanelOpenRef.current((prev) => !prev),
+      },
+    ],
+    []
+  )
+
+  useLeaderAction(chatLeaderActions)
+
   if (!activeWorkspaceId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -330,29 +414,76 @@ export function ChatInterface() {
           <SheetHeader className="sr-only">
             <SheetTitle>Sessions</SheetTitle>
           </SheetHeader>
-          <SessionList
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            sessionStatuses={sessionStatuses}
-            onSelectSession={handleMobileSelectSession}
-            onCreateSession={handleMobileCreateSession}
-            onDeleteSession={handleDeleteSession}
-          />
+          {isUnifiedMode ? (
+            <SessionList
+              mode="unified"
+              sessions={unifiedSessions}
+              workspaceNames={workspaceNames}
+              activeSessionId={activeSessionId}
+              sessionStatuses={sessionStatuses}
+              onSelectSession={handleSelectUnifiedSession}
+              onCreateSession={handleMobileCreateSession}
+              onDeleteSession={handleDeleteSession}
+              isUnifiedMode={isUnifiedMode}
+              onToggleMode={handleToggleUnifiedMode}
+            />
+          ) : (
+            <SessionList
+              mode="workspace"
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              sessionStatuses={sessionStatuses}
+              onSelectSession={handleMobileSelectSession}
+              onCreateSession={handleMobileCreateSession}
+              onDeleteSession={handleDeleteSession}
+              isUnifiedMode={isUnifiedMode}
+              onToggleMode={handleToggleUnifiedMode}
+            />
+          )}
         </SheetContent>
       </Sheet>
 
       {/* Session sidebar — hidden on mobile by default */}
       {isSessionListOpen && (
-        <div className="hidden w-60 shrink-0 overflow-hidden md:block">
-          <SessionList
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            sessionStatuses={sessionStatuses}
-            onSelectSession={handleSelectSession}
-            onCreateSession={handleCreateSession}
-            onDeleteSession={handleDeleteSession}
-          />
-        </div>
+        <>
+          <div
+            className="hidden shrink-0 overflow-hidden md:block"
+            style={{ width: sessionListWidth }}
+          >
+            {isUnifiedMode ? (
+              <SessionList
+                mode="unified"
+                sessions={unifiedSessions}
+                workspaceNames={workspaceNames}
+                activeSessionId={activeSessionId}
+                sessionStatuses={sessionStatuses}
+                onSelectSession={handleSelectUnifiedSession}
+                onCreateSession={handleCreateSession}
+                onDeleteSession={handleDeleteSession}
+                isUnifiedMode={isUnifiedMode}
+                onToggleMode={handleToggleUnifiedMode}
+              />
+            ) : (
+              <SessionList
+                mode="workspace"
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                sessionStatuses={sessionStatuses}
+                onSelectSession={handleSelectSession}
+                onCreateSession={handleCreateSession}
+                onDeleteSession={handleDeleteSession}
+                isUnifiedMode={isUnifiedMode}
+                onToggleMode={handleToggleUnifiedMode}
+              />
+            )}
+          </div>
+          <div
+            className="hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors md:flex"
+            onMouseDown={handleSessionListDragStart}
+          >
+            <GripVertical className="size-3.5 text-muted-foreground/30" />
+          </div>
+        </>
       )}
 
       {/* Main chat area */}
@@ -401,12 +532,16 @@ export function ChatInterface() {
             agents={primaryAgents}
             selectedAgent={selectedAgent}
             onAgentChange={setSelectedAgent}
+            open={isAgentSelectorOpen}
+            onOpenChange={setIsAgentSelectorOpen}
           />
 
           <ModelSelector
             workspaceId={activeWorkspaceId}
             selectedModel={selectedModel}
             onModelChange={setSelectedModel}
+            open={isModelSelectorOpen}
+            onOpenChange={setIsModelSelectorOpen}
           />
         </div>
 

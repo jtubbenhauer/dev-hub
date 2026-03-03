@@ -96,46 +96,9 @@ export function ReviewFileList({
           if (sorted[prevIdx]) onSelectFile(sorted[prevIdx])
           break
         }
-        case "r": {
-          e.preventDefault()
-          if (selectedFileId !== null) {
-            const current = sorted.find((f) => f.id === selectedFileId)
-            if (current) onToggleReviewed(current)
-          }
-          break
-        }
-        case "n": {
-          e.preventDefault()
-          if (selectedFileId !== null) {
-            const current = sorted.find((f) => f.id === selectedFileId)
-            if (current) onMarkAndNext(current)
-          }
-          break
-        }
-        case "]": {
-          if (e.key === "]") {
-            e.preventDefault()
-            const nextUnreviewed = sorted.find(
-              (f, i) => !f.reviewed && i > selectedIndex
-            )
-            if (nextUnreviewed) onSelectFile(nextUnreviewed)
-          }
-          break
-        }
-        case "[": {
-          if (e.key === "[") {
-            e.preventDefault()
-            const prevUnreviewed = [...sorted]
-              .slice(0, selectedIndex)
-              .reverse()
-              .find((f) => !f.reviewed)
-            if (prevUnreviewed) onSelectFile(prevUnreviewed)
-          }
-          break
-        }
       }
     },
-    [selectedIndex, sorted, selectedFileId, onSelectFile, onToggleReviewed, onMarkAndNext]
+    [selectedIndex, sorted, onSelectFile]
   )
 
   useEffect(() => {

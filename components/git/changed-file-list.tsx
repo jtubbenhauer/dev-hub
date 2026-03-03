@@ -76,31 +76,9 @@ export function ChangedFileList({
           if (prev) onSelectFile(prev.path)
           break
         }
-        case "r": {
-          e.preventDefault()
-          if (selectedFile !== null) onToggleReviewed(selectedFile)
-          break
-        }
-        case "]": {
-          e.preventDefault()
-          const nextUnreviewed = files.find(
-            (f, i) => !reviewedFiles.has(f.path) && i > selectedIndex
-          )
-          if (nextUnreviewed) onSelectFile(nextUnreviewed.path)
-          break
-        }
-        case "[": {
-          e.preventDefault()
-          const prevUnreviewed = [...files]
-            .slice(0, selectedIndex)
-            .reverse()
-            .find((f) => !reviewedFiles.has(f.path))
-          if (prevUnreviewed) onSelectFile(prevUnreviewed.path)
-          break
-        }
       }
     },
-    [selectedIndex, files, selectedFile, reviewedFiles, onSelectFile, onToggleReviewed]
+    [selectedIndex, files, onSelectFile]
   )
 
   useEffect(() => {
@@ -125,7 +103,7 @@ export function ChangedFileList({
   }
 
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
       <div className="space-y-px p-2">
         {files.map((file) => {
           const statusChar = STATUS_CHAR[file.status] ?? file.status[0].toUpperCase()
@@ -140,7 +118,7 @@ export function ChangedFileList({
             <div
               key={file.path}
               className={cn(
-                "group flex items-center gap-1.5 rounded-sm px-2 py-1 text-xs cursor-pointer hover:bg-accent/50",
+                "group flex min-w-0 items-center gap-1.5 rounded-sm px-2 py-1 text-xs cursor-pointer hover:bg-accent/50",
                 selectedFile === file.path && "bg-accent",
                 isReviewed && "opacity-60"
               )}

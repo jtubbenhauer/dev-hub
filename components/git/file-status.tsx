@@ -137,28 +137,6 @@ export function FileStatusList({
           if (prev) onSelectFile(prev.path, prev.isStaged)
           break
         }
-        case "r": {
-          e.preventDefault()
-          if (selectedFile !== null) onToggleReviewed(selectedFile)
-          break
-        }
-        case "]": {
-          e.preventDefault()
-          const nextUnreviewed = flatFiles.find(
-            (f, i) => !reviewedFiles.has(f.path) && i > selectedIndex
-          )
-          if (nextUnreviewed) onSelectFile(nextUnreviewed.path, nextUnreviewed.isStaged)
-          break
-        }
-        case "[": {
-          e.preventDefault()
-          const prevUnreviewed = [...flatFiles]
-            .slice(0, selectedIndex)
-            .reverse()
-            .find((f) => !reviewedFiles.has(f.path))
-          if (prevUnreviewed) onSelectFile(prevUnreviewed.path, prevUnreviewed.isStaged)
-          break
-        }
         case "s": {
           e.preventDefault()
           if (selectedFile === null) break
@@ -173,7 +151,7 @@ export function FileStatusList({
         }
       }
     },
-    [selectedIndex, flatFiles, selectedFile, reviewedFiles, onSelectFile, onToggleReviewed, onStageFiles, onUnstageFiles]
+    [selectedIndex, flatFiles, selectedFile, onSelectFile, onStageFiles, onUnstageFiles]
   )
 
   useEffect(() => {
@@ -182,7 +160,7 @@ export function FileStatusList({
   }, [handleKeyboard])
 
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
       <div className="space-y-1 p-2">
         {/* Staged files */}
         <FileSection
@@ -411,7 +389,7 @@ function FileRow({
   return (
     <div
       className={cn(
-        "group flex items-center gap-1.5 rounded-sm px-2 py-1 text-xs cursor-pointer hover:bg-accent/50",
+        "group flex min-w-0 items-center gap-1.5 rounded-sm px-2 py-1 text-xs cursor-pointer hover:bg-accent/50",
         isSelected && "bg-accent",
         isReviewed && "opacity-60"
       )}

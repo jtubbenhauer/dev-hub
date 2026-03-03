@@ -60,15 +60,24 @@ interface AgentSelectorProps {
   agents: Agent[]
   selectedAgent: string | null
   onAgentChange: (agent: string) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function AgentSelector({
   agents,
   selectedAgent,
   onAgentChange,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: AgentSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
   const activeAgent = agents.find((a) => a.name === selectedAgent)
+
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setIsOpen = controlledOnOpenChange !== undefined
+    ? controlledOnOpenChange
+    : setInternalOpen
 
   if (agents.length === 0) return null
 

@@ -10,9 +10,11 @@ import {
   Terminal,
   Settings,
 } from "lucide-react"
-import { useMemo } from "react"
+import { useMemo, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { useCommand } from "@/hooks/use-command"
+import { useLeaderAction } from "@/hooks/use-leader-action"
+import { useCommandPalette } from "@/components/providers/command-palette-provider"
 
 const navItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
@@ -25,6 +27,7 @@ const navItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const { open: openCommandPalette } = useCommandPalette()
 
   const navCommands = useMemo(
     () =>
@@ -41,6 +44,44 @@ export function AppSidebar() {
   )
 
   useCommand(navCommands)
+
+  // Stable refs so the leader action useMemo stays stable
+  const routerRef = useRef(router)
+  routerRef.current = router
+  const openCommandPaletteRef = useRef(openCommandPalette)
+  openCommandPaletteRef.current = openCommandPalette
+
+  const globalLeaderActions = useMemo(
+    () => [
+      {
+        action: { id: "nav:chat", label: "Go to Chat", page: "global" as const },
+        handler: () => routerRef.current.push("/chat"),
+      },
+      {
+        action: { id: "nav:git", label: "Go to Git", page: "global" as const },
+        handler: () => routerRef.current.push("/git"),
+      },
+      {
+        action: { id: "nav:dashboard", label: "Go to Dashboard", page: "global" as const },
+        handler: () => routerRef.current.push("/"),
+      },
+      {
+        action: { id: "nav:repos", label: "Go to Repos", page: "global" as const },
+        handler: () => routerRef.current.push("/workspaces"),
+      },
+      {
+        action: { id: "nav:settings", label: "Go to Settings", page: "global" as const },
+        handler: () => routerRef.current.push("/settings"),
+      },
+      {
+        action: { id: "global:command-palette", label: "Open command palette", page: "global" as const },
+        handler: () => openCommandPaletteRef.current(),
+      },
+    ],
+    []
+  )
+
+  useLeaderAction(globalLeaderActions)
 
   return (
     <aside className="hidden md:flex h-screen w-16 flex-col border-r bg-sidebar">

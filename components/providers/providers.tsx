@@ -8,6 +8,23 @@ import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import { CommandPaletteProvider } from "@/components/providers/command-palette-provider"
 import { CommandPalette } from "@/components/command-palette/command-palette"
+import { LeaderKeyProvider } from "@/components/providers/leader-key-provider"
+import { WhichKeyPanel } from "@/components/leader-key/which-key-panel"
+import { useLeaderKeyBindings, useLeaderWhichKeySetting } from "@/hooks/use-settings"
+
+// Reads bindings from the DB and passes them to the provider.
+// Must be inside QueryClientProvider so the settings hooks work.
+function LeaderKeySetup({ children }: { children: React.ReactNode }) {
+  const { bindings } = useLeaderKeyBindings()
+  const { isWhichKeyEnabled } = useLeaderWhichKeySetting()
+
+  return (
+    <LeaderKeyProvider bindings={bindings}>
+      {children}
+      {isWhichKeyEnabled && <WhichKeyPanel />}
+    </LeaderKeyProvider>
+  )
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -28,9 +45,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ThemeProvider>
           <TooltipProvider>
             <CommandPaletteProvider>
-              {children}
-              <CommandPalette />
-              <Toaster />
+              <LeaderKeySetup>
+                {children}
+                <CommandPalette />
+                <Toaster />
+              </LeaderKeySetup>
             </CommandPaletteProvider>
           </TooltipProvider>
         </ThemeProvider>

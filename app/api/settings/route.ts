@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { settings } from "@/drizzle/schema"
-import { eq, and } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 
 // GET: return all settings for the authenticated user
 export async function GET() {
@@ -11,10 +11,19 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const rows = await db
-    .select()
-    .from(settings)
-    .where(eq(settings.userId, session.user.id))
+  let rows: { userId: string; key: string; value: unknown }[]
+  try {
+    rows = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.userId, session.user.id))
+  } catch (err) {
+    console.error("[settings GET] DB error:", err)
+    return NextResponse.json(
+      { error: "Failed to load settings" },
+      { status: 500 }
+    )
+  }
 
   const result: Record<string, unknown> = {}
   for (const row of rows) {
@@ -31,7 +40,15 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const body: unknown = await request.json()
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid JSON in request body" },
+      { status: 400 }
+    )
+  }
   if (
     !body ||
     typeof body !== "object" ||
@@ -46,22 +63,20 @@ export async function PUT(request: NextRequest) {
 
   const { key, value } = body as { key: string; value: unknown }
 
-  const existing = await db
-    .select()
-    .from(settings)
-    .where(and(eq(settings.userId, session.user.id), eq(settings.key, key)))
-
-  if (existing.length > 0) {
+  try {
     await db
-      .update(settings)
-      .set({ value: value as never })
-      .where(and(eq(settings.userId, session.user.id), eq(settings.key, key)))
-  } else {
-    await db.insert(settings).values({
-      userId: session.user.id,
-      key,
-      value: value as never,
-    })
+      .insert(settings)
+      .values({ userId: session.user.id, key, value })
+      .onConflictDoUpdate({
+        target: [settings.userId, settings.key],
+        set: { value },
+      })
+  } catch (err) {
+    console.error("[settings PUT] DB error:", err)
+    return NextResponse.json(
+      { error: "Failed to save setting" },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ key, value })

@@ -31,6 +31,8 @@ interface ModelSelectorProps {
   workspaceId: string | null
   selectedModel: SelectedModel | null
   onModelChange: (model: SelectedModel) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 interface ConfigProvidersResponse {
@@ -84,12 +86,19 @@ export function ModelSelector({
   workspaceId,
   selectedModel,
   onModelChange,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: ModelSelectorProps) {
   const [providers, setProviders] = useState<ProviderWithModels[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [isOpen, setIsOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
   const selectedModelRef = useRef(selectedModel)
   selectedModelRef.current = selectedModel
+
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setIsOpen = controlledOnOpenChange !== undefined
+    ? controlledOnOpenChange
+    : setInternalOpen
   const { allowlist } = useModelAllowlist()
   const allowlistSet = allowlist.length > 0 ? new Set(allowlist) : null
 

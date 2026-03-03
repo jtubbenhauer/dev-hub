@@ -16,7 +16,10 @@ export function CommandPalette() {
   const { isOpen, close, commands } = useCommandPalette()
 
   const groups = groupByKey(commands, (cmd) => cmd.group)
-  const groupNames = Array.from(groups.keys())
+  const GROUP_ORDER: Record<string, number> = { Workspaces: 0, Navigation: 1 }
+  const groupNames = Array.from(groups.keys()).sort(
+    (a, b) => (GROUP_ORDER[a] ?? 99) - (GROUP_ORDER[b] ?? 99)
+  )
 
   function handleSelect(onSelect: () => void) {
     close()

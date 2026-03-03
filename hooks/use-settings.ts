@@ -1,7 +1,10 @@
 "use client"
 
+import { useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import type { LeaderBindingsMap } from "@/types/leader-key"
+import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults"
 
 interface SelectedModel {
   providerID: string
@@ -23,6 +26,8 @@ export const SETTINGS_KEYS = {
   CLICKUP_API_TOKEN: "clickup-api-token",
   CLICKUP_TEAM_ID: "clickup-team-id",
   CLICKUP_USER_ID: "clickup-user-id",
+  LEADER_KEY_BINDINGS: "leader-key-bindings",
+  LEADER_WHICH_KEY: "leader-which-key",
 } as const
 
 export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
@@ -46,8 +51,19 @@ type SettingsMap = Record<string, unknown>
 async function fetchSettings(): Promise<SettingsMap> {
   const res = await fetch("/api/settings")
   if (!res.ok) {
-    const err = await res.json()
-    throw new Error(err.error || "Failed to fetch settings")
+    let message = `Failed to fetch settings (${res.status})`
+    try {
+      const err = await res.json()
+      if (err.error) message = err.error
+    } catch {
+      // Response body is not JSON (e.g. HTML error page or redirect)
+    }
+    throw new Error(message)
+  }
+  const contentType = res.headers.get("content-type") ?? ""
+  if (!contentType.includes("application/json")) {
+    // Server returned a non-JSON response (e.g. auth redirect to login page)
+    throw new Error("Session expired — please refresh the page")
   }
   return res.json()
 }
@@ -59,8 +75,14 @@ async function putSetting(key: string, value: unknown): Promise<void> {
     body: JSON.stringify({ key, value }),
   })
   if (!res.ok) {
-    const err = await res.json()
-    throw new Error(err.error || "Failed to save setting")
+    let message = `Failed to save setting (${res.status})`
+    try {
+      const err = await res.json()
+      if (err.error) message = err.error
+    } catch {
+      // Response body is not JSON (e.g. HTML error page or server crash)
+    }
+    throw new Error(message)
   }
 }
 
@@ -208,4 +230,33 @@ export function useClickUpSettings(): {
     isConfigured: !!(apiToken && teamId),
     isLoading,
   }
+}
+
+export function useLeaderKeyBindings(): {
+  bindings: LeaderBindingsMap
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.LEADER_KEY_BINDINGS]
+  const stored =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as LeaderBindingsMap)
+      : {}
+  // Merge stored overrides on top of defaults (memoize to keep a stable reference)
+  const bindings: LeaderBindingsMap = useMemo(
+    () => ({ ...DEFAULT_LEADER_BINDINGS, ...stored }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(stored)]
+  )
+  return { bindings, isLoading }
+}
+
+export function useLeaderWhichKeySetting(): {
+  isWhichKeyEnabled: boolean
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.LEADER_WHICH_KEY]
+  // Default: true (which-key popup is on by default)
+  return { isWhichKeyEnabled: raw !== false, isLoading }
 }

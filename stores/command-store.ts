@@ -158,34 +158,43 @@ export const useCommandStore = create<CommandState>()((set, get) => ({
 // Pending lines waiting to be flushed to the store, keyed by sessionId.
 // Using a module-level Map so it's shared across all store instances.
 const pendingLines = new Map<string, string[]>()
-let flushScheduled = false
+let flushHandle: number | null = null
+
+function doFlush(
+  set: (updater: (state: CommandState) => Partial<CommandState>) => void
+) {
+  flushHandle = null
+  if (pendingLines.size === 0) return
+
+  const snapshot = new Map(pendingLines)
+  pendingLines.clear()
+
+  set((state) => {
+    const updatedSessions = { ...state.sessions }
+    for (const [sessionId, newLines] of snapshot) {
+      const session = updatedSessions[sessionId]
+      if (!session) continue
+      updatedSessions[sessionId] = {
+        ...session,
+        lines: [...session.lines, ...newLines],
+      }
+    }
+    return { sessions: updatedSessions }
+  })
+}
 
 function scheduleFlush(
   set: (updater: (state: CommandState) => Partial<CommandState>) => void
 ) {
-  if (flushScheduled) return
-  flushScheduled = true
+  if (flushHandle !== null) return
 
-  requestAnimationFrame(() => {
-    flushScheduled = false
-    if (pendingLines.size === 0) return
-
-    const snapshot = new Map(pendingLines)
-    pendingLines.clear()
-
-    set((state) => {
-      const updatedSessions = { ...state.sessions }
-      for (const [sessionId, newLines] of snapshot) {
-        const session = updatedSessions[sessionId]
-        if (!session) continue
-        updatedSessions[sessionId] = {
-          ...session,
-          lines: [...session.lines, ...newLines],
-        }
-      }
-      return { sessions: updatedSessions }
-    })
-  })
+  // When the tab is hidden, RAF is suspended by the browser. Fall back to a
+  // short timeout so output lines still land in the store while backgrounded.
+  if (typeof document !== "undefined" && document.hidden) {
+    flushHandle = window.setTimeout(() => doFlush(set), 500) as unknown as number
+  } else {
+    flushHandle = requestAnimationFrame(() => doFlush(set))
+  }
 }
 
 function appendLines(

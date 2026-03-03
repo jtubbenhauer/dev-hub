@@ -8,9 +8,10 @@ interface CommitPanelProps {
   stagedCount: number
   onCommit: (message: string) => void
   isCommitting: boolean
+  focusRef?: React.RefObject<HTMLTextAreaElement | null>
 }
 
-export function CommitPanel({ stagedCount, onCommit, isCommitting }: CommitPanelProps) {
+export function CommitPanel({ stagedCount, onCommit, isCommitting, focusRef }: CommitPanelProps) {
   const [message, setMessage] = useState("")
 
   const handleCommit = useCallback(() => {
@@ -33,6 +34,7 @@ export function CommitPanel({ stagedCount, onCommit, isCommitting }: CommitPanel
   return (
     <div className="shrink-0 space-y-2 border-t p-2">
       <textarea
+        ref={focusRef}
         value={message}
         onChange={(event) => setMessage(event.target.value)}
         onKeyDown={handleKeyDown}

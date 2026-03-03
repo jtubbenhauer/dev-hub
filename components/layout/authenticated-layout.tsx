@@ -23,7 +23,9 @@ export function AuthenticatedLayout({
   const { setWorkspaces, setIsLoadingWorkspaces, activeWorkspaceId, setActiveWorkspaceId } =
     useWorkspaceStore()
   const { defaultWorkspaceId } = useDefaultWorkspaceSetting()
-  const { connectSSE, disconnectAllSSE } = useChatStore()
+  const connectSSE = useChatStore((s) => s.connectSSE)
+  const disconnectAllSSE = useChatStore((s) => s.disconnectAllSSE)
+  const handleVisibilityRestored = useChatStore((s) => s.handleVisibilityRestored)
 
   const { data, isFetching } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
@@ -59,6 +61,19 @@ export function AuthenticatedLayout({
   useEffect(() => {
     return () => disconnectAllSSE()
   }, [disconnectAllSSE])
+
+  // When the user returns to this tab, flush any part updates that were buffered
+  // while the tab was hidden (browsers suspend requestAnimationFrame in background
+  // tabs, so the normal RAF flush never fires), and verify SSE health.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        handleVisibilityRestored()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }, [handleVisibilityRestored])
 
   useEffect(() => {
     if (status === "unauthenticated") {

@@ -163,8 +163,8 @@ export async function getSuggestions(
       .from(settings)
       .where(and(eq(settings.userId, userId), eq(settings.key, "shell-rc-path")))
       .limit(1)
-    if (row?.value && typeof row.value === "string") {
-      shellRcPath = row.value
+    if (row?.value) {
+      if (typeof row.value === "string") shellRcPath = row.value
     }
   }
 

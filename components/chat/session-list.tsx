@@ -1,42 +1,83 @@
 "use client"
 
 import { useMemo } from "react"
-import { Plus, Trash2, MessageSquare } from "lucide-react"
+import { Plus, Trash2, MessageSquare, Globe, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { Session, SessionStatus } from "@/lib/opencode/types"
+import type { SessionWithWorkspace } from "@/stores/chat-store"
 
-interface SessionListProps {
-  sessions: Record<string, Session>
+interface BaseSessionListProps {
   activeSessionId: string | null
   sessionStatuses: Record<string, SessionStatus>
-  onSelectSession: (sessionId: string) => void
   onCreateSession: () => void
   onDeleteSession: (sessionId: string) => void
+  isUnifiedMode?: boolean
+  onToggleMode?: () => void
 }
 
-export function SessionList({
-  sessions,
-  activeSessionId,
-  sessionStatuses,
-  onSelectSession,
-  onCreateSession,
-  onDeleteSession,
-}: SessionListProps) {
+interface WorkspaceSessionListProps extends BaseSessionListProps {
+  mode: "workspace"
+  sessions: Record<string, Session>
+  onSelectSession: (sessionId: string) => void
+}
+
+interface UnifiedSessionListProps extends BaseSessionListProps {
+  mode: "unified"
+  sessions: SessionWithWorkspace[]
+  workspaceNames: Record<string, string>
+  onSelectSession: (sessionId: string, workspaceId: string) => void
+}
+
+type SessionListProps = WorkspaceSessionListProps | UnifiedSessionListProps
+
+export function SessionList(props: SessionListProps) {
+  const { activeSessionId, sessionStatuses, onCreateSession, onDeleteSession } = props
+
   const sortedSessions = useMemo(() => {
-    return Object.values(sessions)
-      .filter((s) => !s.parentID)
-      .sort((a, b) => b.time.updated - a.time.updated)
-  }, [sessions])
+    if (props.mode === "workspace") {
+      return Object.values(props.sessions)
+        .filter((s) => !s.parentID)
+        .sort((a, b) => b.time.updated - a.time.updated)
+    }
+    return props.sessions
+  }, [props.mode, props.sessions])
+
+  const handleSelect = (session: Session | SessionWithWorkspace) => {
+    if (props.mode === "unified") {
+      props.onSelectSession(session.id, (session as SessionWithWorkspace).workspaceId)
+    } else {
+      props.onSelectSession(session.id)
+    }
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col border-r bg-muted/30">
       <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-sm font-medium">Sessions</span>
-        <Button size="icon-xs" variant="ghost" onClick={onCreateSession}>
-          <Plus className="size-3.5" />
-        </Button>
+        <span className="text-sm font-medium">
+          {props.mode === "unified" ? "All sessions" : "Sessions"}
+        </span>
+        <div className="flex items-center gap-1">
+          {props.onToggleMode && (
+            <Button
+              size="icon-xs"
+              variant={props.isUnifiedMode ? "secondary" : "ghost"}
+              onClick={props.onToggleMode}
+              title={props.isUnifiedMode ? "Show current workspace" : "Show all workspaces"}
+            >
+              {props.isUnifiedMode ? (
+                <Layers className="size-3.5" />
+              ) : (
+                <Globe className="size-3.5" />
+              )}
+            </Button>
+          )}
+          <Button size="icon-xs" variant="ghost" onClick={onCreateSession}>
+            <Plus className="size-3.5" />
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="min-h-0 min-w-0 flex-1">
@@ -57,7 +98,12 @@ export function SessionList({
                 session={session}
                 isActive={session.id === activeSessionId}
                 status={sessionStatuses[session.id] ?? null}
-                onSelect={() => onSelectSession(session.id)}
+                workspaceName={
+                  props.mode === "unified"
+                    ? props.workspaceNames[(session as SessionWithWorkspace).workspaceId]
+                    : undefined
+                }
+                onSelect={() => handleSelect(session)}
                 onDelete={() => onDeleteSession(session.id)}
               />
             ))}
@@ -72,6 +118,7 @@ interface SessionItemProps {
   session: Session
   isActive: boolean
   status: SessionStatus | null
+  workspaceName?: string
   onSelect: () => void
   onDelete: () => void
 }
@@ -80,6 +127,7 @@ function SessionItem({
   session,
   isActive,
   status,
+  workspaceName,
   onSelect,
   onDelete,
 }: SessionItemProps) {
@@ -116,7 +164,14 @@ function SessionItem({
         <p className="truncate font-medium" title={session.title || "Untitled"}>
           {session.title || "Untitled"}
         </p>
-        <p className="text-xs text-muted-foreground">{formattedTime}</p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="text-xs text-muted-foreground">{formattedTime}</p>
+          {workspaceName && (
+            <Badge variant="outline" className="text-xs px-1 py-0 font-normal">
+              {workspaceName}
+            </Badge>
+          )}
+        </div>
       </div>
       <Button
         size="icon-xs"

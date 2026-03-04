@@ -26,6 +26,7 @@ export const SETTINGS_KEYS = {
   CLICKUP_API_TOKEN: "clickup-api-token",
   CLICKUP_TEAM_ID: "clickup-team-id",
   CLICKUP_USER_ID: "clickup-user-id",
+  GITHUB_API_TOKEN: "github-api-token",
   LEADER_KEY_BINDINGS: "leader-key-bindings",
   LEADER_WHICH_KEY: "leader-which-key",
 } as const
@@ -259,4 +260,21 @@ export function useLeaderWhichKeySetting(): {
   const raw = data?.[SETTINGS_KEYS.LEADER_WHICH_KEY]
   // Default: true (which-key popup is on by default)
   return { isWhichKeyEnabled: raw !== false, isLoading }
+}
+
+export function useGitHubSettings(): {
+  apiToken: string | null
+  isConfigured: boolean
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const apiToken =
+    typeof data?.[SETTINGS_KEYS.GITHUB_API_TOKEN] === "string"
+      ? (data[SETTINGS_KEYS.GITHUB_API_TOKEN] as string)
+      : null
+  return {
+    apiToken,
+    isConfigured: !!apiToken,
+    isLoading,
+  }
 }

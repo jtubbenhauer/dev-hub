@@ -11,6 +11,7 @@ import { useChatStore } from "@/stores/chat-store"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { ChatMessage } from "@/components/chat/message"
 import { PromptInput } from "@/components/chat/prompt-input"
+import type { PromptInputHandle } from "@/components/chat/prompt-input"
 import { SessionList } from "@/components/chat/session-list"
 import { ModelSelector, loadPersistedModel } from "@/components/chat/model-selector"
 import { useAgents, AgentSelector } from "@/components/chat/agent-selector"
@@ -79,6 +80,7 @@ export function ChatInterface() {
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false)
   const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const promptInputRef = useRef<PromptInputHandle>(null)
   const isNearBottom = useRef(true)
   const [showJumpToBottom, setShowJumpToBottom] = useState(false)
 
@@ -98,14 +100,6 @@ export function ChatInterface() {
 
   const { primaryAgents } = useAgents(activeWorkspaceId)
   const { bindings: agentModelBindings } = useModelAgentBindings()
-
-  // Auto-select default agent when agents load
-  useEffect(() => {
-    if (selectedAgent || primaryAgents.length === 0) return
-    const defaultAgent =
-      primaryAgents.find((a) => a.name === "code") ?? primaryAgents[0]
-    setSelectedAgent(defaultAgent.name)
-  }, [primaryAgents, selectedAgent])
 
   // Auto-switch model when agent changes and a binding exists
   useEffect(() => {
@@ -137,7 +131,23 @@ export function ChatInterface() {
     getActiveSessionStatuses,
     getStreamingStatus,
     getRecentSessionsAcrossWorkspaces,
+    setSessionAgent,
+    getSessionAgent,
   } = useChatStore()
+
+  // Restore per-session agent when the active session changes.
+  // Falls back to "code" (or the first available agent) when the session has no stored agent.
+  useEffect(() => {
+    if (primaryAgents.length === 0) return
+    const stored = activeSessionId ? getSessionAgent(activeSessionId) : null
+    if (stored) {
+      setSelectedAgent(stored)
+    } else if (!selectedAgent) {
+      const defaultAgent = primaryAgents.find((a) => a.name === "code") ?? primaryAgents[0]
+      setSelectedAgent(defaultAgent.name)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId, primaryAgents])
 
   // getStreamingStatus must be passed as a stable reference — inline lambdas like
   // `(s) => s.getStreamingStatus()` create a new function each render, which causes
@@ -388,6 +398,10 @@ export function ChatInterface() {
         action: { id: "chat:toggle-plan", label: "Toggle plan panel", page: "chat" as const },
         handler: () => setIsPlanPanelOpenRef.current((prev) => !prev),
       },
+      {
+        action: { id: "chat:focus-prompt", label: "Focus prompt input", page: "chat" as const },
+        handler: () => promptInputRef.current?.focus(),
+      },
     ],
     []
   )
@@ -531,7 +545,12 @@ export function ChatInterface() {
           <AgentSelector
             agents={primaryAgents}
             selectedAgent={selectedAgent}
-            onAgentChange={setSelectedAgent}
+            onAgentChange={(agent) => {
+              setSelectedAgent(agent)
+              if (activeSessionId && activeWorkspaceId) {
+                setSessionAgent(activeSessionId, activeWorkspaceId, agent)
+              }
+            }}
             open={isAgentSelectorOpen}
             onOpenChange={setIsAgentSelectorOpen}
           />
@@ -653,6 +672,7 @@ export function ChatInterface() {
 
         {/* Prompt input */}
         <PromptInput
+          ref={promptInputRef}
           onSubmit={handleSendMessage}
           onAbort={handleAbort}
           isStreaming={streamingStatus === "streaming"}

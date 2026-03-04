@@ -33,6 +33,8 @@ export interface WorkspaceState {
   questions: QuestionRequest[]
   // Todos keyed by session ID
   todos: Record<string, Todo[]>
+  // Last-used agent keyed by session ID
+  sessionAgents: Record<string, string>
   eventSource: EventSource | null
   sseReconnectAttempts: number
 }
@@ -46,6 +48,7 @@ function emptyWorkspaceState(): WorkspaceState {
     permissions: [],
     questions: [],
     todos: {},
+    sessionAgents: {},
     eventSource: null,
     sseReconnectAttempts: 0,
   }
@@ -232,6 +235,8 @@ interface ChatState {
   getActiveSessionStatuses: () => Record<string, SessionStatus>
   getActiveTodos: () => Todo[]
   getRecentSessionsAcrossWorkspaces: (limit: number) => SessionWithWorkspace[]
+  setSessionAgent: (sessionId: string, workspaceId: string, agent: string) => void
+  getSessionAgent: (sessionId: string) => string | null
 }
 
 function buildProxyUrl(
@@ -286,10 +291,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       streamingError: null,
     })
 
-    // Connect SSE for this workspace if not already connected
+    // Connect SSE for this workspace if not already connected or if the connection dropped
     if (workspaceId) {
       const ws = get().workspaceStates[workspaceId]
-      if (!ws?.eventSource) {
+      const es = ws?.eventSource
+      if (!es || es.readyState === EventSource.CLOSED) {
         get().connectSSE(workspaceId)
       }
       // Fetch sessions if we don't have them yet
@@ -322,6 +328,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           .sort((a, b) => b.time.updated - a.time.updated)[0]
         if (mostRecent) {
           get().setActiveSession(mostRecent.id)
+          get().refreshActiveSessionStatus(workspaceId)
         }
       }
     } catch (error) {
@@ -363,6 +370,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const { [sessionId]: _o, ...remainingOptimistic } = ws.optimisticMessageIds
         const { [sessionId]: _st, ...remainingStatuses } = ws.sessionStatuses
         const { [sessionId]: _t, ...remainingTodos } = ws.todos
+        const { [sessionId]: _a, ...remainingSessionAgents } = ws.sessionAgents
         return {
           activeSessionId:
             state.activeSessionId === sessionId ? null : state.activeSessionId,
@@ -375,6 +383,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
               optimisticMessageIds: remainingOptimistic,
               sessionStatuses: remainingStatuses,
               todos: remainingTodos,
+              sessionAgents: remainingSessionAgents,
             },
           },
         }
@@ -395,9 +404,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       set((state) =>
         updateWorkspace(state, workspaceId, (ws) => {
           const { [sessionId]: _, ...remainingOptimistic } = ws.optimisticMessageIds
+          // Seed session agent from the last user message if not already tracked
+          const seededAgent = ws.sessionAgents[sessionId]
+            ? {}
+            : (() => {
+                const lastUserMessage = [...data].reverse().find(
+                  (m) => m.info.role === "user"
+                )
+                const agent = lastUserMessage?.info.role === "user" ? lastUserMessage.info.agent : undefined
+                return agent
+                  ? { sessionAgents: { ...ws.sessionAgents, [sessionId]: agent } }
+                  : {}
+              })()
           return {
             optimisticMessageIds: remainingOptimistic,
             messages: { ...ws.messages, [sessionId]: data },
+            ...seededAgent,
           }
         })
       )
@@ -709,15 +731,17 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     flushPendingPartUpdates(set)
 
     const { activeWorkspaceId, activeSessionId, workspaceStates } = get()
-    if (!activeWorkspaceId || !activeSessionId) return
 
     // Re-sync session status in case the SSE idle event arrived while backgrounded
-    get().refreshActiveSessionStatus(activeWorkspaceId)
+    if (activeWorkspaceId && activeSessionId) {
+      get().refreshActiveSessionStatus(activeWorkspaceId)
+    }
 
-    // If the EventSource was silently dropped while the tab was hidden, reconnect
-    const es = workspaceStates[activeWorkspaceId]?.eventSource
-    if (es && es.readyState === EventSource.CLOSED) {
-      get().connectSSE(activeWorkspaceId)
+    // If any workspace's EventSource was silently dropped while the tab was hidden, reconnect all of them
+    for (const [wsId, ws] of Object.entries(workspaceStates)) {
+      if (ws.eventSource && ws.eventSource.readyState === EventSource.CLOSED) {
+        get().connectSSE(wsId)
+      }
     }
   },
 
@@ -875,10 +899,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
         // Clear optimistic flag when session status arrives — SSE is now the source of truth
         const { activeSessionId, activeWorkspaceId } = get()
-        if (sessionID === activeSessionId && wsId === activeWorkspaceId) {
-          const isIdle = status.type === "idle"
-          if (isIdle) {
+        if (status.type === "idle") {
+          // Clear unconditionally when the session goes idle — even if it's a background workspace.
+          // The wsId check is kept for the poll (which is active-workspace-only).
+          if (get().optimisticStreamingSessionId === sessionID) {
             set({ optimisticStreamingSessionId: null })
+          }
+          if (wsId === activeWorkspaceId && sessionID === activeSessionId) {
             get().clearStreamingPoll()
           }
         }
@@ -896,8 +923,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         )
 
         const { activeSessionId, activeWorkspaceId } = get()
-        if (sessionID === activeSessionId && wsId === activeWorkspaceId) {
+        // Clear optimistic flag unconditionally when the session goes idle — even for background workspaces.
+        if (get().optimisticStreamingSessionId === sessionID) {
           set({ optimisticStreamingSessionId: null })
+        }
+        if (sessionID === activeSessionId && wsId === activeWorkspaceId) {
           get().clearStreamingPoll()
         }
         break
@@ -1171,5 +1201,20 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     _unifiedSessionsCacheRefs = newRefs
     _unifiedSessionsCacheLimit = limit
     return _unifiedSessionsCache
+  },
+
+  setSessionAgent: (sessionId, workspaceId, agent) => {
+    set((state) =>
+      updateWorkspace(state, workspaceId, (ws) => ({
+        sessionAgents: { ...ws.sessionAgents, [sessionId]: agent },
+      }))
+    )
+  },
+
+  getSessionAgent: (sessionId) => {
+    const { activeWorkspaceId, workspaceStates } = get()
+    const wsId = activeWorkspaceId ?? findWorkspaceForSession(workspaceStates, sessionId)
+    if (!wsId) return null
+    return workspaceStates[wsId]?.sessionAgents[sessionId] ?? null
   },
 }))

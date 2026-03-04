@@ -1,10 +1,14 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, forwardRef, useImperativeHandle } from "react"
 import { Send, Square, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FilePicker } from "@/components/chat/file-picker"
 import { cn } from "@/lib/utils"
+
+export interface PromptInputHandle {
+  focus: () => void
+}
 
 interface PromptInputProps {
   onSubmit: (text: string) => void
@@ -14,17 +18,21 @@ interface PromptInputProps {
   workspaceId: string | null
 }
 
-export function PromptInput({
+export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(function PromptInput({
   onSubmit,
   onAbort,
   isStreaming,
   disabled,
   workspaceId,
-}: PromptInputProps) {
+}, ref) {
   const [value, setValue] = useState("")
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])
   const [pickerQuery, setPickerQuery] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => textareaRef.current?.focus(),
+  }), [])
 
   const autoResize = useCallback(() => {
     const textarea = textareaRef.current
@@ -202,4 +210,4 @@ export function PromptInput({
       </div>
     </div>
   )
-}
+})

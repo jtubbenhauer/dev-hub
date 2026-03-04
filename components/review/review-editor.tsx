@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useCallback, useState } from "react"
+import { useEffect, useRef, useCallback, useState, useImperativeHandle, forwardRef } from "react"
 import {
   EditorView,
   keymap,
@@ -45,6 +45,11 @@ Vim.defineAction("goToPreviousChunk", (cm) => {
 Vim.mapCommand("]c", "action", "goToNextChunk", {}, { context: "normal" })
 Vim.mapCommand("[c", "action", "goToPreviousChunk", {}, { context: "normal" })
 
+export interface ReviewEditorHandle {
+  focus: () => void
+  blur: () => void
+}
+
 interface ReviewEditorProps {
   fileContent: {
     original: string
@@ -60,7 +65,7 @@ interface ReviewEditorProps {
   onOpenFileList?: () => void
 }
 
-export function ReviewEditor({
+export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(function ReviewEditor({
   fileContent,
   file,
   workspaceId,
@@ -68,9 +73,14 @@ export function ReviewEditor({
   onToggleReviewed,
   onMarkAndNext,
   onOpenFileList,
-}: ReviewEditorProps) {
+}, ref) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => viewRef.current?.focus(),
+    blur: () => viewRef.current?.contentDOM.blur(),
+  }), [])
   const isVimMode = useEditorStore((s) => s.isVimMode)
   const { fontSize } = useFontSizeSetting()
   const { mobileFontSize } = useMobileFontSizeSetting()
@@ -352,4 +362,4 @@ export function ReviewEditor({
       <div ref={editorRef} className="min-h-0 flex-1 overflow-hidden" />
     </div>
   )
-}
+})

@@ -349,3 +349,115 @@ export interface ClickUpTeam {
   color: string
   avatar: string | null
 }
+
+// GitHub types
+
+export interface GitHubUser {
+  login: string
+  id: number
+  avatar_url: string
+  html_url: string
+  name: string | null
+}
+
+export interface GitHubLabel {
+  id: number
+  name: string
+  color: string
+  description: string | null
+}
+
+export interface GitHubPullRequest {
+  number: number
+  title: string
+  body: string | null
+  state: "open" | "closed"
+  draft: boolean
+  html_url: string
+  created_at: string
+  updated_at: string
+  user: GitHubUser
+  head: {
+    label: string
+    ref: string
+    sha: string
+    repo: { full_name: string; name: string; owner: { login: string } } | null
+  }
+  base: {
+    label: string
+    ref: string
+    sha: string
+    repo: { full_name: string; name: string; owner: { login: string } }
+  }
+  labels: GitHubLabel[]
+  requested_reviewers: GitHubUser[]
+  review_comments: number
+  comments: number
+  additions: number
+  deletions: number
+  changed_files: number
+}
+
+export type GitHubPullRequestFileStatus =
+  | "added"
+  | "removed"
+  | "modified"
+  | "renamed"
+  | "copied"
+  | "changed"
+  | "unchanged"
+
+export interface GitHubPullRequestFile {
+  sha: string
+  filename: string
+  status: GitHubPullRequestFileStatus
+  additions: number
+  deletions: number
+  changes: number
+  patch?: string
+  previous_filename?: string
+  blob_url: string
+  raw_url: string
+  contents_url: string
+}
+
+export interface GitHubReviewComment {
+  id: number
+  body: string
+  path: string
+  // line is the line number in the file the comment is on (right side / new file)
+  line: number | null
+  // start_line is set for multi-line comments
+  start_line: number | null
+  side: "LEFT" | "RIGHT"
+  start_side: "LEFT" | "RIGHT" | null
+  original_line: number | null
+  original_start_line: number | null
+  diff_hunk: string
+  commit_id: string
+  original_commit_id: string
+  created_at: string
+  updated_at: string
+  user: GitHubUser
+  html_url: string
+  in_reply_to_id?: number
+}
+
+export type GitHubReviewEvent = "APPROVE" | "REQUEST_CHANGES" | "COMMENT"
+
+export interface GitHubReview {
+  id: number
+  body: string | null
+  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING"
+  submitted_at: string | null
+  user: GitHubUser
+  html_url: string
+}
+
+export interface GitHubPrFileContent {
+  original: string
+  current: string
+  path: string
+  language: string
+  patch: string | undefined
+}

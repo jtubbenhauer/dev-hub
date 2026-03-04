@@ -17,6 +17,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "chat:new-session", label: "New session", page: "chat" },
   { id: "chat:toggle-sessions", label: "Toggle session list", page: "chat" },
   { id: "chat:toggle-plan", label: "Toggle plan panel", page: "chat" },
+  { id: "chat:focus-prompt", label: "Focus prompt input", page: "chat" },
 
   // Git page
   { id: "git:toggle-reviewed", label: "Toggle file reviewed", page: "git" },
@@ -33,6 +34,8 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "git:prev-file", label: "Select previous file", page: "git" },
   { id: "git:next-unreviewed", label: "Jump to next unreviewed", page: "git" },
   { id: "git:prev-unreviewed", label: "Jump to prev unreviewed", page: "git" },
+  { id: "git:focus-editor", label: "Focus code pane", page: "git" },
+  { id: "git:focus-files", label: "Focus files pane", page: "git" },
 ]
 
 export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
@@ -51,6 +54,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "chat:new-session": "n",
   "chat:toggle-sessions": "s",
   "chat:toggle-plan": "p",
+  "chat:focus-prompt": "i",
 
   // Git page
   "git:toggle-reviewed": "r",
@@ -67,4 +71,6 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "git:prev-file": "k",
   "git:next-unreviewed": "]",
   "git:prev-unreviewed": "[",
+  "git:focus-editor": "l",
+  "git:focus-files": "h",
 }

@@ -1,0 +1,1856 @@
+/**
+ * Tests for the chat store's multi-workspace and multi-session behaviour.
+ *
+ * Approach:
+ *  - Each test resets the store to a clean slate via `resetStore()`.
+ *  - `fetch` is mocked globally; individual tests stub it as needed.
+ *  - SSE is driven through the MockEventSource defined in tests/setup.ts.
+ *  - The module-level memoisation caches in the store are reset between tests
+ *    by re-importing the store factory — achieved via `vi.resetModules()` in
+ *    the beforeEach of suites that need a completely fresh module.
+ *  - Where the store is imported directly, we call `useChatStore.setState`
+ *    to reset to a known baseline instead.
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { act } from "react"
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Minimal valid Session fixture. */
+function makeSession(id: string, opts: { updated?: number; parentID?: string } = {}) {
+  return {
+    id,
+    projectID: "proj-1",
+    directory: "/workspace",
+    title: `Session ${id}`,
+    version: "1",
+    parentID: opts.parentID,
+    time: { created: 1000, updated: opts.updated ?? 1000 },
+  }
+}
+
+/** Minimal valid user Message fixture. */
+function makeUserMessage(id: string, sessionID: string) {
+  return {
+    id,
+    sessionID,
+    role: "user" as const,
+    time: { created: Date.now() },
+    agent: "",
+    model: { providerID: "", modelID: "" },
+  }
+}
+
+/** Minimal valid assistant Message fixture. */
+function makeAssistantMessage(id: string, sessionID: string) {
+  return {
+    id,
+    sessionID,
+    role: "assistant" as const,
+    time: { created: Date.now() },
+    parentID: "",
+    modelID: "",
+    providerID: "",
+    mode: "",
+    path: { cwd: "", root: "" },
+    cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+  }
+}
+
+/** Convenience alias — returns the appropriate fixture based on role. */
+function makeMessage(id: string, sessionID: string, role: "user" | "assistant" = "user") {
+  if (role === "assistant") return makeAssistantMessage(id, sessionID)
+  return makeUserMessage(id, sessionID)
+}
+
+/** Minimal valid Part fixture. */
+function makePart(id: string, sessionID: string, messageID: string) {
+  return {
+    id,
+    sessionID,
+    messageID,
+    type: "text" as const,
+    text: "hello",
+  }
+}
+
+/** Minimal valid Permission fixture. */
+function makePermission(id: string, sessionID: string) {
+  return {
+    id,
+    type: "bash",
+    sessionID,
+    messageID: "msg-1",
+    title: "Run bash",
+    metadata: {},
+    time: { created: Date.now() },
+  }
+}
+
+/** Minimal valid QuestionRequest fixture. */
+function makeQuestion(id: string, sessionID: string) {
+  return {
+    id,
+    sessionID,
+    questions: [
+      {
+        question: "Continue?",
+        header: "Confirm",
+        options: [{ label: "Yes", description: "" }],
+        multiple: false,
+        custom: false,
+      },
+    ],
+  }
+}
+
+/** Fire a synthetic SSE event through the store's handleEvent. */
+function emitEvent(
+  handleEvent: (event: Record<string, unknown>, sourceWorkspaceId: string) => void,
+  type: string,
+  properties: Record<string, unknown>,
+  sourceWorkspaceId: string
+) {
+  handleEvent({ type, properties }, sourceWorkspaceId)
+}
+
+// ---------------------------------------------------------------------------
+// Store import — done lazily so vi.resetModules() works per suite
+// ---------------------------------------------------------------------------
+
+// We import the store once for suites that don't need module isolation.
+// Suites that need full module re-initialisation use dynamic import inside
+// a beforeEach after calling vi.resetModules().
+
+import { useChatStore } from "../../stores/chat-store"
+
+/** Reset the store to a pristine state between tests. */
+function resetStore() {
+  useChatStore.setState({
+    workspaceStates: {},
+    activeWorkspaceId: null,
+    activeSessionId: null,
+    streamingError: null,
+    streamingPollInterval: null,
+    optimisticStreamingSessionId: null,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// 1. Workspace state isolation
+// ---------------------------------------------------------------------------
+
+describe("workspace state isolation", () => {
+  beforeEach(resetStore)
+
+  it("each workspace has its own independent sessions map", () => {
+    const store = useChatStore.getState()
+
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-a") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-b") } },
+      "ws-b"
+    )
+
+    const wsA = useChatStore.getState().workspaceStates["ws-a"]
+    const wsB = useChatStore.getState().workspaceStates["ws-b"]
+
+    expect(wsA.sessions["sess-a"]).toBeDefined()
+    expect(wsA.sessions["sess-b"]).toBeUndefined()
+    expect(wsB.sessions["sess-b"]).toBeDefined()
+    expect(wsB.sessions["sess-a"]).toBeUndefined()
+  })
+
+  it("session statuses are scoped per workspace", () => {
+    const store = useChatStore.getState()
+
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-a") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "session.status", properties: { sessionID: "sess-a", status: { type: "busy" } } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-b") } },
+      "ws-b"
+    )
+    store.handleEvent(
+      { type: "session.status", properties: { sessionID: "sess-b", status: { type: "idle" } } },
+      "ws-b"
+    )
+
+    const { workspaceStates } = useChatStore.getState()
+    expect(workspaceStates["ws-a"].sessionStatuses["sess-a"]).toEqual({ type: "busy" })
+    expect(workspaceStates["ws-b"].sessionStatuses["sess-b"]).toEqual({ type: "idle" })
+    // No cross-contamination
+    expect(workspaceStates["ws-a"].sessionStatuses["sess-b"]).toBeUndefined()
+    expect(workspaceStates["ws-b"].sessionStatuses["sess-a"]).toBeUndefined()
+  })
+
+  it("permissions are scoped per workspace and not shared", () => {
+    const store = useChatStore.getState()
+
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-a") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "permission.updated", properties: makePermission("perm-1", "sess-a") },
+      "ws-a"
+    )
+
+    const { workspaceStates } = useChatStore.getState()
+    expect(workspaceStates["ws-a"].permissions).toHaveLength(1)
+    expect(workspaceStates["ws-b"]?.permissions ?? []).toHaveLength(0)
+  })
+
+  it("questions are scoped per workspace and deduplicated on SSE replay", () => {
+    const store = useChatStore.getState()
+
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-a") } },
+      "ws-a"
+    )
+    const q = makeQuestion("q-1", "sess-a")
+    store.handleEvent({ type: "question.asked", properties: q }, "ws-a")
+    // Replay (SSE reconnect)
+    store.handleEvent({ type: "question.asked", properties: q }, "ws-a")
+
+    const { workspaceStates } = useChatStore.getState()
+    expect(workspaceStates["ws-a"].questions).toHaveLength(1)
+  })
+
+  it("messages are scoped per workspace — background workspace messages do not appear in active workspace selectors", () => {
+    const store = useChatStore.getState()
+
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-a") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-b") } },
+      "ws-b"
+    )
+    store.handleEvent(
+      {
+        type: "message.updated",
+        properties: { info: makeMessage("msg-a", "sess-a") },
+      },
+      "ws-a"
+    )
+
+    useChatStore.setState({ activeWorkspaceId: "ws-b", activeSessionId: "sess-b" })
+
+    const messages = useChatStore.getState().getActiveSessionMessages()
+    expect(messages).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 2. Workspace switching
+// ---------------------------------------------------------------------------
+
+describe("workspace switching", () => {
+  beforeEach(resetStore)
+
+  it("switching workspace resets activeSessionId to null", () => {
+    useChatStore.setState({ activeWorkspaceId: "ws-a", activeSessionId: "sess-a" })
+    useChatStore.getState().setActiveWorkspaceId("ws-b")
+    expect(useChatStore.getState().activeSessionId).toBeNull()
+  })
+
+  it("switching workspace clears a streaming error from the previous workspace", () => {
+    useChatStore.setState({ activeWorkspaceId: "ws-a", streamingError: "something went wrong" })
+    useChatStore.getState().setActiveWorkspaceId("ws-b")
+    expect(useChatStore.getState().streamingError).toBeNull()
+  })
+
+  it("switching to the same workspace is a no-op", () => {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      streamingError: null,
+    })
+    useChatStore.getState().setActiveWorkspaceId("ws-a")
+    // activeSessionId must not have been reset
+    expect(useChatStore.getState().activeSessionId).toBe("sess-a")
+  })
+
+  it("getStreamingStatus returns idle immediately after switching workspace (no active session)", () => {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      optimisticStreamingSessionId: "sess-a",
+    })
+
+    useChatStore.getState().setActiveWorkspaceId("ws-b")
+
+    // No active session on ws-b yet → must be idle
+    expect(useChatStore.getState().getStreamingStatus()).toBe("idle")
+  })
+
+  it("getStreamingStatus reflects the correct workspace after switching back", () => {
+    // ws-a session is busy (SSE confirmed)
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      streamingError: null,
+      streamingPollInterval: null,
+      optimisticStreamingSessionId: null,
+    })
+
+    expect(useChatStore.getState().getStreamingStatus()).toBe("streaming")
+
+    // Switch away then back
+    useChatStore.getState().setActiveWorkspaceId("ws-b")
+    useChatStore.setState({ activeSessionId: "sess-a", activeWorkspaceId: "ws-a" })
+
+    expect(useChatStore.getState().getStreamingStatus()).toBe("streaming")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 3. getStreamingStatus selector
+// ---------------------------------------------------------------------------
+
+describe("getStreamingStatus selector", () => {
+  beforeEach(resetStore)
+
+  it("returns idle when no workspace is active", () => {
+    expect(useChatStore.getState().getStreamingStatus()).toBe("idle")
+  })
+
+  it("returns idle when active workspace has no active session", () => {
+    useChatStore.setState({ activeWorkspaceId: "ws-a", activeSessionId: null })
+    expect(useChatStore.getState().getStreamingStatus()).toBe("idle")
+  })
+
+  it("returns streaming when session status is busy (SSE-confirmed)", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+    expect(useChatStore.getState().getStreamingStatus()).toBe("streaming")
+  })
+
+  it("returns streaming when session status is retry", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {
+            "sess-a": { type: "retry", attempt: 1, message: "Retrying…", next: Date.now() + 5000 },
+          },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+    expect(useChatStore.getState().getStreamingStatus()).toBe("streaming")
+  })
+
+  it("returns idle when SSE confirms session is idle", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "idle" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      optimisticStreamingSessionId: null,
+    })
+    expect(useChatStore.getState().getStreamingStatus()).toBe("idle")
+  })
+
+  it("returns streaming optimistically before first SSE event arrives", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      optimisticStreamingSessionId: "sess-a",
+    })
+    expect(useChatStore.getState().getStreamingStatus()).toBe("streaming")
+  })
+
+  it("returns waiting when there is a pending permission for the active session", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [makePermission("perm-1", "sess-a")],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+    expect(useChatStore.getState().getStreamingStatus()).toBe("waiting")
+  })
+
+  it("returns waiting when there is a pending question for the active session", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [makeQuestion("q-1", "sess-a")],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+    expect(useChatStore.getState().getStreamingStatus()).toBe("waiting")
+  })
+
+  it("returns error when streamingError is set, even if session is busy", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      streamingError: "LLM quota exceeded",
+    })
+    expect(useChatStore.getState().getStreamingStatus()).toBe("error")
+  })
+
+  it("optimistic flag for a different session does not show as streaming for the active session", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      // This is for a *different* session
+      optimisticStreamingSessionId: "sess-other",
+    })
+    expect(useChatStore.getState().getStreamingStatus()).toBe("idle")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 4. SSE event handling — session lifecycle
+// ---------------------------------------------------------------------------
+
+describe("SSE event handling — session lifecycle", () => {
+  beforeEach(resetStore)
+
+  it("session.created adds the session to the correct workspace", () => {
+    const store = useChatStore.getState()
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a"
+    )
+    expect(useChatStore.getState().workspaceStates["ws-a"].sessions["sess-1"]).toBeDefined()
+  })
+
+  it("session.updated merges fields without replacing the whole sessions map", () => {
+    const store = useChatStore.getState()
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      {
+        type: "session.updated",
+        properties: { info: { ...makeSession("sess-1"), title: "Updated title" } },
+      },
+      "ws-a"
+    )
+    expect(useChatStore.getState().workspaceStates["ws-a"].sessions["sess-1"].title).toBe(
+      "Updated title"
+    )
+  })
+
+  it("session.deleted removes the session from the workspace", () => {
+    const store = useChatStore.getState()
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "session.deleted", properties: { info: makeSession("sess-1") } },
+      "ws-a"
+    )
+    expect(useChatStore.getState().workspaceStates["ws-a"].sessions["sess-1"]).toBeUndefined()
+  })
+
+  it("session.status (busy) transitions streaming status to streaming", () => {
+    const store = useChatStore.getState()
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a"
+    )
+    useChatStore.setState({ activeWorkspaceId: "ws-a", activeSessionId: "sess-1" })
+
+    store.handleEvent(
+      { type: "session.status", properties: { sessionID: "sess-1", status: { type: "busy" } } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().getStreamingStatus()).toBe("streaming")
+  })
+
+  it("session.status (idle) transitions streaming status back to idle", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-1": makeSession("sess-1") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-1": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-1",
+      optimisticStreamingSessionId: "sess-1",
+    })
+
+    useChatStore.getState().handleEvent(
+      { type: "session.status", properties: { sessionID: "sess-1", status: { type: "idle" } } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().getStreamingStatus()).toBe("idle")
+    expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull()
+  })
+
+  it("session.idle transitions streaming status to idle and clears optimistic flag", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-1": makeSession("sess-1") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-1": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-1",
+      optimisticStreamingSessionId: "sess-1",
+    })
+
+    useChatStore.getState().handleEvent(
+      { type: "session.idle", properties: { sessionID: "sess-1" } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().getStreamingStatus()).toBe("idle")
+    expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull()
+  })
+
+  it("session.error for the active session sets streamingError and clears optimistic flag", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-1": makeSession("sess-1") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-1",
+      optimisticStreamingSessionId: "sess-1",
+    })
+
+    useChatStore.getState().handleEvent(
+      {
+        type: "session.error",
+        properties: {
+          sessionID: "sess-1",
+          error: { data: { message: "context window exceeded" } },
+        },
+      },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().streamingError).toBe("context window exceeded")
+    expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 5. Cross-workspace SSE routing — the stale streaming state scenario
+// ---------------------------------------------------------------------------
+
+describe("cross-workspace SSE routing", () => {
+  beforeEach(resetStore)
+
+  it("session.idle from a background workspace updates its sessionStatuses regardless of active workspace", () => {
+    // Set up: ws-a has a streaming session, ws-b is active
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+        "ws-b": {
+          sessions: { "sess-b": makeSession("sess-b") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-b",
+      activeSessionId: "sess-b",
+      optimisticStreamingSessionId: null,
+    })
+
+    // SSE idle event arrives for ws-a while user is on ws-b
+    useChatStore.getState().handleEvent(
+      { type: "session.idle", properties: { sessionID: "sess-a" } },
+      "ws-a"
+    )
+
+    // ws-a's sessionStatus must be idle
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].sessionStatuses["sess-a"]
+    ).toEqual({ type: "idle" })
+  })
+
+  it("session.status (idle) from a background workspace updates sessionStatuses in that workspace", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-b",
+      activeSessionId: "sess-b",
+    })
+
+    useChatStore.getState().handleEvent(
+      { type: "session.status", properties: { sessionID: "sess-a", status: { type: "idle" } } },
+      "ws-a"
+    )
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].sessionStatuses["sess-a"]
+    ).toEqual({ type: "idle" })
+  })
+
+  // REGRESSION: this is the exact reported bug scenario.
+  // When user switches back to ws-a after ws-a's session went idle while they
+  // were on ws-b, the streaming status must be idle — not streaming.
+  it("REGRESSION: switching back to a workspace whose session went idle while backgrounded shows idle status", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+        "ws-b": {
+          sessions: {},
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-b",
+      activeSessionId: null,
+      optimisticStreamingSessionId: "sess-a", // was set before the switch
+    })
+
+    // SSE idle event arrives while user is on ws-b
+    useChatStore.getState().handleEvent(
+      { type: "session.idle", properties: { sessionID: "sess-a" } },
+      "ws-a"
+    )
+
+    // User switches back to ws-a and the most-recent session is auto-selected
+    useChatStore.setState({ activeWorkspaceId: "ws-a", activeSessionId: "sess-a" })
+
+    expect(useChatStore.getState().getStreamingStatus()).toBe("idle")
+  })
+
+  it("optimisticStreamingSessionId is cleared when the session goes idle, even if it belongs to a background workspace", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-b",
+      activeSessionId: null,
+      optimisticStreamingSessionId: "sess-a",
+    })
+
+    useChatStore.getState().handleEvent(
+      { type: "session.idle", properties: { sessionID: "sess-a" } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull()
+  })
+
+  it("background workspace session.status (idle) clears optimisticStreamingSessionId when it matches", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-b",
+      activeSessionId: null,
+      optimisticStreamingSessionId: "sess-a",
+    })
+
+    useChatStore.getState().handleEvent(
+      { type: "session.status", properties: { sessionID: "sess-a", status: { type: "idle" } } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull()
+  })
+
+  it("getWorkspaceActivity reflects busy state for background workspace", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-b",
+      activeSessionId: null,
+    })
+
+    expect(useChatStore.getState().getWorkspaceActivity("ws-a")).toBe("active")
+  })
+
+  it("getWorkspaceActivity reflects waiting state when workspace has pending permissions", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [makePermission("perm-1", "sess-a")],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-b",
+      activeSessionId: null,
+    })
+
+    expect(useChatStore.getState().getWorkspaceActivity("ws-a")).toBe("waiting")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 6. Message routing and optimistic updates
+// ---------------------------------------------------------------------------
+
+describe("message routing", () => {
+  beforeEach(resetStore)
+
+  it("message.updated routes to the workspace that owns the session", () => {
+    const store = useChatStore.getState()
+
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-a") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-b") } },
+      "ws-b"
+    )
+
+    // Send event from ws-b's SSE connection but it belongs to sess-a (ws-a owns it)
+    store.handleEvent(
+      { type: "message.updated", properties: { info: makeMessage("msg-1", "sess-a") } },
+      "ws-b" // wrong source workspace
+    )
+
+    const { workspaceStates } = useChatStore.getState()
+    // Should land in ws-a, not ws-b
+    expect(workspaceStates["ws-a"].messages["sess-a"]).toHaveLength(1)
+    expect(workspaceStates["ws-b"].messages["sess-b"] ?? []).toHaveLength(0)
+  })
+
+  it("message.updated appends new messages and upserts existing ones", () => {
+    const store = useChatStore.getState()
+
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-a") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "message.updated", properties: { info: makeMessage("msg-1", "sess-a") } },
+      "ws-a"
+    )
+    // Upsert — same ID with different data
+    store.handleEvent(
+      {
+        type: "message.updated",
+        properties: { info: { ...makeMessage("msg-1", "sess-a"), agent: "updated-agent" } },
+      },
+      "ws-a"
+    )
+
+    const messages = useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"]
+    expect(messages).toHaveLength(1)
+    const info = messages[0].info as { agent: string }
+    expect(info.agent).toBe("updated-agent")
+  })
+
+  it("message.removed deletes the correct message from the correct session", () => {
+    const store = useChatStore.getState()
+
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-a") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "message.updated", properties: { info: makeMessage("msg-1", "sess-a") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "message.updated", properties: { info: makeMessage("msg-2", "sess-a") } },
+      "ws-a"
+    )
+    store.handleEvent(
+      { type: "message.removed", properties: { sessionID: "sess-a", messageID: "msg-1" } },
+      "ws-a"
+    )
+
+    const messages = useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"]
+    expect(messages).toHaveLength(1)
+    expect(messages[0].info.id).toBe("msg-2")
+  })
+
+  it("optimistic user message is replaced when the real message.updated arrives", () => {
+    // Simulate what sendMessage does: inject an optimistic message
+    const optimisticId = "optimistic-123"
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {
+            "sess-a": [
+              {
+                info: makeUserMessage(optimisticId, "sess-a"),
+                parts: [makePart("p-opt", "sess-a", optimisticId)],
+              },
+            ],
+          },
+          optimisticMessageIds: { "sess-a": optimisticId },
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    // Real message arrives from SSE with a server-assigned ID
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.updated",
+        properties: { info: makeMessage("server-msg-1", "sess-a", "user") },
+      },
+      "ws-a"
+    )
+
+    const messages = useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"]
+    // Optimistic message must be gone, replaced by the real one
+    expect(messages).toHaveLength(1)
+    expect(messages[0].info.id).toBe("server-msg-1")
+    // optimisticMessageIds must be cleared for this session
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].optimisticMessageIds["sess-a"]
+    ).toBeUndefined()
+  })
+
+  it("message.part.updated batches and flushes part updates into the correct message", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {
+            "sess-a": [{ info: makeAssistantMessage("msg-1", "sess-a"), parts: [] }],
+          },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.part.updated",
+        properties: { part: makePart("part-1", "sess-a", "msg-1") },
+      },
+      "ws-a"
+    )
+
+    // RAF was shimmed to flush synchronously in setup.ts
+    const messages = useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"]
+    expect(messages[0].parts).toHaveLength(1)
+    expect(messages[0].parts[0].id).toBe("part-1")
+  })
+
+  it("message.part.removed removes the correct part", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {
+            "sess-a": [
+              {
+                info: makeAssistantMessage("msg-1", "sess-a"),
+                parts: [
+                  makePart("part-1", "sess-a", "msg-1"),
+                  makePart("part-2", "sess-a", "msg-1"),
+                ],
+              },
+            ],
+          },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.part.removed",
+        properties: { sessionID: "sess-a", messageID: "msg-1", partID: "part-1" },
+      },
+      "ws-a"
+    )
+
+    const parts = useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"][0].parts
+    expect(parts).toHaveLength(1)
+    expect(parts[0].id).toBe("part-2")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 7. Permission and question lifecycle
+// ---------------------------------------------------------------------------
+
+describe("permission lifecycle", () => {
+  beforeEach(resetStore)
+
+  it("permission.updated adds permission to the owning workspace", () => {
+    useChatStore.getState().handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-a") } },
+      "ws-a"
+    )
+    useChatStore.getState().handleEvent(
+      { type: "permission.updated", properties: makePermission("perm-1", "sess-a") },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].permissions).toHaveLength(1)
+  })
+
+  it("permission.replied removes the permission from all workspaces", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {},
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [makePermission("perm-1", "sess-a")],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    useChatStore.getState().handleEvent(
+      { type: "permission.replied", properties: { permissionID: "perm-1" } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].permissions).toHaveLength(0)
+  })
+
+  it("pending permission makes getStreamingStatus return waiting", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [makePermission("perm-1", "sess-a")],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    expect(useChatStore.getState().getStreamingStatus()).toBe("waiting")
+  })
+
+  it("after permission.replied the status returns to streaming (not idle)", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [makePermission("perm-1", "sess-a")],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    useChatStore.getState().handleEvent(
+      { type: "permission.replied", properties: { permissionID: "perm-1" } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().getStreamingStatus()).toBe("streaming")
+  })
+})
+
+describe("question lifecycle", () => {
+  beforeEach(resetStore)
+
+  it("question.asked adds the question and makes status waiting", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    useChatStore.getState().handleEvent(
+      { type: "question.asked", properties: makeQuestion("q-1", "sess-a") },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].questions).toHaveLength(1)
+    expect(useChatStore.getState().getStreamingStatus()).toBe("waiting")
+  })
+
+  it("question.replied removes the question from the owning workspace", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [makeQuestion("q-1", "sess-a")],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    useChatStore.getState().handleEvent(
+      { type: "question.replied", properties: { requestID: "q-1" } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].questions).toHaveLength(0)
+  })
+
+  it("question.asked with malformed payload is dropped without throwing", () => {
+    expect(() => {
+      useChatStore.getState().handleEvent(
+        { type: "question.asked", properties: { notAnId: true } },
+        "ws-a"
+      )
+    }).not.toThrow()
+
+    expect(useChatStore.getState().workspaceStates["ws-a"]?.questions ?? []).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 8. SSE connection management
+// ---------------------------------------------------------------------------
+
+describe("SSE connection management", () => {
+  beforeEach(resetStore)
+
+  it("connectSSE stores an EventSource in the workspace state", () => {
+    useChatStore.getState().connectSSE("ws-a")
+    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).not.toBeNull()
+  })
+
+  it("connectSSE closes any existing EventSource before creating a new one", () => {
+    useChatStore.getState().connectSSE("ws-a")
+    const first = useChatStore.getState().workspaceStates["ws-a"].eventSource!
+    const closeSpy = vi.spyOn(first, "close")
+
+    useChatStore.getState().connectSSE("ws-a")
+
+    expect(closeSpy).toHaveBeenCalled()
+  })
+
+  it("disconnectSSE closes and nulls the EventSource for a workspace", () => {
+    useChatStore.getState().connectSSE("ws-a")
+    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource!
+    const closeSpy = vi.spyOn(es, "close")
+
+    useChatStore.getState().disconnectSSE("ws-a")
+
+    expect(closeSpy).toHaveBeenCalled()
+    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBeNull()
+  })
+
+  it("disconnectAllSSE closes EventSources for every workspace", () => {
+    useChatStore.getState().connectSSE("ws-a")
+    useChatStore.getState().connectSSE("ws-b")
+
+    const esA = useChatStore.getState().workspaceStates["ws-a"].eventSource!
+    const esB = useChatStore.getState().workspaceStates["ws-b"].eventSource!
+    const closeA = vi.spyOn(esA, "close")
+    const closeB = vi.spyOn(esB, "close")
+
+    useChatStore.getState().disconnectAllSSE()
+
+    expect(closeA).toHaveBeenCalled()
+    expect(closeB).toHaveBeenCalled()
+    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBeNull()
+    expect(useChatStore.getState().workspaceStates["ws-b"].eventSource).toBeNull()
+  })
+
+  it("SSE onopen resets reconnect attempts counter", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {},
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 5,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    useChatStore.getState().connectSSE("ws-a")
+    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+      simulateOpen: () => void
+    }
+    es.simulateOpen()
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].sseReconnectAttempts).toBe(0)
+  })
+
+  it("SSE onopen clears a stale streamingError when it fires for the active workspace", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {},
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      streamingError: "previous error",
+    })
+
+    useChatStore.getState().connectSSE("ws-a")
+    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+      simulateOpen: () => void
+    }
+    es.simulateOpen()
+
+    expect(useChatStore.getState().streamingError).toBeNull()
+  })
+
+  it("SSE onerror increments reconnect attempts and nulls the eventSource", () => {
+    vi.useFakeTimers()
+
+    useChatStore.getState().connectSSE("ws-a")
+    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+      simulateError: () => void
+    }
+    es.simulateError()
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].sseReconnectAttempts).toBe(1)
+    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBeNull()
+
+    vi.useRealTimers()
+  })
+
+  it("setActiveWorkspaceId connects SSE when no connection exists for the workspace", () => {
+    const connectSSESpy = vi.spyOn(useChatStore.getState(), "connectSSE")
+
+    useChatStore.getState().setActiveWorkspaceId("ws-new")
+
+    expect(connectSSESpy).toHaveBeenCalledWith("ws-new")
+  })
+
+  it("setActiveWorkspaceId does not reconnect SSE when a healthy connection already exists", () => {
+    // Give ws-a an open EventSource and make it the active workspace
+    useChatStore.getState().connectSSE("ws-a")
+    useChatStore.setState({ activeWorkspaceId: "ws-a" })
+    const originalEs = useChatStore.getState().workspaceStates["ws-a"].eventSource
+
+    // Switch to ws-b then back to ws-a (which has a healthy OPEN connection)
+    useChatStore.getState().setActiveWorkspaceId("ws-b")
+    useChatStore.getState().setActiveWorkspaceId("ws-a")
+
+    // The eventSource reference must be unchanged — no reconnect happened
+    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBe(originalEs)
+  })
+
+  // REGRESSION: a CLOSED EventSource is still truthy — switching to a workspace
+  // with a dropped SSE connection must reconnect.
+  it("REGRESSION: setActiveWorkspaceId reconnects SSE when existing EventSource is CLOSED", () => {
+    // Give ws-a a closed EventSource
+    const closedEs = new EventSource("/fake-url")
+    closedEs.close() // readyState → CLOSED
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {},
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: closedEs,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-b",
+    })
+
+    const connectSSESpy = vi.spyOn(useChatStore.getState(), "connectSSE")
+    useChatStore.getState().setActiveWorkspaceId("ws-a")
+
+    expect(connectSSESpy).toHaveBeenCalledWith("ws-a")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 9. Streaming poll
+// ---------------------------------------------------------------------------
+
+describe("streaming poll", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    resetStore()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("clearStreamingPoll clears the interval and nulls streamingPollInterval", () => {
+    // Manually inject a fake interval
+    const intervalId = setInterval(() => {}, 9999)
+    useChatStore.setState({ streamingPollInterval: intervalId })
+
+    useChatStore.getState().clearStreamingPoll()
+
+    expect(useChatStore.getState().streamingPollInterval).toBeNull()
+  })
+
+  it("startStreamingPoll replaces any existing poll with a new one", () => {
+    const firstInterval = setInterval(() => {}, 9999)
+    useChatStore.setState({ streamingPollInterval: firstInterval })
+
+    // Set up an active streaming session so the poll doesn't self-cancel immediately
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      optimisticStreamingSessionId: null,
+    })
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ "sess-a": { type: "busy" } }),
+    })
+
+    useChatStore.getState().startStreamingPoll("ws-a")
+
+    expect(useChatStore.getState().streamingPollInterval).not.toBe(firstInterval)
+    expect(useChatStore.getState().streamingPollInterval).not.toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 10. refreshActiveSessionStatus
+// ---------------------------------------------------------------------------
+
+describe("refreshActiveSessionStatus", () => {
+  beforeEach(resetStore)
+
+  it("updates sessionStatuses when server returns idle", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ "sess-a": { type: "idle" } }),
+    })
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      optimisticStreamingSessionId: "sess-a",
+    })
+
+    await useChatStore.getState().refreshActiveSessionStatus("ws-a")
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].sessionStatuses["sess-a"]
+    ).toEqual({ type: "idle" })
+    expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull()
+    expect(useChatStore.getState().getStreamingStatus()).toBe("idle")
+  })
+
+  it("leaves status unchanged when server returns a non-OK response", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false })
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    await useChatStore.getState().refreshActiveSessionStatus("ws-a")
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].sessionStatuses["sess-a"]
+    ).toEqual({ type: "busy" })
+  })
+
+  it("does nothing when there is no active session", async () => {
+    global.fetch = vi.fn()
+    useChatStore.setState({ activeSessionId: null })
+
+    await useChatStore.getState().refreshActiveSessionStatus("ws-a")
+
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 11. handleVisibilityRestored
+// ---------------------------------------------------------------------------
+
+describe("handleVisibilityRestored", () => {
+  beforeEach(resetStore)
+
+  it("reconnects a CLOSED EventSource for the active workspace", () => {
+    const closedEs = new EventSource("/fake-url")
+    closedEs.close()
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: closedEs,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    const connectSSESpy = vi.spyOn(useChatStore.getState(), "connectSSE")
+
+    useChatStore.getState().handleVisibilityRestored()
+
+    expect(connectSSESpy).toHaveBeenCalledWith("ws-a")
+  })
+
+  it("does not reconnect when EventSource is already open", () => {
+    useChatStore.getState().connectSSE("ws-a")
+    // Simulate open state
+    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource!
+    Object.defineProperty(es, "readyState", { value: EventSource.OPEN, writable: true })
+
+    useChatStore.setState({ activeWorkspaceId: "ws-a", activeSessionId: "sess-a" })
+
+    useChatStore.getState().handleVisibilityRestored()
+
+    // The eventSource reference must be unchanged — no reconnect happened
+    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBe(es)
+  })
+
+  // REGRESSION: visibility restore currently only checks the active workspace.
+  // Background workspaces with dropped SSE connections are left broken until
+  // the user switches to them. The ideal behaviour is to reconnect all of them.
+  it("REGRESSION: reconnects CLOSED EventSource for background workspaces too", () => {
+    const closedEsB = new EventSource("/fake-url-b")
+    closedEsB.close()
+
+    useChatStore.getState().connectSSE("ws-a") // active workspace — open
+    useChatStore.setState({
+      workspaceStates: {
+        ...useChatStore.getState().workspaceStates,
+        "ws-b": {
+          sessions: {},
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: closedEsB,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: null,
+    })
+
+    const connectSSESpy = vi.spyOn(useChatStore.getState(), "connectSSE")
+    useChatStore.getState().handleVisibilityRestored()
+
+    expect(connectSSESpy).toHaveBeenCalledWith("ws-b")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 12. Unified / cross-workspace session list
+// ---------------------------------------------------------------------------
+
+describe("getRecentSessionsAcrossWorkspaces", () => {
+  beforeEach(resetStore)
+
+  it("returns sessions from all workspaces merged and sorted by updated time", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {
+            "sess-a": makeSession("sess-a", { updated: 2000 }),
+            "sess-a2": makeSession("sess-a2", { updated: 500 }),
+          },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+        "ws-b": {
+          sessions: { "sess-b": makeSession("sess-b", { updated: 1500 }) },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    const sessions = useChatStore.getState().getRecentSessionsAcrossWorkspaces(10)
+    expect(sessions.map((s) => s.id)).toEqual(["sess-a", "sess-b", "sess-a2"])
+  })
+
+  it("respects the limit parameter", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {
+            "sess-1": makeSession("sess-1", { updated: 3000 }),
+            "sess-2": makeSession("sess-2", { updated: 2000 }),
+            "sess-3": makeSession("sess-3", { updated: 1000 }),
+          },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    const sessions = useChatStore.getState().getRecentSessionsAcrossWorkspaces(2)
+    expect(sessions).toHaveLength(2)
+    expect(sessions[0].id).toBe("sess-1")
+  })
+
+  it("excludes child sessions (those with a parentID)", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {
+            "sess-parent": makeSession("sess-parent", { updated: 2000 }),
+            "sess-child": makeSession("sess-child", { updated: 3000, parentID: "sess-parent" }),
+          },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    const sessions = useChatStore.getState().getRecentSessionsAcrossWorkspaces(10)
+    expect(sessions.map((s) => s.id)).toEqual(["sess-parent"])
+  })
+
+  it("returns a stable reference when workspace sessions have not changed", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    const first = useChatStore.getState().getRecentSessionsAcrossWorkspaces(10)
+    const second = useChatStore.getState().getRecentSessionsAcrossWorkspaces(10)
+    expect(first).toBe(second) // reference equality — memoisation working
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 13. clearChat
+// ---------------------------------------------------------------------------
+
+describe("clearChat", () => {
+  beforeEach(resetStore)
+
+  it("resets activeSessionId, optimisticStreamingSessionId, and streamingError", () => {
+    const fakeInterval = setInterval(() => {}, 9999)
+    useChatStore.setState({
+      activeSessionId: "sess-a",
+      optimisticStreamingSessionId: "sess-a",
+      streamingError: "oops",
+      streamingPollInterval: fakeInterval,
+    })
+
+    useChatStore.getState().clearChat()
+
+    expect(useChatStore.getState().activeSessionId).toBeNull()
+    expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull()
+    expect(useChatStore.getState().streamingError).toBeNull()
+    expect(useChatStore.getState().streamingPollInterval).toBeNull()
+  })
+})

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useMemo, useRef } from "react"
+import { useGitReviewStore } from "@/stores/git-review-store"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -31,18 +32,23 @@ import {
   ArrowUpDown,
   GripVertical,
   PanelLeft,
+  Github,
 } from "lucide-react"
 import { FileStatusList } from "@/components/git/file-status"
 import { ChangedFileList } from "@/components/git/changed-file-list"
 import { ReviewEditor } from "@/components/review/review-editor"
+import type { ReviewEditorHandle } from "@/components/review/review-editor"
 import { CommitPanel } from "@/components/git/commit-panel"
 import { BranchSelector } from "@/components/git/branch-selector"
 import { CommitLog } from "@/components/git/commit-log"
+import { PrPanel } from "@/components/git/pr-panel"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import { useLeaderAction } from "@/hooks/use-leader-action"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { sortFiles, buildFlatFiles } from "@/lib/git-panel-logic"
+import type { SortMode } from "@/lib/git-panel-logic"
 import {
   useGitStatus,
   useGitLog,
@@ -67,39 +73,14 @@ import {
 } from "@/hooks/use-git"
 import type { Workspace, ReviewChangedFile } from "@/types"
 
-type ViewMode = "working" | "branch" | "last-commit"
+type ViewMode = "working" | "branch" | "last-commit" | "pr"
 type BottomPanel = "branches" | "log" | "stashes" | null
-type SortMode = "name-asc" | "name-desc" | "status" | "path"
 
 const SORT_LABELS: Record<SortMode, string> = {
   "name-asc": "Name A-Z",
   "name-desc": "Name Z-A",
   status: "Status",
   path: "Full path",
-}
-
-function sortFiles(files: ReviewChangedFile[], mode: SortMode): ReviewChangedFile[] {
-  const sorted = [...files]
-  switch (mode) {
-    case "name-asc":
-      return sorted.sort((a, b) => {
-        const an = a.path.split("/").pop() ?? a.path
-        const bn = b.path.split("/").pop() ?? b.path
-        return an.localeCompare(bn)
-      })
-    case "name-desc":
-      return sorted.sort((a, b) => {
-        const an = a.path.split("/").pop() ?? a.path
-        const bn = b.path.split("/").pop() ?? b.path
-        return bn.localeCompare(an)
-      })
-    case "status":
-      return sorted.sort((a, b) => a.status.localeCompare(b.status))
-    case "path":
-      return sorted.sort((a, b) => a.path.localeCompare(b.path))
-    default:
-      return sorted
-  }
 }
 
 const MIN_PANEL_WIDTH = 200
@@ -116,11 +97,14 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   const [selectedStaged, setSelectedStaged] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>("working")
   const [compareBaseRef, setCompareBaseRef] = useState<string | null>(null)
-  const [reviewedFiles, setReviewedFiles] = useState<Set<string>>(new Set())
   const [openPanel, setOpenPanel] = useState<BottomPanel>(null)
   const [sortMode, setSortMode] = useState<SortMode>("path")
   const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false)
   const isMobile = useIsMobile()
+
+  const gitReviewStore = useGitReviewStore()
+  const reviewKey = `${workspace.id}:${viewMode}:${compareBaseRef ?? ""}`
+  const reviewedFiles = gitReviewStore.getReviewedFiles(reviewKey)
   const { width: panelWidth, handleDragStart } = useResizablePanel({
     minWidth: MIN_PANEL_WIDTH,
     maxWidth: MAX_PANEL_WIDTH,
@@ -128,6 +112,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   })
 
   const commitFocusRef = useRef<HTMLTextAreaElement>(null)
+  const editorHandleRef = useRef<ReviewEditorHandle>(null)
 
   const { data: status, isLoading: isStatusLoading } = useGitStatus(workspace.id)
   const { data: log = [], isLoading: isLogLoading } = useGitLog(workspace.id)
@@ -195,20 +180,14 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
     setViewMode(mode)
     setSelectedFile(null)
     setSelectedStaged(false)
-    setReviewedFiles(new Set())
   }, [])
 
-  const handleToggleReviewed = useCallback((path: string) => {
-    setReviewedFiles((prev) => {
-      const next = new Set(prev)
-      if (next.has(path)) {
-        next.delete(path)
-      } else {
-        next.add(path)
-      }
-      return next
-    })
-  }, [])
+  const handleToggleReviewed = useCallback(
+    (path: string) => {
+      gitReviewStore.toggleReviewed(reviewKey, path)
+    },
+    [gitReviewStore, reviewKey]
+  )
 
   const handleTogglePanel = useCallback((panel: BottomPanel) => {
     setOpenPanel((prev) => (prev === panel ? null : panel))
@@ -361,40 +340,6 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
 
   const gitLeaderActions = useMemo(
     () => {
-      // Builds the same flat ordered list FileStatusList uses for keyboard nav
-      function buildFlatFiles(currentStatus: typeof status, currentSortMode: SortMode) {
-        if (!currentStatus) return []
-        const sort = <T extends { path: string }>(items: T[]) => {
-          const sorted = [...items]
-          switch (currentSortMode) {
-            case "name-asc":
-              return sorted.sort((a, b) => {
-                const an = a.path.split("/").pop() ?? a.path
-                const bn = b.path.split("/").pop() ?? b.path
-                return an.localeCompare(bn)
-              })
-            case "name-desc":
-              return sorted.sort((a, b) => {
-                const an = a.path.split("/").pop() ?? a.path
-                const bn = b.path.split("/").pop() ?? b.path
-                return bn.localeCompare(an)
-              })
-            case "status":
-              return sorted
-            case "path":
-              return sorted.sort((a, b) => a.path.localeCompare(b.path))
-            default:
-              return sorted
-          }
-        }
-        return [
-          ...sort(currentStatus.staged).map((f) => ({ path: f.path, isStaged: true })),
-          ...sort(currentStatus.unstaged).map((f) => ({ path: f.path, isStaged: false })),
-          ...sort(currentStatus.untracked.map((p) => ({ path: p }))).map((f) => ({ path: f.path, isStaged: false })),
-          ...sort(currentStatus.conflicted.map((p) => ({ path: p }))).map((f) => ({ path: f.path, isStaged: false })),
-        ]
-      }
-
       return [
         {
           action: { id: "git:toggle-reviewed", label: "Toggle file reviewed", page: "git" as const },
@@ -407,13 +352,19 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           handler: () => {
             const file = selectedFileRef.current
             if (!file) return
+            const editorWasFocused = document.activeElement?.closest(".cm-editor") !== null
             handleToggleReviewedRef.current(file)
             const flatFiles = buildFlatFiles(statusRef.current, sortModeRef.current)
             const selectedIndex = flatFiles.findIndex(
               (f) => f.path === selectedFileRef.current && f.isStaged === selectedStagedRef.current
             )
             const next = flatFiles[selectedIndex + 1]
-            if (next) handleSelectFileRef.current(next.path, next.isStaged)
+            if (next) {
+              handleSelectFileRef.current(next.path, next.isStaged)
+              if (editorWasFocused) {
+                requestAnimationFrame(() => editorHandleRef.current?.focus())
+              }
+            }
           },
         },
         {
@@ -510,6 +461,14 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
               .find((f) => !reviewedFilesRef.current.has(f.path))
             if (prev) handleSelectFileRef.current(prev.path, prev.isStaged)
           },
+        },
+        {
+          action: { id: "git:focus-editor", label: "Focus code pane", page: "git" as const },
+          handler: () => editorHandleRef.current?.focus(),
+        },
+        {
+          action: { id: "git:focus-files", label: "Focus files pane", page: "git" as const },
+          handler: () => editorHandleRef.current?.blur(),
         },
       ]
     },
@@ -678,6 +637,26 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           </TooltipContent>
         </Tooltip>
 
+        <div className="mx-1 h-4 w-px bg-border" />
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={viewMode === "pr" ? "secondary" : "ghost"}
+              size="icon-xs"
+              onClick={() => handleViewModeChange("pr")}
+            >
+              <Github className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div>
+              <p className="font-medium">PR Review</p>
+              <p className="text-muted-foreground">Review teammates' GitHub pull requests</p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+
         {viewMode === "branch" && (
           <Select
             value={compareBaseRef ?? ""}
@@ -703,6 +682,9 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
       </div>
 
       {/* Main area: file list + drag handle + editor */}
+      {viewMode === "pr" ? (
+        <PrPanel onClose={() => handleViewModeChange("working")} />
+      ) : (
       <div className="flex min-h-0 flex-1">
         {/* File list - mobile sheet */}
         {isMobile && (
@@ -844,7 +826,8 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
         {/* Editor (right) */}
         <div className="flex min-h-0 flex-1 flex-col">
           {fileContent ? (
-            <ReviewEditor
+             <ReviewEditor
+              ref={editorHandleRef}
               fileContent={fileContent}
               workspaceId={workspace.id}
               isLoading={isFileContentLoading}
@@ -860,6 +843,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           )}
         </div>
       </div>
+      )}
 
       {/* Collapsible bottom section */}
       <div className="shrink-0 border-t">

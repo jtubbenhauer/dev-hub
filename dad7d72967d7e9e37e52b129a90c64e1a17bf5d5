@@ -1,0 +1,37 @@
+infra/dev-rig/cli/Makefile
+  9c860a724ed21ee0 2-21,23-27,29-55,57
+  3a23d55dcad463a8 1,22,28,56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "dad7d72967d7e9e37e52b129a90c64e1a17bf5d5",
+  "prompts": {
+    "3a23d55dcad463a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_33f9b1c7cffeuTYU0NzpIH7s3U-c496f490-07f2-4d9f-bd61-ef3e186b8e7a",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "9c860a724ed21ee0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_33f9b1c7cffeuTYU0NzpIH7s3U-988f202b-f5ce-4807-b1ff-0d1978f32174",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 57,
+      "total_deletions": 0,
+      "accepted_lines": 53,
+      "overriden_lines": 0
+    }
+  }
+}

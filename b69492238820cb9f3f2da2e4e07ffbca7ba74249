@@ -1,0 +1,23 @@
+infra/dev-rig/cli/.gitignore
+  5b308ffae2689624 2-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "b69492238820cb9f3f2da2e4e07ffbca7ba74249",
+  "prompts": {
+    "5b308ffae2689624": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_33f9e9a43ffeqfW0F0PJ7MFS1K-ac41fd90-feee-46bd-8ac0-ce8a10c215b3",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,23 @@
+infra/dev-rig/cli/internal/compose/compose_coverage_test.go
+  a4d1ea02cc21c421 1-461
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "199c0220078f72882c856b93a5a98e30983e66d1",
+  "prompts": {
+    "a4d1ea02cc21c421": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_33f932d7dffe3s3lyWGG20uEXD-7d919919-6408-47ab-afbc-ee9f9430fa5f",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 461,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,25 @@
+apps/backend-principle-bridge/src/app/integrations/sirona/sidexis-db.ts
+  384c16ed5a6efeb7 49,51-54
+apps/backend-principle-bridge/src/app/integrations/sirona/sidexis-db.spec.ts
+  384c16ed5a6efeb7 11,34-37,41-42,44-50,52,56-73,79,90-91,103,118-119,144-165,172,181,191-192,201,206,215,235,240,250-251,264-265,285-287,297,309-310,323-324,337-338,362-364,374,379,384-385
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "b48d6172f49278348967a83c7d4ef3227e02765e",
+  "prompts": {
+    "384c16ed5a6efeb7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_32fa73528ffeVvHDlz25flwzhT",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 148,
+      "total_deletions": 181,
+      "accepted_lines": 96,
+      "overriden_lines": 2
+    }
+  }
+}

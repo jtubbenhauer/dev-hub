@@ -1,0 +1,41 @@
+drizzle/schema.ts
+  33a23e2e29443998 34-38
+app/api/workspaces/[id]/git/route.ts
+  33a23e2e29443998 7-8,14-15,20,31-32,36,43,49,54,64,73,78,94,96-97,102,104-105,114,119,140-141,145,160,165,174,179,188,197,203,209,215,224,233,242,248,254,260,269
+lib/workspaces/backend.ts
+  33a23e2e29443998 1-596
+app/api/reviews/[id]/diff/route.ts
+  33a23e2e29443998 7,38-39,55-56,62-63
+app/api/files/content/route.ts
+  33a23e2e29443998 7,27,37,42-43,73,83,88-89
+app/api/files/tree/route.ts
+  33a23e2e29443998 6,53,63,68-70,75,77
+app/api/reviews/route.ts
+  33a23e2e29443998 8,25,30,36-37,72,77,81-82,92,94,99,104-105,114,116,140-141
+app/api/reviews/[id]/refresh/route.ts
+  33a23e2e29443998 6,31-32,39,42,44,53,76-77
+app/api/opencode/[...path]/route.ts
+  33a23e2e29443998 6,27,29,31,35,37,44-63,65-67,75
+types/index.ts
+  33a23e2e29443998 1-2,12-16,31-35,535-562
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "ed257dc8369f3eb72fc56a22e2e56e85fbd8ca43",
+  "prompts": {
+    "33a23e2e29443998": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_33fba856dffe9aLTF453b6oysN",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 814,
+      "total_deletions": 201,
+      "accepted_lines": 763,
+      "overriden_lines": 0
+    }
+  }
+}

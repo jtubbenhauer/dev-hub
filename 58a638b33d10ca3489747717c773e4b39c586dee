@@ -1,0 +1,82 @@
+components/dashboard/task-worktree-dialog.tsx
+  5354ff29b4345fd6 9,74-75,114-119,123-127,137-138,262-284
+app/layout.tsx
+  5786ee5f69751640 1,28-31
+components/editor/code-editor.tsx
+  1a82d3113f93cd20 101
+package.json
+  e027dd8c761e2dd9 36
+components/chat/prompt-input.tsx
+  5786ee5f69751640 136-142,187
+tests/stores/chat-store.test.ts
+  e027dd8c761e2dd9 1308-1396,1572-1700
+components/layout/authenticated-layout.tsx
+  5786ee5f69751640 15-16,31,102
+stores/chat-store.ts
+  e027dd8c761e2dd9 623,628,633-634,640-658,1066-1067
+components/tasks/task-list.tsx
+  5354ff29b4345fd6 11,14,45-62,68,71,81,84,87-96,99-101,104-105,108,113-115,118-119,122,127-128,134,220-221,229-251,260
+components/layout/mobile-nav.tsx
+  5786ee5f69751640 14,27-29
+hooks/use-keyboard-visible.ts
+  5786ee5f69751640 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "58a638b33d10ca3489747717c773e4b39c586dee",
+  "prompts": {
+    "1a82d3113f93cd20": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_32b482d4affeklmCOinBCM02S5",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "5354ff29b4345fd6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_34745ce5dffejFaS0CbfHSm2mC",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 130,
+      "total_deletions": 39,
+      "accepted_lines": 114,
+      "overriden_lines": 0
+    },
+    "5786ee5f69751640": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_33ee7d78affeHMa1NyQjUWx8ii",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 44,
+      "total_deletions": 2,
+      "accepted_lines": 44,
+      "overriden_lines": 0
+    },
+    "e027dd8c761e2dd9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_33febf843ffe1MEraQKvOI1XCy",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 271,
+      "total_deletions": 33,
+      "accepted_lines": 244,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -29,6 +29,7 @@ export const SETTINGS_KEYS = {
   GITHUB_API_TOKEN: "github-api-token",
   LEADER_KEY_BINDINGS: "leader-key-bindings",
   LEADER_WHICH_KEY: "leader-which-key",
+  CLICKUP_PINNED_VIEWS: "clickup-pinned-views",
 } as const
 
 export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const

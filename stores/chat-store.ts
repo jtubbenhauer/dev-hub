@@ -5,7 +5,7 @@ import type {
   Session,
   Message,
   Part,
-  Permission,
+  PermissionRequest,
   Todo,
   SessionStatus,
   MessageWithParts,
@@ -29,7 +29,7 @@ export interface WorkspaceState {
   optimisticMessageIds: Record<string, string>
   // Status tracked per session ID, not a single scalar
   sessionStatuses: Record<string, SessionStatus>
-  permissions: Permission[]
+  permissions: PermissionRequest[]
   questions: QuestionRequest[]
   // Todos keyed by session ID
   todos: Record<string, Todo[]>
@@ -58,7 +58,7 @@ function emptyWorkspaceState(): WorkspaceState {
 // Returning `{}` or `[]` inline creates a new reference each call, breaking Object.is equality.
 const EMPTY_SESSIONS: Record<string, Session> = {}
 const EMPTY_MESSAGES: MessageWithParts[] = []
-const EMPTY_PERMISSIONS: Permission[] = []
+const EMPTY_PERMISSIONS: PermissionRequest[] = []
 const EMPTY_QUESTIONS: QuestionRequest[] = []
 const EMPTY_TODOS: Todo[] = []
 const EMPTY_SESSION_STATUSES: Record<string, SessionStatus> = {}
@@ -230,7 +230,7 @@ interface ChatState {
   getActiveWorkspaceSessions: () => Record<string, Session>
   getActiveSessionMessages: () => MessageWithParts[]
   getActiveSessionStatus: () => SessionStatus | null
-  getActivePermissions: () => Permission[]
+  getActivePermissions: () => PermissionRequest[]
   getActiveQuestions: () => QuestionRequest[]
   getActiveSessionStatuses: () => Record<string, SessionStatus>
   getActiveTodos: () => Todo[]
@@ -537,16 +537,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   respondToPermission: async (sessionId, permissionId, response, workspaceId) => {
     try {
+      const serverResponse = response === "allow" ? "once" : response === "always" ? "always" : "reject"
       await fetch(
         buildProxyUrl(`session/${sessionId}/permissions/${permissionId}`, workspaceId),
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            response: response === "allow" ? "once" : "reject",
-          }),
+          body: JSON.stringify({ response: serverResponse }),
         }
       )
+      // Optimistically remove — the permission.replied SSE event will also clean up
       set((state) =>
         updateWorkspace(state, workspaceId, (ws) => ({
           permissions: ws.permissions.filter((p) => p.id !== permissionId),
@@ -619,6 +619,44 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           get().refreshActiveSessionStatus(workspaceId)
         }
       }
+
+      // Reconcile permissions with server truth: add any missed, remove any stale
+      fetch(buildProxyUrl("permission", workspaceId))
+        .then((res) => res.json())
+        .then((permissions: PermissionRequest[]) => {
+          if (!Array.isArray(permissions)) return
+          const serverIds = new Set(permissions.map((p) => p.id))
+          set((state) =>
+            updateWorkspace(state, workspaceId, (ws) => {
+              const existing = new Set(ws.permissions.map((p) => p.id))
+              const incoming = permissions.filter((p) => !existing.has(p.id))
+              const reconciled = ws.permissions.filter((p) => serverIds.has(p.id))
+              return { permissions: [...reconciled, ...incoming] }
+            })
+          )
+        })
+        .catch(() => {
+          // Best effort — permissions will still arrive via SSE for new requests
+        })
+
+      // Reconcile questions with server truth: add any missed, remove any stale
+      fetch(buildProxyUrl("question", workspaceId))
+        .then((res) => res.json())
+        .then((questions: QuestionRequest[]) => {
+          if (!Array.isArray(questions)) return
+          const serverIds = new Set(questions.map((q) => q.id))
+          set((state) =>
+            updateWorkspace(state, workspaceId, (ws) => {
+              const existing = new Set(ws.questions.map((q) => q.id))
+              const incoming = questions.filter((q) => !existing.has(q.id))
+              const reconciled = ws.questions.filter((q) => serverIds.has(q.id))
+              return { questions: [...reconciled, ...incoming] }
+            })
+          )
+        })
+        .catch(() => {
+          // Best effort — questions will still arrive via SSE for new requests
+        })
     }
 
     eventSource.onmessage = (event) => {
@@ -953,26 +991,29 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         break
       }
 
-      case "permission.updated": {
-        const permission = properties as unknown as Permission
+      case "permission.asked": {
+        const permission = properties as unknown as PermissionRequest
         const wsId = findWorkspaceForSession(get().workspaceStates, permission.sessionID) ?? sourceWorkspaceId
 
         set((state) =>
           updateWorkspace(state, wsId, (ws) => ({
-            permissions: [...ws.permissions, permission],
+            // Dedup: ignore replayed events from SSE reconnects
+            permissions: ws.permissions.some((p) => p.id === permission.id)
+              ? ws.permissions
+              : [...ws.permissions, permission],
           }))
         )
         break
       }
 
       case "permission.replied": {
-        const permissionID = properties.permissionID as string
+        const requestID = (properties.requestID ?? properties.permissionID) as string
         set((state) => {
           const updated: Record<string, WorkspaceState> = {}
           for (const [wsId, ws] of Object.entries(state.workspaceStates)) {
             updated[wsId] = {
               ...ws,
-              permissions: ws.permissions.filter((p) => p.id !== permissionID),
+              permissions: ws.permissions.filter((p) => p.id !== requestID),
             }
           }
           return { workspaceStates: updated }
@@ -1022,7 +1063,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       case "question.replied":
       case "question.rejected": {
-        const requestID = properties.requestID as string
+        // Mirror the permission handler's fallback pattern in case the API renames the field
+        const requestID = (properties.requestID ?? properties.id ?? properties.questionID) as string
         if (!requestID) break
         // Only update the workspace that actually owns this question
         const ownerWsId = Object.entries(get().workspaceStates)

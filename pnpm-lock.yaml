@@ -66,8 +66,8 @@ importers:
         specifier: ^6.2.3
         version: 6.2.3(@codemirror/language@6.12.2)(@codemirror/state@6.5.4)(@codemirror/view@6.39.15)(@lezer/highlight@1.2.3)
       '@opencode-ai/sdk':
-        specifier: ^1.2.15
-        version: 1.2.15
+        specifier: ^1.2.18
+        version: 1.2.18
       '@replit/codemirror-vim':
         specifier: ^6.3.0
         version: 6.3.0(@codemirror/commands@6.10.2)(@codemirror/language@6.12.2)(@codemirror/search@6.6.0)(@codemirror/state@6.5.4)(@codemirror/view@6.39.15)
@@ -1390,8 +1390,8 @@ packages:
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
 
-  '@opencode-ai/sdk@1.2.15':
-    resolution: {integrity: sha512-NUJNlyBCdZ4R0EBLjJziEQOp2XbRPJosaMcTcWSWO5XJPKGUpz0u8ql+5cR8K+v2RJ+hp2NobtNwpjEYfe6BRQ==}
+  '@opencode-ai/sdk@1.2.18':
+    resolution: {integrity: sha512-MJhnCtbZDxi6QOF2hDOCVzqBX0PjXWhRU/DNvIWGAHrPzUQ836mVu0QG+KIWxIUxAcOFcQmYfABr2YiawN8a0Q==}
 
   '@otplib/core@13.3.0':
     resolution: {integrity: sha512-pnQDOuCmFVeF/XnboJq9TOJgLoo2idNPJKMymOF8vGqJJ+ReKRYM9bUGjNPRWC0tHjMwu1TXbnzyBp494JgRag==}
@@ -6910,7 +6910,7 @@ snapshots:
 
   '@open-draft/until@2.1.0': {}
 
-  '@opencode-ai/sdk@1.2.15': {}
+  '@opencode-ai/sdk@1.2.18': {}
 
   '@otplib/core@13.3.0': {}
 

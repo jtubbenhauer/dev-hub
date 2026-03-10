@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useChatStore } from "@/stores/chat-store"
 import { useWorkspaceStore } from "@/stores/workspace-store"
+import { usePendingChatStore } from "@/stores/pending-chat-store"
 import { ChatMessage } from "@/components/chat/message"
 import { PromptInput } from "@/components/chat/prompt-input"
 import type { PromptInputHandle } from "@/components/chat/prompt-input"
@@ -20,7 +21,7 @@ import { useModelAgentBindings } from "@/hooks/use-settings"
 import { useCommand } from "@/hooks/use-command"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import { useLeaderAction } from "@/hooks/use-leader-action"
-import type { Permission, QuestionRequest, QuestionInfo, QuestionAnswer, MessageWithParts, SessionStatus } from "@/lib/opencode/types"
+import type { PermissionRequest, QuestionRequest, QuestionInfo, QuestionAnswer, MessageWithParts, SessionStatus } from "@/lib/opencode/types"
 
 interface SelectedModel {
   providerID: string
@@ -195,6 +196,25 @@ export function ChatInterface() {
     if (!activeSessionId || !activeWorkspaceId) return
     fetchMessages(activeSessionId, activeWorkspaceId)
   }, [activeSessionId, activeWorkspaceId, fetchMessages])
+
+  // Consume pending chat (e.g. from "Create Worktree" → auto-start plan)
+  const pendingChat = usePendingChatStore((s) => s.pending)
+  const clearPendingChat = usePendingChatStore((s) => s.clear)
+  useEffect(() => {
+    if (!activeWorkspaceId || !pendingChat) return
+    if (pendingChat.workspaceId !== activeWorkspaceId) return
+
+    // Clear immediately so it only fires once
+    const { message } = pendingChat
+    clearPendingChat()
+
+    // Create a session and send the pending message
+    ;(async () => {
+      const session = await createSession(activeWorkspaceId)
+      if (!session) return
+      sendMessage(session.id, message, activeWorkspaceId)
+    })()
+  }, [activeWorkspaceId, pendingChat, clearPendingChat, createSession, sendMessage])
 
   const activeMessages = useChatStore(getActiveSessionMessages)
 
@@ -503,7 +523,7 @@ export function ChatInterface() {
       {/* Main chat area */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Chat toolbar */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
+        <div className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center gap-2 border-b bg-background px-4 py-2">
           {/* Mobile: open session sheet */}
           <Button
             size="icon-xs"
@@ -769,27 +789,31 @@ function EmptyChat({ onSend }: { onSend: (text: string) => void }) {
   )
 }
 
+function formatPermissionTitle(permission: string): string {
+  return permission
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 function PermissionBanner({
   permission,
   onRespond,
 }: {
-  permission: Permission
+  permission: PermissionRequest
   onRespond: (response: string) => void
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-500/5 px-3 py-2">
       <ShieldAlert className="size-5 shrink-0 text-amber-600" />
-      <div className="flex-1">
-        <p className="text-sm font-medium">{permission.title}</p>
-        {permission.pattern && (
-          <p className="text-xs text-muted-foreground">
-            {Array.isArray(permission.pattern)
-              ? permission.pattern.join(", ")
-              : permission.pattern}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">{formatPermissionTitle(permission.permission)}</p>
+        {permission.patterns.length > 0 && (
+          <p className="text-xs text-muted-foreground truncate">
+            {permission.patterns.join(", ")}
           </p>
         )}
       </div>
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 shrink-0">
         <Button
           size="sm"
           variant="outline"
@@ -801,11 +825,20 @@ function PermissionBanner({
         </Button>
         <Button
           size="sm"
+          variant="outline"
           onClick={() => onRespond("allow")}
           className="gap-1"
         >
           <Check className="size-3" />
           Allow
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => onRespond("always")}
+          className="gap-1"
+        >
+          <Check className="size-3" />
+          Always
         </Button>
       </div>
     </div>

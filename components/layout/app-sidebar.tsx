@@ -9,6 +9,7 @@ import {
   GitBranch,
   Terminal,
   Settings,
+  CheckSquare,
 } from "lucide-react"
 import { useMemo, useRef } from "react"
 import { cn } from "@/lib/utils"
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/git", label: "Git", icon: GitMerge },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
@@ -60,6 +62,10 @@ export function AppSidebar() {
       {
         action: { id: "nav:git", label: "Go to Git", page: "global" as const },
         handler: () => routerRef.current.push("/git"),
+      },
+      {
+        action: { id: "nav:tasks", label: "Go to Tasks", page: "global" as const },
+        handler: () => routerRef.current.push("/tasks"),
       },
       {
         action: { id: "nav:dashboard", label: "Go to Dashboard", page: "global" as const },

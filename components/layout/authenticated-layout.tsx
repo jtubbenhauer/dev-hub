@@ -12,6 +12,8 @@ import { useWorkspaceStore } from "@/stores/workspace-store"
 import { useChatStore } from "@/stores/chat-store"
 import { useDefaultWorkspaceSetting } from "@/hooks/use-settings"
 import type { Workspace } from "@/types"
+import { useKeyboardVisible } from "@/hooks/use-keyboard-visible"
+import { cn } from "@/lib/utils"
 
 export function AuthenticatedLayout({
   children,
@@ -26,6 +28,7 @@ export function AuthenticatedLayout({
   const connectSSE = useChatStore((s) => s.connectSSE)
   const disconnectAllSSE = useChatStore((s) => s.disconnectAllSSE)
   const handleVisibilityRestored = useChatStore((s) => s.handleVisibilityRestored)
+  const isKeyboardVisible = useKeyboardVisible()
 
   const { data, isFetching } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
@@ -96,7 +99,7 @@ export function AuthenticatedLayout({
       <AppSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden pb-16 md:pb-0">{children}</main>
+        <main className={cn("flex min-w-0 flex-1 flex-col overflow-hidden", !isKeyboardVisible && "pb-16 md:pb-0")}>{children}</main>
       </div>
       <MobileNav />
       <WorkspaceCommands />

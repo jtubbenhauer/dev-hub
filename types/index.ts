@@ -341,6 +341,7 @@ export interface ClickUpTask {
   folder: { id: string; name: string }
   space: { id: string }
   tags: ClickUpTag[]
+  custom_fields?: ClickUpCustomField[]
 }
 
 export interface ClickUpTeam {
@@ -348,6 +349,64 @@ export interface ClickUpTeam {
   name: string
   color: string
   avatar: string | null
+}
+
+export interface ClickUpList {
+  id: string
+  name: string
+  task_count?: number
+}
+
+export interface ClickUpFolder {
+  id: string
+  name: string
+  lists: ClickUpList[]
+}
+
+export interface ClickUpSpace {
+  id: string
+  name: string
+  color: string | null
+  folders: ClickUpFolder[]
+  lists: ClickUpList[]
+}
+
+export interface ClickUpView {
+  id: string
+  name: string
+  type: string
+  parent: { id: string; type: number }
+}
+
+export interface ClickUpCustomField {
+  id: string
+  name: string
+  type: string
+  value: unknown
+  type_config?: Record<string, unknown>
+}
+
+export interface ClickUpTaskDetail extends ClickUpTask {
+  markdown_description: string | null
+  text_content: string | null
+  custom_fields: ClickUpCustomField[]
+  time_estimate: number | null
+  time_spent: number | null
+  parent: string | null
+  subtasks?: ClickUpTask[]
+}
+
+export interface ClickUpComment {
+  id: string
+  comment_text: string
+  user: ClickUpUser
+  date: string
+  resolved: boolean
+}
+
+export interface ClickUpPinnedView {
+  id: string
+  name: string
 }
 
 // GitHub types

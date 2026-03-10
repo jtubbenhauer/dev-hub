@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
@@ -15,12 +17,32 @@ import {
 import { GitFork, FolderGit2, Loader2, Plus } from "lucide-react"
 import { useCreateWorktree } from "@/hooks/use-git"
 import { useWorkspaceStore } from "@/stores/workspace-store"
-import type { ClickUpTask } from "@/types"
+import { usePendingChatStore } from "@/stores/pending-chat-store"
+import type { ClickUpTask, Workspace } from "@/types"
 
 interface TaskWorktreeDialogProps {
   task: ClickUpTask
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+function formatPlanPrompt(task: ClickUpTask): string {
+  const lines = [
+    `Plan the implementation for this ClickUp task:`,
+    ``,
+    `**${task.name}**`,
+  ]
+  if (task.custom_id) lines.push(`Task ID: ${task.custom_id}`)
+  lines.push(`Status: ${task.status.status}`)
+  lines.push(`List: ${task.list.name}`)
+  if (task.folder?.name) lines.push(`Folder: ${task.folder.name}`)
+  if (task.priority) lines.push(`Priority: ${task.priority.priority}`)
+  if (task.url) lines.push(`URL: ${task.url}`)
+  lines.push(
+    ``,
+    `Please read the .opencode directory for any existing plans or context, then create a plan for this task.`
+  )
+  return lines.join("\n")
 }
 
 function slugify(text: string): string {
@@ -34,7 +56,11 @@ function slugify(text: string): string {
 }
 
 export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDialogProps) {
+  const router = useRouter()
   const workspaces = useWorkspaceStore((s) => s.workspaces)
+  const addWorkspace = useWorkspaceStore((s) => s.addWorkspace)
+  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId)
+  const setPendingChat = usePendingChatStore((s) => s.setPending)
   const repoWorkspaces = useMemo(
     () => workspaces.filter((w) => w.type === "repo"),
     [workspaces]
@@ -45,6 +71,8 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
   const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null)
   const [branchName, setBranchName] = useState(defaultBranch)
   const [customName, setCustomName] = useState("")
+  const [startChat, setStartChat] = useState(true)
+  const [additionalPrompt, setAdditionalPrompt] = useState("")
 
   const createWorktree = useCreateWorktree()
 
@@ -77,9 +105,26 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
         name: customName || undefined,
       },
       {
-        onSuccess: () => {
-          onOpenChange(false)
-          resetState()
+        onSuccess: (data: { workspace: Workspace }) => {
+          const newWorkspace = data.workspace
+
+          addWorkspace(newWorkspace)
+          setActiveWorkspaceId(newWorkspace.id)
+
+          if (startChat) {
+            const planPrompt = formatPlanPrompt(task)
+            const message = additionalPrompt.trim()
+              ? `${planPrompt}\n\n---\n\nAdditional context:\n${additionalPrompt.trim()}`
+              : planPrompt
+
+            setPendingChat({ workspaceId: newWorkspace.id, message })
+            onOpenChange(false)
+            resetState()
+            router.push("/chat")
+          } else {
+            onOpenChange(false)
+            resetState()
+          }
         },
       }
     )
@@ -89,6 +134,8 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
     setSelectedRepoId(null)
     setBranchName(defaultBranch)
     setCustomName("")
+    setStartChat(true)
+    setAdditionalPrompt("")
   }
 
   return (
@@ -211,6 +258,29 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
               </div>
             </div>
           )}
+
+          {/* Start chat toggle */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="start-chat-toggle" className="text-sm cursor-pointer">
+                Start chat with plan prompt
+              </Label>
+              <Switch
+                id="start-chat-toggle"
+                checked={startChat}
+                onCheckedChange={setStartChat}
+              />
+            </div>
+            {startChat && (
+              <textarea
+                value={additionalPrompt}
+                onChange={(e) => setAdditionalPrompt(e.target.value)}
+                placeholder="Additional context (optional)"
+                rows={3}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+              />
+            )}
+          </div>
 
           {/* Create button */}
           <Button

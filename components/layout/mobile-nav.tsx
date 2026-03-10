@@ -8,19 +8,25 @@ import {
   GitMerge,
   GitBranch,
   Settings,
+  CheckSquare,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useKeyboardVisible } from "@/hooks/use-keyboard-visible"
 
 const mobileNavItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/git", label: "Git", icon: GitMerge },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
 export function MobileNav() {
   const pathname = usePathname()
+  const isKeyboardVisible = useKeyboardVisible()
+
+  if (isKeyboardVisible) return null
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-around border-t bg-background md:hidden">

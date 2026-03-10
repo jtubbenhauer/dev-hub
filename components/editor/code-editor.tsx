@@ -98,6 +98,7 @@ export function CodeEditor({
         },
       }),
       EditorState.tabSize.of(tabSize),
+      EditorView.lineWrapping,
     ]
 
     if (isVimMode) {

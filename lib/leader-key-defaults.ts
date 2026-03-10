@@ -5,6 +5,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   // Global navigation
   { id: "nav:chat", label: "Go to Chat", page: "global" },
   { id: "nav:git", label: "Go to Git", page: "global" },
+  { id: "nav:tasks", label: "Go to Tasks", page: "global" },
   { id: "nav:dashboard", label: "Go to Dashboard", page: "global" },
   { id: "nav:repos", label: "Go to Repos", page: "global" },
   { id: "nav:settings", label: "Go to Settings", page: "global" },
@@ -42,6 +43,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   // Global navigation
   "nav:chat": "g c",
   "nav:git": "g g",
+  "nav:tasks": "g t",
   "nav:dashboard": "g d",
   "nav:repos": "g r",
   "nav:settings": "g s",

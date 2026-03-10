@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, IBM_Plex_Mono } from "next/font/google"
 import "highlight.js/styles/github-dark-dimmed.css"
 import "./globals.css"
@@ -23,6 +23,10 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Dev Hub",
   description: "Personal development command center",
+}
+
+export const viewport: Viewport = {
+  interactiveWidget: "resizes-content",
 }
 
 export default function RootLayout({

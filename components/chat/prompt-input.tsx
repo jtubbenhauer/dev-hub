@@ -133,6 +133,13 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
     setSelectedFiles((prev) => prev.filter((p) => p !== path))
   }, [])
 
+  const handleFocus = useCallback(() => {
+    // Delay to let the keyboard animation finish before scrolling
+    setTimeout(() => {
+      textareaRef.current?.scrollIntoView({ block: "end", behavior: "smooth" })
+    }, 300)
+  }, [])
+
   const isPickerOpen = pickerQuery !== null && !!workspaceId
 
   return (
@@ -177,6 +184,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
           placeholder="Send a message... (type @ to reference files)"
           disabled={disabled}
           rows={1}

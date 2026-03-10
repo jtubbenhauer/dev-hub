@@ -140,7 +140,7 @@ async function fetchFileContentAtRef(
 ): Promise<string> {
   try {
     const data = await githubFetch<{ content: string; encoding: string }>(
-      `repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${ref}`
+      `repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${ref}`
     )
     if (data.encoding === "base64") {
       // atob works in browser; in Node edge runtime use Buffer
@@ -151,9 +151,10 @@ async function fetchFileContentAtRef(
       }
     }
     return data.content
-  } catch {
-    // File may not exist at that ref (e.g. newly added file)
-    return ""
+  } catch (err) {
+    // File may not exist at that ref (e.g. newly added / deleted file) — return empty for 404 only
+    if (err instanceof Error && err.message.includes("404")) return ""
+    throw err
   }
 }
 

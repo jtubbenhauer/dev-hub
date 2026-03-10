@@ -82,12 +82,11 @@ function makePart(id: string, sessionID: string, messageID: string) {
 function makePermission(id: string, sessionID: string) {
   return {
     id,
-    type: "bash",
     sessionID,
-    messageID: "msg-1",
-    title: "Run bash",
+    permission: "bash",
+    patterns: [],
     metadata: {},
-    time: { created: Date.now() },
+    always: [],
   }
 }
 
@@ -204,7 +203,7 @@ describe("workspace state isolation", () => {
       "ws-a"
     )
     store.handleEvent(
-      { type: "permission.updated", properties: makePermission("perm-1", "sess-a") },
+      { type: "permission.asked", properties: makePermission("perm-1", "sess-a") },
       "ws-a"
     )
 
@@ -1145,13 +1144,13 @@ describe("message routing", () => {
 describe("permission lifecycle", () => {
   beforeEach(resetStore)
 
-  it("permission.updated adds permission to the owning workspace", () => {
+  it("permission.asked adds permission to the owning workspace", () => {
     useChatStore.getState().handleEvent(
       { type: "session.created", properties: { info: makeSession("sess-a") } },
       "ws-a"
     )
     useChatStore.getState().handleEvent(
-      { type: "permission.updated", properties: makePermission("perm-1", "sess-a") },
+      { type: "permission.asked", properties: makePermission("perm-1", "sess-a") },
       "ws-a"
     )
 
@@ -1177,7 +1176,7 @@ describe("permission lifecycle", () => {
     })
 
     useChatStore.getState().handleEvent(
-      { type: "permission.replied", properties: { permissionID: "perm-1" } },
+      { type: "permission.replied", properties: { requestID: "perm-1" } },
       "ws-a"
     )
 
@@ -1228,7 +1227,7 @@ describe("permission lifecycle", () => {
     })
 
     useChatStore.getState().handleEvent(
-      { type: "permission.replied", properties: { permissionID: "perm-1" } },
+      { type: "permission.replied", properties: { requestID: "perm-1" } },
       "ws-a"
     )
 
@@ -1305,6 +1304,95 @@ describe("question lifecycle", () => {
     }).not.toThrow()
 
     expect(useChatStore.getState().workspaceStates["ws-a"]?.questions ?? []).toHaveLength(0)
+  })
+
+  it("question.replied resolves using fallback id field when requestID is absent", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [makeQuestion("q-1", "sess-a")],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    // Simulate API renaming the field to "id"
+    useChatStore.getState().handleEvent(
+      { type: "question.replied", properties: { id: "q-1" } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].questions).toHaveLength(0)
+  })
+
+  it("question.rejected resolves using fallback questionID field when requestID is absent", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [makeQuestion("q-2", "sess-a")],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    // Simulate API renaming the field to "questionID"
+    useChatStore.getState().handleEvent(
+      { type: "question.rejected", properties: { questionID: "q-2" } },
+      "ws-a"
+    )
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].questions).toHaveLength(0)
+  })
+
+  it("question.replied with no recognisable ID field is silently dropped", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [makeQuestion("q-3", "sess-a")],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    expect(() => {
+      useChatStore.getState().handleEvent(
+        { type: "question.replied", properties: { unknownField: "q-3" } },
+        "ws-a"
+      )
+    }).not.toThrow()
+
+    // Question remains — event was dropped, not an error
+    expect(useChatStore.getState().workspaceStates["ws-a"].questions).toHaveLength(1)
   })
 })
 
@@ -1480,6 +1568,135 @@ describe("SSE connection management", () => {
     useChatStore.getState().setActiveWorkspaceId("ws-a")
 
     expect(connectSSESpy).toHaveBeenCalledWith("ws-a")
+  })
+
+  it("SSE onopen seeds questions missed during disconnect", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/question")) {
+        return Promise.resolve({ ok: true, json: async () => [makeQuestion("q-missed", "sess-a")] })
+      }
+      // permission endpoint, session/status, session list — all return benign empty responses
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      // Not the active workspace — avoids fetchMessages/refreshActiveSessionStatus side effects
+      activeWorkspaceId: null,
+      activeSessionId: null,
+    })
+
+    useChatStore.getState().connectSSE("ws-a")
+    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+      simulateOpen: () => void
+    }
+    es.simulateOpen()
+
+    // Flush: fetch → .then(res.json()) → async json body → .then(setState) = 4 microtask hops
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].questions).toHaveLength(1)
+    expect(useChatStore.getState().workspaceStates["ws-a"].questions[0].id).toBe("q-missed")
+  })
+
+  it("SSE onopen reconciles permissions — removes stale entries not in server response", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/permission")) {
+        // Server no longer has perm-stale (was replied while SSE was down)
+        return Promise.resolve({ ok: true, json: async () => [] })
+      }
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [makePermission("perm-stale", "sess-a")],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: null,
+      activeSessionId: null,
+    })
+
+    useChatStore.getState().connectSSE("ws-a")
+    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+      simulateOpen: () => void
+    }
+    es.simulateOpen()
+
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].permissions).toHaveLength(0)
+  })
+
+  it("SSE onopen reconciles questions — removes stale entries not in server response", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/question")) {
+        // Server no longer has q-stale (was answered while SSE was down)
+        return Promise.resolve({ ok: true, json: async () => [] })
+      }
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [makeQuestion("q-stale", "sess-a")],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+      activeWorkspaceId: null,
+      activeSessionId: null,
+    })
+
+    useChatStore.getState().connectSSE("ws-a")
+    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+      simulateOpen: () => void
+    }
+    es.simulateOpen()
+
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(useChatStore.getState().workspaceStates["ws-a"].questions).toHaveLength(0)
   })
 })
 

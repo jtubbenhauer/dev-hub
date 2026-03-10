@@ -31,6 +31,11 @@ export const workspaces = sqliteTable("workspaces", {
     enum: ["pnpm", "npm", "bun", "cargo", "go", "none"],
   }),
   quickCommands: text("quick_commands", { mode: "json" }),
+  backend: text("backend", { enum: ["local", "remote"] }).notNull().default("local"),
+  provider: text("provider"),
+  opencodeUrl: text("opencode_url"),
+  agentUrl: text("agent_url"),
+  providerMeta: text("provider_meta", { mode: "json" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

@@ -3,8 +3,7 @@ import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
-import { readDirectoryTree } from "@/lib/files/operations"
-import { getFileStatuses } from "@/lib/git/status"
+import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 import type { FileTreeEntry, FileGitStatus } from "@/types"
 
 function applyGitStatuses(
@@ -51,7 +50,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const [workspace] = await db
+  const [row] = await db
     .select()
     .from(workspaces)
     .where(
@@ -61,19 +60,21 @@ export async function GET(request: NextRequest) {
       )
     )
 
-  if (!workspace) {
+  if (!row) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
   }
 
   try {
+    const workspace = toWorkspace(row)
+    const backend = getBackend(workspace)
+
     const targetPath = relativePath === "."
       ? workspace.path
       : require("node:path").resolve(workspace.path, relativePath)
 
-    const entries = readDirectoryTree(targetPath, workspace.path, depth)
+    const entries = await backend.listDirectory(targetPath, depth)
 
-    // Apply git statuses
-    const statuses = await getFileStatuses(workspace.path)
+    const statuses = await backend.getFileStatuses()
     applyGitStatuses(entries, statuses)
 
     return NextResponse.json(entries)

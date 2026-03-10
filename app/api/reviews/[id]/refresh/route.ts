@@ -3,13 +3,7 @@ import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { reviews, reviewFiles, workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
-import {
-  getChangedFiles,
-  getUncommittedFiles,
-  computeDiffHash,
-  computeUncommittedDiffHash,
-  getMergeBase,
-} from "@/lib/git/review"
+import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -34,19 +28,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Review not found" }, { status: 404 })
   }
 
-  const { review, workspace } = result[0]
+  const { review, workspace: workspaceRow } = result[0]
+  const backend = getBackend(toWorkspace(workspaceRow))
 
   try {
     let currentFiles: { path: string; status: string; oldPath?: string }[] = []
     let effectiveBase = review.mergeBase ?? review.baseRef
 
     if (review.mode === "uncommitted") {
-      currentFiles = await getUncommittedFiles(workspace.path)
+      currentFiles = await backend.getUncommittedFiles()
     } else if (review.mode === "branch" && review.targetRef) {
       // Recompute merge-base in case the branch moved
-      const newMergeBase = await getMergeBase(workspace.path, review.targetRef)
+      const newMergeBase = await backend.getMergeBase(review.targetRef)
       effectiveBase = newMergeBase
-      currentFiles = await getChangedFiles(workspace.path, newMergeBase)
+      currentFiles = await backend.getChangedFiles(newMergeBase)
 
       if (newMergeBase !== review.mergeBase) {
         await db
@@ -55,7 +50,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           .where(eq(reviews.id, reviewId))
       }
     } else if (effectiveBase) {
-      currentFiles = await getChangedFiles(workspace.path, effectiveBase)
+      currentFiles = await backend.getChangedFiles(effectiveBase)
     }
 
     const existingFiles = await db
@@ -78,8 +73,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     for (const file of currentFiles) {
       const newHash =
         review.mode === "uncommitted"
-          ? await computeUncommittedDiffHash(workspace.path, file.path)
-          : await computeDiffHash(workspace.path, effectiveBase!, file.path)
+          ? await backend.computeUncommittedDiffHash(file.path)
+          : await backend.computeDiffHash(effectiveBase!, file.path)
 
       const existing = existingByPath.get(file.path)
       if (existing) {

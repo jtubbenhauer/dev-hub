@@ -1,3 +1,5 @@
+export type WorkspaceBackendType = "local" | "remote"
+
 export interface Workspace {
   id: string
   userId: string
@@ -7,6 +9,11 @@ export interface Workspace {
   parentRepoPath: string | null
   packageManager: "pnpm" | "npm" | "bun" | "cargo" | "go" | "none" | null
   quickCommands: QuickCommand[] | null
+  backend: WorkspaceBackendType
+  provider: string | null
+  opencodeUrl: string | null
+  agentUrl: string | null
+  providerMeta: Record<string, unknown> | null
   createdAt: Date
   lastAccessedAt: Date
 }
@@ -21,6 +28,11 @@ export interface WorkspaceCreateInput {
   path: string
   type: "repo" | "worktree"
   parentRepoPath?: string
+  backend?: WorkspaceBackendType
+  provider?: string
+  opencodeUrl?: string
+  agentUrl?: string
+  providerMeta?: Record<string, unknown>
 }
 
 export interface CpuStats {
@@ -519,4 +531,32 @@ export interface GitHubPrFileContent {
   path: string
   language: string
   patch: string | undefined
+}
+
+// Workspace Provider types
+
+export interface WorkspaceProviderManifest {
+  name: string
+  version: string
+  capabilities: string[]
+  invoke: {
+    type: "cli"
+    binary: string
+  }
+  commands: {
+    create: string
+    destroy: string
+    status: string
+  }
+}
+
+export interface WorkspaceProviderEndpoints {
+  opencode: string
+  agent: string
+}
+
+export interface WorkspaceProviderResponse {
+  id: string
+  endpoints: WorkspaceProviderEndpoints
+  metadata: Record<string, unknown>
 }

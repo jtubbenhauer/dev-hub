@@ -5,17 +5,7 @@ import { reviews, reviewFiles, workspaces } from "@/drizzle/schema"
 import { eq, and, desc } from "drizzle-orm"
 import { randomUUID } from "node:crypto"
 import type { ReviewMode } from "@/types"
-import {
-  getMergeBase,
-  getChangedFiles,
-  getUncommittedFiles,
-  getLastCommitRef,
-  computeDiffHash,
-  computeUncommittedDiffHash,
-  getAllBranches,
-  getOriginalContent,
-  getCurrentContent,
-} from "@/lib/git/review"
+import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 
 // GET: list reviews for a workspace, or get all branches
 export async function GET(request: NextRequest) {
@@ -32,18 +22,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "workspaceId required" }, { status: 400 })
   }
 
-  const [workspace] = await db
+  const [row] = await db
     .select()
     .from(workspaces)
     .where(and(eq(workspaces.id, workspaceId), eq(workspaces.userId, session.user.id)))
 
-  if (!workspace) {
+  if (!row) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
   }
 
   try {
     if (action === "branches") {
-      const branches = await getAllBranches(workspace.path)
+      const backend = getBackend(toWorkspace(row))
+      const branches = await backend.getAllBranches()
       return NextResponse.json(branches)
     }
 
@@ -78,14 +69,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "workspaceId and mode required" }, { status: 400 })
   }
 
-  const [workspace] = await db
+  const [row] = await db
     .select()
     .from(workspaces)
     .where(and(eq(workspaces.id, workspaceId), eq(workspaces.userId, session.user.id)))
 
-  if (!workspace) {
+  if (!row) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
   }
+
+  const backend = getBackend(toWorkspace(row))
 
   try {
     const reviewId = randomUUID()
@@ -96,20 +89,20 @@ export async function POST(request: NextRequest) {
     switch (mode) {
       case "branch": {
         const ref = targetRef ?? "origin/HEAD"
-        mergeBase = await getMergeBase(workspace.path, ref)
+        mergeBase = await backend.getMergeBase(ref)
         baseRef = ref
-        changedFiles = await getChangedFiles(workspace.path, mergeBase)
+        changedFiles = await backend.getChangedFiles(mergeBase)
         break
       }
       case "uncommitted": {
         baseRef = "HEAD"
-        const allUncommitted = await getUncommittedFiles(workspace.path)
+        const allUncommitted = await backend.getUncommittedFiles()
         // Filter out files with no actual content on either side (phantom git status entries)
         const hasContent = await Promise.all(
           allUncommitted.map(async (file) => {
             const [original, current] = await Promise.all([
-              getOriginalContent(workspace.path, file.path),
-              Promise.resolve(getCurrentContent(workspace.path, file.path)),
+              backend.getOriginalContent(file.path),
+              backend.getCurrentContent(file.path),
             ])
             return original !== "" || current !== ""
           })
@@ -118,9 +111,9 @@ export async function POST(request: NextRequest) {
         break
       }
       case "last-commit": {
-        baseRef = await getLastCommitRef(workspace.path)
+        baseRef = await backend.getLastCommitRef()
         mergeBase = baseRef
-        changedFiles = await getChangedFiles(workspace.path, baseRef)
+        changedFiles = await backend.getChangedFiles(baseRef)
         break
       }
     }
@@ -144,8 +137,8 @@ export async function POST(request: NextRequest) {
       changedFiles.map(async (file) => {
         const diffHash =
           mode === "uncommitted"
-            ? await computeUncommittedDiffHash(workspace.path, file.path)
-            : await computeDiffHash(workspace.path, mergeBase ?? baseRef!, file.path)
+            ? await backend.computeUncommittedDiffHash(file.path)
+            : await backend.computeDiffHash(mergeBase ?? baseRef!, file.path)
 
         return {
           reviewId,

@@ -1,0 +1,33 @@
+apps/backend-principle-bridge/src/app/api/preload.ts
+  104735aa2cf41c86 31
+libs/ng-principle-bridge/src/lib/electron.service.ts
+  104735aa2cf41c86 98
+libs/ng-principle-bridge/src/lib/pages/bridge-settings/bridge-settings.component.ts
+  104735aa2cf41c86 327,334
+apps/backend-principle-bridge/src/app/integrations/sirona/sidexis-config.ts
+  104735aa2cf41c86 74-93
+apps/backend-principle-bridge/src/app/electron-principle-bridge.ts
+  104735aa2cf41c86 67,122-123
+libs/principle-bridge-core/src/lib/settings.ts
+  104735aa2cf41c86 88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "46ab709cc77e88a4893abe34c80604c5df2fc97a",
+  "prompts": {
+    "104735aa2cf41c86": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_32afc7352ffeyvKCa3z2UXOJdN",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 49,
+      "total_deletions": 67,
+      "accepted_lines": 28,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,45 @@
+libs/principle-core/interfaces/src/lib/bridge-device/bridge-device.ts
+  104735aa2cf41c86 85
+libs/ng-principle-bridge/src/lib/pages/bridge-settings/bridge-settings.component.ts
+  104735aa2cf41c86 15-17,77,165-167,249-250,322-371
+apps/backend-principle-bridge/src/app/electron-principle-bridge.ts
+  104735aa2cf41c86 24-25,66-70,123
+apps/backend-principle-bridge/src/app/api/preload.ts
+  104735aa2cf41c86 31-34
+libs/ng-principle-bridge/src/lib/components/sidexis-bridge-settings/sidexis-bridge-settings.component.ts
+  104735aa2cf41c86 12,20,24-25,27
+libs/ng-principle-bridge/src/lib/pages/bridge-settings/bridge-settings.component.html
+  104735aa2cf41c86 40-41,43
+apps/backend-principle-bridge/src/app/integrations/sirona/sidexis-config.spec.ts
+  104735aa2cf41c86 49-53,163-164,166,168-169,172-174,208-213,350-352,456-460,464-466
+apps/backend-principle-bridge/src/app/settings.ts
+  104735aa2cf41c86 83
+libs/ng-principle-bridge/src/lib/electron.service.ts
+  104735aa2cf41c86 7-8,97-101,103-110,112-114
+apps/backend-principle-bridge/src/app/integrations/sirona/sidexis-config-generator.spec.ts
+  104735aa2cf41c86 1-8,11-62,64-73,75-80,82-89,91-100,102-111,113-118,120-126,128-144,146-154,156-203,205-249,251-270,272-290,292-303,305-321,323-332,334-350,352-386,388-409,411-459,461-490,492-497
+libs/principle-bridge-core/src/lib/settings.ts
+  104735aa2cf41c86 52-70,87-90
+libs/ng-principle-bridge/src/lib/components/sidexis-bridge-settings/sidexis-bridge-settings.component.html
+  104735aa2cf41c86 8-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "5c410fd1ce201d634326f163dca36002dfa57e25",
+  "prompts": {
+    "104735aa2cf41c86": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_32afc7352ffeyvKCa3z2UXOJdN",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 1327,
+      "total_deletions": 278,
+      "accepted_lines": 1045,
+      "overriden_lines": 34
+    }
+  }
+}

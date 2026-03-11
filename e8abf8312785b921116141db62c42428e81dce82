@@ -1,0 +1,25 @@
+apps/migration-toolkit/src/converters/d4w-converter.ts
+  7b3c7fb32781363f 9,57
+apps/migration-toolkit/src/lib/process.ts
+  7b3c7fb32781363f 1,111-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "e8abf8312785b921116141db62c42428e81dce82",
+  "prompts": {
+    "7b3c7fb32781363f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_32523966bffe94S9MrwxH6GOCv",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 8,
+      "accepted_lines": 17,
+      "overriden_lines": 0
+    }
+  }
+}

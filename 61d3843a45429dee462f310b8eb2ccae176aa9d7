@@ -1,0 +1,33 @@
+package.json
+  ac93ccf7744d26d6 210
+apps/migration-toolkit/src/media/sidexis/sidexis-runner.ts
+  ac93ccf7744d26d6 14,24,46,75
+apps/migration-toolkit/src/media/sidexis/sidexis-db.ts
+  ac93ccf7744d26d6 6-7,13,28-29,32
+apps/principle-functions/src/app/http/migration-upload/download-script.ts
+  ac93ccf7744d26d6 280
+apps/migration-toolkit/src/media/media-command.ts
+  ac93ccf7744d26d6 34-35,40,44,85-86,97,103
+apps/migration-toolkit/src/media/sidexis/sidexis-types.ts
+  ac93ccf7744d26d6 25-26,41-42,60,71-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "61d3843a45429dee462f310b8eb2ccae176aa9d7",
+  "prompts": {
+    "ac93ccf7744d26d6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_325c44d71ffew5UOgWK1BSHohP",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 5,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    }
+  }
+}

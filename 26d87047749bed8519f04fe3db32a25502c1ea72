@@ -1,0 +1,23 @@
+libs/ng-payments/src/lib/transactions/transaction-providers/tyro/health-point/health-point-transaction.ts
+  4c7fa1304be23e63 20,30,112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "26d87047749bed8519f04fe3db32a25502c1ea72",
+  "prompts": {
+    "4c7fa1304be23e63": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_3241fdcf7ffeHkcucUutj8dzqT",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 10,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

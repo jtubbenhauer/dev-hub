@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { workspaces, commandHistory } from "@/drizzle/schema"
-import { eq } from "drizzle-orm"
+import { eq, and } from "drizzle-orm"
 import {
   spawnProcess,
   subscribe,
   getOutputBuffer,
   getProcess,
 } from "@/lib/commands/process-manager"
+import { toWorkspace } from "@/lib/workspaces/backend"
 import type { RunCommandRequest } from "@/lib/commands/types"
 
 export async function POST(request: NextRequest) {
@@ -32,19 +33,36 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const [workspace] = await db
-    .select({ path: workspaces.path, userId: workspaces.userId })
+  const [row] = await db
+    .select()
     .from(workspaces)
-    .where(eq(workspaces.id, workspaceId))
+    .where(
+      and(eq(workspaces.id, workspaceId), eq(workspaces.userId, session.user.id))
+    )
     .limit(1)
 
-  if (!workspace || workspace.userId !== session.user.id) {
+  if (!row) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
   }
 
+  const workspace = toWorkspace(row)
+
+  if (workspace.backend === "remote") {
+    return proxyRemoteRun(workspace.agentUrl!, command, workspaceId)
+  }
+
+  return runLocalCommand(request, command, workspaceId, workspace.path)
+}
+
+function runLocalCommand(
+  request: NextRequest,
+  command: string,
+  workspaceId: string,
+  workspacePath: string,
+): Response {
   const sessionId = crypto.randomUUID()
 
-  spawnProcess(sessionId, command, workspace.path, workspaceId)
+  spawnProcess(sessionId, command, workspacePath, workspaceId)
 
   const managed = getProcess(sessionId)
   if (!managed) {
@@ -57,12 +75,10 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
     start(controller) {
-      // Send the sessionId so the client can reference it for kill/reconnect
       controller.enqueue(
         encoder.encode(`event: session\ndata: ${JSON.stringify({ sessionId })}\n\n`)
       )
 
-      // Replay buffered output for reconnection support
       const buffer = getOutputBuffer(sessionId)
       for (const chunk of buffer) {
         controller.enqueue(
@@ -70,7 +86,6 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // If the process already exited before we subscribed, send the exit event
       if (managed.exited) {
         controller.enqueue(
           encoder.encode(
@@ -85,7 +100,6 @@ export async function POST(request: NextRequest) {
         try {
           controller.enqueue(encoder.encode(event))
 
-          // Close the stream after exit/error events
           if (event.startsWith("event: exit") || event.startsWith("event: error")) {
             recordToHistory(workspaceId, command, managed.exitCode)
             unsubscribe?.()
@@ -96,7 +110,6 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // Clean up if the client disconnects
       request.signal.addEventListener("abort", () => {
         unsubscribe?.()
       })
@@ -110,6 +123,66 @@ export async function POST(request: NextRequest) {
       "cache-control": "no-cache",
       connection: "keep-alive",
       "x-session-id": sessionId,
+    },
+  })
+}
+
+async function proxyRemoteRun(
+  agentUrl: string,
+  command: string,
+  workspaceId: string,
+): Promise<Response> {
+  const url = new URL("/commands/run", agentUrl)
+
+  const agentResponse = await globalThis.fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ command }),
+  })
+
+  if (!agentResponse.ok) {
+    const text = await agentResponse.text()
+    return NextResponse.json(
+      { error: `Agent error: ${text}` },
+      { status: agentResponse.status }
+    )
+  }
+
+  if (!agentResponse.body) {
+    return NextResponse.json(
+      { error: "Agent returned no stream body" },
+      { status: 502 }
+    )
+  }
+
+  // Pipe the SSE stream through, recording history when done
+  const agentBody = agentResponse.body
+  let lastExitCode: number | null = null
+
+  const transformStream = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      controller.enqueue(chunk)
+
+      // Try to detect exit events for history recording
+      const text = new TextDecoder().decode(chunk)
+      const exitMatch = text.match(/"exitCode"\s*:\s*(-?\d+|null)/)
+      if (exitMatch) {
+        lastExitCode = exitMatch[1] === "null" ? null : parseInt(exitMatch[1], 10)
+      }
+    },
+    flush() {
+      recordToHistory(workspaceId, command, lastExitCode)
+    },
+  })
+
+  const proxiedStream = agentBody.pipeThrough(transformStream)
+
+  return new Response(proxiedStream, {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      connection: "keep-alive",
     },
   })
 }

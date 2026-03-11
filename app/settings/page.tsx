@@ -10,6 +10,7 @@ import { ModelSettings } from "@/components/settings/model-settings"
 import { KeybindingsSettings } from "@/components/settings/keybindings-settings"
 import { WorkspaceSettings } from "@/components/settings/workspace-settings"
 import { IntegrationSettings } from "@/components/settings/integration-settings"
+import { ProviderSettings } from "@/components/settings/provider-settings"
 import { AboutSettings } from "@/components/settings/about-settings"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 
@@ -19,6 +20,7 @@ const VALID_TABS: SettingsTab[] = [
   "keybindings",
   "workspace",
   "integrations",
+  "providers",
   "about",
 ]
 
@@ -67,6 +69,7 @@ function SettingsContent() {
             {activeTab === "keybindings" && <KeybindingsSettings />}
             {activeTab === "workspace" && <WorkspaceSettings />}
             {activeTab === "integrations" && <IntegrationSettings />}
+            {activeTab === "providers" && <ProviderSettings />}
             {activeTab === "about" && <AboutSettings />}
           </div>
         </div>

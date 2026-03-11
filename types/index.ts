@@ -446,14 +446,10 @@ export interface GitHubPrFileContent {
 
 // Workspace Provider types
 
-export interface WorkspaceProviderManifest {
+export interface WorkspaceProvider {
+  id: string
   name: string
-  version: string
-  capabilities: string[]
-  invoke: {
-    type: "cli"
-    binary: string
-  }
+  binaryPath: string
   commands: {
     create: string
     destroy: string
@@ -461,13 +457,11 @@ export interface WorkspaceProviderManifest {
   }
 }
 
-export interface WorkspaceProviderEndpoints {
-  opencode: string
-  agent: string
-}
-
-export interface WorkspaceProviderResponse {
+export interface WorkspaceProviderCreateResult {
   id: string
-  endpoints: WorkspaceProviderEndpoints
+  endpoints: {
+    opencode: string
+    agent: string
+  }
   metadata: Record<string, unknown>
 }

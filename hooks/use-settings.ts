@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { LeaderBindingsMap } from "@/types/leader-key"
 import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults"
+import type { WorkspaceProvider } from "@/types"
 
 interface SelectedModel {
   providerID: string
@@ -30,6 +31,7 @@ export const SETTINGS_KEYS = {
   LEADER_KEY_BINDINGS: "leader-key-bindings",
   LEADER_WHICH_KEY: "leader-which-key",
   CLICKUP_PINNED_VIEWS: "clickup-pinned-views",
+  WORKSPACE_PROVIDERS: "workspace-providers",
 } as const
 
 export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
@@ -278,4 +280,29 @@ export function useGitHubSettings(): {
     isConfigured: !!apiToken,
     isLoading,
   }
+}
+
+function isWorkspaceProvider(value: unknown): value is WorkspaceProvider {
+  if (!value || typeof value !== "object") return false
+  const obj = value as Record<string, unknown>
+  return (
+    typeof obj.id === "string" &&
+    typeof obj.name === "string" &&
+    typeof obj.binaryPath === "string" &&
+    typeof obj.commands === "object" &&
+    obj.commands !== null &&
+    typeof (obj.commands as Record<string, unknown>).create === "string" &&
+    typeof (obj.commands as Record<string, unknown>).destroy === "string" &&
+    typeof (obj.commands as Record<string, unknown>).status === "string"
+  )
+}
+
+export function useWorkspaceProviders(): {
+  providers: WorkspaceProvider[]
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.WORKSPACE_PROVIDERS]
+  const providers = Array.isArray(raw) ? raw.filter(isWorkspaceProvider) : []
+  return { providers, isLoading }
 }

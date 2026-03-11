@@ -16,6 +16,7 @@ export type SettingsTab =
   | "keybindings"
   | "workspace"
   | "integrations"
+  | "providers"
   | "about"
 
 export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
@@ -24,6 +25,7 @@ export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "keybindings", label: "Keybindings" },
   { id: "workspace", label: "Workspace" },
   { id: "integrations", label: "Integrations" },
+  { id: "providers", label: "Providers" },
   { id: "about", label: "About" },
 ]
 

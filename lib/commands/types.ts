@@ -46,4 +46,5 @@ export interface RunCommandRequest {
 // Request body for POST /api/commands/kill
 export interface KillCommandRequest {
   sessionId: string
+  workspaceId?: string
 }

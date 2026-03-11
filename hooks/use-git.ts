@@ -428,3 +428,30 @@ export function useCreateWorktree() {
     },
   })
 }
+
+// Agent health
+
+export type AgentHealthStatus = "healthy" | "unreachable" | "unknown"
+
+interface AgentHealthResponse {
+  status: "ok" | "unreachable"
+  backend?: "local" | "remote"
+  reason?: string
+  workspacePath?: string
+}
+
+export function useAgentHealth(workspaceId: string | null, isRemote: boolean) {
+  return useQuery<AgentHealthStatus>({
+    queryKey: ["agent-health", workspaceId],
+    queryFn: async (): Promise<AgentHealthStatus> => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/health`)
+      if (!res.ok) return "unreachable"
+      const data = (await res.json()) as AgentHealthResponse
+      return data.status === "ok" ? "healthy" : "unreachable"
+    },
+    enabled: !!workspaceId && isRemote,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+    retry: false,
+  })
+}

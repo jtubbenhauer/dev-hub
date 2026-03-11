@@ -1,0 +1,65 @@
+hooks/use-settings.ts
+  33a23e2e29443998 8,34,284-308
+app/api/providers/test/route.ts
+  33a23e2e29443998 1-40
+app/workspaces/page.tsx
+  33a23e2e29443998 33,85-89,91,93,95-97,99,119,240
+stores/command-store.ts
+  33a23e2e29443998 62,67,76-77
+app/api/commands/run/route.ts
+  33a23e2e29443998 5,12,36-37,40,44,48-51,54-62,65,130-185
+hooks/use-git.ts
+  33a23e2e29443998 431-457
+types/index.ts
+  33a23e2e29443998 449-450,452,460,462
+app/api/providers/create-workspace/route.ts
+  33a23e2e29443998 1-195
+app/api/workspaces/[id]/route.ts
+  33a23e2e29443998 4,6,8,96,114-144,149-188,190
+packages/agent/src/index.ts
+  33a23e2e29443998 5,23
+components/workspace/create-provider-workspace-dialog.tsx
+  33a23e2e29443998 1-236
+app/api/commands/kill/route.ts
+  33a23e2e29443998 3-5,7,23,31-47,56-82
+app/settings/page.tsx
+  33a23e2e29443998 13,23,72
+lib/commands/types.ts
+  33a23e2e29443998 49
+components/layout/workspace-switcher.tsx
+  33a23e2e29443998 7,16,18-19,43-66,73,100-102,109-112,116-118
+packages/agent/src/routes/commands.ts
+  33a23e2e29443998 1-323
+components/settings/settings-nav.tsx
+  33a23e2e29443998 19,28
+app/api/workspaces/[id]/health/route.ts
+  33a23e2e29443998 1-54
+app/api/commands/autocomplete/route.ts
+  33a23e2e29443998 5,7-8,24-25,28,32,36-41,46-145
+components/workspace/workspace-card.tsx
+  33a23e2e29443998 8,44,49,60,72-74,90-100,102-109,251-292,304
+components/settings/provider-settings.tsx
+  33a23e2e29443998 1-348
+README.md
+  33a23e2e29443998 3,7-22,78-121,124,144,148-150,154-155,159,161,164,167-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "0e36e83a7c16b666d754526d750ab5121c48c811",
+  "prompts": {
+    "33a23e2e29443998": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_33fba856dffe9aLTF453b6oysN",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 1808,
+      "total_deletions": 84,
+      "accepted_lines": 1788,
+      "overriden_lines": 0
+    }
+  }
+}

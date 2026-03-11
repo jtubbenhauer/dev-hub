@@ -1,10 +1,9 @@
-import fs from "node:fs"
-import path from "node:path"
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
+import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 
 const PLANS_RELATIVE_PATH = ".opencode/plans"
 
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "workspaceId is required" }, { status: 400 })
   }
 
-  const [workspace] = await db
+  const [row] = await db
     .select()
     .from(workspaces)
     .where(
@@ -35,34 +34,28 @@ export async function GET(request: NextRequest) {
       )
     )
 
-  if (!workspace) {
+  if (!row) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
   }
 
-  const plansDir = path.join(workspace.path, PLANS_RELATIVE_PATH)
-
-  if (!fs.existsSync(plansDir)) {
-    return NextResponse.json({ files: [] })
-  }
+  const workspace = toWorkspace(row)
+  const backend = getBackend(workspace)
 
   try {
-    const entries = fs.readdirSync(plansDir, { withFileTypes: true })
+    const entries = await backend.listDirectory(PLANS_RELATIVE_PATH, 1)
     const files: PlanFile[] = entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
-      .map((entry) => {
-        const fullPath = path.join(plansDir, entry.name)
-        const stat = fs.statSync(fullPath)
-        return {
-          name: entry.name,
-          path: path.join(PLANS_RELATIVE_PATH, entry.name),
-          lastModified: stat.mtime.toISOString(),
-        }
-      })
-      .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
+      .filter((entry) => entry.type === "file" && entry.name.endsWith(".md"))
+      .map((entry) => ({
+        name: entry.name,
+        path: `${PLANS_RELATIVE_PATH}/${entry.name}`,
+        // listDirectory doesn't return mtime — use current time as fallback
+        lastModified: new Date().toISOString(),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
 
     return NextResponse.json({ files })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to list plan files"
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch {
+    // Directory doesn't exist
+    return NextResponse.json({ files: [] })
   }
 }

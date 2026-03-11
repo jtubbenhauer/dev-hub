@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { workspaces } from "@/drizzle/schema"
+import { eq, and } from "drizzle-orm"
 import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
-import { addWorktree, getWorktreeBaseDir } from "@/lib/git/worktrees"
-import { getBranches } from "@/lib/git/operations"
+import { getWorktreeBaseDir } from "@/lib/git/worktrees"
+import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 
 function detectPackageManager(
   dirPath: string
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json()
   const {
-    parentRepoPath,
+    parentWorkspaceId,
+    parentRepoPath: legacyParentRepoPath,
     branch,
     newBranch = false,
     basePath,
@@ -37,21 +39,98 @@ export async function POST(request: NextRequest) {
   } = body
 
   // Validate required fields
-  if (!parentRepoPath || typeof parentRepoPath !== "string") {
-    return NextResponse.json({ error: "parentRepoPath is required" }, { status: 400 })
-  }
   if (!branch || typeof branch !== "string") {
     return NextResponse.json({ error: "branch is required" }, { status: 400 })
   }
 
-  const resolvedParent = path.resolve(parentRepoPath)
+  // Resolve the parent workspace — either by ID (preferred) or legacy path
+  let resolvedParent: string
+  let parentBackendType: "local" | "remote" = "local"
 
-  // Verify parent repo exists
+  if (parentWorkspaceId && typeof parentWorkspaceId === "string") {
+    const [parentRow] = await db
+      .select()
+      .from(workspaces)
+      .where(
+        and(
+          eq(workspaces.id, parentWorkspaceId),
+          eq(workspaces.userId, session.user.id)
+        )
+      )
+
+    if (!parentRow) {
+      return NextResponse.json({ error: "Parent workspace not found" }, { status: 404 })
+    }
+
+    const parentWorkspace = toWorkspace(parentRow)
+    parentBackendType = parentWorkspace.backend
+    resolvedParent = parentWorkspace.path
+
+    // Use the parent workspace's backend to verify branch exists
+    const backend = getBackend(parentWorkspace)
+    if (!newBranch) {
+      const branches = await backend.getBranches()
+      const branchExists = branches.some((b) => b.name === branch)
+      if (!branchExists) {
+        return NextResponse.json(
+          { error: `Branch "${branch}" does not exist. Check "Create new branch" to create it.` },
+          { status: 400 }
+        )
+      }
+    }
+
+    const worktreePath = await backend.addWorktree(branch, newBranch, basePath, startPoint)
+
+    const packageManager = parentBackendType === "local"
+      ? detectPackageManager(worktreePath)
+      : parentWorkspace.packageManager
+
+    const parentName = path.basename(resolvedParent)
+    const workspaceName = name || `${parentName}/${branch}`
+
+    const workspace = {
+      id: crypto.randomUUID(),
+      userId: session.user.id,
+      name: workspaceName,
+      path: worktreePath,
+      type: "worktree" as const,
+      parentRepoPath: resolvedParent,
+      packageManager,
+      quickCommands: null,
+      backend: parentBackendType,
+      agentUrl: parentWorkspace.agentUrl,
+      opencodeUrl: parentWorkspace.opencodeUrl,
+      provider: parentWorkspace.provider,
+      createdAt: new Date(),
+      lastAccessedAt: new Date(),
+    }
+
+    await db.insert(workspaces).values(workspace)
+
+    return NextResponse.json(
+      {
+        workspace,
+        worktreePath,
+        branch,
+        defaultBaseDir: parentBackendType === "local"
+          ? getWorktreeBaseDir(resolvedParent)
+          : undefined,
+      },
+      { status: 201 }
+    )
+  }
+
+  // Legacy path-based flow (local only)
+  if (!legacyParentRepoPath || typeof legacyParentRepoPath !== "string") {
+    return NextResponse.json({ error: "parentWorkspaceId or parentRepoPath is required" }, { status: 400 })
+  }
+
+  resolvedParent = path.resolve(legacyParentRepoPath)
+
   if (!fs.existsSync(resolvedParent)) {
     return NextResponse.json({ error: "Parent repo directory does not exist" }, { status: 400 })
   }
 
-  // Verify it's actually a git repo (not a worktree itself)
   const gitDir = path.join(resolvedParent, ".git")
   try {
     const stat = fs.statSync(gitDir)
@@ -65,9 +144,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Parent path is not a git repository" }, { status: 400 })
   }
 
-  // If using an existing branch, verify it exists
+  // Build a temporary local workspace to use the backend
+  const tempWorkspace = toWorkspace({
+    id: "",
+    userId: session.user.id,
+    name: "",
+    path: resolvedParent,
+    type: "repo",
+    parentRepoPath: null,
+    packageManager: null,
+    quickCommands: null,
+    backend: "local",
+    provider: null,
+    opencodeUrl: null,
+    agentUrl: null,
+    providerMeta: null,
+    createdAt: new Date(),
+    lastAccessedAt: new Date(),
+  })
+
+  const backend = getBackend(tempWorkspace)
+
   if (!newBranch) {
-    const branches = await getBranches(resolvedParent)
+    const branches = await backend.getBranches()
     const branchExists = branches.some((b) => b.name === branch)
     if (!branchExists) {
       return NextResponse.json(
@@ -78,23 +177,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Create the worktree
-    const worktreePath = await addWorktree(
-      resolvedParent,
-      branch,
-      newBranch,
-      basePath,
-      startPoint
-    )
-
-    // Detect package manager in the new worktree
+    const worktreePath = await backend.addWorktree(branch, newBranch, basePath, startPoint)
     const packageManager = detectPackageManager(worktreePath)
 
-    // Auto-generate workspace name
     const parentName = path.basename(resolvedParent)
     const workspaceName = name || `${parentName}/${branch}`
 
-    // Register as workspace
     const workspace = {
       id: crypto.randomUUID(),
       userId: session.user.id,
@@ -104,6 +192,7 @@ export async function POST(request: NextRequest) {
       parentRepoPath: resolvedParent,
       packageManager,
       quickCommands: null,
+      backend: "local" as const,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
     }

@@ -46,11 +46,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   const { id } = await params
   const body = await request.json()
-  const { name, quickCommands } = body
+  const { name, quickCommands, agentUrl, opencodeUrl, provider, providerMeta } = body
 
   const updateData: Record<string, unknown> = {}
   if (name !== undefined) updateData.name = name
   if (quickCommands !== undefined) updateData.quickCommands = quickCommands
+  if (agentUrl !== undefined) updateData.agentUrl = agentUrl
+  if (opencodeUrl !== undefined) updateData.opencodeUrl = opencodeUrl
+  if (provider !== undefined) updateData.provider = provider
+  if (providerMeta !== undefined) updateData.providerMeta = providerMeta
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json(
@@ -99,7 +103,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  if (deleteFiles && fs.existsSync(workspace.path)) {
+  // Only delete local files — remote workspace files live in the container
+  if (deleteFiles && workspace.backend !== "remote" && fs.existsSync(workspace.path)) {
     fs.rmSync(workspace.path, { recursive: true, force: true })
   }
 

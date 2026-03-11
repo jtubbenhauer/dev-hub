@@ -80,6 +80,11 @@ export function WorkspaceCard({
         <div className="flex min-w-0 items-center justify-between">
           <CardTitle className="min-w-0 text-base truncate">{workspace.name}</CardTitle>
           <div className="flex items-center gap-1.5 shrink-0">
+            {workspace.backend === "remote" && (
+              <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-500">
+                remote
+              </Badge>
+            )}
             <Badge variant="secondary" className="text-xs">
               {workspace.type}
             </Badge>

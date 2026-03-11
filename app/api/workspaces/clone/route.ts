@@ -18,7 +18,7 @@ function detectPackageManager(
   return "none"
 }
 
-// POST: clone a remote repo and register it as a workspace
+// POST: clone a remote repo and register it as a local workspace
 export async function POST(request: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
@@ -28,12 +28,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const { url, targetDir, name, depth } = body
 
-  // Validate required fields
   if (!url || typeof url !== "string") {
     return NextResponse.json({ error: "url is required" }, { status: 400 })
   }
 
-  // Basic URL validation — accept https://, git://, ssh://, or git@host:user/repo patterns
   const validUrlPattern = /^(https?:\/\/|git:\/\/|ssh:\/\/|git@)/
   if (!validUrlPattern.test(url)) {
     return NextResponse.json(
@@ -43,15 +41,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Extract repo name for default naming
     const repoName = extractRepoName(url)
 
-    // Compute target path for validation
     const cloneTarget = targetDir
       ? path.resolve(targetDir)
       : path.join(getDefaultCloneBaseDir(), repoName)
 
-    // Check if target already exists
     if (fs.existsSync(cloneTarget)) {
       return NextResponse.json(
         { error: `Directory already exists: ${cloneTarget}` },
@@ -59,14 +54,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Clone the repo
     const clonePath = await cloneRepo(url, targetDir, depth)
-
-    // Detect package manager in the cloned repo
     const packageManager = detectPackageManager(clonePath)
-
-    // Register as workspace
     const workspaceName = name || repoName
+
     const workspace = {
       id: crypto.randomUUID(),
       userId: session.user.id,
@@ -76,6 +67,7 @@ export async function POST(request: NextRequest) {
       parentRepoPath: null,
       packageManager,
       quickCommands: null,
+      backend: "local" as const,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
     }

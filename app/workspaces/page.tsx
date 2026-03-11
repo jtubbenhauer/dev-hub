@@ -23,11 +23,13 @@ import {
   FolderGit2,
   Plus,
   FolderSearch,
+  Globe,
 } from "lucide-react"
 import { DirectoryBrowser } from "@/components/workspace/directory-browser"
 import { WorkspaceCard } from "@/components/workspace/workspace-card"
 import { CreateWorktreeDialog } from "@/components/workspace/create-worktree-dialog"
 import { CloneRepoDialog } from "@/components/workspace/clone-repo-dialog"
+import { ConnectRemoteDialog } from "@/components/workspace/connect-remote-dialog"
 import { toast } from "sonner"
 import type { Workspace } from "@/types"
 
@@ -105,6 +107,7 @@ export default function WorkspacesPage() {
           <h1 className="text-2xl font-bold">Workspaces</h1>
           <div className="flex items-center gap-2">
             <CloneRepoDialog />
+            <ConnectRemoteDialog />
             <CreateWorktreeDialog workspaces={workspaces} />
             <Dialog open={addDialogOpen} onOpenChange={(open) => {
               setAddDialogOpen(open)

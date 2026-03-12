@@ -2071,3 +2071,314 @@ describe("clearChat", () => {
     expect(useChatStore.getState().streamingPollInterval).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------
+// 14. createSession — message initialization
+// ---------------------------------------------------------------------------
+
+describe("createSession — message initialization", () => {
+  beforeEach(resetStore)
+
+  it("initializes an empty messages array for the newly created session", async () => {
+    const newSession = makeSession("sess-new")
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => newSession,
+    })
+
+    await useChatStore.getState().createSession("ws-a")
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"]
+    expect(ws.messages["sess-new"]).toEqual([])
+  })
+
+  it("does not overwrite existing messages for other sessions in the same workspace", async () => {
+    const existingMessages = [{ info: makeAssistantMessage("msg-1", "sess-existing"), parts: [] }]
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-existing": makeSession("sess-existing") },
+          messages: { "sess-existing": existingMessages },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    const newSession = makeSession("sess-new")
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => newSession,
+    })
+
+    await useChatStore.getState().createSession("ws-a")
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"]
+    expect(ws.messages["sess-new"]).toEqual([])
+    expect(ws.messages["sess-existing"]).toHaveLength(1)
+  })
+
+  it("sets activeSessionId to the new session", async () => {
+    const newSession = makeSession("sess-new")
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => newSession,
+    })
+
+    await useChatStore.getState().createSession("ws-a")
+
+    expect(useChatStore.getState().activeSessionId).toBe("sess-new")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 15. fetchMessages — error handling
+// ---------------------------------------------------------------------------
+
+describe("fetchMessages — error handling", () => {
+  beforeEach(resetStore)
+
+  it("sets empty messages array on HTTP error (non-ok response)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 })
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    await useChatStore.getState().fetchMessages("sess-a", "ws-a")
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"]
+    expect(ws.messages["sess-a"]).toEqual([])
+  })
+
+  it("sets empty messages array on network error (fetch throws)", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error("Network error"))
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    await useChatStore.getState().fetchMessages("sess-a", "ws-a")
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"]
+    expect(ws.messages["sess-a"]).toEqual([])
+  })
+
+  it("preserves existing messages on HTTP error (does not clobber)", async () => {
+    const existingMessages = [{ info: makeAssistantMessage("msg-1", "sess-a"), parts: [] }]
+
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 })
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: { "sess-a": existingMessages },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    await useChatStore.getState().fetchMessages("sess-a", "ws-a")
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"]
+    expect(ws.messages["sess-a"]).toHaveLength(1)
+    expect(ws.messages["sess-a"][0].info.id).toBe("msg-1")
+  })
+
+  it("preserves existing messages on network error (does not clobber)", async () => {
+    const existingMessages = [{ info: makeAssistantMessage("msg-1", "sess-a"), parts: [] }]
+
+    global.fetch = vi.fn().mockRejectedValue(new Error("Network error"))
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: { "sess-a": existingMessages },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+
+    await useChatStore.getState().fetchMessages("sess-a", "ws-a")
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"]
+    expect(ws.messages["sess-a"]).toHaveLength(1)
+    expect(ws.messages["sess-a"][0].info.id).toBe("msg-1")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 16. isMessagesLoaded selector logic
+// ---------------------------------------------------------------------------
+
+describe("isMessagesLoaded selector logic", () => {
+  // Tests the inline selector used in chat-interface.tsx:
+  //   const isMessagesLoaded = useChatStore((state) => {
+  //     const { activeSessionId: sid, activeWorkspaceId: wid, workspaceStates } = state
+  //     if (!sid || !wid) return true
+  //     const ws = workspaceStates[wid]
+  //     if (!ws) return false
+  //     return sid in ws.messages
+  //   })
+
+  function isMessagesLoaded(state: {
+    activeSessionId: string | null
+    activeWorkspaceId: string | null
+    workspaceStates: Record<string, { messages: Record<string, unknown[]> }>
+  }): boolean {
+    const { activeSessionId: sid, activeWorkspaceId: wid, workspaceStates } = state
+    if (!sid || !wid) return true
+    const ws = workspaceStates[wid]
+    if (!ws) return false
+    return sid in ws.messages
+  }
+
+  beforeEach(resetStore)
+
+  it("returns true when no active session (guard clause)", () => {
+    useChatStore.setState({ activeSessionId: null, activeWorkspaceId: "ws-a" })
+    expect(isMessagesLoaded(useChatStore.getState())).toBe(true)
+  })
+
+  it("returns true when no active workspace (guard clause)", () => {
+    useChatStore.setState({ activeSessionId: "sess-a", activeWorkspaceId: null })
+    expect(isMessagesLoaded(useChatStore.getState())).toBe(true)
+  })
+
+  it("returns false when workspace has no messages key for the active session", () => {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+    expect(isMessagesLoaded(useChatStore.getState())).toBe(false)
+  })
+
+  it("returns true when messages[sessionId] is an empty array (loaded but empty)", () => {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: { "sess-a": [] },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+    expect(isMessagesLoaded(useChatStore.getState())).toBe(true)
+  })
+
+  it("returns true when messages[sessionId] has data", () => {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: { "sess-a": [{ info: makeAssistantMessage("msg-1", "sess-a"), parts: [] }] },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          eventSource: null,
+          sseReconnectAttempts: 0,
+          sessionAgents: {},
+        },
+      },
+    })
+    expect(isMessagesLoaded(useChatStore.getState())).toBe(true)
+  })
+
+  it("returns false when workspace state does not exist at all", () => {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-missing",
+      activeSessionId: "sess-a",
+      workspaceStates: {},
+    })
+    expect(isMessagesLoaded(useChatStore.getState())).toBe(false)
+  })
+
+  it("integration: createSession makes isMessagesLoaded true immediately", async () => {
+    const newSession = makeSession("sess-new")
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => newSession,
+    })
+
+    useChatStore.setState({ activeWorkspaceId: "ws-a" })
+    await useChatStore.getState().createSession("ws-a")
+
+    const state = useChatStore.getState()
+    expect(isMessagesLoaded(state)).toBe(true)
+  })
+})

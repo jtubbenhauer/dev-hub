@@ -116,7 +116,7 @@ export default function WorkspacesPage() {
           <div className="flex items-center gap-2">
             <CloneRepoDialog />
             <ConnectRemoteDialog />
-            <CreateProviderWorkspaceDialog />
+            <CreateProviderWorkspaceDialog workspaces={workspaces} />
             <CreateWorktreeDialog workspaces={workspaces} />
             <Dialog open={addDialogOpen} onOpenChange={(open) => {
               setAddDialogOpen(open)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { ChevronsUpDown, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -74,6 +74,22 @@ export function AgentSelector({
   const [internalOpen, setInternalOpen] = useState(false)
   const activeAgent = agents.find((a) => a.name === selectedAgent)
 
+  const orderedAgents = useMemo(() => {
+    const utilityNames = new Set(["compaction", "title", "summary"])
+    const regular: Agent[] = []
+    const utility: Agent[] = []
+
+    for (const agent of agents) {
+      if (utilityNames.has(agent.name.toLowerCase())) {
+        utility.push(agent)
+      } else {
+        regular.push(agent)
+      }
+    }
+
+    return [...regular, ...utility]
+  }, [agents])
+
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen
   const setIsOpen = controlledOnOpenChange !== undefined
     ? controlledOnOpenChange
@@ -110,7 +126,7 @@ export function AgentSelector({
           <CommandInput placeholder="Search agents..." />
           <CommandList>
             <CommandEmpty>No agents found.</CommandEmpty>
-            {agents.map((agent) => {
+            {orderedAgents.map((agent) => {
               const isSelected = agent.name === selectedAgent
               return (
                 <CommandItem

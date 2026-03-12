@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { ChevronsUpDown, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -31,6 +31,7 @@ interface ModelSelectorProps {
   workspaceId: string | null
   selectedModel: SelectedModel | null
   onModelChange: (model: SelectedModel) => void
+  onVariantsChange?: (variants: string[]) => void
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
@@ -86,6 +87,7 @@ export function ModelSelector({
   workspaceId,
   selectedModel,
   onModelChange,
+  onVariantsChange,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: ModelSelectorProps) {
@@ -162,6 +164,26 @@ export function ModelSelector({
   useEffect(() => {
     fetchProviders()
   }, [fetchProviders])
+
+  // Emit available variants for the currently selected model
+  const variantsForSelectedModel = useMemo(() => {
+    if (!selectedModel || providers.length === 0) return []
+    const provider = providers.find(
+      (p) => p.provider.id === selectedModel.providerID
+    )
+    if (!provider) return []
+    const model = provider.models.find((m) => m.id === selectedModel.modelID)
+    if (!model) return []
+    const raw = (model as Record<string, unknown>).variants
+    if (!raw || typeof raw !== "object") return []
+    return Object.entries(raw as Record<string, Record<string, unknown>>)
+      .filter(([, v]) => !v.disabled)
+      .map(([key]) => key)
+  }, [selectedModel, providers])
+
+  useEffect(() => {
+    onVariantsChange?.(variantsForSelectedModel)
+  }, [variantsForSelectedModel, onVariantsChange])
 
   const allModelOptions: ModelOption[] = providers.flatMap((p) =>
     p.models.map((m) => ({

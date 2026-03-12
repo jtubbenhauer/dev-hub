@@ -4,7 +4,9 @@ import { useState, useRef, useCallback, forwardRef, useImperativeHandle } from "
 import { Send, Square, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FilePicker } from "@/components/chat/file-picker"
+import { CommandPicker, type SlashCommand } from "@/components/chat/command-picker"
 import { cn } from "@/lib/utils"
+import type { Command } from "@/lib/opencode/types"
 
 export interface PromptInputHandle {
   focus: () => void
@@ -16,6 +18,8 @@ interface PromptInputProps {
   isStreaming: boolean
   disabled?: boolean
   workspaceId: string | null
+  commands: Command[]
+  onCommandSelect: (command: SlashCommand, args: string) => void
 }
 
 export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(function PromptInput({
@@ -24,10 +28,13 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   isStreaming,
   disabled,
   workspaceId,
+  commands,
+  onCommandSelect,
 }, ref) {
   const [value, setValue] = useState("")
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])
   const [pickerQuery, setPickerQuery] = useState<string | null>(null)
+  const [commandQuery, setCommandQuery] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useImperativeHandle(ref, () => ({
@@ -41,9 +48,42 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
   }, [])
 
+  const availableCommands = useCallback((): SlashCommand[] => {
+    const builtins: SlashCommand[] = [
+      { name: "compact", description: "Summarize conversation to save context", source: "builtin" },
+      { name: "undo", description: "Revert last assistant message changes", source: "builtin" },
+    ]
+    const serverCommands = commands.map((command) => ({
+      name: command.name,
+      description: command.description,
+      source: "server" as const,
+    }))
+    return [...builtins, ...serverCommands]
+  }, [commands])
+
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim()
     if (!trimmed || disabled) return
+
+    if (trimmed.startsWith("/")) {
+      const withoutSlash = trimmed.slice(1)
+      const spaceIndex = withoutSlash.indexOf(" ")
+      const commandName = spaceIndex === -1 ? withoutSlash : withoutSlash.slice(0, spaceIndex)
+      const args = spaceIndex === -1 ? "" : withoutSlash.slice(spaceIndex + 1)
+      const match = availableCommands().find((cmd) => cmd.name === commandName)
+      if (match) {
+        onCommandSelect(match, args)
+        setValue("")
+        setSelectedFiles([])
+        setPickerQuery(null)
+        setCommandQuery(null)
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto"
+        }
+        return
+      }
+    }
+
     const fileContext =
       selectedFiles.length > 0
         ? `Context files: ${selectedFiles.join(", ")}\n\n`
@@ -52,10 +92,11 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
     setValue("")
     setSelectedFiles([])
     setPickerQuery(null)
+    setCommandQuery(null)
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
-  }, [value, disabled, selectedFiles, onSubmit])
+  }, [value, disabled, selectedFiles, onSubmit, availableCommands, onCommandSelect])
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -77,20 +118,41 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
         }
       }
       setPickerQuery(null)
+
+      if (newValue.startsWith("/")) {
+        const firstSpace = newValue.indexOf(" ")
+        const isInCommand = firstSpace === -1 || cursor <= firstSpace
+        if (isInCommand) {
+          const queryEnd = firstSpace === -1 ? cursor : Math.min(cursor, firstSpace)
+          const queryAfterSlash = newValue.slice(1, queryEnd)
+          setCommandQuery(queryAfterSlash)
+          return
+        }
+      }
+
+      setCommandQuery(null)
     },
     [autoResize]
   )
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key === "Escape" && pickerQuery !== null) {
+      if (event.key === "Escape" && (pickerQuery !== null || commandQuery !== null)) {
         event.preventDefault()
         setPickerQuery(null)
+        setCommandQuery(null)
         return
       }
       // Let FilePicker intercept ArrowUp/ArrowDown/Enter when picker is open
       if (
         pickerQuery !== null &&
+        (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter")
+      ) {
+        event.preventDefault()
+        return
+      }
+      if (
+        commandQuery !== null &&
         (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter")
       ) {
         event.preventDefault()
@@ -102,7 +164,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
         handleSubmit()
       }
     },
-    [handleSubmit, isStreaming, pickerQuery]
+    [handleSubmit, isStreaming, pickerQuery, commandQuery]
   )
 
   const handleFileSelect = useCallback(
@@ -133,6 +195,12 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
     setSelectedFiles((prev) => prev.filter((p) => p !== path))
   }, [])
 
+  const handleCommandSelect = useCallback((cmd: SlashCommand) => {
+    setValue(`/${cmd.name} `)
+    setCommandQuery(null)
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }, [])
+
   const handleFocus = useCallback(() => {
     // Delay to let the keyboard animation finish before scrolling
     setTimeout(() => {
@@ -141,6 +209,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   }, [])
 
   const isPickerOpen = pickerQuery !== null && !!workspaceId
+  const isCommandPickerOpen = commandQuery !== null
 
   return (
     <div className="shrink-0 border-t bg-background p-4">
@@ -176,6 +245,15 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
             query={pickerQuery}
             onSelect={handleFileSelect}
             onClose={() => setPickerQuery(null)}
+          />
+        )}
+
+        {isCommandPickerOpen && (
+          <CommandPicker
+            commands={commands}
+            query={commandQuery ?? ""}
+            onSelect={handleCommandSelect}
+            onClose={() => setCommandQuery(null)}
           />
         )}
 

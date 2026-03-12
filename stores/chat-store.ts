@@ -11,6 +11,7 @@ import type {
   MessageWithParts,
   QuestionRequest,
   QuestionAnswer,
+  Command,
 } from "@/lib/opencode/types"
 
 export type StreamingStatus = "idle" | "connecting" | "streaming" | "waiting" | "error"
@@ -258,6 +259,7 @@ function findWorkspaceForSession(
 
 interface ChatState {
   workspaceStates: Record<string, WorkspaceState>
+  commands: Command[]
 
   // UI focus
   activeWorkspaceId: string | null
@@ -278,6 +280,9 @@ interface ChatState {
   createSession: (workspaceId: string) => Promise<Session | null>
   deleteSession: (sessionId: string, workspaceId: string) => Promise<void>
   fetchMessages: (sessionId: string, workspaceId: string) => Promise<void>
+  fetchCommands: (workspaceId: string) => Promise<void>
+  summarizeSession: (sessionId: string, workspaceId: string) => Promise<void>
+  revertSession: (sessionId: string, workspaceId: string, messageID: string) => Promise<void>
 
   // Messaging
   sendMessage: (
@@ -285,7 +290,17 @@ interface ChatState {
     text: string,
     workspaceId: string,
     model?: { providerID: string; modelID: string },
-    agent?: string
+    agent?: string,
+    variant?: string
+  ) => Promise<void>
+  executeCommand: (
+    sessionId: string,
+    workspaceId: string,
+    command: string,
+    args: string,
+    model?: { providerID: string; modelID: string },
+    agent?: string,
+    variant?: string
   ) => Promise<void>
   abortSession: (sessionId: string, workspaceId: string) => Promise<void>
   respondToPermission: (
@@ -361,6 +376,7 @@ function updateWorkspace(
 
 export const useChatStore = create<ChatState>()((set, get) => ({
   workspaceStates: {},
+  commands: [],
   activeWorkspaceId: null,
   activeSessionId: null,
   streamingError: null,
@@ -423,6 +439,21 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
     } catch (error) {
       console.warn("[chat] fetchSessions error:", error)
+    }
+  },
+
+  fetchCommands: async (workspaceId) => {
+    try {
+      const response = await fetch(buildProxyUrl("command", workspaceId))
+      if (!response.ok) {
+        console.warn(`[chat] fetchCommands failed: ${response.status}`)
+        return
+      }
+
+      const data: Command[] = await response.json()
+      set({ commands: data })
+    } catch (error) {
+      console.warn("[chat] fetchCommands error:", error)
     }
   },
 
@@ -518,7 +549,31 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
-  sendMessage: async (sessionId, text, workspaceId, model, agent) => {
+  summarizeSession: async (sessionId, workspaceId) => {
+    try {
+      await fetch(buildProxyUrl(`session/${sessionId}/summarize`, workspaceId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      })
+    } catch {
+      // Best effort
+    }
+  },
+
+  revertSession: async (sessionId, workspaceId, messageID) => {
+    try {
+      await fetch(buildProxyUrl(`session/${sessionId}/revert`, workspaceId), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ messageID }),
+      })
+    } catch {
+      // Best effort
+    }
+  },
+
+  sendMessage: async (sessionId, text, workspaceId, model, agent, variant) => {
     set({ optimisticStreamingSessionId: sessionId, streamingError: null })
 
     const optimisticId = `optimistic-${Date.now()}`
@@ -558,6 +613,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
       if (model) body.model = model
       if (agent) body.agent = agent
+      if (variant) body.variant = variant
 
       const response = await fetch(
         buildProxyUrl(`session/${sessionId}/prompt_async`, workspaceId),
@@ -593,6 +649,102 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       get().startStreamingPoll(workspaceId)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to send message"
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => {
+          const { [sessionId]: _, ...remainingOptimistic } = ws.optimisticMessageIds
+          return {
+            optimisticMessageIds: remainingOptimistic,
+            messages: {
+              ...ws.messages,
+              [sessionId]: (ws.messages[sessionId] ?? []).filter(
+                (m) => m.info.id !== optimisticId
+              ),
+            },
+          }
+        })
+      )
+      set({ optimisticStreamingSessionId: null, streamingError: message })
+    }
+  },
+
+  executeCommand: async (sessionId, workspaceId, command, args, model, agent, variant) => {
+    set({ optimisticStreamingSessionId: sessionId, streamingError: null })
+
+    const optimisticId = `optimistic-${Date.now()}`
+    const commandText = `/${command}${args ? ` ${args}` : ""}`
+    const optimisticMessage: MessageWithParts = {
+      info: {
+        id: optimisticId,
+        sessionID: sessionId,
+        role: "user",
+        time: { created: Date.now() },
+        agent: agent ?? "",
+        model: model ?? { providerID: "", modelID: "" },
+      },
+      parts: [
+        {
+          id: `${optimisticId}-part`,
+          sessionID: sessionId,
+          messageID: optimisticId,
+          type: "text",
+          text: commandText,
+        },
+      ],
+    }
+
+    set((state) =>
+      updateWorkspace(state, workspaceId, (ws) => ({
+        optimisticMessageIds: { ...ws.optimisticMessageIds, [sessionId]: optimisticId },
+        messages: {
+          ...ws.messages,
+          [sessionId]: [...(ws.messages[sessionId] ?? []), optimisticMessage],
+        },
+      }))
+    )
+
+    try {
+      const body: Record<string, unknown> = {
+        command,
+        arguments: args,
+      }
+      if (model) body.model = model
+      if (agent) body.agent = agent
+      if (variant) body.variant = variant
+
+      const response = await fetch(
+        buildProxyUrl(`session/${sessionId}/command`, workspaceId),
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Failed to execute command" }))
+        set((state) =>
+          updateWorkspace(state, workspaceId, (ws) => {
+            const { [sessionId]: _, ...remainingOptimistic } = ws.optimisticMessageIds
+            return {
+              optimisticMessageIds: remainingOptimistic,
+              messages: {
+                ...ws.messages,
+                [sessionId]: (ws.messages[sessionId] ?? []).filter(
+                  (m) => m.info.id !== optimisticId
+                ),
+              },
+            }
+          })
+        )
+        set({
+          optimisticStreamingSessionId: null,
+          streamingError: error.error || error.detail || "Failed to execute command",
+        })
+        return
+      }
+      get().startStreamingPoll(workspaceId)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to execute command"
       set((state) =>
         updateWorkspace(state, workspaceId, (ws) => {
           const { [sessionId]: _, ...remainingOptimistic } = ws.optimisticMessageIds

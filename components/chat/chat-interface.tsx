@@ -14,15 +14,17 @@ import { usePendingChatStore } from "@/stores/pending-chat-store"
 import { ChatMessage } from "@/components/chat/message"
 import { PromptInput } from "@/components/chat/prompt-input"
 import type { PromptInputHandle } from "@/components/chat/prompt-input"
+import type { SlashCommand } from "@/components/chat/command-picker"
 import { SessionList } from "@/components/chat/session-list"
 import { ModelSelector, loadPersistedModel } from "@/components/chat/model-selector"
 import { useAgents, AgentSelector } from "@/components/chat/agent-selector"
+import { VariantSelector } from "@/components/chat/variant-selector"
 import { PlanPanel } from "@/components/chat/plan-panel"
 import { useModelAgentBindings } from "@/hooks/use-settings"
 import { useCommand } from "@/hooks/use-command"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import { useLeaderAction } from "@/hooks/use-leader-action"
-import type { PermissionRequest, QuestionRequest, QuestionInfo, QuestionAnswer, MessageWithParts, SessionStatus } from "@/lib/opencode/types"
+import type { PermissionRequest, QuestionRequest, QuestionInfo, QuestionAnswer, MessageWithParts, SessionStatus, Command } from "@/lib/opencode/types"
 
 interface SelectedModel {
   providerID: string
@@ -67,9 +69,14 @@ export function ChatInterface() {
     () => loadPersistedModel()
   )
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null)
+  const [availableVariants, setAvailableVariants] = useState<string[]>([])
   const [isSessionListOpen, setIsSessionListOpen] = useState(true)
   const [isMobileSessionsOpen, setIsMobileSessionsOpen] = useState(false)
-  const [isUnifiedMode, setIsUnifiedMode] = useState(false)
+  const [isUnifiedMode, setIsUnifiedMode] = useState(() => {
+    if (typeof window === "undefined") return false
+    return localStorage.getItem("dev-hub:chat-unified-mode") === "true"
+  })
 
   const { width: sessionListWidth, handleDragStart: handleSessionListDragStart } = useResizablePanel({
     minWidth: 160,
@@ -102,13 +109,17 @@ export function ChatInterface() {
   const { primaryAgents } = useAgents(activeWorkspaceId)
   const { bindings: agentModelBindings } = useModelAgentBindings()
 
-  // Auto-switch model when agent changes and a binding exists
   useEffect(() => {
-    if (!selectedAgent) return
-    const bound = agentModelBindings[selectedAgent]
-    if (!bound) return
-    setSelectedModel(bound)
-  }, [selectedAgent, agentModelBindings])
+    if (!selectedAgent || primaryAgents.length === 0) return
+    const agent = primaryAgents.find((a) => a.name === selectedAgent)
+    if (agent?.model) {
+      setSelectedModel(agent.model)
+    } else {
+      const bound = agentModelBindings[selectedAgent]
+      if (bound) setSelectedModel(bound)
+    }
+    setSelectedVariant(agent?.variant ?? null)
+  }, [selectedAgent, primaryAgents, agentModelBindings])
   const {
     activeSessionId,
     streamingError,
@@ -118,7 +129,11 @@ export function ChatInterface() {
     createSession,
     deleteSession,
     fetchMessages,
+    fetchCommands,
+    summarizeSession,
+    revertSession,
     sendMessage,
+    executeCommand,
     abortSession,
     respondToPermission,
     replyToQuestion,
@@ -160,6 +175,7 @@ export function ChatInterface() {
     state.getRecentSessionsAcrossWorkspaces(10)
   )
   const sessionStatus = useChatStore(getActiveSessionStatus)
+  const commands: Command[] = useChatStore((state) => state.commands)
   // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
   // We filter by sessionID here with useMemo so we never create a new array reference
   // on every render — that would violate useSyncExternalStore's snapshot contract and
@@ -187,9 +203,24 @@ export function ChatInterface() {
   useEffect(() => {
     if (!activeWorkspaceId) return
     fetchSessions(activeWorkspaceId)
+    fetchCommands(activeWorkspaceId)
     connectSSE(activeWorkspaceId)
     // SSE connections now live per-workspace and are not torn down on unmount
-  }, [activeWorkspaceId, fetchSessions, connectSSE])
+  }, [activeWorkspaceId, fetchSessions, fetchCommands, connectSSE])
+
+  // When unified mode is restored from persistence, lazy-fetch sessions for all workspaces
+  useEffect(() => {
+    if (!isUnifiedMode) return
+    const { workspaceStates } = useChatStore.getState()
+    for (const ws of allWorkspaces) {
+      const state = workspaceStates[ws.id]
+      if (!state || Object.keys(state.sessions).length === 0) {
+        fetchSessions(ws.id)
+        connectSSE(ws.id)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnifiedMode])
 
   // Fetch messages when active session changes
   useEffect(() => {
@@ -250,15 +281,73 @@ export function ChatInterface() {
         sessionId = newSession.id
       }
 
-      sendMessage(sessionId, text, activeWorkspaceId, selectedModel ?? undefined, selectedAgent ?? undefined)
+      sendMessage(sessionId, text, activeWorkspaceId, selectedModel ?? undefined, selectedAgent ?? undefined, selectedVariant ?? undefined)
     },
     [
       activeWorkspaceId,
       activeSessionId,
       selectedModel,
       selectedAgent,
+      selectedVariant,
       createSession,
       sendMessage,
+    ]
+  )
+
+  const handleCommandDispatch = useCallback(
+    async (command: SlashCommand, args: string) => {
+      if (!activeWorkspaceId) return
+
+      let sessionId = activeSessionId
+      if (!sessionId) {
+        const newSession = await createSession(activeWorkspaceId)
+        if (!newSession) return
+        sessionId = newSession.id
+      }
+
+      setShowJumpToBottom(false)
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end" })
+      })
+
+      if (command.source === "builtin") {
+        switch (command.name) {
+          case "compact":
+            summarizeSession(sessionId, activeWorkspaceId)
+            break
+          case "undo": {
+            const lastAssistant = [...activeMessages]
+              .reverse()
+              .find((m) => m.info.role === "assistant")
+            if (lastAssistant) {
+              revertSession(sessionId, activeWorkspaceId, lastAssistant.info.id)
+            }
+            break
+          }
+        }
+      } else {
+        executeCommand(
+          sessionId,
+          activeWorkspaceId,
+          command.name,
+          args,
+          selectedModel ?? undefined,
+          selectedAgent ?? undefined,
+          selectedVariant ?? undefined
+        )
+      }
+    },
+    [
+      activeWorkspaceId,
+      activeSessionId,
+      activeMessages,
+      createSession,
+      summarizeSession,
+      revertSession,
+      executeCommand,
+      selectedModel,
+      selectedAgent,
+      selectedVariant,
     ]
   )
 
@@ -317,6 +406,7 @@ export function ChatInterface() {
   const handleToggleUnifiedMode = useCallback(() => {
     setIsUnifiedMode((prev) => {
       const next = !prev
+      localStorage.setItem("dev-hub:chat-unified-mode", String(next))
       if (next) {
         // Lazy-fetch sessions for workspaces that haven't loaded yet
         const { workspaceStates } = useChatStore.getState()
@@ -398,6 +488,53 @@ export function ChatInterface() {
 
   useLeaderAction(chatLeaderActions)
 
+  // Tab / Shift+Tab cycles through agents
+  const primaryAgentsRef = useRef(primaryAgents)
+  primaryAgentsRef.current = primaryAgents
+  const selectedAgentRef = useRef(selectedAgent)
+  selectedAgentRef.current = selectedAgent
+  const setSelectedAgentRef = useRef(setSelectedAgent)
+  setSelectedAgentRef.current = setSelectedAgent
+  const setSessionAgentRef = useRef(setSessionAgent)
+  setSessionAgentRef.current = setSessionAgent
+  const activeSessionIdRef = useRef(activeSessionId)
+  activeSessionIdRef.current = activeSessionId
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId)
+  activeWorkspaceIdRef.current = activeWorkspaceId
+
+  useEffect(() => {
+    const handleTabCycle = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return
+      const agents = primaryAgentsRef.current
+      if (agents.length < 2) return
+
+      // Only cycle when focus is inside the chat interface (not in popovers/modals)
+      const target = e.target as HTMLElement | null
+      const inChat = target?.closest("[data-chat-interface]")
+      if (!inChat) return
+
+      e.preventDefault()
+
+      const currentIdx = agents.findIndex(
+        (a) => a.name === selectedAgentRef.current
+      )
+      const nextIdx = e.shiftKey
+        ? (currentIdx - 1 + agents.length) % agents.length
+        : (currentIdx + 1) % agents.length
+      const nextAgent = agents[nextIdx].name
+
+      setSelectedAgentRef.current(nextAgent)
+      const sessionId = activeSessionIdRef.current
+      const workspaceId = activeWorkspaceIdRef.current
+      if (sessionId && workspaceId) {
+        setSessionAgentRef.current(sessionId, workspaceId, nextAgent)
+      }
+    }
+
+    window.addEventListener("keydown", handleTabCycle)
+    return () => window.removeEventListener("keydown", handleTabCycle)
+  }, [])
+
   if (!activeWorkspaceId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -411,7 +548,7 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 w-full">
+    <div data-chat-interface className="flex h-full min-h-0 min-w-0 w-full">
       {/* Mobile session sheet */}
       <Sheet open={isMobileSessionsOpen} onOpenChange={setIsMobileSessionsOpen}>
         <SheetContent side="left" className="w-72 p-0" showCloseButton={false}>
@@ -549,8 +686,15 @@ export function ChatInterface() {
             workspaceId={activeWorkspaceId}
             selectedModel={selectedModel}
             onModelChange={setSelectedModel}
+            onVariantsChange={setAvailableVariants}
             open={isModelSelectorOpen}
             onOpenChange={setIsModelSelectorOpen}
+          />
+
+          <VariantSelector
+            variants={availableVariants}
+            selectedVariant={selectedVariant}
+            onVariantChange={setSelectedVariant}
           />
         </div>
 
@@ -675,10 +819,12 @@ export function ChatInterface() {
         <PromptInput
           ref={promptInputRef}
           onSubmit={handleSendMessage}
+          onCommandSelect={handleCommandDispatch}
           onAbort={handleAbort}
           isStreaming={streamingStatus === "streaming"}
           disabled={!activeWorkspaceId}
           workspaceId={activeWorkspaceId}
+          commands={commands}
         />
       </div>
     </div>

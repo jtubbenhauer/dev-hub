@@ -136,7 +136,7 @@ function EditorSettingsCard() {
             onValueChange={handleFontSizeChange}
             disabled={mutation.isPending}
           >
-            <SelectTrigger id="font-size" className="w-24">
+            <SelectTrigger id="font-size" className="w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -161,7 +161,7 @@ function EditorSettingsCard() {
             onValueChange={handleMobileFontSizeChange}
             disabled={mutation.isPending}
           >
-            <SelectTrigger id="mobile-font-size" className="w-24">
+            <SelectTrigger id="mobile-font-size" className="w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -186,7 +186,7 @@ function EditorSettingsCard() {
             onValueChange={handleTabSizeChange}
             disabled={mutation.isPending}
           >
-            <SelectTrigger id="tab-size" className="w-24">
+            <SelectTrigger id="tab-size" className="w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

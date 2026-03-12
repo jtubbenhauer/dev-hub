@@ -471,6 +471,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         activeSessionId: session.id,
         ...updateWorkspace(state, workspaceId, (ws) => ({
           sessions: { ...ws.sessions, [session.id]: session },
+          messages: { ...ws.messages, [session.id]: [] },
         })),
       }))
       return session
@@ -519,7 +520,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const response = await fetch(
         buildProxyUrl(`session/${sessionId}/message`, workspaceId)
       )
-      if (!response.ok) return
+      if (!response.ok) {
+        set((state) =>
+          updateWorkspace(state, workspaceId, (ws) => ({
+            messages: { ...ws.messages, [sessionId]: ws.messages[sessionId] ?? [] },
+          }))
+        )
+        return
+      }
 
       const data: MessageWithParts[] = await response.json()
       set((state) =>
@@ -545,7 +553,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         })
       )
     } catch {
-      // Silently fail
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => ({
+          messages: { ...ws.messages, [sessionId]: ws.messages[sessionId] ?? [] },
+        }))
+      )
     }
   },
 

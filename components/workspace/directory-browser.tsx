@@ -90,7 +90,7 @@ export function DirectoryBrowser({ onSelect, initialPath }: DirectoryBrowserProp
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 overflow-hidden min-w-0">
       {/* Path input bar */}
       <div className="flex gap-2">
         <Button
@@ -109,7 +109,7 @@ export function DirectoryBrowser({ onSelect, initialPath }: DirectoryBrowserProp
             if (e.key === "Enter") handlePathSubmit()
           }}
           placeholder="/path/to/directory"
-          className="font-mono text-sm"
+          className="font-mono text-sm min-w-0"
         />
         <Button
           variant="outline"
@@ -163,7 +163,7 @@ export function DirectoryBrowser({ onSelect, initialPath }: DirectoryBrowserProp
                   )}
                 >
                   {getEntryIcon(entry)}
-                  <span className="truncate flex-1">{entry.name}</span>
+                  <span className="truncate flex-1 min-w-0">{entry.name}</span>
                   <div className="flex items-center gap-1 shrink-0">
                     {entry.hasPackageJson && (
                       <span title="Has package.json">

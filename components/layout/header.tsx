@@ -5,6 +5,7 @@ import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher"
 import { GitStatusBar } from "@/components/layout/git-status-bar"
 import { SystemIndicator } from "@/components/layout/system-indicator"
 import { CommandDrawer } from "@/components/command-runner/command-drawer"
+import { ProviderCreationIndicator } from "@/components/workspace/provider-creation-indicator"
 import { useCommandPalette } from "@/components/providers/command-palette-provider"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -37,6 +38,7 @@ export function Header() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <ProviderCreationIndicator />
           <Button
             variant="ghost"
             size="icon"

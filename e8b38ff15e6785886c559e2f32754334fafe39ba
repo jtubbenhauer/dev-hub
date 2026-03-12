@@ -1,0 +1,37 @@
+components/workspace/directory-browser.tsx
+  9a87d6e76fe1179e 166
+  9fdb738e11d19bb6 93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "e8b38ff15e6785886c559e2f32754334fafe39ba",
+  "prompts": {
+    "9a87d6e76fe1179e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_31ec09220ffepUhz4sYm5ts49d-cd30b02a-68e1-48bf-87f7-a18e5348a0f6",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "9fdb738e11d19bb6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_31ec09220ffepUhz4sYm5ts49d-ea290fb9-8db3-45ce-bd60-2b8f8655ccc6",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

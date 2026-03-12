@@ -396,6 +396,7 @@ export function ChatInterface() {
 
   const handleSelectUnifiedSession = useCallback(
     (sessionId: string, workspaceId: string) => {
+      useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId)
       setActiveWorkspaceId(workspaceId)
       setActiveSession(sessionId)
       setIsMobileSessionsOpen(false)

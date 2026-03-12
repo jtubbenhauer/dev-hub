@@ -150,7 +150,7 @@ export const ChatMessage = memo(
   prev.message.info === next.message.info
 )
 
-function ReasoningBlock({ part }: { part: ReasoningPart }) {
+const ReasoningBlock = memo(function ReasoningBlock({ part }: { part: ReasoningPart }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const duration =
     part.time.end != null
@@ -182,9 +182,11 @@ function ReasoningBlock({ part }: { part: ReasoningPart }) {
       )}
     </div>
   )
-}
+},
+(prev, next) => prev.part.id === next.part.id && prev.part.text === next.part.text && prev.part.time === next.part.time
+)
 
-function SubtaskCard({ part }: { part: SubtaskPart }) {
+const SubtaskCard = memo(function SubtaskCard({ part }: { part: SubtaskPart }) {
   return (
     <div className="flex items-start gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-2 overflow-hidden">
       <GitBranch className="mt-0.5 size-3.5 shrink-0 text-violet-500" />
@@ -198,7 +200,7 @@ function SubtaskCard({ part }: { part: SubtaskPart }) {
       </div>
     </div>
   )
-}
+})
 
 function CompactionDivider() {
   return (
@@ -212,7 +214,7 @@ function CompactionDivider() {
   )
 }
 
-function MarkdownContent({ content }: { content: string }) {
+const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -259,7 +261,7 @@ function MarkdownContent({ content }: { content: string }) {
       {content}
     </ReactMarkdown>
   )
-}
+})
 
 function CopyButton({
   content,

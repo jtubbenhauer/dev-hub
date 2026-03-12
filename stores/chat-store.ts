@@ -75,6 +75,15 @@ let _unifiedSessionsCacheLimit = 0
 const pendingPartUpdates = new Map<string, Map<string, Map<string, Part>>>()
 let partUpdateRafHandle: number | null = null
 
+// RAF-batched buffer for message.updated events.
+// Keyed: sessionId → Message (latest info wins)
+interface PendingMessageUpdate {
+  info: Message
+  sourceWorkspaceId: string
+}
+const pendingMessageUpdates = new Map<string, Map<string, PendingMessageUpdate>>()
+let messageUpdateRafHandle: number | null = null
+
 function flushPendingPartUpdates(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void
 ): void {
@@ -152,6 +161,87 @@ function schedulePendingPartFlush(
     partUpdateRafHandle = requestAnimationFrame(() => {
       partUpdateRafHandle = null
       flushPendingPartUpdates(set)
+    })
+  }
+}
+
+function flushPendingMessageUpdates(
+  set: (fn: (state: ChatState) => Partial<ChatState>) => void,
+  get: () => ChatState
+): void {
+  if (pendingMessageUpdates.size === 0) return
+
+  const snapshot = new Map(
+    [...pendingMessageUpdates.entries()].map(([sessionId, byMessage]) => [
+      sessionId,
+      new Map(byMessage),
+    ])
+  )
+  pendingMessageUpdates.clear()
+
+  // Collect finished assistant messages so we can trigger status refresh after set()
+  const finishedWorkspaces = new Set<string>()
+
+  set((state) => {
+    const nextWorkspaceStates = { ...state.workspaceStates }
+
+    for (const [sessionId, byMessage] of snapshot) {
+      for (const [, { info, sourceWorkspaceId }] of byMessage) {
+        const wsId = findWorkspaceForSession(nextWorkspaceStates, sessionId) ?? sourceWorkspaceId
+        const ws = nextWorkspaceStates[wsId] ?? emptyWorkspaceState()
+
+        const optimisticId = ws.optimisticMessageIds[sessionId]
+        const sessionMessages = (ws.messages[sessionId] ?? []).filter(
+          (m) => !(info.role === "user" && optimisticId && m.info.id === optimisticId)
+        )
+        const optimisticMessageIds =
+          info.role === "user" && optimisticId
+            ? Object.fromEntries(
+                Object.entries(ws.optimisticMessageIds).filter(([k]) => k !== sessionId)
+              )
+            : ws.optimisticMessageIds
+
+        const existingIndex = sessionMessages.findIndex((m) => m.info.id === info.id)
+        const updated =
+          existingIndex >= 0
+            ? sessionMessages.map((m, i) => (i === existingIndex ? { ...m, info } : m))
+            : [...sessionMessages, { info, parts: [] }]
+
+        nextWorkspaceStates[wsId] = {
+          ...ws,
+          optimisticMessageIds,
+          messages: { ...ws.messages, [sessionId]: updated },
+        }
+
+        if (info.role === "assistant" && "finish" in info && info.finish) {
+          finishedWorkspaces.add(sourceWorkspaceId)
+        }
+      }
+    }
+
+    return { workspaceStates: nextWorkspaceStates }
+  })
+
+  for (const wsId of finishedWorkspaces) {
+    get().refreshActiveSessionStatus(wsId)
+  }
+}
+
+function schedulePendingMessageFlush(
+  set: (fn: (state: ChatState) => Partial<ChatState>) => void,
+  get: () => ChatState
+): void {
+  if (messageUpdateRafHandle !== null) return
+
+  if (typeof document !== "undefined" && document.hidden) {
+    messageUpdateRafHandle = window.setTimeout(() => {
+      messageUpdateRafHandle = null
+      flushPendingMessageUpdates(set, get)
+    }, 500) as unknown as number
+  } else {
+    messageUpdateRafHandle = requestAnimationFrame(() => {
+      messageUpdateRafHandle = null
+      flushPendingMessageUpdates(set, get)
     })
   }
 }
@@ -760,13 +850,20 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   handleVisibilityRestored: () => {
     // Cancel any pending scheduled flush (RAF or timeout) and force an immediate
     // synchronous flush. While the tab was hidden, the RAF-based flush was
-    // suspended by the browser, leaving part updates stranded in the buffer.
+    // suspended by the browser, leaving updates stranded in the buffer.
     if (partUpdateRafHandle !== null) {
       cancelAnimationFrame(partUpdateRafHandle)
       clearTimeout(partUpdateRafHandle)
       partUpdateRafHandle = null
     }
     flushPendingPartUpdates(set)
+
+    if (messageUpdateRafHandle !== null) {
+      cancelAnimationFrame(messageUpdateRafHandle)
+      clearTimeout(messageUpdateRafHandle)
+      messageUpdateRafHandle = null
+    }
+    flushPendingMessageUpdates(set, get)
 
     const { activeWorkspaceId, activeSessionId, workspaceStates } = get()
 
@@ -794,44 +891,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const info = properties.info as Message
         if (!info) return
 
-        // Route to the correct workspace
-        const wsId = findWorkspaceForSession(get().workspaceStates, info.sessionID) ?? sourceWorkspaceId
-
-        set((state) => {
-          const ws = state.workspaceStates[wsId] ?? emptyWorkspaceState()
-          const optimisticId = ws.optimisticMessageIds[info.sessionID]
-          const sessionMessages = (ws.messages[info.sessionID] ?? []).filter(
-            (m) => !(info.role === "user" && optimisticId && m.info.id === optimisticId)
-          )
-          const optimisticMessageIds =
-            info.role === "user" && optimisticId
-              ? Object.fromEntries(
-                  Object.entries(ws.optimisticMessageIds).filter(([k]) => k !== info.sessionID)
-                )
-              : ws.optimisticMessageIds
-
-          const existingIndex = sessionMessages.findIndex((m) => m.info.id === info.id)
-          const updated =
-            existingIndex >= 0
-              ? sessionMessages.map((m, i) => (i === existingIndex ? { ...m, info } : m))
-              : [...sessionMessages, { info, parts: [] }]
-
-          return {
-            workspaceStates: {
-              ...state.workspaceStates,
-              [wsId]: {
-                ...ws,
-                optimisticMessageIds,
-                messages: { ...ws.messages, [info.sessionID]: updated },
-              },
-            },
-          }
-        })
-
-        // When assistant message finishes, refresh the session status
-        if (info.role === "assistant" && "finish" in info && info.finish) {
-          get().refreshActiveSessionStatus(sourceWorkspaceId)
+        let byMessage = pendingMessageUpdates.get(info.sessionID)
+        if (!byMessage) {
+          byMessage = new Map()
+          pendingMessageUpdates.set(info.sessionID, byMessage)
         }
+        byMessage.set(info.id, { info, sourceWorkspaceId })
+
+        schedulePendingMessageFlush(set, get)
         break
       }
 

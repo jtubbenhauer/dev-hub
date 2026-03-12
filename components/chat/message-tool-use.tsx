@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { memo, useState } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -17,7 +17,7 @@ interface MessageToolUseProps {
   part: ToolPart
 }
 
-export function MessageToolUse({ part }: MessageToolUseProps) {
+export const MessageToolUse = memo(function MessageToolUse({ part }: MessageToolUseProps) {
   const { state } = part
   // Auto-expand while running/pending, collapse once done — user toggle overrides
   const isActiveStatus = state.status === "running" || state.status === "pending"
@@ -97,7 +97,9 @@ export function MessageToolUse({ part }: MessageToolUseProps) {
       )}
     </div>
   )
-}
+},
+(prev, next) => prev.part.id === next.part.id && prev.part.state === next.part.state
+)
 
 function getStatusIcon(status: string) {
   switch (status) {

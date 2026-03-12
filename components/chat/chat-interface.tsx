@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useCallback, useState, useMemo, Component } from "react"
 import type { ReactNode } from "react"
+import { Virtuoso } from "react-virtuoso"
+import type { VirtuosoHandle } from "react-virtuoso"
 import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, Plus, MessageSquare, ArrowDown, GripVertical } from "lucide-react"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -80,9 +81,8 @@ export function ChatInterface() {
   const [hasPlanFiles, setHasPlanFiles] = useState(false)
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false)
   const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const virtuosoRef = useRef<VirtuosoHandle>(null)
   const promptInputRef = useRef<PromptInputHandle>(null)
-  const isNearBottom = useRef(true)
   const [showJumpToBottom, setShowJumpToBottom] = useState(false)
 
   const activeWorkspaceId = useWorkspaceStore(
@@ -218,56 +218,30 @@ export function ChatInterface() {
 
   const activeMessages = useChatStore(getActiveSessionMessages)
 
-  // Auto-scroll to bottom only when the user is already near the bottom
+  // Virtuoso handles auto-scroll via followOutput and atBottomStateChange.
+  // Reset jump-to-bottom when switching sessions.
   useEffect(() => {
-    if (isPlanPanelOpen || !isNearBottom.current) return
-    const frame = requestAnimationFrame(() => {
-      const viewport = scrollAreaRef.current?.querySelector("[data-slot='scroll-area-viewport']")
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight
-      }
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [activeMessages, isPlanPanelOpen])
-
-  // Detect when the user scrolls away from the bottom and show the jump button
-  useEffect(() => {
-    const viewport = scrollAreaRef.current?.querySelector("[data-slot='scroll-area-viewport']")
-    if (!viewport) return
-
-    let rafHandle: number | null = null
-    const handleScroll = () => {
-      if (rafHandle !== null) return
-      rafHandle = requestAnimationFrame(() => {
-        rafHandle = null
-        const atBottom = viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 80
-        if (atBottom !== isNearBottom.current) {
-          isNearBottom.current = atBottom
-          setShowJumpToBottom(!atBottom)
-        }
-      })
-    }
-
-    viewport.addEventListener("scroll", handleScroll, { passive: true })
-    return () => {
-      viewport.removeEventListener("scroll", handleScroll)
-      if (rafHandle !== null) cancelAnimationFrame(rafHandle)
-    }
-  }, [])
-
-  // Reset scroll state when switching sessions
-  useEffect(() => {
-    isNearBottom.current = true
     setShowJumpToBottom(false)
   }, [activeSessionId])
+
+  const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
+    setShowJumpToBottom(!atBottom)
+  }, [])
+
+  // Snap to bottom instantly during streaming so growing content doesn't undershoot
+  const handleFollowOutput = useCallback((isAtBottom: boolean) => {
+    return isAtBottom ? "auto" as const : false as const
+  }, [])
 
   const handleSendMessage = useCallback(
     async (text: string) => {
       if (!activeWorkspaceId) return
 
       // Always scroll to bottom when the user sends a message
-      isNearBottom.current = true
       setShowJumpToBottom(false)
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end" })
+      })
 
       let sessionId = activeSessionId
       if (!sessionId) {
@@ -289,12 +263,8 @@ export function ChatInterface() {
   )
 
   const handleJumpToBottom = useCallback(() => {
-    isNearBottom.current = true
     setShowJumpToBottom(false)
-    const viewport = scrollAreaRef.current?.querySelector("[data-slot='scroll-area-viewport']")
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight
-    }
+    virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "smooth" })
   }, [])
 
   const handleAbort = useCallback(() => {    if (!activeSessionId || !activeWorkspaceId) return
@@ -595,20 +565,31 @@ export function ChatInterface() {
               onPlanFilesChange={setHasPlanFiles}
             />
           ) : (
-            <ScrollArea ref={scrollAreaRef} className="h-full">
+            <div className="flex h-full flex-col">
               {activeMessages.length === 0 ? (
                 <EmptyChat onSend={handleSendMessage} />
               ) : (
-                <div className="min-w-0 overflow-hidden pb-4">
-                  {activeMessages.map((msg) => (
+                <Virtuoso
+                  key={activeSessionId}
+                  ref={virtuosoRef}
+                  data={activeMessages}
+                  initialTopMostItemIndex={Math.max(0, activeMessages.length - 1)}
+                  itemContent={(_index, msg) => (
                     <ChatMessage key={msg.info.id} message={msg} />
-                  ))}
-                  {streamingStatus === "streaming" && (
-                    <StreamingIndicator messages={activeMessages} sessionStatus={sessionStatus} />
                   )}
-                </div>
+                  followOutput={handleFollowOutput}
+                  atBottomStateChange={handleAtBottomStateChange}
+                  atBottomThreshold={80}
+                  increaseViewportBy={{ top: 200, bottom: 400 }}
+                  className="h-full"
+                  components={{
+                    Footer: streamingStatus === "streaming"
+                      ? () => <StreamingIndicator messages={activeMessages} sessionStatus={sessionStatus} />
+                      : undefined,
+                  }}
+                />
               )}
-            </ScrollArea>
+            </div>
           )}
 
           {/* Jump-to-bottom pill — shown when user has scrolled up during streaming or after */}

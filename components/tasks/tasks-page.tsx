@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { CheckSquare, GripVertical } from "lucide-react"
 import { TaskSidebar } from "@/components/tasks/task-sidebar"
@@ -15,6 +15,10 @@ const MIN_SIDEBAR_WIDTH = 180
 const MAX_SIDEBAR_WIDTH = 500
 const DEFAULT_SIDEBAR_WIDTH = 224
 
+const MIN_DETAIL_WIDTH = 280
+const MAX_DETAIL_WIDTH = 700
+const DEFAULT_DETAIL_WIDTH = 384
+
 type SidebarSelection =
   | { type: "search"; query: string }
   | { type: "view"; view: ClickUpPinnedView }
@@ -22,16 +26,37 @@ type SidebarSelection =
 
 export function TasksPage() {
   const { isConfigured, isLoading: isLoadingSettings } = useClickUpSettings()
-  const { width: sidebarWidth, handleDragStart } = useResizablePanel({
+  const { width: sidebarWidth, handleDragStart: handleSidebarDragStart } = useResizablePanel({
     minWidth: MIN_SIDEBAR_WIDTH,
     maxWidth: MAX_SIDEBAR_WIDTH,
     defaultWidth: DEFAULT_SIDEBAR_WIDTH,
     storageKey: "dev-hub:tasks-sidebar-width",
   })
-  const [selection, setSelection] = useState<SidebarSelection | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
+  const { width: detailWidth, handleDragStart: handleDetailDragStart } = useResizablePanel({
+    minWidth: MIN_DETAIL_WIDTH,
+    maxWidth: MAX_DETAIL_WIDTH,
+    defaultWidth: DEFAULT_DETAIL_WIDTH,
+    storageKey: "dev-hub:tasks-detail-width",
+    reverse: true,
+  })
+  const [selection, setSelection] = useState<SidebarSelection | null>(() => {
+    try {
+      const stored = localStorage.getItem("dev-hub:tasks-selection")
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  })
+  const [searchQuery, setSearchQuery] = useState(() => {
+    try {
+      return localStorage.getItem("dev-hub:tasks-search") ?? ""
+    } catch {
+      return ""
+    }
+  })
   const [selectedTask, setSelectedTask] = useState<ClickUpTask | null>(null)
   const [viewPage, _setViewPage] = useState(0)
+  const restoredTaskRef = useRef(false)
 
   const activeViewId = selection?.type === "view" ? selection.view.id : null
   const viewTasksResult = useClickUpViewTasks(activeViewId, viewPage, { enabled: !!activeViewId })
@@ -73,8 +98,33 @@ export function TasksPage() {
     contextLabel = "Search results"
   }
 
+  useEffect(() => {
+    try {
+      if (selection) {
+        localStorage.setItem("dev-hub:tasks-selection", JSON.stringify(selection))
+      } else {
+        localStorage.removeItem("dev-hub:tasks-selection")
+      }
+    } catch {}
+  }, [selection])
+
+  // Restore selected task from loaded list once on mount — the ref guard
+  // prevents re-triggering when the user manually changes selection later.
+  useEffect(() => {
+    if (restoredTaskRef.current || selectedTask) return
+    if (!tasks?.length) return
+    try {
+      const id = localStorage.getItem("dev-hub:tasks-selected-task-id")
+      if (!id) { restoredTaskRef.current = true; return }
+      const found = tasks.find((t) => t.id === id)
+      if (found) setSelectedTask(found)
+    } catch {}
+    restoredTaskRef.current = true
+  }, [tasks, selectedTask])
+
   function handleSearchChange(query: string) {
     setSearchQuery(query)
+    try { localStorage.setItem("dev-hub:tasks-search", query) } catch {}
     if (query.length >= 2) {
       setSelection({ type: "search", query })
     } else if (selection?.type === "search") {
@@ -83,7 +133,22 @@ export function TasksPage() {
   }
 
   function handleSelectTask(task: ClickUpTask) {
-    setSelectedTask((prev) => (prev?.id === task.id ? null : task))
+    setSelectedTask((prev) => {
+      const next = prev?.id === task.id ? null : task
+      try {
+        if (next) {
+          localStorage.setItem("dev-hub:tasks-selected-task-id", next.id)
+        } else {
+          localStorage.removeItem("dev-hub:tasks-selected-task-id")
+        }
+      } catch {}
+      return next
+    })
+  }
+
+  function handleCloseTask() {
+    setSelectedTask(null)
+    try { localStorage.removeItem("dev-hub:tasks-selected-task-id") } catch {}
   }
 
   if (!isLoadingSettings && !isConfigured) {
@@ -115,7 +180,7 @@ export function TasksPage() {
 
       <div
         className="hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors md:flex"
-        onMouseDown={handleDragStart}
+        onMouseDown={handleSidebarDragStart}
       >
         <GripVertical className="size-3.5 text-muted-foreground/30" />
       </div>
@@ -140,10 +205,19 @@ export function TasksPage() {
         )}
 
         {selectedTask && (
-          <TaskDetailPanel
-            task={selectedTask}
-            onClose={() => setSelectedTask(null)}
-          />
+          <>
+            <div
+              className="hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors md:flex"
+              onMouseDown={handleDetailDragStart}
+            >
+              <GripVertical className="size-3.5 text-muted-foreground/30" />
+            </div>
+            <TaskDetailPanel
+              task={selectedTask}
+              onClose={handleCloseTask}
+              style={{ width: detailWidth }}
+            />
+          </>
         )}
       </div>
     </div>

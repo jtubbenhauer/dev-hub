@@ -113,9 +113,10 @@ function CustomFieldValue({ field }: { field: ClickUpCustomField }) {
 interface TaskDetailPanelProps {
   task: ClickUpTask
   onClose: () => void
+  style?: React.CSSProperties
 }
 
-export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) {
   const [worktreeOpen, setWorktreeOpen] = useState(false)
 
   const { data: detail, isLoading: isLoadingDetail, error: detailError } = useClickUpTaskDetail(task.id)
@@ -131,7 +132,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
 
   return (
     <>
-      <div className="flex flex-col h-full border-l w-96 shrink-0 bg-background">
+      <div className="flex flex-col h-full border-l shrink-0 bg-background" style={style}>
         {/* Header */}
         <div className="flex items-start gap-2 p-3 border-b">
           <div className="flex-1 min-w-0">

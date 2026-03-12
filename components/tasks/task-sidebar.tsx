@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Star, ChevronRight, ChevronDown, List, Folder, Layout, Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -8,6 +8,23 @@ import { TaskSearch } from "@/components/tasks/task-search"
 import { useClickUpHierarchy, useClickUpPinnedViews, usePinView, useUnpinView } from "@/hooks/use-clickup"
 import { useClickUpSettings } from "@/hooks/use-settings"
 import type { ClickUpView, ClickUpFolder, ClickUpList, ClickUpPinnedView } from "@/types"
+
+const SPACES_KEY = "dev-hub:tasks-expanded-spaces"
+const FOLDERS_KEY = "dev-hub:tasks-expanded-folders"
+
+function readStoredSet(key: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return new Set()
+    return new Set(JSON.parse(raw) as string[])
+  } catch {
+    return new Set()
+  }
+}
+
+function persistSet(key: string, set: Set<string>) {
+  try { localStorage.setItem(key, JSON.stringify([...set])) } catch {}
+}
 
 type SidebarSelection =
   | { type: "search"; query: string }
@@ -115,20 +132,22 @@ function ListBrowseItem({
 
 function FolderItem({
   folder,
+  isOpen,
+  onToggle,
   selection,
   onSelect,
 }: {
   folder: ClickUpFolder
+  isOpen: boolean
+  onToggle: () => void
   selection: SidebarSelection | null
   onSelect: (selection: SidebarSelection) => void
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-
   return (
     <div>
       <button
         className="flex w-full items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-muted/30 transition-colors"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={onToggle}
       >
         {isOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
         <Folder className="size-3 shrink-0" />
@@ -169,16 +188,28 @@ export function TaskSidebar({ selection, onSelect, searchQuery, onSearchChange, 
   const pinView = usePinView()
   const unpinView = useUnpinView()
 
-  const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(new Set())
+  const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(() => readStoredSet(SPACES_KEY))
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => readStoredSet(FOLDERS_KEY))
 
-  function toggleSpace(spaceId: string) {
+  const toggleSpace = useCallback((spaceId: string) => {
     setExpandedSpaces((prev) => {
       const next = new Set(prev)
       if (next.has(spaceId)) next.delete(spaceId)
       else next.add(spaceId)
+      persistSet(SPACES_KEY, next)
       return next
     })
-  }
+  }, [])
+
+  const toggleFolder = useCallback((folderId: string) => {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev)
+      if (next.has(folderId)) next.delete(folderId)
+      else next.add(folderId)
+      persistSet(FOLDERS_KEY, next)
+      return next
+    })
+  }, [])
 
   function handleSearchChange(query: string) {
     onSearchChange(query)
@@ -282,6 +313,8 @@ export function TaskSidebar({ selection, onSelect, searchQuery, onSearchChange, 
                             <FolderItem
                               key={folder.id}
                               folder={folder}
+                              isOpen={expandedFolders.has(folder.id)}
+                              onToggle={() => toggleFolder(folder.id)}
                               selection={selection}
                               onSelect={onSelect}
                             />

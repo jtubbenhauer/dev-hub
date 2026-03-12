@@ -1,0 +1,38 @@
+tests/components/session-list.test.tsx
+  63f80b93130debd6 1-162
+tests/stores/chat-store.test.ts
+  ca2a694396ac92c0 2074-2384
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "13e9db4e42901e41e6e647b9098687f5951a0a1f",
+  "prompts": {
+    "63f80b93130debd6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_31be9c19fffek2K7whwG1ouRmX-42d56fa7-787c-4f2e-8172-a61a1930f54f",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 162,
+      "overriden_lines": 0
+    },
+    "ca2a694396ac92c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_31be9c19fffek2K7whwG1ouRmX-ada18eff-7f54-437d-a2e7-ed4aeaaf49f1",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 311,
+      "overriden_lines": 0
+    }
+  }
+}

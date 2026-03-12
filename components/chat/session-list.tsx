@@ -1,10 +1,16 @@
 "use client"
 
 import { useMemo } from "react"
-import { Plus, Trash2, MessageSquare, Globe, Layers } from "lucide-react"
+import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import type { Session, SessionStatus } from "@/lib/opencode/types"
 import type { SessionWithWorkspace } from "@/stores/chat-store"
@@ -29,6 +35,9 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
   sessions: SessionWithWorkspace[]
   workspaceNames: Record<string, string>
   onSelectSession: (sessionId: string, workspaceId: string) => void
+  workspaces?: { id: string; name: string; backend: string }[]
+  activeWorkspaceId?: string | null
+  onCreateSessionInWorkspace?: (workspaceId: string) => void
 }
 
 type SessionListProps = WorkspaceSessionListProps | UnifiedSessionListProps
@@ -74,9 +83,38 @@ export function SessionList(props: SessionListProps) {
               )}
             </Button>
           )}
-          <Button size="icon-xs" variant="ghost" onClick={onCreateSession}>
-            <Plus className="size-3.5" />
-          </Button>
+          {props.mode === "unified" && props.workspaces && props.workspaces.length > 0 && props.onCreateSessionInWorkspace ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon-xs" variant="ghost">
+                  <Plus className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                {props.workspaces.map((ws) => (
+                  <DropdownMenuItem
+                    key={ws.id}
+                    onClick={() => props.onCreateSessionInWorkspace!(ws.id)}
+                    className="gap-2"
+                  >
+                    {ws.backend === "remote" ? (
+                      <Globe className="size-3.5 text-blue-500" />
+                    ) : (
+                      <FolderGit2 className="size-3.5" />
+                    )}
+                    <span className="truncate flex-1">{ws.name}</span>
+                    {ws.id === props.activeWorkspaceId && (
+                      <Check className="size-3.5 text-muted-foreground" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button size="icon-xs" variant="ghost" onClick={onCreateSession}>
+              <Plus className="size-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 

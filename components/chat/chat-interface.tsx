@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState, useMemo, Component } from "re
 import type { ReactNode } from "react"
 import { Virtuoso } from "react-virtuoso"
 import type { VirtuosoHandle } from "react-virtuoso"
-import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, Plus, MessageSquare, ArrowDown, GripVertical } from "lucide-react"
+import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, Plus, MessageSquare, ArrowDown, GripVertical, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -104,6 +104,10 @@ export function ChatInterface() {
     const map: Record<string, string> = {}
     for (const ws of allWorkspaces) map[ws.id] = ws.name
     return map
+  }, [allWorkspaces])
+
+  const workspaceOptions = useMemo(() => {
+    return allWorkspaces.map((ws) => ({ id: ws.id, name: ws.name, backend: ws.backend }))
   }, [allWorkspaces])
 
   const { primaryAgents } = useAgents(activeWorkspaceId)
@@ -249,6 +253,23 @@ export function ChatInterface() {
   }, [activeWorkspaceId, pendingChat, clearPendingChat, createSession, sendMessage])
 
   const activeMessages = useChatStore(getActiveSessionMessages)
+  const isMessagesLoaded = useChatStore((state) => {
+    const { activeSessionId: sid, activeWorkspaceId: wid, workspaceStates } = state
+    if (!sid || !wid) return true
+    const ws = workspaceStates[wid]
+    if (!ws) return false
+    return sid in ws.messages
+  })
+
+  const [showLoader, setShowLoader] = useState(false)
+  useEffect(() => {
+    if (isMessagesLoaded) {
+      setShowLoader(false)
+      return
+    }
+    const timer = setTimeout(() => setShowLoader(true), 300)
+    return () => clearTimeout(timer)
+  }, [isMessagesLoaded, activeSessionId])
 
   // Virtuoso handles auto-scroll via followOutput and atBottomStateChange.
   // Reset jump-to-bottom when switching sessions.
@@ -365,6 +386,15 @@ export function ChatInterface() {
     if (!activeWorkspaceId) return
     createSession(activeWorkspaceId)
   }, [activeWorkspaceId, createSession])
+
+  const handleCreateSessionInWorkspace = useCallback(
+    (workspaceId: string) => {
+      useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId)
+      setActiveWorkspaceId(workspaceId)
+      createSession(workspaceId)
+    },
+    [setActiveWorkspaceId, createSession]
+  )
 
   const handleDeleteSession = useCallback(
     (sessionId: string) => {
@@ -562,6 +592,9 @@ export function ChatInterface() {
               mode="unified"
               sessions={unifiedSessions}
               workspaceNames={workspaceNames}
+              workspaces={workspaceOptions}
+              activeWorkspaceId={activeWorkspaceId}
+              onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
               onSelectSession={handleSelectUnifiedSession}
@@ -598,6 +631,9 @@ export function ChatInterface() {
                 mode="unified"
                 sessions={unifiedSessions}
                 workspaceNames={workspaceNames}
+                workspaces={workspaceOptions}
+                activeWorkspaceId={activeWorkspaceId}
+                onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
                 onSelectSession={handleSelectUnifiedSession}
@@ -713,7 +749,15 @@ export function ChatInterface() {
           ) : (
             <div className="flex h-full flex-col">
               {activeMessages.length === 0 ? (
-                <EmptyChat onSend={handleSendMessage} />
+                showLoader ? (
+                  <div className="flex h-full items-center justify-center">
+                    <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : !isMessagesLoaded ? (
+                  <div className="h-full" />
+                ) : (
+                  <EmptyChat onSend={handleSendMessage} />
+                )
               ) : (
                 <Virtuoso
                   key={activeSessionId}

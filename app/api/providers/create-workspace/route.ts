@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { settings, workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
-import { exec } from "node:child_process"
+import { spawn } from "node:child_process"
 import crypto from "node:crypto"
 import type { WorkspaceProvider, WorkspaceProviderCreateResult } from "@/types"
 
@@ -42,6 +42,32 @@ function interpolateCommand(
   return result
 }
 
+/**
+ * Extract a trailing JSON object from mixed CLI output.
+ * The create command emits progress text followed by a JSON result block.
+ * We find the last balanced `{ ... }` and attempt to parse it.
+ */
+function extractTrailingJson(output: string): unknown {
+  // Strip ANSI escape codes that PTY may inject
+  const clean = output.replace(new RegExp("\x1b\\[[0-9;]*[a-zA-Z]", "g"), "").trimEnd()
+  const lastBrace = clean.lastIndexOf("}")
+  if (lastBrace === -1) return undefined
+
+  let depth = 0
+  for (let i = lastBrace; i >= 0; i--) {
+    if (clean[i] === "}") depth++
+    else if (clean[i] === "{") depth--
+    if (depth === 0) {
+      try {
+        return JSON.parse(clean.slice(i, lastBrace + 1))
+      } catch {
+        return undefined
+      }
+    }
+  }
+  return undefined
+}
+
 async function verifyAgentHealth(agentUrl: string): Promise<boolean> {
   try {
     const response = await globalThis.fetch(new URL("/health", agentUrl).toString(), {
@@ -53,6 +79,10 @@ async function verifyAgentHealth(agentUrl: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+function sseEvent(event: string, data: Record<string, unknown>): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
 }
 
 export async function POST(request: NextRequest) {
@@ -82,7 +112,6 @@ export async function POST(request: NextRequest) {
   const name = typeof body.name === "string" ? body.name : undefined
   const context = typeof body.context === "string" ? body.context : ""
 
-  // Look up provider from user settings
   const [settingRow] = await db
     .select()
     .from(settings)
@@ -106,70 +135,151 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Provider not found" }, { status: 404 })
   }
 
-  // Derive a workspace name from the repo URL if not provided
-  const derivedName = name || repo.split("/").pop()?.replace(/\.git$/, "") || "Remote Workspace"
+  const repoName = repo.split("/").pop()?.replace(/\.git$/, "") || "workspace"
+  const derivedName = name || repoName
+  const isDefaultBranch = !branch || branch === "main" || branch === "master"
+  const idSource = name || (!isDefaultBranch ? branch : repoName)
+
+  const id = idSource
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 
   const templateVars: Record<string, string> = {
     binary: provider.binaryPath,
     repo,
     branch,
     name: derivedName,
+    id,
     context,
   }
 
   const command = interpolateCommand(provider.commands.create, templateVars)
+  const userId = session.user.id
 
-  // Execute the provider CLI command with a generous timeout for container creation
-  let stdout: string
-  try {
-    stdout = await new Promise<string>((resolve, reject) => {
-      exec(command, { timeout: 120_000 }, (error, stdoutBuf, stderrBuf) => {
-        if (error) {
-          reject(new Error(stderrBuf || error.message))
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream({
+    start(controller) {
+      const emit = (event: string, data: Record<string, unknown>) => {
+        try { controller.enqueue(encoder.encode(sseEvent(event, data))) } catch { }
+      }
+
+      emit("status", { message: `Running: ${command}` })
+
+      const child = spawn("sh", ["-c", command], { timeout: 300_000 })
+
+      let createStdout = ""
+
+      child.stdout.on("data", (chunk: Buffer) => {
+        const text = chunk.toString().replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+        createStdout += text
+        emit("output", { stream: "stdout", data: text })
+      })
+
+      child.stderr.on("data", (chunk: Buffer) => {
+        emit("output", { stream: "stderr", data: chunk.toString().replace(/\r\n/g, "\n").replace(/\r/g, "\n") })
+      })
+
+      request.signal.addEventListener("abort", () => {
+        child.kill()
+      })
+
+      child.on("error", (err) => {
+        emit("error", { message: err.message })
+        controller.close()
+      })
+
+      child.on("close", (exitCode, signal) => {
+        if (exitCode === null) {
+          emit("error", { message: `Provider command was terminated by signal ${signal}` })
+          controller.close()
           return
         }
-        resolve(stdoutBuf)
+        if (exitCode !== 0) {
+          emit("error", { message: `Provider command exited with code ${exitCode}` })
+          controller.close()
+          return
+        }
+
+        emit("status", { message: "Command completed. Processing result..." })
+
+        handlePostSpawn({
+          provider,
+          derivedName,
+          id,
+          repo,
+          branch,
+          userId,
+          emit,
+          createOutput: createStdout,
+        }).then(() => {
+          controller.close()
+        }).catch((err) => {
+          emit("error", { message: err instanceof Error ? err.message : "Post-processing failed" })
+          controller.close()
+        })
       })
-    })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Provider command failed"
-    return NextResponse.json(
-      { error: `Provider create command failed: ${message}` },
-      { status: 500 }
+    },
+  })
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      connection: "keep-alive",
+    },
+  })
+}
+
+interface PostSpawnParams {
+  provider: WorkspaceProvider
+  derivedName: string
+  id: string
+  repo: string
+  branch: string
+  userId: string
+  emit: (event: string, data: Record<string, unknown>) => void
+  createOutput: string
+}
+
+async function handlePostSpawn({ provider, derivedName, id, repo, branch, userId, emit, createOutput }: PostSpawnParams) {
+  emit("status", { message: "Processing create output..." })
+
+  const parsed = extractTrailingJson(createOutput)
+  if (!isCreateResult(parsed)) {
+    throw new Error(
+      "Provider create command did not output valid JSON. " +
+      "Expected a trailing JSON object with { id, endpoints: { opencode, agent }, metadata }."
     )
   }
+  const createResult: WorkspaceProviderCreateResult = parsed
 
-  // Parse the JSON output from the provider CLI
-  let createResult: WorkspaceProviderCreateResult
-  try {
-    const parsed: unknown = JSON.parse(stdout.trim())
-    if (!isCreateResult(parsed)) {
-      return NextResponse.json(
-        { error: "Provider returned invalid JSON. Expected { id, endpoints: { opencode, agent }, metadata }." },
-        { status: 500 }
-      )
+  emit("status", { message: "Waiting for agent to become reachable..." })
+
+  const maxAttempts = 15
+  const retryDelayMs = 4_000
+  let isHealthy = false
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    isHealthy = await verifyAgentHealth(createResult.endpoints.agent)
+    if (isHealthy) break
+
+    if (attempt < maxAttempts) {
+      emit("status", { message: `Agent not ready yet, retrying... (${attempt}/${maxAttempts})` })
+      await new Promise((r) => setTimeout(r, retryDelayMs))
     }
-    createResult = parsed
-  } catch {
-    return NextResponse.json(
-      { error: "Provider did not return valid JSON on stdout." },
-      { status: 500 }
-    )
   }
 
-  // Health-check the new agent (give container time to start)
-  const isHealthy = await verifyAgentHealth(createResult.endpoints.agent)
   if (!isHealthy) {
-    return NextResponse.json(
-      { error: "Provider created workspace but agent is not reachable. It may still be starting up." },
-      { status: 502 }
-    )
+    throw new Error("Provider created workspace but agent is not reachable after 60s. It may need more time — try connecting manually.")
   }
 
-  // Create the workspace record
+  emit("status", { message: "Registering workspace..." })
+
   const workspace = {
     id: crypto.randomUUID(),
-    userId: session.user.id,
+    userId,
     name: derivedName,
     path: "/workspace",
     type: "repo" as const,
@@ -183,6 +293,8 @@ export async function POST(request: NextRequest) {
     providerMeta: {
       providerId: provider.id,
       providerWorkspaceId: createResult.id,
+      repo,
+      branch,
       ...createResult.metadata,
     },
     createdAt: new Date(),
@@ -191,5 +303,7 @@ export async function POST(request: NextRequest) {
 
   await db.insert(workspaces).values(workspace)
 
-  return NextResponse.json(workspace, { status: 201 })
+  emit("result", { workspace })
 }
+
+export const maxDuration = 300

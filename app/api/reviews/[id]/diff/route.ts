@@ -3,8 +3,8 @@ import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { reviews, reviewFiles, workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
-import { getOriginalContent, getContentAtRef, getCurrentContent } from "@/lib/git/review"
 import { getLanguageFromFilename } from "@/lib/files/operations"
+import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -35,7 +35,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Review not found" }, { status: 404 })
   }
 
-  const { review, workspace } = result[0]
+  const { review, workspace: workspaceRow } = result[0]
+  const backend = getBackend(toWorkspace(workspaceRow))
 
   const [file] = await db
     .select()
@@ -51,15 +52,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     let current: string
 
     if (review.mode === "uncommitted") {
-      original = await getOriginalContent(workspace.path, file.path)
-      current = getCurrentContent(workspace.path, file.path)
+      original = await backend.getOriginalContent(file.path)
+      current = await backend.getCurrentContent(file.path)
     } else {
       const effectiveBase = review.mergeBase ?? review.baseRef
       if (!effectiveBase) {
         return NextResponse.json({ error: "No base ref for review" }, { status: 500 })
       }
-      original = await getContentAtRef(workspace.path, effectiveBase, file.path)
-      current = getCurrentContent(workspace.path, file.path)
+      original = await backend.getContentAtRef(effectiveBase, file.path)
+      current = await backend.getCurrentContent(file.path)
     }
 
     const language = getLanguageFromFilename(file.path)

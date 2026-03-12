@@ -1,0 +1,22 @@
+{
+  "name": "@devhub/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@devhub/shared": "workspace:*",
+    "@hono/node-server": "^1.14.3",
+    "hono": "^4.7.11",
+    "simple-git": "^3.32.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

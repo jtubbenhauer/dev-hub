@@ -59,11 +59,12 @@ export const useCommandStore = create<CommandState>()((set, get) => ({
   },
 
   killCommand: async (sessionId) => {
+    const session = get().sessions[sessionId]
     try {
       await fetch("/api/commands/kill", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ sessionId, workspaceId: session?.workspaceId }),
       })
     } catch {
       // Best effort
@@ -72,8 +73,8 @@ export const useCommandStore = create<CommandState>()((set, get) => ({
     // Always provide immediate UI feedback after kill.
     // The SSE stream may also deliver an exit event, but markExited is
     // idempotent so the duplicate is harmless.
-    const session = get().sessions[sessionId]
-    if (session && session.isRunning) {
+    const currentSession = get().sessions[sessionId]
+    if (currentSession && currentSession.isRunning) {
       appendLines(set, sessionId, "\x1b[90m\n--- process killed ---\x1b[0m\n")
       markExited(set, sessionId, null)
     }

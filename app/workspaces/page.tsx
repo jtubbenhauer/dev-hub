@@ -23,11 +23,14 @@ import {
   FolderGit2,
   Plus,
   FolderSearch,
+  Globe,
 } from "lucide-react"
 import { DirectoryBrowser } from "@/components/workspace/directory-browser"
 import { WorkspaceCard } from "@/components/workspace/workspace-card"
 import { CreateWorktreeDialog } from "@/components/workspace/create-worktree-dialog"
 import { CloneRepoDialog } from "@/components/workspace/clone-repo-dialog"
+import { ConnectRemoteDialog } from "@/components/workspace/connect-remote-dialog"
+import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-provider-workspace-dialog"
 import { toast } from "sonner"
 import type { Workspace } from "@/types"
 
@@ -79,14 +82,21 @@ export default function WorkspacesPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/workspaces/${id}`, { method: "DELETE" })
+    mutationFn: async ({ id, destroyProvider }: { id: string; destroyProvider?: boolean }) => {
+      const params = new URLSearchParams()
+      if (destroyProvider) params.set("destroyProvider", "true")
+      const query = params.toString()
+      const res = await fetch(`/api/workspaces/${id}${query ? `?${query}` : ""}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Failed to delete")
-      return res.json()
+      return res.json() as Promise<{ deleted: boolean; providerDestroyError?: string }>
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] })
-      toast.success("Workspace removed")
+      if (data.providerDestroyError) {
+        toast.warning(`Workspace removed, but provider destroy failed: ${data.providerDestroyError}`)
+      } else {
+        toast.success("Workspace removed")
+      }
     },
     onError: () => {
       toast.error("Failed to remove workspace")
@@ -105,6 +115,8 @@ export default function WorkspacesPage() {
           <h1 className="text-2xl font-bold">Workspaces</h1>
           <div className="flex items-center gap-2">
             <CloneRepoDialog />
+            <ConnectRemoteDialog />
+            <CreateProviderWorkspaceDialog />
             <CreateWorktreeDialog workspaces={workspaces} />
             <Dialog open={addDialogOpen} onOpenChange={(open) => {
               setAddDialogOpen(open)
@@ -225,7 +237,7 @@ export default function WorkspacesPage() {
               <WorkspaceCard
                 key={workspace.id}
                 workspace={workspace}
-                onDelete={(id) => deleteMutation.mutate(id)}
+                onDelete={(id, destroyProvider) => deleteMutation.mutate({ id, destroyProvider })}
                 isDeleting={deleteMutation.isPending}
               />
             ))}

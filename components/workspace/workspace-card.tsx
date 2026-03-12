@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { useCommandStore } from "@/stores/command-store"
-import { useGitStatus } from "@/hooks/use-git"
+import { useGitStatus, useAgentHealth } from "@/hooks/use-git"
 import {
   Card,
   CardContent,
@@ -41,11 +41,12 @@ import {
   Settings2,
 } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import type { Workspace, QuickCommand } from "@/types"
 
 interface WorkspaceCardProps {
   workspace: Workspace
-  onDelete: (id: string) => void
+  onDelete: (id: string, destroyProvider?: boolean) => void
   isDeleting: boolean
 }
 
@@ -56,6 +57,7 @@ export function WorkspaceCard({
 }: WorkspaceCardProps) {
   const { setActiveWorkspaceId } = useWorkspaceStore()
   const { data: gitStatus } = useGitStatus(workspace.id)
+  const { data: healthStatus } = useAgentHealth(workspace.id, workspace.backend === "remote")
   const runCommand = useCommandStore((s) => s.runCommand)
   const setDrawerOpen = useCommandStore((s) => s.setDrawerOpen)
 
@@ -66,6 +68,10 @@ export function WorkspaceCard({
   const relativeDate = gitStatus?.lastCommit?.date
     ? formatRelativeDate(gitStatus.lastCommit.date)
     : null
+
+  const hasProvider = workspace.backend === "remote" &&
+    workspace.providerMeta &&
+    typeof (workspace.providerMeta as Record<string, unknown>).providerId === "string"
 
   const quickCommands = workspace.quickCommands ?? []
 
@@ -80,6 +86,28 @@ export function WorkspaceCard({
         <div className="flex min-w-0 items-center justify-between">
           <CardTitle className="min-w-0 text-base truncate">{workspace.name}</CardTitle>
           <div className="flex items-center gap-1.5 shrink-0">
+            {workspace.backend === "remote" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-500 gap-1">
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        healthStatus === "healthy" && "bg-emerald-500",
+                        healthStatus === "unreachable" && "bg-red-500",
+                        !healthStatus && "bg-muted-foreground/50"
+                      )}
+                    />
+                    remote
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {healthStatus === "healthy" && "Agent is reachable"}
+                  {healthStatus === "unreachable" && "Agent is unreachable"}
+                  {!healthStatus && "Checking agent status..."}
+                </TooltipContent>
+              </Tooltip>
+            )}
             <Badge variant="secondary" className="text-xs">
               {workspace.type}
             </Badge>
@@ -220,18 +248,60 @@ export function WorkspaceCard({
           </div>
           <div className="flex items-center gap-1">
             <QuickCommandsEditor workspace={workspace} />
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={(event) => {
-                event.stopPropagation()
-                onDelete(workspace.id)
-              }}
-              disabled={isDeleting}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
+            {hasProvider ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={(event) => event.stopPropagation()}
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-56 p-2"
+                  align="end"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="space-y-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-xs"
+                      onClick={() => onDelete(workspace.id)}
+                      disabled={isDeleting}
+                    >
+                      Remove from list
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-xs text-destructive hover:text-destructive"
+                      onClick={() => onDelete(workspace.id, true)}
+                      disabled={isDeleting}
+                    >
+                      Remove &amp; destroy container
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onDelete(workspace.id)
+                }}
+                disabled={isDeleting}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

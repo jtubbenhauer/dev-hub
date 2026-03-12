@@ -1,3 +1,20 @@
+export type {
+  FileTreeEntry,
+  FileGitStatus,
+  GitFileStatus,
+  GitStatusResult,
+  GitLogEntry,
+  GitBranch,
+  GitStashEntry,
+  GitDiffResult,
+  ReviewFileStatus,
+  ReviewChangedFile,
+  AllBranch,
+  WorktreeInfo,
+} from "@devhub/shared"
+
+export type WorkspaceBackendType = "local" | "remote"
+
 export interface Workspace {
   id: string
   userId: string
@@ -7,6 +24,11 @@ export interface Workspace {
   parentRepoPath: string | null
   packageManager: "pnpm" | "npm" | "bun" | "cargo" | "go" | "none" | null
   quickCommands: QuickCommand[] | null
+  backend: WorkspaceBackendType
+  provider: string | null
+  opencodeUrl: string | null
+  agentUrl: string | null
+  providerMeta: Record<string, unknown> | null
   createdAt: Date
   lastAccessedAt: Date
 }
@@ -21,6 +43,11 @@ export interface WorkspaceCreateInput {
   path: string
   type: "repo" | "worktree"
   parentRepoPath?: string
+  backend?: WorkspaceBackendType
+  provider?: string
+  opencodeUrl?: string
+  agentUrl?: string
+  providerMeta?: Record<string, unknown>
 }
 
 export interface CpuStats {
@@ -108,24 +135,6 @@ export interface GitStatus {
   lastCommitDate: string
 }
 
-export interface FileTreeEntry {
-  name: string
-  path: string
-  type: "file" | "directory"
-  size?: number
-  children?: FileTreeEntry[]
-  gitStatus?: FileGitStatus
-}
-
-export type FileGitStatus =
-  | "modified"
-  | "staged"
-  | "untracked"
-  | "deleted"
-  | "renamed"
-  | "conflicted"
-  | "added"
-
 export interface OpenFile {
   path: string
   name: string
@@ -135,74 +144,9 @@ export interface OpenFile {
   originalContent: string
 }
 
-export interface GitFileStatus {
-  path: string
-  index: string
-  workingDir: string
-}
-
-export interface GitStatusResult {
-  isRepo: boolean
-  branch: string
-  tracking: string | null
-  ahead: number
-  behind: number
-  staged: GitFileStatus[]
-  unstaged: GitFileStatus[]
-  untracked: string[]
-  conflicted: string[]
-  lastCommit: {
-    hash: string
-    message: string
-    author: string
-    date: string
-  } | null
-}
-
-export interface GitLogEntry {
-  hash: string
-  abbrevHash: string
-  message: string
-  body: string
-  author: string
-  authorEmail: string
-  date: string
-  refs: string
-}
-
-export interface GitBranch {
-  name: string
-  current: boolean
-  commit: string
-  label: string
-  linkedWorkTree: boolean
-}
-
-export interface GitStashEntry {
-  index: number
-  hash: string
-  message: string
-  date: string
-}
-
-export interface GitDiffResult {
-  file: string
-  diff: string
-  additions: number
-  deletions: number
-  isBinary: boolean
-}
-
 export type ReviewMode = "branch" | "uncommitted" | "last-commit"
 
-export type ReviewFileStatus =
-  | "added"
-  | "modified"
-  | "deleted"
-  | "renamed"
-  | "copied"
-  | "type-changed"
-  | "untracked"
+import type { ReviewFileStatus } from "@devhub/shared"
 
 export interface ReviewFile {
   id: number
@@ -238,18 +182,6 @@ export interface ReviewCreateInput {
   targetRef?: string
 }
 
-export interface ReviewChangedFile {
-  path: string
-  status: ReviewFileStatus
-  oldPath?: string
-}
-
-export interface AllBranch {
-  name: string
-  isRemote: boolean
-  current: boolean
-}
-
 export interface ReviewFileContent {
   original: string
   current: string
@@ -258,15 +190,6 @@ export interface ReviewFileContent {
 }
 
 // Worktree types
-
-export interface WorktreeInfo {
-  path: string
-  branch: string
-  head: string
-  isMain: boolean
-  isBare: boolean
-  isDetached: boolean
-}
 
 export interface WorktreeCreateInput {
   parentRepoPath: string
@@ -519,4 +442,26 @@ export interface GitHubPrFileContent {
   path: string
   language: string
   patch: string | undefined
+}
+
+// Workspace Provider types
+
+export interface WorkspaceProvider {
+  id: string
+  name: string
+  binaryPath: string
+  commands: {
+    create: string
+    destroy: string
+    status: string
+  }
+}
+
+export interface WorkspaceProviderCreateResult {
+  id: string
+  endpoints: {
+    opencode: string
+    agent: string
+  }
+  metadata: Record<string, unknown>
 }

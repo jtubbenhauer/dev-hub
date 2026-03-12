@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
-import { workspaces } from "@/drizzle/schema"
+import { workspaces, settings } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
+import { exec } from "node:child_process"
 import fs from "node:fs"
+import type { WorkspaceProvider } from "@/types"
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -46,11 +48,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   const { id } = await params
   const body = await request.json()
-  const { name, quickCommands } = body
+  const { name, quickCommands, agentUrl, opencodeUrl, provider, providerMeta } = body
 
   const updateData: Record<string, unknown> = {}
   if (name !== undefined) updateData.name = name
   if (quickCommands !== undefined) updateData.quickCommands = quickCommands
+  if (agentUrl !== undefined) updateData.agentUrl = agentUrl
+  if (opencodeUrl !== undefined) updateData.opencodeUrl = opencodeUrl
+  if (provider !== undefined) updateData.provider = provider
+  if (providerMeta !== undefined) updateData.providerMeta = providerMeta
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json(
@@ -87,6 +93,7 @@ export async function DELETE(
   const { id } = await params
   const url = new URL(request.url)
   const deleteFiles = url.searchParams.get("deleteFiles") === "true"
+  const destroyProvider = url.searchParams.get("destroyProvider") === "true"
 
   const [workspace] = await db
     .select()
@@ -99,13 +106,86 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  if (deleteFiles && fs.existsSync(workspace.path)) {
+  // Only delete local files — remote workspace files live in the container
+  if (deleteFiles && workspace.backend !== "remote" && fs.existsSync(workspace.path)) {
     fs.rmSync(workspace.path, { recursive: true, force: true })
+  }
+
+  // Run provider destroy command if requested and workspace has provider metadata
+  let providerDestroyError: string | null = null
+  if (destroyProvider && workspace.backend === "remote" && workspace.providerMeta) {
+    const meta = workspace.providerMeta as Record<string, unknown>
+    const providerId = typeof meta.providerId === "string" ? meta.providerId : null
+    const providerWorkspaceId = typeof meta.providerWorkspaceId === "string" ? meta.providerWorkspaceId : null
+
+    if (providerId && providerWorkspaceId) {
+      const provider = await findProvider(session.user.id, providerId)
+      if (provider) {
+        const command = provider.commands.destroy
+          .replaceAll("{binary}", provider.binaryPath)
+          .replaceAll("{id}", providerWorkspaceId)
+
+        try {
+          await new Promise<void>((resolve, reject) => {
+            exec(command, { timeout: 60_000 }, (error, _stdout, stderrBuf) => {
+              if (error) {
+                reject(new Error(stderrBuf || error.message))
+                return
+              }
+              resolve()
+            })
+          })
+        } catch (err) {
+          providerDestroyError = err instanceof Error ? err.message : "Provider destroy failed"
+        }
+      }
+    }
   }
 
   await db
     .delete(workspaces)
     .where(eq(workspaces.id, id))
 
-  return NextResponse.json({ deleted: true })
+  return NextResponse.json({
+    deleted: true,
+    ...(providerDestroyError ? { providerDestroyError } : {}),
+  })
+}
+
+function isWorkspaceProvider(value: unknown): value is WorkspaceProvider {
+  if (!value || typeof value !== "object") return false
+  const obj = value as Record<string, unknown>
+  return (
+    typeof obj.id === "string" &&
+    typeof obj.name === "string" &&
+    typeof obj.binaryPath === "string" &&
+    typeof obj.commands === "object" &&
+    obj.commands !== null &&
+    typeof (obj.commands as Record<string, unknown>).create === "string" &&
+    typeof (obj.commands as Record<string, unknown>).destroy === "string" &&
+    typeof (obj.commands as Record<string, unknown>).status === "string"
+  )
+}
+
+async function findProvider(
+  userId: string,
+  providerId: string
+): Promise<WorkspaceProvider | null> {
+  const [settingRow] = await db
+    .select()
+    .from(settings)
+    .where(
+      and(
+        eq(settings.userId, userId),
+        eq(settings.key, "workspace-providers")
+      )
+    )
+
+  if (!settingRow) return null
+
+  const providerList = Array.isArray(settingRow.value)
+    ? (settingRow.value as unknown[]).filter(isWorkspaceProvider)
+    : []
+
+  return providerList.find((p) => p.id === providerId) ?? null
 }

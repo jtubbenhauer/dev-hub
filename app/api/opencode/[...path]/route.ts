@@ -3,23 +3,10 @@ import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
-import { getServerUrl } from "@/lib/opencode/client"
+import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 
 interface RouteParams {
   params: Promise<{ path: string[] }>
-}
-
-async function resolveWorkspaceDirectory(
-  workspaceId: string,
-  userId: string
-): Promise<string | null> {
-  const [workspace] = await db
-    .select()
-    .from(workspaces)
-    .where(
-      and(eq(workspaces.id, workspaceId), eq(workspaces.userId, userId))
-    )
-  return workspace?.path ?? null
 }
 
 async function proxyToOpenCode(
@@ -37,31 +24,55 @@ async function proxyToOpenCode(
   const url = new URL(request.url)
   const workspaceId = url.searchParams.get("workspaceId")
 
+  let serverUrl: string
   let directory: string | undefined
+
   if (workspaceId) {
-    const resolved = await resolveWorkspaceDirectory(
-      workspaceId,
-      session.user.id
-    )
-    if (!resolved) {
+    const [row] = await db
+      .select()
+      .from(workspaces)
+      .where(
+        and(eq(workspaces.id, workspaceId), eq(workspaces.userId, session.user.id))
+      )
+    if (!row) {
       return NextResponse.json(
         { error: "Workspace not found" },
         { status: 404 }
       )
     }
-    directory = resolved
-  }
 
-  let serverUrl: string
-  try {
-    serverUrl = await getServerUrl()
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to start OpenCode server"
-    return NextResponse.json(
-      { error: "OpenCode server unavailable", detail: message },
-      { status: 503 }
-    )
+    const workspace = toWorkspace(row)
+    const backend = getBackend(workspace)
+
+    try {
+      serverUrl = await backend.getOpenCodeUrl()
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to start OpenCode server"
+      return NextResponse.json(
+        { error: "OpenCode server unavailable", detail: message },
+        { status: 503 }
+      )
+    }
+
+    // Local workspaces need directory param; remote containers are pre-scoped
+    if (workspace.backend !== "remote") {
+      directory = workspace.path
+    }
+  } else {
+    // No workspace specified — fall back to local OpenCode server
+    try {
+      const { getOrStartServer } = await import("@/lib/opencode/server-pool")
+      const { url: localUrl } = await getOrStartServer()
+      serverUrl = localUrl
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to start OpenCode server"
+      return NextResponse.json(
+        { error: "OpenCode server unavailable", detail: message },
+        { status: 503 }
+      )
+    }
   }
 
   const targetUrl = new URL(opencodePath, serverUrl)

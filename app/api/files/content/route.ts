@@ -3,11 +3,8 @@ import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
-import {
-  readFileContent,
-  writeFileContent,
-  getLanguageFromFilename,
-} from "@/lib/files/operations"
+import { getLanguageFromFilename } from "@/lib/files/operations"
+import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 
 // GET: read file content
 export async function GET(request: NextRequest) {
@@ -27,7 +24,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const [workspace] = await db
+  const [row] = await db
     .select()
     .from(workspaces)
     .where(
@@ -37,12 +34,13 @@ export async function GET(request: NextRequest) {
       )
     )
 
-  if (!workspace) {
+  if (!row) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
   }
 
   try {
-    const { content, size } = readFileContent(workspace.path, filePath)
+    const backend = getBackend(toWorkspace(row))
+    const { content, size } = await backend.readFile(filePath)
     const language = getLanguageFromFilename(filePath)
 
     return NextResponse.json({ content, size, language, path: filePath })
@@ -72,7 +70,7 @@ export async function PUT(request: NextRequest) {
     )
   }
 
-  const [workspace] = await db
+  const [row] = await db
     .select()
     .from(workspaces)
     .where(
@@ -82,12 +80,13 @@ export async function PUT(request: NextRequest) {
       )
     )
 
-  if (!workspace) {
+  if (!row) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
   }
 
   try {
-    writeFileContent(workspace.path, filePath, content)
+    const backend = getBackend(toWorkspace(row))
+    await backend.writeFile(filePath, content)
     return NextResponse.json({ success: true, path: filePath })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to write file"

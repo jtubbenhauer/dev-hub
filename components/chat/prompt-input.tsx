@@ -276,19 +276,19 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
         />
         {isStreaming ? (
           <Button
-            size="icon"
+            size={null}
             variant="destructive"
             onClick={onAbort}
-            className="shrink-0"
+            className="shrink-0 h-auto w-[46px] rounded-lg border border-transparent px-0 py-3.5"
           >
             <Square className="size-4" />
           </Button>
         ) : (
           <Button
-            size="icon"
+            size={null}
             onClick={handleSubmit}
             disabled={!value.trim() || disabled}
-            className="shrink-0"
+            className="shrink-0 h-auto w-[46px] rounded-lg border border-transparent px-0 py-3.5"
           >
             <Send className="size-4" />
           </Button>

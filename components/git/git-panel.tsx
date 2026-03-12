@@ -109,6 +109,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
     minWidth: MIN_PANEL_WIDTH,
     maxWidth: MAX_PANEL_WIDTH,
     defaultWidth: DEFAULT_PANEL_WIDTH,
+    storageKey: "dev-hub:git-panel-width",
   })
 
   const commitFocusRef = useRef<HTMLTextAreaElement>(null)

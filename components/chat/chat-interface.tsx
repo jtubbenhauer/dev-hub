@@ -208,7 +208,9 @@ export function ChatInterface() {
     // SSE connections now live per-workspace and are not torn down on unmount
   }, [activeWorkspaceId, fetchSessions, fetchCommands, connectSSE])
 
-  // When unified mode is restored from persistence, lazy-fetch sessions for all workspaces
+  // When unified mode is restored from persistence, lazy-fetch sessions for all workspaces.
+  // allWorkspaces is included so the effect re-fires after zustand persist hydrates the
+  // workspace store (initially empty on SSR / first client render).
   useEffect(() => {
     if (!isUnifiedMode) return
     const { workspaceStates } = useChatStore.getState()
@@ -219,8 +221,7 @@ export function ChatInterface() {
         connectSSE(ws.id)
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isUnifiedMode])
+  }, [isUnifiedMode, allWorkspaces, fetchSessions, connectSSE])
 
   // Fetch messages when active session changes
   useEffect(() => {

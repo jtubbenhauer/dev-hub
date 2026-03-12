@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useWorkspaceStore } from "@/stores/workspace-store"
@@ -39,6 +39,7 @@ import {
   Plus,
   X,
   Settings2,
+  Pencil,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -84,7 +85,7 @@ export function WorkspaceCard({
     <Card className="overflow-hidden hover:border-primary/50">
       <CardHeader className="pb-2">
         <div className="flex min-w-0 items-center justify-between">
-          <CardTitle className="min-w-0 text-base truncate">{workspace.name}</CardTitle>
+          <EditableWorkspaceName workspace={workspace} />
           <div className="flex items-center gap-1.5 shrink-0">
             {workspace.backend === "remote" && (
               <Tooltip>
@@ -306,6 +307,94 @@ export function WorkspaceCard({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function EditableWorkspaceName({ workspace }: { workspace: Workspace }) {
+  const queryClient = useQueryClient()
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(workspace.name)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [isEditing])
+
+  const renameMutation = useMutation({
+    mutationFn: async (newName: string) => {
+      const res = await fetch(`/api/workspaces/${workspace.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to rename")
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
+      toast.success("Workspace renamed")
+    },
+    onError: (err: Error) => {
+      toast.error(err.message)
+      setEditValue(workspace.name)
+    },
+  })
+
+  const handleSave = useCallback(() => {
+    const trimmed = editValue.trim()
+    if (!trimmed || trimmed === workspace.name) {
+      setEditValue(workspace.name)
+      setIsEditing(false)
+      return
+    }
+    renameMutation.mutate(trimmed)
+    setIsEditing(false)
+  }, [editValue, workspace.name, renameMutation])
+
+  if (isEditing) {
+    return (
+      <Input
+        ref={inputRef}
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSave()
+          if (e.key === "Escape") {
+            setEditValue(workspace.name)
+            setIsEditing(false)
+          }
+        }}
+        className="h-7 min-w-0 text-base font-semibold px-1"
+        onClick={(e) => e.stopPropagation()}
+      />
+    )
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="group/name flex min-w-0 items-center gap-1.5 hover:text-primary transition-colors"
+          onClick={(e) => {
+            e.stopPropagation()
+            setEditValue(workspace.name)
+            setIsEditing(true)
+          }}
+        >
+          <CardTitle className="min-w-0 text-base truncate">{workspace.name}</CardTitle>
+          <Pencil className="size-3 shrink-0 opacity-0 group-hover/name:opacity-50 transition-opacity" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>Click to rename</TooltipContent>
+    </Tooltip>
   )
 }
 

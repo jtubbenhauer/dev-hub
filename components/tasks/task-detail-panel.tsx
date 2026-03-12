@@ -17,7 +17,9 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog"
+import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-provider-workspace-dialog"
 import { useClickUpTaskDetail, useClickUpTaskComments } from "@/hooks/use-clickup"
+import { useWorkspaceProviders } from "@/hooks/use-settings"
 import type { ClickUpTask, ClickUpCustomField } from "@/types"
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -121,6 +123,7 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
 
   const { data: detail, isLoading: isLoadingDetail, error: detailError } = useClickUpTaskDetail(task.id)
   const { data: comments, isLoading: isLoadingComments } = useClickUpTaskComments(task.id)
+  const { providers } = useWorkspaceProviders()
 
   const priorityColor = task.priority
     ? (PRIORITY_COLORS[task.priority.priority] ?? "bg-gray-400")
@@ -173,11 +176,14 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
         <ScrollArea className="flex-1">
           <div className="p-3 space-y-5">
             {/* Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button size="sm" variant="outline" onClick={() => setWorktreeOpen(true)}>
                 <GitFork className="mr-2 size-3.5" />
                 Create Worktree
               </Button>
+              {providers.length > 0 && (
+                <CreateProviderWorkspaceDialog workspaces={[]} />
+              )}
               <a href={task.url} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" variant="ghost" className="text-muted-foreground">
                   <ExternalLink className="mr-2 size-3.5" />

@@ -280,7 +280,7 @@ async function handlePostSpawn({ provider, derivedName, id, repo, branch, userId
   const workspace = {
     id: crypto.randomUUID(),
     userId,
-    name: derivedName,
+    name: id,
     path: "/workspace",
     type: "repo" as const,
     parentRepoPath: null,

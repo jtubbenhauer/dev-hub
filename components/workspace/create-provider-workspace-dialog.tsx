@@ -399,7 +399,7 @@ export function CreateProviderWorkspaceDialog({ workspaces }: CreateProviderWork
                   id="provider-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Defaults to branch or repo name"
+                  placeholder="Defaults to workspace ID"
                   className="text-sm"
                   onKeyDown={handleKeyDown}
                 />

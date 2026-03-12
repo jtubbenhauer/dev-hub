@@ -1,3 +1,5 @@
+import "@testing-library/jest-dom/vitest"
+
 // Global test setup — runs before every test file
 
 // EventSource is not available in jsdom; provide a minimal stub so the store

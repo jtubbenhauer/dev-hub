@@ -2,13 +2,18 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { CheckSquare } from "lucide-react"
+import { CheckSquare, GripVertical } from "lucide-react"
 import { TaskSidebar } from "@/components/tasks/task-sidebar"
 import { TaskList } from "@/components/tasks/task-list"
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel"
 import { useClickUpSearch, useClickUpViewTasks } from "@/hooks/use-clickup"
 import { useClickUpSettings } from "@/hooks/use-settings"
+import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import type { ClickUpTask, ClickUpPinnedView } from "@/types"
+
+const MIN_SIDEBAR_WIDTH = 180
+const MAX_SIDEBAR_WIDTH = 500
+const DEFAULT_SIDEBAR_WIDTH = 224
 
 type SidebarSelection =
   | { type: "search"; query: string }
@@ -17,6 +22,12 @@ type SidebarSelection =
 
 export function TasksPage() {
   const { isConfigured, isLoading: isLoadingSettings } = useClickUpSettings()
+  const { width: sidebarWidth, handleDragStart } = useResizablePanel({
+    minWidth: MIN_SIDEBAR_WIDTH,
+    maxWidth: MAX_SIDEBAR_WIDTH,
+    defaultWidth: DEFAULT_SIDEBAR_WIDTH,
+    storageKey: "dev-hub:tasks-sidebar-width",
+  })
   const [selection, setSelection] = useState<SidebarSelection | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTask, setSelectedTask] = useState<ClickUpTask | null>(null)
@@ -99,7 +110,15 @@ export function TasksPage() {
         onSelect={setSelection}
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
+        style={{ width: sidebarWidth }}
       />
+
+      <div
+        className="hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors md:flex"
+        onMouseDown={handleDragStart}
+      >
+        <GripVertical className="size-3.5 text-muted-foreground/30" />
+      </div>
 
       <div className="flex flex-1 overflow-hidden">
         {selection == null && !isSearch ? (

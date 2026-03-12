@@ -1,0 +1,29 @@
+components/chat/message.tsx
+  5178c27aa01c4682 153,185-187,189,203,217,264
+components/chat/chat-interface.tsx
+  5178c27aa01c4682 5-6,84,221-222,227-228,231-234,242-244,267,568,572-577,580-590,592
+stores/chat-store.ts
+  5178c27aa01c4682 78-86,168-248,853,861-866,894-897,899-901
+components/chat/message-tool-use.tsx
+  5178c27aa01c4682 3,20,100-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "bfe78403eaef081a27add22c3379376c16d954d0",
+  "prompts": {
+    "5178c27aa01c4682": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31fe2ecffffen0xl46n6PfX3BX",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 160,
+      "total_deletions": 108,
+      "accepted_lines": 155,
+      "overriden_lines": 0
+    }
+  }
+}

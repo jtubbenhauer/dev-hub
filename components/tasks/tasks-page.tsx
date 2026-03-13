@@ -185,7 +185,7 @@ export function TasksPage() {
         <GripVertical className="size-3.5 text-muted-foreground/30" />
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-w-0 overflow-hidden">
         {selection == null && !isSearch ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
             <CheckSquare className="size-10 text-muted-foreground" />

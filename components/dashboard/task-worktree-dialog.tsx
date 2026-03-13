@@ -40,7 +40,7 @@ function formatPlanPrompt(task: ClickUpTask): string {
   if (task.url) lines.push(`URL: ${task.url}`)
   lines.push(
     ``,
-    `Please read the .opencode directory for any existing plans or context, then create a plan for this task.`
+    `Please read the .opencode or .sisyphus directory for any existing plans or context, then create a plan for this task.`
   )
   return lines.join("\n")
 }

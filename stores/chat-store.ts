@@ -366,6 +366,26 @@ function buildProxyUrl(
   return `/api/opencode/${path}${query ? `?${query}` : ""}`
 }
 
+function extractErrorString(error: unknown): string {
+  if (typeof error === "string") return error
+  if (error && typeof error === "object") {
+    const e = error as Record<string, unknown>
+    if (typeof e.error === "string") return e.error
+    if (typeof e.detail === "string") return e.detail
+    if (typeof e.message === "string") return e.message
+    if (Array.isArray(e.errors)) {
+      const first = e.errors[0]
+      if (first && typeof first === "object") {
+        const fe = first as Record<string, unknown>
+        if (typeof fe.message === "string") return fe.message
+      }
+      return JSON.stringify(e.errors)
+    }
+    return JSON.stringify(error)
+  }
+  return "An unknown error occurred"
+}
+
 function updateWorkspace(
   state: ChatState,
   workspaceId: string,
@@ -664,7 +684,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         )
         set({
           optimisticStreamingSessionId: isAlreadyStreaming ? get().optimisticStreamingSessionId : null,
-          streamingError: error.error || error.detail || "Failed to send message",
+          streamingError: extractErrorString(error),
         })
         return
       }
@@ -736,7 +756,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         command,
         arguments: args,
       }
-      if (model) body.model = model
+      if (model) body.model = model.modelID
       if (agent) body.agent = agent
       if (variant) body.variant = variant
 
@@ -767,7 +787,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         )
         set({
           optimisticStreamingSessionId: isAlreadyStreaming ? get().optimisticStreamingSessionId : null,
-          streamingError: error.error || error.detail || "Failed to execute command",
+          streamingError: extractErrorString(error),
         })
         return
       }

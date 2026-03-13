@@ -41,9 +41,12 @@ import type { Workspace } from "@/types"
 
 interface CreateProviderWorkspaceDialogProps {
   workspaces: Workspace[]
+  initialRepo?: string
+  initialBranch?: string
+  triggerSize?: "sm" | "default"
 }
 
-export function CreateProviderWorkspaceDialog({ workspaces }: CreateProviderWorkspaceDialogProps) {
+export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initialBranch, triggerSize }: CreateProviderWorkspaceDialogProps) {
   const queryClient = useQueryClient()
   const { providers } = useWorkspaceProviders()
 
@@ -51,8 +54,8 @@ export function CreateProviderWorkspaceDialog({ workspaces }: CreateProviderWork
   const [providerId, setProviderId] = useState(() =>
     providers.length === 1 ? providers[0].id : ""
   )
-  const [repo, setRepo] = useState("")
-  const [branch, setBranch] = useState("")
+  const [repo, setRepo] = useState(initialRepo ?? "")
+  const [branch, setBranch] = useState(initialBranch ?? "")
   const [name, setName] = useState("")
   const [context, setContext] = useState("")
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false)
@@ -142,8 +145,8 @@ export function CreateProviderWorkspaceDialog({ workspaces }: CreateProviderWork
 
   function resetFormState() {
     setProviderId(providers.length === 1 ? providers[0].id : "")
-    setRepo("")
-    setBranch("")
+    setRepo(initialRepo ?? "")
+    setBranch(initialBranch ?? "")
     setName("")
     setContext("")
     setRepoSearch("")
@@ -179,10 +182,17 @@ export function CreateProviderWorkspaceDialog({ workspaces }: CreateProviderWork
   return (
     <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon" className="sm:size-auto sm:px-3 sm:py-2">
-          <Terminal className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Create via Provider</span>
-        </Button>
+        {triggerSize === "sm" ? (
+          <Button size="sm" variant="outline">
+            <Terminal className="mr-2 size-3.5" />
+            Create via Provider
+          </Button>
+        ) : (
+          <Button variant="outline" size="icon" className="sm:size-auto sm:px-3 sm:py-2">
+            <Terminal className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Create via Provider</span>
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>

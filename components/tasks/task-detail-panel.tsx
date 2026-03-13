@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import {
@@ -20,6 +20,7 @@ import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog"
 import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-provider-workspace-dialog"
 import { useClickUpTaskDetail, useClickUpTaskComments } from "@/hooks/use-clickup"
 import { useWorkspaceProviders } from "@/hooks/use-settings"
+import { useWorkspaceStore } from "@/stores/workspace-store"
 import type { ClickUpTask, ClickUpCustomField } from "@/types"
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -112,6 +113,16 @@ function CustomFieldValue({ field }: { field: ClickUpCustomField }) {
   }
 }
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60)
+}
+
 interface TaskDetailPanelProps {
   task: ClickUpTask
   onClose: () => void
@@ -124,6 +135,24 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
   const { data: detail, isLoading: isLoadingDetail, error: detailError } = useClickUpTaskDetail(task.id)
   const { data: comments, isLoading: isLoadingComments } = useClickUpTaskComments(task.id)
   const { providers } = useWorkspaceProviders()
+  const workspaces = useWorkspaceStore((s) => s.workspaces)
+
+  const firstLinkedRepo = useMemo(() => {
+    for (const ws of workspaces) {
+      if (ws.backend === "remote" && ws.providerMeta) {
+        const meta = ws.providerMeta as Record<string, unknown>
+        if (typeof meta.repo === "string" && meta.repo.trim()) {
+          return meta.repo
+        }
+      }
+    }
+    return undefined
+  }, [workspaces])
+
+  const suggestedBranch = useMemo(() => {
+    const prefix = task.custom_id ? `${task.custom_id.toLowerCase()}/` : ""
+    return prefix + slugify(task.name)
+  }, [task.custom_id, task.name])
 
   const priorityColor = task.priority
     ? (PRIORITY_COLORS[task.priority.priority] ?? "bg-gray-400")
@@ -135,7 +164,7 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
 
   return (
     <>
-      <div className="flex flex-col h-full border-l shrink-0 bg-background" style={style}>
+      <div className="flex flex-col h-full min-w-0 overflow-hidden border-l shrink-0 bg-background" style={style}>
         {/* Header */}
         <div className="flex items-start gap-2 p-3 border-b">
           <div className="flex-1 min-w-0">
@@ -173,8 +202,8 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
           </button>
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="p-3 space-y-5">
+        <ScrollArea className="flex-1 min-w-0 [&_[data-slot=scroll-area-viewport]>div]:!block">
+          <div className="p-3 space-y-5 overflow-hidden">
             {/* Actions */}
             <div className="flex items-center gap-2 flex-wrap">
               <Button size="sm" variant="outline" onClick={() => setWorktreeOpen(true)}>
@@ -182,7 +211,12 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
                 Create Worktree
               </Button>
               {providers.length > 0 && (
-                <CreateProviderWorkspaceDialog workspaces={[]} />
+                <CreateProviderWorkspaceDialog
+                  workspaces={workspaces}
+                  initialRepo={firstLinkedRepo}
+                  initialBranch={suggestedBranch}
+                  triggerSize="sm"
+                />
               )}
               <a href={task.url} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" variant="ghost" className="text-muted-foreground">
@@ -271,7 +305,7 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Description
                 </div>
-                <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+                <div className="prose prose-sm dark:prose-invert max-w-none text-sm break-words">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {detail.markdown_description}
                   </ReactMarkdown>

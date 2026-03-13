@@ -1,0 +1,1 @@
+ALTER TABLE `workspaces` ADD `worktree_symlinks` text;

@@ -4,7 +4,7 @@ import { db } from "@/lib/db"
 import { workspaces, settings } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
 import { exec } from "node:child_process"
-import fs from "node:fs"
+import { removeWorktree, pruneWorktrees } from "@/lib/git/worktrees"
 import type { WorkspaceProvider } from "@/types"
 
 interface RouteParams {
@@ -92,7 +92,6 @@ export async function DELETE(
 
   const { id } = await params
   const url = new URL(request.url)
-  const deleteFiles = url.searchParams.get("deleteFiles") === "true"
   const destroyProvider = url.searchParams.get("destroyProvider") === "true"
 
   const [workspace] = await db
@@ -106,9 +105,15 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  // Only delete local files — remote workspace files live in the container
-  if (deleteFiles && workspace.backend !== "remote" && fs.existsSync(workspace.path)) {
-    fs.rmSync(workspace.path, { recursive: true, force: true })
+  // Clean up git worktree on disk before deleting the DB row
+  let worktreeRemoveError: string | null = null
+  if (workspace.type === "worktree" && workspace.parentRepoPath) {
+    try {
+      await removeWorktree(workspace.parentRepoPath, workspace.path, true)
+      await pruneWorktrees(workspace.parentRepoPath)
+    } catch (err) {
+      worktreeRemoveError = err instanceof Error ? err.message : "Failed to remove worktree"
+    }
   }
 
   // Run provider destroy command if requested and workspace has provider metadata
@@ -148,6 +153,7 @@ export async function DELETE(
 
   return NextResponse.json({
     deleted: true,
+    ...(worktreeRemoveError ? { worktreeRemoveError } : {}),
     ...(providerDestroyError ? { providerDestroyError } : {}),
   })
 }

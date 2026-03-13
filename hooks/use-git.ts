@@ -401,12 +401,14 @@ export function useCreateWorktree() {
 
   return useMutation({
     mutationFn: async (body: {
-      parentRepoPath: string
+      parentRepoPath?: string
+      parentWorkspaceId?: string
       branch: string
       newBranch: boolean
       basePath?: string
       startPoint?: string
       name?: string
+      symlinkPaths?: string[]
     }) => {
       const res = await fetch("/api/workspaces/worktrees", {
         method: "POST",
@@ -422,6 +424,47 @@ export function useCreateWorktree() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] })
       toast.success("Worktree created")
+    },
+    onError: (err: Error) => {
+      toast.error(err.message)
+    },
+  })
+}
+
+export function useWorktreeSymlinks(workspaceId: string | null) {
+  return useQuery<string[]>({
+    queryKey: ["worktree-symlinks", workspaceId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/symlinks`)
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to fetch symlink config")
+      }
+      const data = await res.json()
+      return data.symlinkPaths
+    },
+    enabled: !!workspaceId,
+  })
+}
+
+export function useUpdateWorktreeSymlinks() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ workspaceId, symlinkPaths }: { workspaceId: string; symlinkPaths: string[] }) => {
+      const res = await fetch(`/api/workspaces/${workspaceId}/symlinks`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symlinkPaths }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to update symlink config")
+      }
+      return res.json()
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["worktree-symlinks", variables.workspaceId] })
     },
     onError: (err: Error) => {
       toast.error(err.message)

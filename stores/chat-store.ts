@@ -74,7 +74,8 @@ let _unifiedSessionsCacheLimit = 0
 // RAF-batched buffer for message.part.updated events.
 // Keyed: sessionId → messageId → partId → Part
 const pendingPartUpdates = new Map<string, Map<string, Map<string, Part>>>()
-let partUpdateRafHandle: number | null = null
+let partFlushScheduled = false
+let partFlushHandle: number | null = null
 
 // RAF-batched buffer for message.updated events.
 // Keyed: sessionId → Message (latest info wins)
@@ -83,7 +84,8 @@ interface PendingMessageUpdate {
   sourceWorkspaceId: string
 }
 const pendingMessageUpdates = new Map<string, Map<string, PendingMessageUpdate>>()
-let messageUpdateRafHandle: number | null = null
+let messageFlushScheduled = false
+let messageFlushHandle: number | null = null
 
 function flushPendingPartUpdates(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void
@@ -149,20 +151,21 @@ function flushPendingPartUpdates(
 function schedulePendingPartFlush(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void
 ): void {
-  if (partUpdateRafHandle !== null) return
+  if (partFlushScheduled) return
+  partFlushScheduled = true
 
-  // When the tab is hidden, RAF is suspended by the browser. Fall back to a
-  // short timeout so part updates still land in the store while backgrounded.
   if (typeof document !== "undefined" && document.hidden) {
-    partUpdateRafHandle = window.setTimeout(() => {
-      partUpdateRafHandle = null
+    partFlushHandle = window.setTimeout(() => {
+      partFlushScheduled = false
+      partFlushHandle = null
       flushPendingPartUpdates(set)
     }, 500) as unknown as number
   } else {
-    partUpdateRafHandle = requestAnimationFrame(() => {
-      partUpdateRafHandle = null
+    partFlushHandle = requestAnimationFrame(() => {
+      partFlushScheduled = false
+      partFlushHandle = null
       flushPendingPartUpdates(set)
-    })
+    }) as unknown as number
   }
 }
 
@@ -232,18 +235,21 @@ function schedulePendingMessageFlush(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void,
   get: () => ChatState
 ): void {
-  if (messageUpdateRafHandle !== null) return
+  if (messageFlushScheduled) return
+  messageFlushScheduled = true
 
   if (typeof document !== "undefined" && document.hidden) {
-    messageUpdateRafHandle = window.setTimeout(() => {
-      messageUpdateRafHandle = null
+    messageFlushHandle = window.setTimeout(() => {
+      messageFlushScheduled = false
+      messageFlushHandle = null
       flushPendingMessageUpdates(set, get)
     }, 500) as unknown as number
   } else {
-    messageUpdateRafHandle = requestAnimationFrame(() => {
-      messageUpdateRafHandle = null
+    messageFlushHandle = requestAnimationFrame(() => {
+      messageFlushScheduled = false
+      messageFlushHandle = null
       flushPendingMessageUpdates(set, get)
-    })
+    }) as unknown as number
   }
 }
 
@@ -586,7 +592,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   sendMessage: async (sessionId, text, workspaceId, model, agent, variant) => {
-    set({ optimisticStreamingSessionId: sessionId, streamingError: null })
+    const isAlreadyStreaming = get().getStreamingStatus() === "streaming"
+    if (!isAlreadyStreaming) {
+      set({ optimisticStreamingSessionId: sessionId })
+    }
+    set({ streamingError: null })
 
     const optimisticId = `optimistic-${Date.now()}`
     const optimisticMessage: MessageWithParts = {
@@ -653,7 +663,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           })
         )
         set({
-          optimisticStreamingSessionId: null,
+          optimisticStreamingSessionId: isAlreadyStreaming ? get().optimisticStreamingSessionId : null,
           streamingError: error.error || error.detail || "Failed to send message",
         })
         return
@@ -675,12 +685,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           }
         })
       )
-      set({ optimisticStreamingSessionId: null, streamingError: message })
+      set({
+        optimisticStreamingSessionId: isAlreadyStreaming ? get().optimisticStreamingSessionId : null,
+        streamingError: message,
+      })
     }
   },
 
   executeCommand: async (sessionId, workspaceId, command, args, model, agent, variant) => {
-    set({ optimisticStreamingSessionId: sessionId, streamingError: null })
+    const isAlreadyStreaming = get().getStreamingStatus() === "streaming"
+    if (!isAlreadyStreaming) {
+      set({ optimisticStreamingSessionId: sessionId })
+    }
+    set({ streamingError: null })
 
     const optimisticId = `optimistic-${Date.now()}`
     const commandText = `/${command}${args ? ` ${args}` : ""}`
@@ -749,7 +766,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           })
         )
         set({
-          optimisticStreamingSessionId: null,
+          optimisticStreamingSessionId: isAlreadyStreaming ? get().optimisticStreamingSessionId : null,
           streamingError: error.error || error.detail || "Failed to execute command",
         })
         return
@@ -771,7 +788,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           }
         })
       )
-      set({ optimisticStreamingSessionId: null, streamingError: message })
+      set({
+        optimisticStreamingSessionId: isAlreadyStreaming ? get().optimisticStreamingSessionId : null,
+        streamingError: message,
+      })
     }
   },
 
@@ -993,7 +1013,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       const statusMap = (await response.json()) as Record<string, SessionStatus>
       const status = statusMap[activeSessionId]
-      if (!status) return
+
+      if (!status) {
+        // Session absent from the active status map → it's idle (server only lists non-idle sessions)
+        set((state) =>
+          updateWorkspace(state, workspaceId, (ws) => ({
+            sessionStatuses: { ...ws.sessionStatuses, [activeSessionId]: { type: "idle" as const } },
+          }))
+        )
+        set({ optimisticStreamingSessionId: null })
+        get().clearStreamingPoll()
+        return
+      }
 
       set((state) =>
         updateWorkspace(state, workspaceId, (ws) => ({
@@ -1015,17 +1046,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     // Cancel any pending scheduled flush (RAF or timeout) and force an immediate
     // synchronous flush. While the tab was hidden, the RAF-based flush was
     // suspended by the browser, leaving updates stranded in the buffer.
-    if (partUpdateRafHandle !== null) {
-      cancelAnimationFrame(partUpdateRafHandle)
-      clearTimeout(partUpdateRafHandle)
-      partUpdateRafHandle = null
+    if (partFlushHandle !== null) {
+      cancelAnimationFrame(partFlushHandle)
+      clearTimeout(partFlushHandle)
+      partFlushHandle = null
+      partFlushScheduled = false
     }
     flushPendingPartUpdates(set)
 
-    if (messageUpdateRafHandle !== null) {
-      cancelAnimationFrame(messageUpdateRafHandle)
-      clearTimeout(messageUpdateRafHandle)
-      messageUpdateRafHandle = null
+    if (messageFlushHandle !== null) {
+      cancelAnimationFrame(messageFlushHandle)
+      clearTimeout(messageFlushHandle)
+      messageFlushHandle = null
+      messageFlushScheduled = false
     }
     flushPendingMessageUpdates(set, get)
 
@@ -1328,7 +1361,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     get().clearStreamingPoll()
     const interval = setInterval(() => {
       const status = get().getStreamingStatus()
-      if (status !== "streaming" && status !== "connecting") {
+      if (status === "idle") {
         get().clearStreamingPoll()
         return
       }

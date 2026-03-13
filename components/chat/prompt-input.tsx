@@ -160,11 +160,10 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
       }
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault()
-        if (isStreaming) return
         handleSubmit()
       }
     },
-    [handleSubmit, isStreaming, pickerQuery, commandQuery]
+    [handleSubmit, pickerQuery, commandQuery]
   )
 
   const handleFileSelect = useCallback(
@@ -274,7 +273,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
             "max-h-[200px]"
           )}
         />
-        {isStreaming ? (
+        {isStreaming && (
           <Button
             size={null}
             variant="destructive"
@@ -283,16 +282,15 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
           >
             <Square className="size-4" />
           </Button>
-        ) : (
-          <Button
-            size={null}
-            onClick={handleSubmit}
-            disabled={!value.trim() || disabled}
-            className="shrink-0 h-auto w-[46px] rounded-lg border border-transparent px-0 py-3.5"
-          >
-            <Send className="size-4" />
-          </Button>
         )}
+        <Button
+          size={null}
+          onClick={handleSubmit}
+          disabled={!value.trim() || disabled}
+          className="shrink-0 h-auto w-[46px] rounded-lg border border-transparent px-0 py-3.5"
+        >
+          <Send className="size-4" />
+        </Button>
       </div>
     </div>
   )

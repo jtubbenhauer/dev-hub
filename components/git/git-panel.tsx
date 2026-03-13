@@ -181,6 +181,15 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
     setViewMode(mode)
     setSelectedFile(null)
     setSelectedStaged(false)
+    if (mode === "branch") {
+      setCompareBaseRef((prev) => {
+        if (prev) return prev
+        const defaultBranch = comparableBranchesRef.current.find(
+          (b) => b.name === "main" || b.name === "master"
+        )
+        return defaultBranch?.name ?? null
+      })
+    }
   }, [])
 
   const handleToggleReviewed = useCallback(
@@ -297,6 +306,8 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
     () => branches.filter((b) => !b.current),
     [branches]
   )
+  const comparableBranchesRef = useRef(comparableBranches)
+  comparableBranchesRef.current = comparableBranches
 
   const hasMultipleBranches = comparableBranches.length > 0
 

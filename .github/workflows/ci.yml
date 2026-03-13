@@ -27,6 +27,8 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-latest
+    env:
+      AUTH_SECRET: ci-test-secret
     steps:
       - uses: actions/checkout@v4
 

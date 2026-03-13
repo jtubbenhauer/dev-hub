@@ -36,6 +36,7 @@ export const workspaces = sqliteTable("workspaces", {
   opencodeUrl: text("opencode_url"),
   agentUrl: text("agent_url"),
   providerMeta: text("provider_meta", { mode: "json" }),
+  worktreeSymlinks: text("worktree_symlinks", { mode: "json" }).$type<string[]>(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

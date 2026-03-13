@@ -29,6 +29,7 @@ export interface Workspace {
   opencodeUrl: string | null
   agentUrl: string | null
   providerMeta: Record<string, unknown> | null
+  worktreeSymlinks: string[] | null
   createdAt: Date
   lastAccessedAt: Date
 }
@@ -197,6 +198,7 @@ export interface WorktreeCreateInput {
   newBranch: boolean
   basePath?: string // override default sibling dir location
   startPoint?: string // for new branches, which commit/branch to start from
+  symlinkPaths?: string[]
 }
 
 export interface WorktreeCreateResult {

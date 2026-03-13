@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm"
 import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
-import { getWorktreeBaseDir } from "@/lib/git/worktrees"
+import { getWorktreeBaseDir, createSymlinks } from "@/lib/git/worktrees"
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 
 function detectPackageManager(
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
     basePath,
     startPoint,
     name,
+    symlinkPaths,
   } = body
 
   // Validate required fields
@@ -81,6 +82,19 @@ export async function POST(request: NextRequest) {
 
     const worktreePath = await backend.addWorktree(branch, newBranch, basePath, startPoint)
 
+    // Resolve symlink paths: use explicitly provided list, or fall back to parent's saved config
+    const resolvedSymlinks: string[] = Array.isArray(symlinkPaths)
+      ? symlinkPaths
+      : (parentWorkspace.worktreeSymlinks ?? [])
+
+    let symlinkResult: { created: string[]; skipped: string[] } | undefined
+    if (resolvedSymlinks.length > 0 && parentBackendType === "local") {
+      symlinkResult = await createSymlinks(resolvedParent, worktreePath, resolvedSymlinks)
+      await db.update(workspaces)
+        .set({ worktreeSymlinks: resolvedSymlinks })
+        .where(eq(workspaces.id, parentWorkspaceId))
+    }
+
     const packageManager = parentBackendType === "local"
       ? detectPackageManager(worktreePath)
       : parentWorkspace.packageManager
@@ -112,6 +126,7 @@ export async function POST(request: NextRequest) {
         workspace,
         worktreePath,
         branch,
+        symlinks: symlinkResult,
         defaultBaseDir: parentBackendType === "local"
           ? getWorktreeBaseDir(resolvedParent)
           : undefined,
@@ -159,6 +174,7 @@ export async function POST(request: NextRequest) {
     opencodeUrl: null,
     agentUrl: null,
     providerMeta: null,
+    worktreeSymlinks: null,
     createdAt: new Date(),
     lastAccessedAt: new Date(),
   })
@@ -178,6 +194,29 @@ export async function POST(request: NextRequest) {
 
   try {
     const worktreePath = await backend.addWorktree(branch, newBranch, basePath, startPoint)
+
+    // Resolve symlink paths: use explicitly provided list, or look up parent's saved config
+    let resolvedSymlinksLegacy: string[] = []
+    if (Array.isArray(symlinkPaths)) {
+      resolvedSymlinksLegacy = symlinkPaths
+    } else {
+      const [parentRow] = await db
+        .select({ worktreeSymlinks: workspaces.worktreeSymlinks })
+        .from(workspaces)
+        .where(eq(workspaces.path, resolvedParent))
+      if (parentRow?.worktreeSymlinks && Array.isArray(parentRow.worktreeSymlinks)) {
+        resolvedSymlinksLegacy = parentRow.worktreeSymlinks
+      }
+    }
+
+    let symlinkResultLegacy: { created: string[]; skipped: string[] } | undefined
+    if (resolvedSymlinksLegacy.length > 0) {
+      symlinkResultLegacy = await createSymlinks(resolvedParent, worktreePath, resolvedSymlinksLegacy)
+      await db.update(workspaces)
+        .set({ worktreeSymlinks: resolvedSymlinksLegacy })
+        .where(eq(workspaces.path, resolvedParent))
+    }
+
     const packageManager = detectPackageManager(worktreePath)
 
     const parentName = path.basename(resolvedParent)
@@ -204,6 +243,7 @@ export async function POST(request: NextRequest) {
         workspace,
         worktreePath,
         branch,
+        symlinks: symlinkResultLegacy,
         defaultBaseDir: getWorktreeBaseDir(resolvedParent),
       },
       { status: 201 }

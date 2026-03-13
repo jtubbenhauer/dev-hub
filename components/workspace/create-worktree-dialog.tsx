@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,9 +22,13 @@ import {
   FolderGit2,
   Search,
   Check,
+  Link,
+  X,
 } from "lucide-react"
-import { useCreateWorktree, useGitBranches } from "@/hooks/use-git"
+import { useCreateWorktree, useGitBranches, useWorktreeSymlinks } from "@/hooks/use-git"
 import type { Workspace, GitBranch as GitBranchType } from "@/types"
+
+const SYMLINK_SUGGESTIONS = [".npmrc", ".env", ".env.local", ".opencode/plans"]
 
 interface CreateWorktreeDialogProps {
   workspaces: Workspace[]
@@ -40,8 +43,16 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
   const [startPoint, setStartPoint] = useState("")
   const [customName, setCustomName] = useState("")
   const [branchFilter, setBranchFilter] = useState("")
+  const [symlinkPaths, setSymlinkPaths] = useState<string[]>([])
 
   const createWorktree = useCreateWorktree()
+  const { data: savedSymlinks } = useWorktreeSymlinks(selectedRepo?.id ?? null)
+
+  useEffect(() => {
+    if (savedSymlinks && savedSymlinks.length > 0) {
+      setSymlinkPaths(savedSymlinks)
+    }
+  }, [savedSymlinks])
 
   // Filter to only repo-type workspaces (not worktrees)
   const repoWorkspaces = useMemo(
@@ -81,6 +92,7 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
     setBranchName("")
     setStartPoint("")
     setBranchFilter("")
+    setSymlinkPaths([])
     setStep("configure")
   }
 
@@ -94,11 +106,12 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
 
     createWorktree.mutate(
       {
-        parentRepoPath: selectedRepo.path,
+        parentWorkspaceId: selectedRepo.id,
         branch: branchName,
         newBranch: isNewBranch,
         startPoint: startPoint || undefined,
         name: customName || undefined,
+        symlinkPaths: symlinkPaths.length > 0 ? symlinkPaths : undefined,
       },
       {
         onSuccess: () => {
@@ -117,6 +130,7 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
     setStartPoint("")
     setCustomName("")
     setBranchFilter("")
+    setSymlinkPaths([])
   }
 
   return (
@@ -160,6 +174,8 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
             setCustomName={setCustomName}
             branchFilter={branchFilter}
             setBranchFilter={setBranchFilter}
+            symlinkPaths={symlinkPaths}
+            setSymlinkPaths={setSymlinkPaths}
             targetPath={targetPath}
             workspaceName={workspaceName}
             onBack={() => setStep("select-repo")}
@@ -235,6 +251,8 @@ function WorktreeConfigForm({
   setCustomName,
   branchFilter,
   setBranchFilter,
+  symlinkPaths,
+  setSymlinkPaths,
   targetPath,
   workspaceName,
   onBack,
@@ -255,6 +273,8 @@ function WorktreeConfigForm({
   setCustomName: (v: string) => void
   branchFilter: string
   setBranchFilter: (v: string) => void
+  symlinkPaths: string[]
+  setSymlinkPaths: (v: string[]) => void
   targetPath: string
   workspaceName: string
   onBack: () => void
@@ -262,6 +282,7 @@ function WorktreeConfigForm({
   onCreate: () => void
   isCreating: boolean
 }) {
+  const [symlinkInput, setSymlinkInput] = useState("")
   // Branches that aren't already checked out in a worktree
   const availableBranches = branches.filter((b) => !b.linkedWorkTree && !b.current)
 
@@ -377,6 +398,78 @@ function WorktreeConfigForm({
           placeholder={workspaceName || "auto-generated"}
           className="text-sm"
         />
+      </div>
+
+      {/* Symlink configuration */}
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1.5 text-sm">
+          <Link className="h-3.5 w-3.5" />
+          Symlink files
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          Symlink gitignored files from the parent repo into the new worktree.
+        </p>
+        {symlinkPaths.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {symlinkPaths.map((p) => (
+              <Badge key={p} variant="secondary" className="gap-1 font-mono text-xs">
+                {p}
+                <button
+                  type="button"
+                  onClick={() => setSymlinkPaths(symlinkPaths.filter((s) => s !== p))}
+                  className="ml-0.5 hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Input
+            value={symlinkInput}
+            onChange={(e) => setSymlinkInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                const trimmed = symlinkInput.trim()
+                if (trimmed && !symlinkPaths.includes(trimmed)) {
+                  setSymlinkPaths([...symlinkPaths, trimmed])
+                  setSymlinkInput("")
+                }
+              }
+            }}
+            placeholder=".env, .npmrc, etc."
+            className="font-mono text-xs"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!symlinkInput.trim() || symlinkPaths.includes(symlinkInput.trim())}
+            onClick={() => {
+              const trimmed = symlinkInput.trim()
+              if (trimmed && !symlinkPaths.includes(trimmed)) {
+                setSymlinkPaths([...symlinkPaths, trimmed])
+                setSymlinkInput("")
+              }
+            }}
+          >
+            Add
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {SYMLINK_SUGGESTIONS.filter((s) => !symlinkPaths.includes(s)).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSymlinkPaths([...symlinkPaths, s])}
+              className="rounded-md border px-2 py-0.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              + {s}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Preview */}

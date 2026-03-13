@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,11 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { GitFork, FolderGit2, Loader2, Plus } from "lucide-react"
-import { useCreateWorktree } from "@/hooks/use-git"
+import { GitFork, FolderGit2, Loader2, Plus, Link, X } from "lucide-react"
+import { useCreateWorktree, useWorktreeSymlinks } from "@/hooks/use-git"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { usePendingChatStore } from "@/stores/pending-chat-store"
 import type { ClickUpTask, Workspace } from "@/types"
+
+const SYMLINK_SUGGESTIONS = [".npmrc", ".env", ".env.local", ".opencode/plans"]
 
 interface TaskWorktreeDialogProps {
   task: ClickUpTask
@@ -73,8 +75,17 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
   const [customName, setCustomName] = useState("")
   const [startChat, setStartChat] = useState(true)
   const [additionalPrompt, setAdditionalPrompt] = useState("")
+  const [symlinkPaths, setSymlinkPaths] = useState<string[]>([])
+  const [symlinkInput, setSymlinkInput] = useState("")
 
   const createWorktree = useCreateWorktree()
+  const { data: savedSymlinks } = useWorktreeSymlinks(selectedRepoId)
+
+  useEffect(() => {
+    if (savedSymlinks && savedSymlinks.length > 0) {
+      setSymlinkPaths(savedSymlinks)
+    }
+  }, [savedSymlinks])
 
   const selectedRepo = useMemo(
     () => repoWorkspaces.find((w) => w.id === selectedRepoId) ?? null,
@@ -99,10 +110,11 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
 
     createWorktree.mutate(
       {
-        parentRepoPath: selectedRepo.path,
+        parentWorkspaceId: selectedRepo.id,
         branch: branchName,
         newBranch: true,
         name: customName || undefined,
+        symlinkPaths: symlinkPaths.length > 0 ? symlinkPaths : undefined,
       },
       {
         onSuccess: (data: { workspace: Workspace }) => {
@@ -136,6 +148,8 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
     setCustomName("")
     setStartChat(true)
     setAdditionalPrompt("")
+    setSymlinkPaths([])
+    setSymlinkInput("")
   }
 
   return (
@@ -243,6 +257,78 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
               placeholder={workspaceName || "auto-generated"}
               className="text-sm"
             />
+          </div>
+
+          {/* Symlink configuration */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5 text-sm">
+              <Link className="h-3.5 w-3.5" />
+              Symlink files
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Symlink gitignored files from the parent repo into the new worktree.
+            </p>
+            {symlinkPaths.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {symlinkPaths.map((p) => (
+                  <Badge key={p} variant="secondary" className="gap-1 font-mono text-xs">
+                    {p}
+                    <button
+                      type="button"
+                      onClick={() => setSymlinkPaths(symlinkPaths.filter((s) => s !== p))}
+                      className="ml-0.5 hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                value={symlinkInput}
+                onChange={(e) => setSymlinkInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    const trimmed = symlinkInput.trim()
+                    if (trimmed && !symlinkPaths.includes(trimmed)) {
+                      setSymlinkPaths([...symlinkPaths, trimmed])
+                      setSymlinkInput("")
+                    }
+                  }
+                }}
+                placeholder=".env, .npmrc, etc."
+                className="font-mono text-xs"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!symlinkInput.trim() || symlinkPaths.includes(symlinkInput.trim())}
+                onClick={() => {
+                  const trimmed = symlinkInput.trim()
+                  if (trimmed && !symlinkPaths.includes(trimmed)) {
+                    setSymlinkPaths([...symlinkPaths, trimmed])
+                    setSymlinkInput("")
+                  }
+                }}
+              >
+                Add
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {SYMLINK_SUGGESTIONS.filter((s) => !symlinkPaths.includes(s)).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSymlinkPaths([...symlinkPaths, s])}
+                  className="rounded-md border px-2 py-0.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  + {s}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Preview */}

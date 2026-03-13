@@ -25,5 +25,15 @@ export default defineConfig({
       dependencies: ['setup'],
     },
   ],
-  // webServer is intentionally omitted — tests require the dev server to already be running
+  ...(process.env.CI
+    ? {
+        webServer: {
+          command: 'pnpm build && pnpm start',
+          url: 'http://localhost:3000',
+          reuseExistingServer: false,
+          timeout: 120_000,
+        },
+      }
+    : {}),
+  // In local dev, the server must already be running
 })

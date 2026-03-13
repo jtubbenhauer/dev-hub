@@ -12,7 +12,7 @@ export default function GlobalError({
       <body>
         <div style={{ padding: "2rem", fontFamily: "sans-serif" }}>
           <h2>Something went wrong</h2>
-          <p style={{ color: "#888", fontSize: "0.875rem" }}>
+          <p className="text-muted-foreground text-sm">
             {error.digest && `Error ID: ${error.digest}`}
           </p>
           <button

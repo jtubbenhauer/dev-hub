@@ -32,11 +32,24 @@ export const SETTINGS_KEYS = {
   LEADER_WHICH_KEY: "leader-which-key",
   CLICKUP_PINNED_VIEWS: "clickup-pinned-views",
   WORKSPACE_PROVIDERS: "workspace-providers",
+  THEME: "theme",
 } as const
 
 export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
 export type FontSize = (typeof FONT_SIZE_OPTIONS)[number]
 export const DEFAULT_FONT_SIZE: FontSize = 13
+
+export type AppTheme = "system" | "default-dark" | "default-light" | "catppuccin-latte" | "catppuccin-frappe" | "catppuccin-macchiato" | "catppuccin-mocha"
+
+export const APP_THEMES: Array<{ value: AppTheme; label: string; isDark: boolean; flavorClass: string | null }> = [
+  { value: "system",              label: "System",           isDark: true,  flavorClass: null },
+  { value: "default-dark",        label: "Default Dark",     isDark: true,  flavorClass: null },
+  { value: "default-light",       label: "Default Light",    isDark: false, flavorClass: null },
+  { value: "catppuccin-latte",    label: "Catppuccin Latte",    isDark: false, flavorClass: "catppuccin-latte" },
+  { value: "catppuccin-frappe",   label: "Catppuccin Frappé",   isDark: true,  flavorClass: "catppuccin-frappe" },
+  { value: "catppuccin-macchiato",label: "Catppuccin Macchiato",isDark: true,  flavorClass: "catppuccin-macchiato" },
+  { value: "catppuccin-mocha",    label: "Catppuccin Mocha",    isDark: true,  flavorClass: "catppuccin-mocha" },
+]
 
 export const MOBILE_FONT_SIZE_OPTIONS = [8, 9, 10, 12, 13, 14] as const
 export type MobileFontSize = (typeof MOBILE_FONT_SIZE_OPTIONS)[number]
@@ -305,4 +318,11 @@ export function useWorkspaceProviders(): {
   const raw = data?.[SETTINGS_KEYS.WORKSPACE_PROVIDERS]
   const providers = Array.isArray(raw) ? raw.filter(isWorkspaceProvider) : []
   return { providers, isLoading }
+}
+
+export function useThemeSetting(): { theme: AppTheme; isLoading: boolean } {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.THEME]
+  const isValid = typeof raw === "string" && APP_THEMES.some(t => t.value === raw)
+  return { theme: isValid ? (raw as AppTheme) : "system", isLoading }
 }

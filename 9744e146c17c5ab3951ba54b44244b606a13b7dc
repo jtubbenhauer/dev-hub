@@ -1,0 +1,23 @@
+next.config.ts
+  1ed8600b21df8008 4-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "9744e146c17c5ab3951ba54b44244b606a13b7dc",
+  "prompts": {
+    "1ed8600b21df8008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_319f17e2dffeUeoI2KR12phWxX-304d915c-c190-44a7-8af1-e2a72fe32a91",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

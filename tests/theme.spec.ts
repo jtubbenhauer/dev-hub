@@ -76,6 +76,16 @@ test.describe('Theme application', () => {
     expect(classes).not.toContain('dark')
     await page.screenshot({ path: '.sisyphus/evidence/task-13-catppuccin-latte.png' })
   })
+
+  test('dracula applies .dark .dracula', async ({ page }) => {
+    await setThemeViaUI(page, 'dracula')
+    const classes = await getHtmlClasses(page)
+    expect(classes).toContain('dark')
+    expect(classes).toContain('dracula')
+    const bg = await getCSSVar(page, '--background')
+    expect(bg).toBeTruthy()
+    await page.screenshot({ path: '.sisyphus/evidence/task-13-dracula.png' })
+  })
 })
 
 test.describe('Class cleanup on theme switch', () => {
@@ -98,6 +108,17 @@ test.describe('Class cleanup on theme switch', () => {
     expect(classes).toContain('catppuccin-mocha')
     expect(classes).not.toContain('catppuccin-latte')
     expect(classes).not.toContain('light')
+  })
+
+  test('switching from dracula to default-dark removes dracula class', async ({ page }) => {
+    await setThemeViaUI(page, 'dracula')
+    let classes = await getHtmlClasses(page)
+    expect(classes).toContain('dracula')
+
+    await setThemeViaUI(page, 'default-dark')
+    classes = await getHtmlClasses(page)
+    expect(classes).toContain('dark')
+    expect(classes).not.toContain('dracula')
   })
 })
 
@@ -130,6 +151,17 @@ test.describe('Theme persistence (FOUC prevention)', () => {
     const classes = await getHtmlClasses(page)
     expect(classes).toContain('dark')
     expect(classes).not.toContain('catppuccin-mocha')
+  })
+
+  test('dracula persists across page reload with no FOUC', async ({ page }) => {
+    await setThemeViaUI(page, 'dracula')
+    const stored = await page.evaluate(() => localStorage.getItem('dev-hub-theme'))
+    expect(stored).toBe('dracula')
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    const classes = await getHtmlClasses(page)
+    expect(classes).toContain('dark')
+    expect(classes).toContain('dracula')
   })
 })
 
@@ -173,7 +205,7 @@ test.describe('Edge cases', () => {
 })
 
 test.describe('Theme picker UI', () => {
-  test('settings page shows all 7 theme options', async ({ page }) => {
+  test('settings page shows all 8 theme options', async ({ page }) => {
     await page.goto('/settings')
     await page.waitForLoadState('networkidle')
     await expect(page.locator('[data-testid="theme-system"]')).toBeVisible()
@@ -183,6 +215,7 @@ test.describe('Theme picker UI', () => {
     await expect(page.locator('[data-testid="theme-catppuccin-frappe"]')).toBeVisible()
     await expect(page.locator('[data-testid="theme-catppuccin-macchiato"]')).toBeVisible()
     await expect(page.locator('[data-testid="theme-catppuccin-mocha"]')).toBeVisible()
+    await expect(page.locator('[data-testid="theme-dracula"]')).toBeVisible()
     await page.screenshot({ path: '.sisyphus/evidence/task-13-theme-picker.png', fullPage: false })
   })
 })

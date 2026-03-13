@@ -53,6 +53,7 @@ const THEME_SWATCHES: Record<AppTheme, { bg: string; accent: string }> = {
   "catppuccin-frappe": { bg: "#303446", accent: "#ca9ee6" },
   "catppuccin-macchiato": { bg: "#24273a", accent: "#c6a0f6" },
   "catppuccin-mocha": { bg: "#1e1e2e", accent: "#cba6f7" },
+  dracula: { bg: "#282a36", accent: "#bd93f9" },
 }
 
 function AppearanceSettingsCard() {

@@ -39,7 +39,7 @@ export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
 export type FontSize = (typeof FONT_SIZE_OPTIONS)[number]
 export const DEFAULT_FONT_SIZE: FontSize = 13
 
-export type AppTheme = "system" | "default-dark" | "default-light" | "catppuccin-latte" | "catppuccin-frappe" | "catppuccin-macchiato" | "catppuccin-mocha"
+export type AppTheme = "system" | "default-dark" | "default-light" | "catppuccin-latte" | "catppuccin-frappe" | "catppuccin-macchiato" | "catppuccin-mocha" | "dracula"
 
 export const APP_THEMES: Array<{ value: AppTheme; label: string; isDark: boolean; flavorClass: string | null }> = [
   { value: "system",              label: "System",           isDark: true,  flavorClass: null },
@@ -49,6 +49,7 @@ export const APP_THEMES: Array<{ value: AppTheme; label: string; isDark: boolean
   { value: "catppuccin-frappe",   label: "Catppuccin Frappé",   isDark: true,  flavorClass: "catppuccin-frappe" },
   { value: "catppuccin-macchiato",label: "Catppuccin Macchiato",isDark: true,  flavorClass: "catppuccin-macchiato" },
   { value: "catppuccin-mocha",    label: "Catppuccin Mocha",    isDark: true,  flavorClass: "catppuccin-mocha" },
+  { value: "dracula",             label: "Dracula",              isDark: true,  flavorClass: "dracula" },
 ]
 
 export const MOBILE_FONT_SIZE_OPTIONS = [8, 9, 10, 12, 13, 14] as const

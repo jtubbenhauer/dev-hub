@@ -9,6 +9,7 @@ import {
   catppuccinFrappe,
   catppuccinLatte,
 } from "@catppuccin/codemirror"
+import { dracula } from "@uiw/codemirror-theme-dracula"
 
 const defaultLightEditorTheme = EditorView.theme(
   {
@@ -140,6 +141,8 @@ export function getCM6Theme(theme: string): Extension {
       return catppuccinFrappe
     case "catppuccin-latte":
       return catppuccinLatte
+    case "dracula":
+      return dracula
     case "default-light":
       return defaultLight
     case "default-dark":

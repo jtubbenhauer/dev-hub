@@ -1,0 +1,25 @@
+.gitignore
+  5178c27aa01c4682 38
+components/chat/chat-interface.tsx
+  5178c27aa01c4682 840
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "6714572373cd00283769806385974b27ae6d8b5b",
+  "prompts": {
+    "5178c27aa01c4682": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31fe2ecffffen0xl46n6PfX3BX",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 12,
+      "accepted_lines": 2,
+      "overriden_lines": 2
+    }
+  }
+}

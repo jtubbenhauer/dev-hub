@@ -72,8 +72,9 @@ instrumentation.ts      # Auto-migration on Next.js server startup
 ```bash
 pnpm dev              # Start dev server (Turbopack)
 pnpm build            # Production build
-pnpm test             # Run all tests (vitest run)
-pnpm test:watch       # Run tests in watch mode
+pnpm test             # Run unit tests (vitest run)
+pnpm test:e2e         # Run E2E tests (playwright test)
+pnpm test:watch       # Run unit tests in watch mode
 pnpm lint             # ESLint
 pnpm typecheck        # TypeScript check (app + shared + agent)
 pnpm db:generate      # Generate Drizzle migration from schema changes
@@ -108,21 +109,23 @@ pnpm agent:start      # Start agent sidecar
 ### Path Alias
 
 Use `@/` for all imports from the project root. Defined in `tsconfig.json`:
+
 ```ts
-import { db } from "@/lib/db"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { db } from "@/lib/db";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 ```
 
 ### Radix UI
 
 This project uses the unified `radix-ui` package. Do NOT use individual `@radix-ui/react-*` packages:
+
 ```ts
 // Correct
-import { Dialog as DialogPrimitive } from "radix-ui"
+import { Dialog as DialogPrimitive } from "radix-ui";
 
 // Wrong — do not use
-import * as DialogPrimitive from "@radix-ui/react-dialog"
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 ```
 
 ### shadcn/ui
@@ -136,25 +139,39 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 
 ### Setup
 
-- **Runner:** Vitest 4 with jsdom environment
+- **Unit tests:** Vitest 4 with jsdom environment
+- **E2E tests:** Playwright (Chromium)
 - **Assertion helpers:** `@testing-library/jest-dom/vitest` (auto-imported via `tests/setup.ts`)
 - **Component testing:** `@testing-library/react` + `@testing-library/user-event`
 - **Globals:** `describe`, `it`, `expect`, `vi` are global (no imports needed)
 
-### Test File Location
+### Test File Conventions
 
-Tests mirror the source structure under `tests/`:
+All tests live under `tests/`, mirroring the source structure. **File extension determines the runner:**
+
+- `*.test.ts` / `*.test.tsx` — **Vitest** unit tests
+- `*.spec.ts` — **Playwright** E2E tests (excluded from Vitest via `vitest.config.ts`)
+
 ```
-stores/chat-store.ts         -> tests/stores/chat-store.test.ts
-lib/git-panel-logic.ts       -> tests/lib/git-panel-logic.test.ts
-components/foo/bar.tsx        -> tests/components/bar.test.tsx
+stores/chat-store.ts         -> tests/stores/chat-store.test.ts    (unit)
+lib/git-panel-logic.ts       -> tests/lib/git-panel-logic.test.ts  (unit)
+components/foo/bar.tsx        -> tests/components/bar.test.tsx      (unit)
+tests/theme.spec.ts                                                (E2E)
+tests/smoke.spec.ts                                                (E2E)
 ```
+
+### E2E Test Setup
+
+- **Auth:** `tests/auth.setup.ts` runs first as a Playwright setup project — creates a test user via `/login` and saves storage state to `tests/.auth/user.json`
+- **Server:** In CI, Playwright auto-starts the app via `webServer` config (`pnpm build && pnpm start`). Locally, you must start the dev server yourself before running E2E tests.
+- **Config:** `playwright.config.ts` — single worker, Chromium only, `baseURL: http://localhost:3000`
 
 ### Running Tests
 
 ```bash
-pnpm test              # Run all tests once
-pnpm test:watch        # Watch mode
+pnpm test              # Run unit tests once (Vitest)
+pnpm test:e2e          # Run E2E tests (Playwright — requires server locally)
+pnpm test:watch        # Unit tests in watch mode
 ```
 
 Always run `pnpm test` after making changes to verify nothing broke.
@@ -162,6 +179,7 @@ Always run `pnpm test` after making changes to verify nothing broke.
 ## API Routes
 
 API routes live in `app/api/` and follow Next.js App Router conventions:
+
 - File: `app/api/<path>/route.ts`
 - Export named functions: `GET`, `POST`, `PUT`, `DELETE`
 - Return `NextResponse.json()`

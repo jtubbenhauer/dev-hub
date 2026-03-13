@@ -18,6 +18,7 @@ export default defineConfig({
     },
     {
       name: 'chromium',
+      testMatch: /\.spec\.ts$/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'tests/.auth/user.json',

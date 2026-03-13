@@ -48,7 +48,7 @@ export const commandHistory = sqliteTable("command_history", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   workspaceId: text("workspace_id")
     .notNull()
-    .references(() => workspaces.id),
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   command: text("command").notNull(),
   exitCode: integer("exit_code"),
   executedAt: integer("executed_at", { mode: "timestamp" })

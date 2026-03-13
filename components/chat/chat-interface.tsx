@@ -1,34 +1,70 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useCallback, useState, useMemo, Component } from "react"
-import type { ReactNode } from "react"
-import { Virtuoso } from "react-virtuoso"
-import type { VirtuosoHandle } from "react-virtuoso"
-import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, Plus, MessageSquare, ArrowDown, GripVertical, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { useChatStore } from "@/stores/chat-store"
-import { useWorkspaceStore } from "@/stores/workspace-store"
-import { usePendingChatStore } from "@/stores/pending-chat-store"
-import { ChatMessage } from "@/components/chat/message"
-import { PromptInput } from "@/components/chat/prompt-input"
-import type { PromptInputHandle } from "@/components/chat/prompt-input"
-import type { SlashCommand } from "@/components/chat/command-picker"
-import { SessionList } from "@/components/chat/session-list"
-import { ModelSelector, loadPersistedModel } from "@/components/chat/model-selector"
-import { useAgents, AgentSelector } from "@/components/chat/agent-selector"
-import { VariantSelector } from "@/components/chat/variant-selector"
-import { PlanPanel } from "@/components/chat/plan-panel"
-import { useModelAgentBindings } from "@/hooks/use-settings"
-import { useCommand } from "@/hooks/use-command"
-import { useResizablePanel } from "@/hooks/use-resizable-panel"
-import { useLeaderAction } from "@/hooks/use-leader-action"
-import type { PermissionRequest, QuestionRequest, QuestionInfo, QuestionAnswer, MessageWithParts, SessionStatus, Command } from "@/lib/opencode/types"
+import {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  useMemo,
+  Component,
+} from "react";
+import type { ReactNode } from "react";
+import { Virtuoso } from "react-virtuoso";
+import type { VirtuosoHandle } from "react-virtuoso";
+import {
+  AlertCircle,
+  ShieldAlert,
+  Check,
+  X,
+  MessageCircleQuestion,
+  ScrollText,
+  Plus,
+  MessageSquare,
+  ArrowDown,
+  GripVertical,
+  Loader2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { useChatStore } from "@/stores/chat-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { usePendingChatStore } from "@/stores/pending-chat-store";
+import { ChatMessage } from "@/components/chat/message";
+import { PromptInput } from "@/components/chat/prompt-input";
+import type { PromptInputHandle } from "@/components/chat/prompt-input";
+import type { SlashCommand } from "@/components/chat/command-picker";
+import { SessionList } from "@/components/chat/session-list";
+import {
+  ModelSelector,
+  loadPersistedModel,
+} from "@/components/chat/model-selector";
+import { useAgents, AgentSelector } from "@/components/chat/agent-selector";
+import { VariantSelector } from "@/components/chat/variant-selector";
+import { PlanPanel } from "@/components/chat/plan-panel";
+import { useModelAgentBindings } from "@/hooks/use-settings";
+import { useCommand } from "@/hooks/use-command";
+import { useResizablePanel } from "@/hooks/use-resizable-panel";
+import { useLeaderAction } from "@/hooks/use-leader-action";
+import type {
+  PermissionRequest,
+  QuestionRequest,
+  QuestionInfo,
+  QuestionAnswer,
+  MessageWithParts,
+  SessionStatus,
+  Command,
+} from "@/lib/opencode/types";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SelectedModel {
-  providerID: string
-  modelID: string
+  providerID: string;
+  modelID: string;
 }
 
 class QuestionErrorBoundary extends Component<
@@ -36,16 +72,16 @@ class QuestionErrorBoundary extends Component<
   { hasError: boolean }
 > {
   constructor(props: { children: ReactNode; onDismissAll: () => void }) {
-    super(props)
-    this.state = { hasError: false }
+    super(props);
+    this.state = { hasError: false };
   }
 
   static getDerivedStateFromError() {
-    return { hasError: true }
+    return { hasError: true };
   }
 
   componentDidCatch(error: Error) {
-    console.error("[chat] QuestionBanner render error:", error)
+    console.error("[chat] QuestionBanner render error:", error);
   }
 
   render() {
@@ -53,77 +89,89 @@ class QuestionErrorBoundary extends Component<
       return (
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>Could not display question.</span>
-          <Button size="sm" variant="outline" onClick={this.props.onDismissAll} className="h-6 gap-1 px-2 text-xs">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={this.props.onDismissAll}
+            className="h-6 gap-1 px-2 text-xs"
+          >
             <X className="size-3" />
             Dismiss
           </Button>
         </div>
-      )
+      );
     }
-    return this.props.children
+    return this.props.children;
   }
 }
 
 export function ChatInterface() {
-  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
-    () => loadPersistedModel()
-  )
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
-  const [selectedVariant, setSelectedVariant] = useState<string | null>(null)
-  const [availableVariants, setAvailableVariants] = useState<string[]>([])
-  const [isSessionListOpen, setIsSessionListOpen] = useState(true)
-  const [isMobileSessionsOpen, setIsMobileSessionsOpen] = useState(false)
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(() =>
+    loadPersistedModel(),
+  );
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+  const [availableVariants, setAvailableVariants] = useState<string[]>([]);
+  const [isSessionListOpen, setIsSessionListOpen] = useState(true);
+  const [isMobileSessionsOpen, setIsMobileSessionsOpen] = useState(false);
   const [isUnifiedMode, setIsUnifiedMode] = useState(() => {
-    if (typeof window === "undefined") return false
-    return localStorage.getItem("dev-hub:chat-unified-mode") === "true"
-  })
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("dev-hub:chat-unified-mode") === "true";
+  });
 
-  const { width: sessionListWidth, handleDragStart: handleSessionListDragStart } = useResizablePanel({
+  const {
+    width: sessionListWidth,
+    handleDragStart: handleSessionListDragStart,
+  } = useResizablePanel({
     minWidth: 160,
     maxWidth: 400,
     defaultWidth: 240,
     storageKey: "dev-hub:chat-panel-width",
-  })
-  const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false)
-  const [hasPlanFiles, setHasPlanFiles] = useState(false)
-  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false)
-  const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false)
-  const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const promptInputRef = useRef<PromptInputHandle>(null)
-  const [showJumpToBottom, setShowJumpToBottom] = useState(false)
+  });
+  const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false);
+  const [hasPlanFiles, setHasPlanFiles] = useState(false);
+  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
+  const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const promptInputRef = useRef<PromptInputHandle>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const activeWorkspaceId = useWorkspaceStore(
-    (state) => state.activeWorkspaceId
-  )
+    (state) => state.activeWorkspaceId,
+  );
   const activeWorkspaceName = useWorkspaceStore(
-    (state) => state.activeWorkspace?.name ?? ""
-  )
-  const allWorkspaces = useWorkspaceStore((state) => state.workspaces)
+    (state) => state.activeWorkspace?.name ?? "",
+  );
+  const allWorkspaces = useWorkspaceStore((state) => state.workspaces);
 
   const workspaceNames = useMemo(() => {
-    const map: Record<string, string> = {}
-    for (const ws of allWorkspaces) map[ws.id] = ws.name
-    return map
-  }, [allWorkspaces])
+    const map: Record<string, string> = {};
+    for (const ws of allWorkspaces) map[ws.id] = ws.name;
+    return map;
+  }, [allWorkspaces]);
 
   const workspaceOptions = useMemo(() => {
-    return allWorkspaces.map((ws) => ({ id: ws.id, name: ws.name, backend: ws.backend }))
-  }, [allWorkspaces])
+    return allWorkspaces.map((ws) => ({
+      id: ws.id,
+      name: ws.name,
+      backend: ws.backend,
+    }));
+  }, [allWorkspaces]);
 
-  const { primaryAgents } = useAgents(activeWorkspaceId)
-  const { bindings: agentModelBindings } = useModelAgentBindings()
+  const { primaryAgents } = useAgents(activeWorkspaceId);
+  const { bindings: agentModelBindings } = useModelAgentBindings();
 
   useEffect(() => {
-    if (!selectedAgent || primaryAgents.length === 0) return
-    const agent = primaryAgents.find((a) => a.name === selectedAgent)
+    if (!selectedAgent || primaryAgents.length === 0) return;
+    const agent = primaryAgents.find((a) => a.name === selectedAgent);
     if (agent?.model) {
-      setSelectedModel(agent.model)
+      setSelectedModel(agent.model);
     } else {
-      const bound = agentModelBindings[selectedAgent]
-      if (bound) setSelectedModel(bound)
+      const bound = agentModelBindings[selectedAgent];
+      if (bound) setSelectedModel(bound);
     }
-    setSelectedVariant(agent?.variant ?? null)
-  }, [selectedAgent, primaryAgents, agentModelBindings])
+    setSelectedVariant(agent?.variant ?? null);
+  }, [selectedAgent, primaryAgents, agentModelBindings]);
   const {
     activeSessionId,
     streamingError,
@@ -153,157 +201,176 @@ export function ChatInterface() {
     getRecentSessionsAcrossWorkspaces,
     setSessionAgent,
     getSessionAgent,
-  } = useChatStore()
+  } = useChatStore();
 
   // Restore per-session agent when the active session changes.
   // Falls back to "code" (or the first available agent) when the session has no stored agent.
   useEffect(() => {
-    if (primaryAgents.length === 0) return
-    const stored = activeSessionId ? getSessionAgent(activeSessionId) : null
+    if (primaryAgents.length === 0) return;
+    const stored = activeSessionId ? getSessionAgent(activeSessionId) : null;
     if (stored) {
-      setSelectedAgent(stored)
+      setSelectedAgent(stored);
     } else if (!selectedAgent) {
-      const defaultAgent = primaryAgents.find((a) => a.name === "code") ?? primaryAgents[0]
-      setSelectedAgent(defaultAgent.name)
+      const defaultAgent =
+        primaryAgents.find((a) => a.name === "code") ?? primaryAgents[0];
+      setSelectedAgent(defaultAgent.name);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId, primaryAgents])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId, primaryAgents]);
 
   // getStreamingStatus must be passed as a stable reference — inline lambdas like
   // `(s) => s.getStreamingStatus()` create a new function each render, which causes
   // useSyncExternalStore to see a "new snapshot" every tick → infinite re-render loop.
-  const streamingStatus = useChatStore(getStreamingStatus)
+  const streamingStatus = useChatStore(getStreamingStatus);
+  const isMobile = useIsMobile();
 
-  const sessions = useChatStore(getActiveWorkspaceSessions)
+  const sessions = useChatStore(getActiveWorkspaceSessions);
   const unifiedSessions = useChatStore((state) =>
-    state.getRecentSessionsAcrossWorkspaces(10)
-  )
-  const sessionStatus = useChatStore(getActiveSessionStatus)
-  const commands: Command[] = useChatStore((state) => state.commands)
+    state.getRecentSessionsAcrossWorkspaces(10),
+  );
+  const sessionStatus = useChatStore(getActiveSessionStatus);
+  const commands: Command[] = useChatStore((state) => state.commands);
   // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
   // We filter by sessionID here with useMemo so we never create a new array reference
   // on every render — that would violate useSyncExternalStore's snapshot contract and
   // cause "Maximum update depth exceeded" via the ScrollArea ref cascade.
-  const allPermissions = useChatStore(getActivePermissions)
-  const allQuestions = useChatStore(getActiveQuestions)
-  const sessionStatuses = useChatStore(getActiveSessionStatuses)
+  const allPermissions = useChatStore(getActivePermissions);
+  const allQuestions = useChatStore(getActiveQuestions);
+  const sessionStatuses = useChatStore(getActiveSessionStatuses);
 
   const activePermissions = useMemo(
     () => allPermissions.filter((p) => p.sessionID === activeSessionId),
-    [allPermissions, activeSessionId]
-  )
+    [allPermissions, activeSessionId],
+  );
   const activeQuestions = useMemo(
     () => allQuestions.filter((q) => q.sessionID === activeSessionId),
-    [allQuestions, activeSessionId]
-  )
+    [allQuestions, activeSessionId],
+  );
 
   // Sync workspace from global workspace store
   useEffect(() => {
-    setActiveWorkspaceId(activeWorkspaceId)
-  }, [activeWorkspaceId, setActiveWorkspaceId])
+    setActiveWorkspaceId(activeWorkspaceId);
+  }, [activeWorkspaceId, setActiveWorkspaceId]);
 
   // Connect SSE when workspace changes (state switch + SSE happen inside setActiveWorkspaceId,
   // but we also need to fetch sessions if the workspace is being visited for the first time)
   useEffect(() => {
-    if (!activeWorkspaceId) return
-    fetchSessions(activeWorkspaceId)
-    fetchCommands(activeWorkspaceId)
-    connectSSE(activeWorkspaceId)
+    if (!activeWorkspaceId) return;
+    fetchSessions(activeWorkspaceId);
+    fetchCommands(activeWorkspaceId);
+    connectSSE(activeWorkspaceId);
     // SSE connections now live per-workspace and are not torn down on unmount
-  }, [activeWorkspaceId, fetchSessions, fetchCommands, connectSSE])
+  }, [activeWorkspaceId, fetchSessions, fetchCommands, connectSSE]);
 
   // When unified mode is restored from persistence, lazy-fetch sessions for all workspaces.
   // allWorkspaces is included so the effect re-fires after zustand persist hydrates the
   // workspace store (initially empty on SSR / first client render).
   useEffect(() => {
-    if (!isUnifiedMode) return
-    const { workspaceStates } = useChatStore.getState()
+    if (!isUnifiedMode) return;
+    const { workspaceStates } = useChatStore.getState();
     for (const ws of allWorkspaces) {
-      const state = workspaceStates[ws.id]
+      const state = workspaceStates[ws.id];
       if (!state || Object.keys(state.sessions).length === 0) {
-        fetchSessions(ws.id)
-        connectSSE(ws.id)
+        fetchSessions(ws.id);
+        connectSSE(ws.id);
       }
     }
-  }, [isUnifiedMode, allWorkspaces, fetchSessions, connectSSE])
+  }, [isUnifiedMode, allWorkspaces, fetchSessions, connectSSE]);
 
   // Fetch messages when active session changes
   useEffect(() => {
-    if (!activeSessionId || !activeWorkspaceId) return
-    fetchMessages(activeSessionId, activeWorkspaceId)
-  }, [activeSessionId, activeWorkspaceId, fetchMessages])
+    if (!activeSessionId || !activeWorkspaceId) return;
+    fetchMessages(activeSessionId, activeWorkspaceId);
+  }, [activeSessionId, activeWorkspaceId, fetchMessages]);
 
   // Consume pending chat (e.g. from "Create Worktree" → auto-start plan)
-  const pendingChat = usePendingChatStore((s) => s.pending)
-  const clearPendingChat = usePendingChatStore((s) => s.clear)
+  const pendingChat = usePendingChatStore((s) => s.pending);
+  const clearPendingChat = usePendingChatStore((s) => s.clear);
   useEffect(() => {
-    if (!activeWorkspaceId || !pendingChat) return
-    if (pendingChat.workspaceId !== activeWorkspaceId) return
+    if (!activeWorkspaceId || !pendingChat) return;
+    if (pendingChat.workspaceId !== activeWorkspaceId) return;
 
     // Clear immediately so it only fires once
-    const { message } = pendingChat
-    clearPendingChat()
+    const { message } = pendingChat;
+    clearPendingChat();
 
     // Create a session and send the pending message
-    ;(async () => {
-      const session = await createSession(activeWorkspaceId)
-      if (!session) return
-      sendMessage(session.id, message, activeWorkspaceId)
-    })()
-  }, [activeWorkspaceId, pendingChat, clearPendingChat, createSession, sendMessage])
+    (async () => {
+      const session = await createSession(activeWorkspaceId);
+      if (!session) return;
+      sendMessage(session.id, message, activeWorkspaceId);
+    })();
+  }, [
+    activeWorkspaceId,
+    pendingChat,
+    clearPendingChat,
+    createSession,
+    sendMessage,
+  ]);
 
-  const activeMessages = useChatStore(getActiveSessionMessages)
+  const activeMessages = useChatStore(getActiveSessionMessages);
   const isMessagesLoaded = useChatStore((state) => {
-    const { activeSessionId: sid, activeWorkspaceId: wid, workspaceStates } = state
-    if (!sid || !wid) return true
-    const ws = workspaceStates[wid]
-    if (!ws) return false
-    return sid in ws.messages
-  })
+    const {
+      activeSessionId: sid,
+      activeWorkspaceId: wid,
+      workspaceStates,
+    } = state;
+    if (!sid || !wid) return true;
+    const ws = workspaceStates[wid];
+    if (!ws) return false;
+    return sid in ws.messages;
+  });
 
-  const [showLoader, setShowLoader] = useState(false)
+  const [showLoader, setShowLoader] = useState(false);
   useEffect(() => {
     if (isMessagesLoaded) {
-      setShowLoader(false)
-      return
+      setShowLoader(false);
+      return;
     }
-    const timer = setTimeout(() => setShowLoader(true), 300)
-    return () => clearTimeout(timer)
-  }, [isMessagesLoaded, activeSessionId])
+    const timer = setTimeout(() => setShowLoader(true), 300);
+    return () => clearTimeout(timer);
+  }, [isMessagesLoaded, activeSessionId]);
 
   // Virtuoso handles auto-scroll via followOutput and atBottomStateChange.
   // Reset jump-to-bottom when switching sessions.
   useEffect(() => {
-    setShowJumpToBottom(false)
-  }, [activeSessionId])
+    setShowJumpToBottom(false);
+  }, [activeSessionId]);
 
   const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
-    setShowJumpToBottom(!atBottom)
-  }, [])
+    setShowJumpToBottom(!atBottom);
+  }, []);
 
   // Snap to bottom instantly during streaming so growing content doesn't undershoot
   const handleFollowOutput = useCallback((isAtBottom: boolean) => {
-    return isAtBottom ? "auto" as const : false as const
-  }, [])
+    return isAtBottom ? ("auto" as const) : (false as const);
+  }, []);
 
   const handleSendMessage = useCallback(
     async (text: string) => {
-      if (!activeWorkspaceId) return
+      if (!activeWorkspaceId) return;
 
       // Always scroll to bottom when the user sends a message
-      setShowJumpToBottom(false)
+      setShowJumpToBottom(false);
       requestAnimationFrame(() => {
-        virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end" })
-      })
+        virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end" });
+      });
 
-      let sessionId = activeSessionId
+      let sessionId = activeSessionId;
       if (!sessionId) {
-        const newSession = await createSession(activeWorkspaceId)
-        if (!newSession) return
-        sessionId = newSession.id
+        const newSession = await createSession(activeWorkspaceId);
+        if (!newSession) return;
+        sessionId = newSession.id;
       }
 
-      sendMessage(sessionId, text, activeWorkspaceId, selectedModel ?? undefined, selectedAgent ?? undefined, selectedVariant ?? undefined)
+      sendMessage(
+        sessionId,
+        text,
+        activeWorkspaceId,
+        selectedModel ?? undefined,
+        selectedAgent ?? undefined,
+        selectedVariant ?? undefined,
+      );
     },
     [
       activeWorkspaceId,
@@ -313,38 +380,42 @@ export function ChatInterface() {
       selectedVariant,
       createSession,
       sendMessage,
-    ]
-  )
+    ],
+  );
 
   const handleCommandDispatch = useCallback(
     async (command: SlashCommand, args: string) => {
-      if (!activeWorkspaceId) return
+      if (!activeWorkspaceId) return;
 
-      let sessionId = activeSessionId
+      let sessionId = activeSessionId;
       if (!sessionId) {
-        const newSession = await createSession(activeWorkspaceId)
-        if (!newSession) return
-        sessionId = newSession.id
+        const newSession = await createSession(activeWorkspaceId);
+        if (!newSession) return;
+        sessionId = newSession.id;
       }
 
-      setShowJumpToBottom(false)
+      setShowJumpToBottom(false);
       requestAnimationFrame(() => {
-        virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end" })
-      })
+        virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end" });
+      });
 
       if (command.source === "builtin") {
         switch (command.name) {
           case "compact":
-            summarizeSession(sessionId, activeWorkspaceId)
-            break
+            summarizeSession(sessionId, activeWorkspaceId);
+            break;
           case "undo": {
             const lastAssistant = [...activeMessages]
               .reverse()
-              .find((m) => m.info.role === "assistant")
+              .find((m) => m.info.role === "assistant");
             if (lastAssistant) {
-              revertSession(sessionId, activeWorkspaceId, lastAssistant.info.id)
+              revertSession(
+                sessionId,
+                activeWorkspaceId,
+                lastAssistant.info.id,
+              );
             }
-            break
+            break;
           }
         }
       } else {
@@ -355,8 +426,8 @@ export function ChatInterface() {
           args,
           selectedModel ?? undefined,
           selectedAgent ?? undefined,
-          selectedVariant ?? undefined
-        )
+          selectedVariant ?? undefined,
+        );
       }
     },
     [
@@ -370,101 +441,106 @@ export function ChatInterface() {
       selectedModel,
       selectedAgent,
       selectedVariant,
-    ]
-  )
+    ],
+  );
 
   const handleJumpToBottom = useCallback(() => {
-    setShowJumpToBottom(false)
-    virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "smooth" })
-  }, [])
+    setShowJumpToBottom(false);
+    virtuosoRef.current?.scrollToIndex({
+      index: "LAST",
+      align: "end",
+      behavior: "smooth",
+    });
+  }, []);
 
-  const handleAbort = useCallback(() => {    if (!activeSessionId || !activeWorkspaceId) return
-    abortSession(activeSessionId, activeWorkspaceId)
-  }, [activeSessionId, activeWorkspaceId, abortSession])
+  const handleAbort = useCallback(() => {
+    if (!activeSessionId || !activeWorkspaceId) return;
+    abortSession(activeSessionId, activeWorkspaceId);
+  }, [activeSessionId, activeWorkspaceId, abortSession]);
 
   const handleCreateSession = useCallback(() => {
-    if (!activeWorkspaceId) return
-    createSession(activeWorkspaceId)
-  }, [activeWorkspaceId, createSession])
+    if (!activeWorkspaceId) return;
+    createSession(activeWorkspaceId);
+  }, [activeWorkspaceId, createSession]);
 
   const handleCreateSessionInWorkspace = useCallback(
     (workspaceId: string) => {
-      useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId)
-      setActiveWorkspaceId(workspaceId)
-      createSession(workspaceId)
+      useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
+      setActiveWorkspaceId(workspaceId);
+      createSession(workspaceId);
     },
-    [setActiveWorkspaceId, createSession]
-  )
+    [setActiveWorkspaceId, createSession],
+  );
 
   const handleDeleteSession = useCallback(
     (sessionId: string) => {
-      if (!activeWorkspaceId) return
-      deleteSession(sessionId, activeWorkspaceId)
+      if (!activeWorkspaceId) return;
+      deleteSession(sessionId, activeWorkspaceId);
     },
-    [activeWorkspaceId, deleteSession]
-  )
+    [activeWorkspaceId, deleteSession],
+  );
 
   const handleSelectSession = useCallback(
     (sessionId: string) => {
-      setActiveSession(sessionId)
+      setActiveSession(sessionId);
     },
-    [setActiveSession]
-  )
+    [setActiveSession],
+  );
 
   const handleMobileSelectSession = useCallback(
     (sessionId: string) => {
-      setActiveSession(sessionId)
-      setIsMobileSessionsOpen(false)
+      setActiveSession(sessionId);
+      setIsMobileSessionsOpen(false);
     },
-    [setActiveSession]
-  )
+    [setActiveSession],
+  );
 
   const handleMobileCreateSession = useCallback(() => {
-    if (!activeWorkspaceId) return
-    createSession(activeWorkspaceId)
-    setIsMobileSessionsOpen(false)
-  }, [activeWorkspaceId, createSession])
+    if (!activeWorkspaceId) return;
+    createSession(activeWorkspaceId);
+    setIsMobileSessionsOpen(false);
+  }, [activeWorkspaceId, createSession]);
 
   const handleSelectUnifiedSession = useCallback(
     (sessionId: string, workspaceId: string) => {
-      useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId)
-      setActiveWorkspaceId(workspaceId)
-      setActiveSession(sessionId)
-      setIsMobileSessionsOpen(false)
+      useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
+      setActiveWorkspaceId(workspaceId);
+      setActiveSession(sessionId);
+      setIsMobileSessionsOpen(false);
     },
-    [setActiveWorkspaceId, setActiveSession]
-  )
+    [setActiveWorkspaceId, setActiveSession],
+  );
 
   const handleToggleUnifiedMode = useCallback(() => {
     setIsUnifiedMode((prev) => {
-      const next = !prev
-      localStorage.setItem("dev-hub:chat-unified-mode", String(next))
+      const next = !prev;
+      localStorage.setItem("dev-hub:chat-unified-mode", String(next));
       if (next) {
         // Lazy-fetch sessions for workspaces that haven't loaded yet
-        const { workspaceStates } = useChatStore.getState()
+        const { workspaceStates } = useChatStore.getState();
         for (const ws of allWorkspaces) {
-          const state = workspaceStates[ws.id]
+          const state = workspaceStates[ws.id];
           if (!state || Object.keys(state.sessions).length === 0) {
-            fetchSessions(ws.id)
-            connectSSE(ws.id)
+            fetchSessions(ws.id);
+            connectSSE(ws.id);
           }
         }
       }
-      return next
-    })
-  }, [allWorkspaces, fetchSessions, connectSSE])
+      return next;
+    });
+  }, [allWorkspaces, fetchSessions, connectSSE]);
 
   // Use refs so command closures stay stable but always call latest handlers
-  const handleCreateSessionRef = useRef(handleCreateSession)
-  handleCreateSessionRef.current = handleCreateSession
-  const setIsPlanPanelOpenRef = useRef(setIsPlanPanelOpen)
-  setIsPlanPanelOpenRef.current = setIsPlanPanelOpen
-  const setIsSessionListOpenRef = useRef(setIsSessionListOpen)
-  setIsSessionListOpenRef.current = setIsSessionListOpen
-  const setIsModelSelectorOpenRef = useRef(setIsModelSelectorOpen)
-  setIsModelSelectorOpenRef.current = setIsModelSelectorOpen
-  const setIsAgentSelectorOpenRef = useRef(setIsAgentSelectorOpen)
-  setIsAgentSelectorOpenRef.current = setIsAgentSelectorOpen
+  const handleCreateSessionRef = useRef(handleCreateSession);
+  handleCreateSessionRef.current = handleCreateSession;
+  const setIsPlanPanelOpenRef = useRef(setIsPlanPanelOpen);
+  setIsPlanPanelOpenRef.current = setIsPlanPanelOpen;
+  const setIsSessionListOpenRef = useRef(setIsSessionListOpen);
+  setIsSessionListOpenRef.current = setIsSessionListOpen;
+  const setIsModelSelectorOpenRef = useRef(setIsModelSelectorOpen);
+  setIsModelSelectorOpenRef.current = setIsModelSelectorOpen;
+  const setIsAgentSelectorOpenRef = useRef(setIsAgentSelectorOpen);
+  setIsAgentSelectorOpenRef.current = setIsAgentSelectorOpen;
 
   const chatCommands = useMemo(
     () => [
@@ -483,89 +559,113 @@ export function ChatInterface() {
         onSelect: () => handleCreateSessionRef.current(),
       },
     ],
-    []
-  )
+    [],
+  );
 
-  useCommand(chatCommands)
+  useCommand(chatCommands);
 
   const chatLeaderActions = useMemo(
     () => [
       {
-        action: { id: "chat:switch-model", label: "Switch model", page: "chat" as const },
+        action: {
+          id: "chat:switch-model",
+          label: "Switch model",
+          page: "chat" as const,
+        },
         handler: () => setIsModelSelectorOpenRef.current(true),
       },
       {
-        action: { id: "chat:switch-agent", label: "Switch agent", page: "chat" as const },
+        action: {
+          id: "chat:switch-agent",
+          label: "Switch agent",
+          page: "chat" as const,
+        },
         handler: () => setIsAgentSelectorOpenRef.current(true),
       },
       {
-        action: { id: "chat:new-session", label: "New session", page: "chat" as const },
+        action: {
+          id: "chat:new-session",
+          label: "New session",
+          page: "chat" as const,
+        },
         handler: () => handleCreateSessionRef.current(),
       },
       {
-        action: { id: "chat:toggle-sessions", label: "Toggle session list", page: "chat" as const },
+        action: {
+          id: "chat:toggle-sessions",
+          label: "Toggle session list",
+          page: "chat" as const,
+        },
         handler: () => setIsSessionListOpenRef.current((prev) => !prev),
       },
       {
-        action: { id: "chat:toggle-plan", label: "Toggle plan panel", page: "chat" as const },
+        action: {
+          id: "chat:toggle-plan",
+          label: "Toggle plan panel",
+          page: "chat" as const,
+        },
         handler: () => setIsPlanPanelOpenRef.current((prev) => !prev),
       },
       {
-        action: { id: "chat:focus-prompt", label: "Focus prompt input", page: "chat" as const },
+        action: {
+          id: "chat:focus-prompt",
+          label: "Focus prompt input",
+          page: "chat" as const,
+        },
         handler: () => promptInputRef.current?.focus(),
       },
     ],
-    []
-  )
+    [],
+  );
 
-  useLeaderAction(chatLeaderActions)
+  useLeaderAction(chatLeaderActions);
 
   // Tab / Shift+Tab cycles through agents
-  const primaryAgentsRef = useRef(primaryAgents)
-  primaryAgentsRef.current = primaryAgents
-  const selectedAgentRef = useRef(selectedAgent)
-  selectedAgentRef.current = selectedAgent
-  const setSelectedAgentRef = useRef(setSelectedAgent)
-  setSelectedAgentRef.current = setSelectedAgent
-  const setSessionAgentRef = useRef(setSessionAgent)
-  setSessionAgentRef.current = setSessionAgent
-  const activeSessionIdRef = useRef(activeSessionId)
-  activeSessionIdRef.current = activeSessionId
-  const activeWorkspaceIdRef = useRef(activeWorkspaceId)
-  activeWorkspaceIdRef.current = activeWorkspaceId
+  const primaryAgentsRef = useRef(primaryAgents);
+  primaryAgentsRef.current = primaryAgents;
+  const selectedAgentRef = useRef(selectedAgent);
+  selectedAgentRef.current = selectedAgent;
+  const setSelectedAgentRef = useRef(setSelectedAgent);
+  setSelectedAgentRef.current = setSelectedAgent;
+  const setSessionAgentRef = useRef(setSessionAgent);
+  setSessionAgentRef.current = setSessionAgent;
+  const activeSessionIdRef = useRef(activeSessionId);
+  activeSessionIdRef.current = activeSessionId;
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
+  activeWorkspaceIdRef.current = activeWorkspaceId;
 
   useEffect(() => {
     const handleTabCycle = (e: KeyboardEvent) => {
-      if (e.key !== "Tab") return
-      const agents = primaryAgentsRef.current
-      if (agents.length < 2) return
+      if (e.key !== "Tab") return;
+      const agents = primaryAgentsRef.current;
+      if (agents.length < 2) return;
 
       // Only cycle when focus is inside the chat interface (not in popovers/modals)
-      const target = e.target as HTMLElement | null
-      const inChat = target?.closest("[data-chat-interface]")
-      if (!inChat) return
+      const target = e.target as HTMLElement | null;
+      const inChat = target?.closest("[data-chat-interface]");
+      if (!inChat) return;
 
-      e.preventDefault()
+      e.preventDefault();
 
       const currentIdx = agents.findIndex(
-        (a) => a.name === selectedAgentRef.current
-      )
+        (a) => a.name === selectedAgentRef.current,
+      );
       const nextIdx = e.shiftKey
         ? (currentIdx - 1 + agents.length) % agents.length
-        : (currentIdx + 1) % agents.length
-      const nextAgent = agents[nextIdx].name
+        : (currentIdx + 1) % agents.length;
+      const nextAgent = agents[nextIdx].name;
 
-      setSelectedAgentRef.current(nextAgent)
-      const sessionId = activeSessionIdRef.current
-      const workspaceId = activeWorkspaceIdRef.current
+      setSelectedAgentRef.current(nextAgent);
+      const sessionId = activeSessionIdRef.current;
+      const workspaceId = activeWorkspaceIdRef.current;
       if (sessionId && workspaceId) {
-        setSessionAgentRef.current(sessionId, workspaceId, nextAgent)
+        setSessionAgentRef.current(sessionId, workspaceId, nextAgent);
       }
-    }
+    };
 
-    window.addEventListener("keydown", handleTabCycle)
-    return () => window.removeEventListener("keydown", handleTabCycle)
-  }, [])
+    window.addEventListener("keydown", handleTabCycle);
+    return () => window.removeEventListener("keydown", handleTabCycle);
+  }, []);
 
   if (!activeWorkspaceId) {
     return (
@@ -576,7 +676,7 @@ export function ChatInterface() {
           Select a workspace from the sidebar to start chatting with OpenCode.
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -711,9 +811,9 @@ export function ChatInterface() {
             agents={primaryAgents}
             selectedAgent={selectedAgent}
             onAgentChange={(agent) => {
-              setSelectedAgent(agent)
+              setSelectedAgent(agent);
               if (activeSessionId && activeWorkspaceId) {
-                setSessionAgent(activeSessionId, activeWorkspaceId, agent)
+                setSessionAgent(activeSessionId, activeWorkspaceId, agent);
               }
             }}
             open={isAgentSelectorOpen}
@@ -737,7 +837,7 @@ export function ChatInterface() {
         </div>
 
         {/* Messages area or plan panel — mutually exclusive */}
-        <div className="chat-scroll-area relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div className="chat-scroll-area relative min-h-0 min-w-0 flex-1 overflow-hidden [contain:strict]">
           {isPlanPanelOpen && activeWorkspaceId ? (
             <PlanPanel
               workspaceId={activeWorkspaceId}
@@ -763,19 +863,31 @@ export function ChatInterface() {
                   key={activeSessionId}
                   ref={virtuosoRef}
                   data={activeMessages}
-                  initialTopMostItemIndex={Math.max(0, activeMessages.length - 1)}
+                  initialTopMostItemIndex={Math.max(
+                    0,
+                    activeMessages.length - 1,
+                  )}
                   itemContent={(_index, msg) => (
                     <ChatMessage key={msg.info.id} message={msg} />
                   )}
                   followOutput={handleFollowOutput}
                   atBottomStateChange={handleAtBottomStateChange}
                   atBottomThreshold={80}
-                  increaseViewportBy={{ top: 200, bottom: 400 }}
+                  increaseViewportBy={{
+                    top: 200,
+                    bottom: isMobile ? 100 : 400,
+                  }}
                   className="h-full"
                   components={{
-                    Footer: streamingStatus === "streaming"
-                      ? () => <StreamingIndicator messages={activeMessages} sessionStatus={sessionStatus} />
-                      : undefined,
+                    Footer:
+                      streamingStatus === "streaming"
+                        ? () => (
+                            <StreamingIndicator
+                              messages={activeMessages}
+                              sessionStatus={sessionStatus}
+                            />
+                          )
+                        : undefined,
                   }}
                 />
               )}
@@ -783,17 +895,19 @@ export function ChatInterface() {
           )}
 
           {/* Jump-to-bottom pill — shown when user has scrolled up during streaming or after */}
-          {showJumpToBottom && activeMessages.length > 0 && !isPlanPanelOpen && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-              <button
-                onClick={handleJumpToBottom}
-                className="pointer-events-auto flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium shadow-md transition-opacity hover:bg-muted"
-              >
-                <ArrowDown className="size-3" />
-                Jump to bottom
-              </button>
-            </div>
-          )}
+          {showJumpToBottom &&
+            activeMessages.length > 0 &&
+            !isPlanPanelOpen && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+                <button
+                  onClick={handleJumpToBottom}
+                  className="pointer-events-auto flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium shadow-md transition-opacity hover:bg-muted"
+                >
+                  <ArrowDown className="size-3" />
+                  Jump to bottom
+                </button>
+              </div>
+            )}
         </div>
 
         {/* Permission requests */}
@@ -804,13 +918,13 @@ export function ChatInterface() {
                 key={permission.id}
                 permission={permission}
                 onRespond={(response) => {
-                  if (!activeSessionId || !activeWorkspaceId) return
+                  if (!activeSessionId || !activeWorkspaceId) return;
                   respondToPermission(
                     activeSessionId,
                     permission.id,
                     response,
-                    activeWorkspaceId
-                  )
+                    activeWorkspaceId,
+                  );
                 }}
               />
             ))}
@@ -823,8 +937,10 @@ export function ChatInterface() {
             <QuestionErrorBoundary
               key={activeQuestions.map((q) => q.id).join(",")}
               onDismissAll={() => {
-                if (!activeWorkspaceId) return
-                activeQuestions.forEach((q) => rejectQuestion(q.id, activeWorkspaceId))
+                if (!activeWorkspaceId) return;
+                activeQuestions.forEach((q) =>
+                  rejectQuestion(q.id, activeWorkspaceId),
+                );
               }}
             >
               {activeQuestions.map((question) => (
@@ -832,12 +948,12 @@ export function ChatInterface() {
                   key={question.id}
                   request={question}
                   onReply={(answers) => {
-                    if (!activeWorkspaceId) return
-                    replyToQuestion(question.id, answers, activeWorkspaceId)
+                    if (!activeWorkspaceId) return;
+                    replyToQuestion(question.id, answers, activeWorkspaceId);
                   }}
                   onReject={() => {
-                    if (!activeWorkspaceId) return
-                    rejectQuestion(question.id, activeWorkspaceId)
+                    if (!activeWorkspaceId) return;
+                    rejectQuestion(question.id, activeWorkspaceId);
                   }}
                 />
               ))}
@@ -874,49 +990,54 @@ export function ChatInterface() {
         />
       </div>
     </div>
-  )
+  );
 }
 
 function StreamingIndicator({
   messages,
   sessionStatus,
 }: {
-  messages: MessageWithParts[]
-  sessionStatus: SessionStatus | null
+  messages: MessageWithParts[];
+  sessionStatus: SessionStatus | null;
 }) {
   const label = useMemo(() => {
     // Session-level status takes priority
     if (sessionStatus?.type === "retry") {
-      const secondsUntilRetry = Math.max(0, Math.ceil((sessionStatus.next - Date.now()) / 1000))
-      return `Retrying... attempt ${sessionStatus.attempt}${secondsUntilRetry > 0 ? ` · ${secondsUntilRetry}s` : ""}`
+      const secondsUntilRetry = Math.max(
+        0,
+        Math.ceil((sessionStatus.next - Date.now()) / 1000),
+      );
+      return `Retrying... attempt ${sessionStatus.attempt}${secondsUntilRetry > 0 ? ` · ${secondsUntilRetry}s` : ""}`;
     }
 
     // Walk parts of the last assistant message to find the most recent activity
-    const lastAssistant = [...messages].reverse().find((m) => m.info.role === "assistant")
-    if (!lastAssistant) return "Thinking..."
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.info.role === "assistant");
+    if (!lastAssistant) return "Thinking...";
 
-    const { parts } = lastAssistant
+    const { parts } = lastAssistant;
 
     // Compaction in progress
-    const hasCompaction = parts.some((p) => p.type === "compaction")
-    if (hasCompaction) return "Compacting context..."
+    const hasCompaction = parts.some((p) => p.type === "compaction");
+    if (hasCompaction) return "Compacting context...";
 
     // Running tool → most informative signal
     const runningTool = [...parts]
       .reverse()
-      .find((p) => p.type === "tool" && p.state.status === "running")
+      .find((p) => p.type === "tool" && p.state.status === "running");
     if (runningTool?.type === "tool") {
-      return `Running: ${runningTool.state.status === "running" && runningTool.state.title ? runningTool.state.title : runningTool.tool}`
+      return `Running: ${runningTool.state.status === "running" && runningTool.state.title ? runningTool.state.title : runningTool.tool}`;
     }
 
     // Subtask spawned
-    const subtask = [...parts].reverse().find((p) => p.type === "subtask")
+    const subtask = [...parts].reverse().find((p) => p.type === "subtask");
     if (subtask?.type === "subtask") {
-      return `Subagent: ${subtask.description || subtask.agent}`
+      return `Subagent: ${subtask.description || subtask.agent}`;
     }
 
-    return "Thinking..."
-  }, [messages, sessionStatus])
+    return "Thinking...";
+  }, [messages, sessionStatus]);
 
   return (
     <div className="flex items-center gap-3 px-4 py-3">
@@ -927,7 +1048,7 @@ function StreamingIndicator({
       </div>
       <span className="text-xs text-muted-foreground">{label}</span>
     </div>
-  )
+  );
 }
 
 function EmptyChat({ onSend }: { onSend: (text: string) => void }) {
@@ -936,7 +1057,7 @@ function EmptyChat({ onSend }: { onSend: (text: string) => void }) {
     "Explain the project structure",
     "Find and fix any bugs",
     "Write tests for the main module",
-  ]
+  ];
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
@@ -959,27 +1080,27 @@ function EmptyChat({ onSend }: { onSend: (text: string) => void }) {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 function formatPermissionTitle(permission: string): string {
-  return permission
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+  return permission.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function PermissionBanner({
   permission,
   onRespond,
 }: {
-  permission: PermissionRequest
-  onRespond: (response: string) => void
+  permission: PermissionRequest;
+  onRespond: (response: string) => void;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-500/5 px-3 py-2">
       <ShieldAlert className="size-5 shrink-0 text-amber-600" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">{formatPermissionTitle(permission.permission)}</p>
+        <p className="text-sm font-medium">
+          {formatPermissionTitle(permission.permission)}
+        </p>
         {permission.patterns.length > 0 && (
           <p className="text-xs text-muted-foreground truncate">
             {permission.patterns.join(", ")}
@@ -1005,17 +1126,13 @@ function PermissionBanner({
           <Check className="size-3" />
           Allow
         </Button>
-        <Button
-          size="sm"
-          onClick={() => onRespond("always")}
-          className="gap-1"
-        >
+        <Button size="sm" onClick={() => onRespond("always")} className="gap-1">
           <Check className="size-3" />
           Always
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 function QuestionBanner({
@@ -1023,55 +1140,60 @@ function QuestionBanner({
   onReply,
   onReject,
 }: {
-  request: QuestionRequest
-  onReply: (answers: QuestionAnswer[]) => void
-  onReject: () => void
+  request: QuestionRequest;
+  onReply: (answers: QuestionAnswer[]) => void;
+  onReject: () => void;
 }) {
-  const questionList = request.questions ?? []
+  const questionList = request.questions ?? [];
 
   // One selection state per question in the request
-  const [selections, setSelections] = useState<string[][]>(
-    () => questionList.map(() => [])
-  )
-  const [customInputs, setCustomInputs] = useState<string[]>(
-    () => questionList.map(() => "")
-  )
+  const [selections, setSelections] = useState<string[][]>(() =>
+    questionList.map(() => []),
+  );
+  const [customInputs, setCustomInputs] = useState<string[]>(() =>
+    questionList.map(() => ""),
+  );
 
-  const toggleOption = (questionIndex: number, label: string, isMultiple: boolean) => {
+  const toggleOption = (
+    questionIndex: number,
+    label: string,
+    isMultiple: boolean,
+  ) => {
     setSelections((prev) => {
-      const next = [...prev]
-      const current = next[questionIndex] ?? []
+      const next = [...prev];
+      const current = next[questionIndex] ?? [];
       if (isMultiple) {
         next[questionIndex] = current.includes(label)
           ? current.filter((l) => l !== label)
-          : [...current, label]
+          : [...current, label];
       } else {
-        next[questionIndex] = current.includes(label) ? [] : [label]
+        next[questionIndex] = current.includes(label) ? [] : [label];
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   const handleSubmit = () => {
     const answers: QuestionAnswer[] = questionList.map((q, i) => {
-      const selected = selections[i]
-      const custom = customInputs[i].trim()
-      if (custom && selected.length === 0) return [custom]
-      if (custom) return [...selected, custom]
-      return selected
-    })
-    onReply(answers)
-  }
+      const selected = selections[i];
+      const custom = customInputs[i].trim();
+      if (custom && selected.length === 0) return [custom];
+      if (custom) return [...selected, custom];
+      return selected;
+    });
+    onReply(answers);
+  };
 
-  const hasAnySelection = selections.some((s) => s.length > 0) ||
-    customInputs.some((c) => c.trim().length > 0)
+  const hasAnySelection =
+    selections.some((s) => s.length > 0) ||
+    customInputs.some((c) => c.trim().length > 0);
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey && hasAnySelection) {
-      e.preventDefault()
-      handleSubmit()
+      e.preventDefault();
+      handleSubmit();
     }
-  }
+  };
 
   return (
     <div className="rounded-lg border border-indigo-500/50 bg-indigo-500/5 px-3 py-2 space-y-3">
@@ -1086,16 +1208,21 @@ function QuestionBanner({
           }
           onCustomInputChange={(value) => {
             setCustomInputs((prev) => {
-              const next = [...prev]
-              next[questionIndex] = value
-              return next
-            })
+              const next = [...prev];
+              next[questionIndex] = value;
+              return next;
+            });
           }}
           onSubmitOnEnter={handleInputKeyDown}
         />
       ))}
       <div className="flex justify-end gap-1.5">
-        <Button size="sm" variant="outline" onClick={onReject} className="gap-1">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onReject}
+          className="gap-1"
+        >
           <X className="size-3" />
           Skip
         </Button>
@@ -1110,7 +1237,7 @@ function QuestionBanner({
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 function QuestionItem({
@@ -1121,15 +1248,15 @@ function QuestionItem({
   onCustomInputChange,
   onSubmitOnEnter,
 }: {
-  question: QuestionInfo
-  selected: string[]
-  customInput: string
-  onToggleOption: (label: string) => void
-  onCustomInputChange: (value: string) => void
-  onSubmitOnEnter: (e: React.KeyboardEvent<HTMLInputElement>) => void
+  question: QuestionInfo;
+  selected: string[];
+  customInput: string;
+  onToggleOption: (label: string) => void;
+  onCustomInputChange: (value: string) => void;
+  onSubmitOnEnter: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
-  const allowCustom = question.custom !== false
-  const options = question.options ?? []
+  const allowCustom = question.custom !== false;
+  const options = question.options ?? [];
 
   return (
     <div className="space-y-2">
@@ -1144,7 +1271,7 @@ function QuestionItem({
       {options.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pl-7">
           {options.map((option) => {
-            const isSelected = selected.includes(option.label)
+            const isSelected = selected.includes(option.label);
             return (
               <button
                 key={option.label}
@@ -1158,7 +1285,7 @@ function QuestionItem({
               >
                 {option.label}
               </button>
-            )
+            );
           })}
         </div>
       )}
@@ -1175,5 +1302,5 @@ function QuestionItem({
         </div>
       )}
     </div>
-  )
+  );
 }

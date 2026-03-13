@@ -281,7 +281,7 @@ export function PlanPanel({
           <div className="flex h-full items-center justify-center p-6 text-center">
             <p className="text-sm text-muted-foreground">
               {planFiles.length === 0
-                ? "No .opencode/plans/ files found in this workspace."
+                ? "No plan files found in this workspace."
                 : "Select a plan file above to start editing."}
             </p>
           </div>

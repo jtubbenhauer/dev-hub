@@ -21,6 +21,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -289,6 +300,37 @@ export function WorkspaceCard({
                   </div>
                 </PopoverContent>
               </Popover>
+            ) : workspace.type === "worktree" ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={(event) => event.stopPropagation()}
+                    disabled={isDeleting}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent onClick={(event) => event.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete worktree</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will remove the worktree from disk. The branch itself will not be deleted.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={() => onDelete(workspace.id)}
+                    >
+                      Delete worktree
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             ) : (
               <Button
                 variant="ghost"

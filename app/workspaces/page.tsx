@@ -88,11 +88,13 @@ export default function WorkspacesPage() {
       const query = params.toString()
       const res = await fetch(`/api/workspaces/${id}${query ? `?${query}` : ""}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Failed to delete")
-      return res.json() as Promise<{ deleted: boolean; providerDestroyError?: string }>
+      return res.json() as Promise<{ deleted: boolean; worktreeRemoveError?: string; providerDestroyError?: string }>
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] })
-      if (data.providerDestroyError) {
+      if (data.worktreeRemoveError) {
+        toast.warning(`Workspace removed, but worktree cleanup failed: ${data.worktreeRemoveError}`)
+      } else if (data.providerDestroyError) {
         toast.warning(`Workspace removed, but provider destroy failed: ${data.providerDestroyError}`)
       } else {
         toast.success("Workspace removed")

@@ -36,19 +36,21 @@ function thresholdColor(percent: number): string {
 }
 
 function sparklineColor(percent: number): string {
-  if (percent >= 80) return "#ef4444"
-  if (percent >= 60) return "#eab308"
-  return "#22c55e"
+  if (percent >= 80) return "var(--chart-error)"
+  if (percent >= 60) return "var(--chart-warning)"
+  return "var(--chart-success)"
 }
 
 interface SparklineProps {
   data: number[]
   color: string
+  id: string
   maxValue?: number
 }
 
-function Sparkline({ data, color, maxValue }: SparklineProps) {
+function Sparkline({ data, color, id, maxValue }: SparklineProps) {
   const chartData = data.map((value, index) => ({ index, value }))
+  const gradientId = `grad-${id}`
 
   return (
     <ResponsiveContainer width="100%" height={48}>
@@ -57,7 +59,7 @@ function Sparkline({ data, color, maxValue }: SparklineProps) {
         margin={{ top: 2, right: 0, bottom: 0, left: 0 }}
       >
         <defs>
-          <linearGradient id={`grad-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor={color} stopOpacity={0.3} />
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
@@ -67,7 +69,7 @@ function Sparkline({ data, color, maxValue }: SparklineProps) {
           dataKey="value"
           stroke={color}
           strokeWidth={1.5}
-          fill={`url(#grad-${color.replace("#", "")})`}
+          fill={`url(#${gradientId})`}
           dot={false}
           isAnimationActive={false}
           yAxisId={0}
@@ -131,7 +133,7 @@ export function SystemStatsCards() {
               {current.cpu.model} · {current.cpu.cores} cores
               {current.cpu.temperature !== undefined && ` · ${current.cpu.temperature}°C`}
             </p>
-            <Sparkline data={history.cpu} color={cpuColor} maxValue={100} />
+            <Sparkline data={history.cpu} color={cpuColor} id="cpu" maxValue={100} />
           </CardContent>
         </Card>
 
@@ -161,7 +163,7 @@ export function SystemStatsCards() {
             {current.memory.swapTotal === 0 && (
               <p className="text-xs text-muted-foreground mb-2">&nbsp;</p>
             )}
-            <Sparkline data={history.memory} color={memColor} maxValue={100} />
+            <Sparkline data={history.memory} color={memColor} id="memory" maxValue={100} />
           </CardContent>
         </Card>
 
@@ -226,7 +228,7 @@ export function SystemStatsCards() {
             <p className="text-xs text-muted-foreground mb-2">
               {current.network.map((n) => n.iface).join(", ")}
             </p>
-            <Sparkline data={history.networkRx} color="#3b82f6" />
+            <Sparkline data={history.networkRx} color="var(--chart-info)" id="network" />
           </CardContent>
         </Card>
       </div>

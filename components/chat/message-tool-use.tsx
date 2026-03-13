@@ -82,7 +82,8 @@ export const MessageToolUse = memo(function MessageToolUse({ part }: MessageTool
 
           {state.status === "error" && (
             <div className="text-destructive">
-              <span className="font-medium">Error:</span> {state.error}
+              <span className="font-medium">Error:</span>{" "}
+              {typeof state.error === "string" ? state.error : JSON.stringify(state.error)}
             </div>
           )}
 

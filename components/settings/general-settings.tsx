@@ -30,15 +30,71 @@ import {
   DEFAULT_FONT_SIZE,
   DEFAULT_MOBILE_FONT_SIZE,
   DEFAULT_TAB_SIZE,
+  APP_THEMES,
 } from "@/hooks/use-settings"
-import type { FontSize, MobileFontSize, TabSize } from "@/hooks/use-settings"
+import type { FontSize, MobileFontSize, TabSize, AppTheme } from "@/hooks/use-settings"
+import { useTheme } from "@/components/providers/theme-provider"
 
 export function GeneralSettings() {
   return (
     <div className="space-y-6">
+      <AppearanceSettingsCard />
       <EditorSettingsCard />
       <CommandSettingsCard />
     </div>
+  )
+}
+
+const THEME_SWATCHES: Record<AppTheme, { bg: string; accent: string }> = {
+  system: { bg: "linear-gradient(135deg, #1e1e2e 50%, #eff1f5 50%)", accent: "#cba6f7" },
+  "default-dark": { bg: "#1a1a1a", accent: "#a0a0a0" },
+  "default-light": { bg: "#f5f5f5", accent: "#333333" },
+  "catppuccin-latte": { bg: "#eff1f5", accent: "#8839ef" },
+  "catppuccin-frappe": { bg: "#303446", accent: "#ca9ee6" },
+  "catppuccin-macchiato": { bg: "#24273a", accent: "#c6a0f6" },
+  "catppuccin-mocha": { bg: "#1e1e2e", accent: "#cba6f7" },
+  dracula: { bg: "#282a36", accent: "#bd93f9" },
+}
+
+function AppearanceSettingsCard() {
+  const { theme: currentTheme, setTheme } = useTheme()
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Appearance</CardTitle>
+        <CardDescription>Choose your color theme</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {APP_THEMES.map((t) => {
+            const isActive = currentTheme === t.value
+            const swatch = THEME_SWATCHES[t.value]
+            return (
+              <button
+                key={t.value}
+                data-testid={`theme-${t.value}`}
+                onClick={() => setTheme(t.value)}
+                className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs transition-colors hover:bg-accent/50 ${
+                  isActive ? "border-primary ring-2 ring-primary/30" : "border-border"
+                }`}
+              >
+                <div
+                  className="h-10 w-full rounded-md border border-border/50"
+                  style={{ background: swatch.bg }}
+                >
+                  <div
+                    className="ml-2 mt-2 h-3 w-3 rounded-full"
+                    style={{ background: swatch.accent }}
+                  />
+                </div>
+                <span className="font-medium truncate max-w-full">{t.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

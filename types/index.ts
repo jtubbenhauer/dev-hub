@@ -29,6 +29,7 @@ export interface Workspace {
   opencodeUrl: string | null
   agentUrl: string | null
   providerMeta: Record<string, unknown> | null
+  worktreeSymlinks: string[] | null
   createdAt: Date
   lastAccessedAt: Date
 }
@@ -197,6 +198,7 @@ export interface WorktreeCreateInput {
   newBranch: boolean
   basePath?: string // override default sibling dir location
   startPoint?: string // for new branches, which commit/branch to start from
+  symlinkPaths?: string[]
 }
 
 export interface WorktreeCreateResult {
@@ -378,6 +380,9 @@ export interface GitHubPullRequest {
   additions: number
   deletions: number
   changed_files: number
+  mergeable: boolean | null
+  mergeable_state: string
+  merge_commit_sha: string | null
 }
 
 export type GitHubPullRequestFileStatus =
@@ -442,6 +447,30 @@ export interface GitHubPrFileContent {
   path: string
   language: string
   patch: string | undefined
+}
+
+export type GitHubMergeMethod = "merge" | "squash" | "rebase"
+
+export type GitHubCheckStatus = "queued" | "in_progress" | "completed"
+
+export type GitHubCheckConclusion =
+  | "success"
+  | "failure"
+  | "neutral"
+  | "cancelled"
+  | "skipped"
+  | "timed_out"
+  | "action_required"
+  | null
+
+export interface GitHubCheckRun {
+  id: number
+  name: string
+  status: GitHubCheckStatus
+  conclusion: GitHubCheckConclusion
+  html_url: string
+  started_at: string | null
+  completed_at: string | null
 }
 
 // Workspace Provider types

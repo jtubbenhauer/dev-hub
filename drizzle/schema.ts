@@ -36,6 +36,7 @@ export const workspaces = sqliteTable("workspaces", {
   opencodeUrl: text("opencode_url"),
   agentUrl: text("agent_url"),
   providerMeta: text("provider_meta", { mode: "json" }),
+  worktreeSymlinks: text("worktree_symlinks", { mode: "json" }).$type<string[]>(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -48,7 +49,7 @@ export const commandHistory = sqliteTable("command_history", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   workspaceId: text("workspace_id")
     .notNull()
-    .references(() => workspaces.id),
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   command: text("command").notNull(),
   exitCode: integer("exit_code"),
   executedAt: integer("executed_at", { mode: "timestamp" })

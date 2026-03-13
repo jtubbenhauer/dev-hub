@@ -2,15 +2,16 @@
 
 import { useEffect, useRef, useCallback } from "react"
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, rectangularSelection } from "@codemirror/view"
-import { EditorState, type Extension } from "@codemirror/state"
+import { EditorState, type Extension, Compartment } from "@codemirror/state"
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands"
 import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language"
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search"
 import { lintKeymap } from "@codemirror/lint"
-import { githubDark } from "@fsegurai/codemirror-theme-github-dark"
 import { vim, Vim } from "@replit/codemirror-vim"
 import { useEditorStore } from "@/stores/editor-store"
+import { getCM6Theme } from "@/lib/editor/catppuccin-theme"
+import { useTheme } from "@/components/providers/theme-provider"
 import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
@@ -33,7 +34,9 @@ export function CodeEditor({
 }: CodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const themeCompartmentRef = useRef(new Compartment())
   const isVimMode = useEditorStore((s) => s.isVimMode)
+  const { theme } = useTheme()
   const { fontSize } = useFontSizeSetting()
   const { mobileFontSize } = useMobileFontSizeSetting()
   const { tabSize } = useTabSizeSetting()
@@ -58,7 +61,7 @@ export function CodeEditor({
       highlightActiveLine(),
       highlightSelectionMatches(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-      githubDark,
+      themeCompartmentRef.current.of(getCM6Theme(theme)),
       keymap.of([
         ...closeBracketsKeymap,
         ...defaultKeymap,
@@ -111,7 +114,7 @@ export function CodeEditor({
     }
 
     return extensions
-  }, [isVimMode, language, fontSize, mobileFontSize, isMobile, tabSize])
+  }, [isVimMode, language, fontSize, mobileFontSize, isMobile, tabSize, theme])
 
   // Create or recreate the editor when vim mode or language changes
   useEffect(() => {
@@ -138,6 +141,14 @@ export function CodeEditor({
     // content intentionally excluded — we only want to rebuild on mode/lang changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildExtensions])
+
+  // Reconfigure theme dynamically without rebuilding the editor
+  useEffect(() => {
+    if (!viewRef.current) return
+    viewRef.current.dispatch({
+      effects: themeCompartmentRef.current.reconfigure(getCM6Theme(theme)),
+    })
+  }, [theme])
 
   // Sync content from outside without rebuilding the editor
   useEffect(() => {

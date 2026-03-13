@@ -147,3 +147,33 @@ export async function pruneWorktrees(repoPath: string): Promise<void> {
   const git = createGit(repoPath)
   await git.raw(["worktree", "prune"])
 }
+
+export async function createSymlinks(
+  parentRepoPath: string,
+  worktreePath: string,
+  symlinkPaths: string[]
+): Promise<{ created: string[]; skipped: string[] }> {
+  const created: string[] = []
+  const skipped: string[] = []
+
+  for (const relPath of symlinkPaths) {
+    const sourcePath = path.join(parentRepoPath, relPath)
+    const targetPath = path.join(worktreePath, relPath)
+
+    if (!fs.existsSync(sourcePath)) {
+      skipped.push(relPath)
+      continue
+    }
+
+    if (fs.existsSync(targetPath)) {
+      skipped.push(relPath)
+      continue
+    }
+
+    await fs.promises.mkdir(path.dirname(targetPath), { recursive: true })
+    await fs.promises.symlink(sourcePath, targetPath)
+    created.push(relPath)
+  }
+
+  return { created, skipped }
+}

@@ -5,7 +5,7 @@ import { workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 
-const PLANS_RELATIVE_PATH = ".opencode/plans"
+const PLAN_DIRECTORIES = [".opencode/plans", ".sisyphus/plans"]
 
 export interface PlanFile {
   name: string
@@ -41,21 +41,27 @@ export async function GET(request: NextRequest) {
   const workspace = toWorkspace(row)
   const backend = getBackend(workspace)
 
-  try {
-    const entries = await backend.listDirectory(PLANS_RELATIVE_PATH, 1)
-    const files: PlanFile[] = entries
-      .filter((entry) => entry.type === "file" && entry.name.endsWith(".md"))
-      .map((entry) => ({
-        name: entry.name,
-        path: `${PLANS_RELATIVE_PATH}/${entry.name}`,
-        // listDirectory doesn't return mtime — use current time as fallback
-        lastModified: new Date().toISOString(),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name))
+  const seen = new Set<string>()
+  const allFiles: PlanFile[] = []
 
-    return NextResponse.json({ files })
-  } catch {
-    // Directory doesn't exist
-    return NextResponse.json({ files: [] })
+  for (const dir of PLAN_DIRECTORIES) {
+    try {
+      const entries = await backend.listDirectory(dir, 1)
+      for (const entry of entries) {
+        if (entry.type !== "file" || !entry.name.endsWith(".md")) continue
+        if (seen.has(entry.name)) continue
+        seen.add(entry.name)
+        allFiles.push({
+          name: entry.name,
+          path: `${dir}/${entry.name}`,
+          lastModified: new Date().toISOString(),
+        })
+      }
+    } catch {
+      // Directory doesn't exist, skip
+    }
   }
+
+  allFiles.sort((a, b) => a.name.localeCompare(b.name))
+  return NextResponse.json({ files: allFiles })
 }

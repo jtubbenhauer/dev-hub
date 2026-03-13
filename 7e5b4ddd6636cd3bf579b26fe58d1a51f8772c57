@@ -1,0 +1,29 @@
+components/tasks/tasks-page.tsx
+  b004fa097b3d5ee2 3,5-7,14,32,65-67,139-150,164-166,171,192-199,201-202,205-215,217-221,223-227,229-230,232-239,241-248,251-259,261-268,270-305,307
+tests/tasks-mobile.spec.ts
+  b004fa097b3d5ee2 1-325
+components/tasks/task-sidebar.tsx
+  b004fa097b3d5ee2 223
+components/tasks/task-detail-panel.tsx
+  b004fa097b3d5ee2 23,120,123,140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "7e5b4ddd6636cd3bf579b26fe58d1a51f8772c57",
+  "prompts": {
+    "b004fa097b3d5ee2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_316a7c8e3ffeA9yHgwij89Lman",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 466,
+      "total_deletions": 54,
+      "accepted_lines": 464,
+      "overriden_lines": 0
+    }
+  }
+}

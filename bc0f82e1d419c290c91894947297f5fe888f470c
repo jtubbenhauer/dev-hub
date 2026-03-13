@@ -1,0 +1,23 @@
+.github/workflows/ci.yml
+  1152708178a07ec9 30-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "bc0f82e1d419c290c91894947297f5fe888f470c",
+  "prompts": {
+    "1152708178a07ec9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_316f2c3c6ffeOhp2ntrN3c1Abm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -57,8 +57,14 @@ function formatDuration(ms: number): string {
   return `${minutes}m`
 }
 
-function CustomFieldValue({ field }: { field: ClickUpCustomField }) {
+export function CustomFieldValue({ field }: { field: ClickUpCustomField }) {
   if (field.value == null || field.value === "") return <span className="text-muted-foreground">—</span>
+
+  if (typeof field.value === "object" && field.value !== null && "percent_completed" in field.value) {
+    const v = field.value as { percent_completed?: number; current?: string }
+    const pct = v.percent_completed ?? Number(v.current) / 100
+    return <span>{isNaN(pct) ? "—" : `${Math.round(pct * 100)}%`}</span>
+  }
 
   switch (field.type) {
     case "number":
@@ -109,7 +115,7 @@ function CustomFieldValue({ field }: { field: ClickUpCustomField }) {
       )
     }
     default:
-      return <span className="text-xs text-muted-foreground break-all">{JSON.stringify(field.value)}</span>
+      return <span className="text-xs text-muted-foreground break-all">{typeof field.value === "string" ? field.value : JSON.stringify(field.value)}</span>
   }
 }
 

@@ -36,7 +36,6 @@ interface TaskSidebarProps {
   onSelect: (selection: SidebarSelection) => void
   searchQuery: string
   onSearchChange: (query: string) => void
-  style?: React.CSSProperties
 }
 
 function PinnedViewItem({
@@ -181,7 +180,7 @@ function HierarchySkeleton() {
   )
 }
 
-export function TaskSidebar({ selection, onSelect, searchQuery, onSearchChange, style }: TaskSidebarProps) {
+export function TaskSidebar({ selection, onSelect, searchQuery, onSearchChange }: TaskSidebarProps) {
   const { isConfigured } = useClickUpSettings()
   const { pinnedViews } = useClickUpPinnedViews()
   const { data: hierarchy, isLoading: isLoadingHierarchy } = useClickUpHierarchy({ enabled: isConfigured })
@@ -221,7 +220,7 @@ export function TaskSidebar({ selection, onSelect, searchQuery, onSearchChange, 
   const pinnedViewIds = new Set(pinnedViews.map((v) => v.id))
 
   return (
-    <aside className="flex flex-col h-full border-r shrink-0 bg-sidebar" style={style}>
+    <aside className="flex flex-col h-full border-r shrink-0 bg-sidebar">
       <div className="p-2 border-b">
         <TaskSearch
           value={searchQuery}

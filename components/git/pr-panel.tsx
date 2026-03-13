@@ -4,21 +4,36 @@ import { useState, useCallback, useMemo, useRef } from "react"
 import {
   ExternalLink,
   GitPullRequest,
+  GitMerge,
   Loader2,
   GripVertical,
   ChevronDown,
+  ChevronUp,
   Check,
   X,
   MessageSquare,
   PanelLeft,
+  Circle,
+  CircleDot,
+  AlertCircle,
+  Clock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { PrFileList } from "@/components/git/pr-file-list"
 import { PrDiffEditor } from "@/components/git/pr-diff-editor"
@@ -28,29 +43,45 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import {
   useGitHubPrsAwaitingReview,
+  useGitHubPrsCreatedByMe,
   useGitHubPrFiles,
   useGitHubPrComments,
+  useGitHubPrReviews,
+  useGitHubPrChecks,
   useGitHubPrFileContent,
   useGitHubAddComment,
   useGitHubReplyToComment,
   useGitHubSubmitReview,
+  useGitHubMergePr,
+  useGitHubCurrentUser,
 } from "@/hooks/use-github"
-import type { GitHubPullRequest, GitHubReviewEvent } from "@/types"
+import type {
+  GitHubPullRequest,
+  GitHubReviewEvent,
+  GitHubReview,
+  GitHubCheckRun,
+  GitHubMergeMethod,
+  GitHubUser,
+} from "@/types"
 
 const MIN_PANEL_WIDTH = 200
 const MAX_PANEL_WIDTH = 500
 const DEFAULT_PANEL_WIDTH = 280
+
+type PrTab = "for-review" | "my-prs"
 
 interface PrPanelProps {
   onClose: () => void
 }
 
 export function PrPanel({ onClose }: PrPanelProps) {
+  const [activeTab, setActiveTab] = useState<PrTab>("for-review")
   const [selectedPr, setSelectedPr] = useState<GitHubPullRequest | null>(null)
   const [selectedFilename, setSelectedFilename] = useState<string | null>(null)
   const [reviewedFilenames, setReviewedFilenames] = useState<Set<string>>(new Set())
   const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false)
   const [isPrListOpen, setIsPrListOpen] = useState(false)
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false)
 
   const isMobile = useIsMobile()
   const editorHandleRef = useRef<PrDiffEditorHandle>(null)
@@ -60,7 +91,9 @@ export function PrPanel({ onClose }: PrPanelProps) {
     defaultWidth: DEFAULT_PANEL_WIDTH,
   })
 
-  const { data: prs = [], isLoading: isPrsLoading } = useGitHubPrsAwaitingReview()
+  const { data: reviewPrs = [], isLoading: isReviewPrsLoading } = useGitHubPrsAwaitingReview()
+  const { data: myPrs = [], isLoading: isMyPrsLoading } = useGitHubPrsCreatedByMe()
+  const { data: currentUser } = useGitHubCurrentUser()
 
   const owner = selectedPr?.base.repo.owner.login ?? null
   const repo = selectedPr?.base.repo.name ?? null
@@ -70,6 +103,8 @@ export function PrPanel({ onClose }: PrPanelProps) {
 
   const { data: prFiles = [], isLoading: isFilesLoading } = useGitHubPrFiles(owner, repo, prNumber)
   const { data: prComments = [] } = useGitHubPrComments(owner, repo, prNumber)
+  const { data: prReviews = [] } = useGitHubPrReviews(owner, repo, prNumber)
+  const { data: prChecks = [] } = useGitHubPrChecks(owner, repo, headSha)
 
   const selectedFile = prFiles.find((f) => f.filename === selectedFilename) ?? null
 
@@ -84,6 +119,9 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const addCommentMutation = useGitHubAddComment(owner, repo, prNumber)
   const replyToCommentMutation = useGitHubReplyToComment(owner, repo, prNumber)
   const submitReviewMutation = useGitHubSubmitReview(owner, repo, prNumber)
+  const mergeMutation = useGitHubMergePr()
+
+  const isMyPr = activeTab === "my-prs"
 
   const commentCountByFilename = useMemo(() => {
     const map = new Map<string, number>()
@@ -103,6 +141,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
     setSelectedFilename(null)
     setReviewedFilenames(new Set())
     setIsPrListOpen(false)
+    setIsDescriptionOpen(false)
   }, [])
 
   const handleSelectFile = useCallback((filename: string) => {
@@ -161,7 +200,18 @@ export function PrPanel({ onClose }: PrPanelProps) {
     [owner, repo, prNumber, submitReviewMutation]
   )
 
-  if (isPrsLoading) {
+  const handleMerge = useCallback(
+    (mergeMethod: GitHubMergeMethod) => {
+      if (!owner || !repo || !prNumber) return
+      mergeMutation.mutate({ owner, repo, prNumber, mergeMethod })
+    },
+    [owner, repo, prNumber, mergeMutation]
+  )
+
+  const isPrsLoading = activeTab === "for-review" ? isReviewPrsLoading : isMyPrsLoading
+  const activePrs = activeTab === "for-review" ? reviewPrs : myPrs
+
+  if (isPrsLoading && !selectedPr) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -170,7 +220,19 @@ export function PrPanel({ onClose }: PrPanelProps) {
   }
 
   if (!selectedPr) {
-    return <PrListView prs={prs} isLoading={isPrsLoading} onSelect={handleSelectPr} onClose={onClose} />
+    return (
+      <PrListView
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        reviewPrs={reviewPrs}
+        myPrs={myPrs}
+        isReviewLoading={isReviewPrsLoading}
+        isMyPrsLoading={isMyPrsLoading}
+        onSelect={handleSelectPr}
+        onClose={onClose}
+        currentUser={currentUser ?? null}
+      />
+    )
   }
 
   const isSubmittingComment = addCommentMutation.isPending || replyToCommentMutation.isPending
@@ -192,6 +254,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
           </div>
           <ChevronDown className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
         </button>
+        <ChecksStatusBadge checks={prChecks} />
         <a
           href={selectedPr.html_url}
           target="_blank"
@@ -204,6 +267,14 @@ export function PrPanel({ onClose }: PrPanelProps) {
           <X className="size-3.5" />
         </Button>
       </div>
+
+      {/* PR description + review status collapsible */}
+      <PrDetailBar
+        pr={selectedPr}
+        reviews={prReviews}
+        isOpen={isDescriptionOpen}
+        onToggle={() => setIsDescriptionOpen((prev) => !prev)}
+      />
 
       {/* Main area */}
       <div className="flex min-h-0 flex-1">
@@ -309,12 +380,21 @@ export function PrPanel({ onClose }: PrPanelProps) {
         </div>
       </div>
 
-      {/* Review submission bar */}
-      {selectedPr && (
+      {/* Bottom bar — review or merge */}
+      {selectedPr && !isMyPr && (
         <ReviewSubmitBar
           onSubmit={handleSubmitReview}
           isSubmitting={submitReviewMutation.isPending}
           commentCount={prComments.length}
+        />
+      )}
+      {selectedPr && isMyPr && (
+        <MergeActionBar
+          pr={selectedPr}
+          checks={prChecks}
+          reviews={prReviews}
+          onMerge={handleMerge}
+          isMerging={mergeMutation.isPending}
         />
       )}
 
@@ -322,66 +402,133 @@ export function PrPanel({ onClose }: PrPanelProps) {
       <Sheet open={isPrListOpen} onOpenChange={setIsPrListOpen}>
         <SheetContent side="left" className="w-[320px] p-0" showCloseButton={false}>
           <SheetHeader className="border-b px-3 py-2">
-            <SheetTitle className="text-sm">PRs awaiting review</SheetTitle>
+            <SheetTitle className="text-sm">
+              {activeTab === "for-review" ? "PRs awaiting review" : "My PRs"}
+            </SheetTitle>
           </SheetHeader>
-          <PrListItems prs={prs} selectedPr={selectedPr} onSelect={handleSelectPr} />
+          <PrListItems
+            prs={activePrs}
+            selectedPr={selectedPr}
+            onSelect={handleSelectPr}
+            currentUser={currentUser ?? null}
+          />
         </SheetContent>
       </Sheet>
     </div>
   )
 }
 
-// ─── PR list (initial empty state view) ──────────────────────────────────────
+// ─── PR list (initial empty state view with tabs) ────────────────────────────
 
 interface PrListViewProps {
-  prs: GitHubPullRequest[]
-  isLoading: boolean
+  activeTab: PrTab
+  onTabChange: (tab: PrTab) => void
+  reviewPrs: GitHubPullRequest[]
+  myPrs: GitHubPullRequest[]
+  isReviewLoading: boolean
+  isMyPrsLoading: boolean
   onSelect: (pr: GitHubPullRequest) => void
   onClose: () => void
+  currentUser: GitHubUser | null
 }
 
-function PrListView({ prs, isLoading, onSelect, onClose }: PrListViewProps) {
+function PrListView({
+  activeTab,
+  onTabChange,
+  reviewPrs,
+  myPrs,
+  isReviewLoading,
+  isMyPrsLoading,
+  onSelect,
+  onClose,
+  currentUser,
+}: PrListViewProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-medium">
           <GitPullRequest className="size-4" />
-          PRs awaiting your review
+          Pull Requests
         </div>
         <Button variant="ghost" size="icon-xs" onClick={onClose}>
           <X className="size-3.5" />
         </Button>
       </div>
-      {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : prs.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-          <Check className="size-8 text-green-500" />
-          <p className="text-sm font-medium">All caught up!</p>
-          <p className="text-xs text-muted-foreground">No PRs are waiting for your review.</p>
-        </div>
-      ) : (
-        <PrListItems prs={prs} selectedPr={null} onSelect={onSelect} />
-      )}
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => onTabChange(v as PrTab)}
+        className="flex min-h-0 flex-1 flex-col gap-0"
+      >
+        <TabsList variant="line" className="shrink-0 w-full border-b px-2 pt-1">
+          <TabsTrigger value="for-review" className="text-xs">
+            For Review
+            {reviewPrs.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                {reviewPrs.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="my-prs" className="text-xs">
+            My PRs
+            {myPrs.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                {myPrs.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="for-review" className="min-h-0 flex-1">
+          {isReviewLoading ? (
+            <div className="flex flex-1 items-center justify-center py-12">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : reviewPrs.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+              <Check className="size-8 text-green-500" />
+              <p className="text-sm font-medium">All caught up!</p>
+              <p className="text-xs text-muted-foreground">No PRs are waiting for your review.</p>
+            </div>
+          ) : (
+            <PrListItems prs={reviewPrs} selectedPr={null} onSelect={onSelect} currentUser={currentUser} />
+          )}
+        </TabsContent>
+        <TabsContent value="my-prs" className="min-h-0 flex-1">
+          {isMyPrsLoading ? (
+            <div className="flex flex-1 items-center justify-center py-12">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : myPrs.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+              <GitPullRequest className="size-8 text-muted-foreground" />
+              <p className="text-sm font-medium">No open PRs</p>
+              <p className="text-xs text-muted-foreground">You don&apos;t have any open pull requests.</p>
+            </div>
+          ) : (
+            <PrListItems prs={myPrs} selectedPr={null} onSelect={onSelect} currentUser={currentUser} />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
+
+// ─── PR list items ───────────────────────────────────────────────────────────
 
 interface PrListItemsProps {
   prs: GitHubPullRequest[]
   selectedPr: GitHubPullRequest | null
   onSelect: (pr: GitHubPullRequest) => void
+  currentUser: GitHubUser | null
 }
 
-function PrListItems({ prs, selectedPr, onSelect }: PrListItemsProps) {
+function PrListItems({ prs, selectedPr, onSelect, currentUser }: PrListItemsProps) {
   return (
     <ScrollArea className="min-h-0 flex-1">
       <div className="space-y-px p-2">
         {prs.map((pr) => {
           const repoName = pr.base.repo.full_name
           const isSelected = selectedPr?.number === pr.number && selectedPr?.base.repo.full_name === repoName
+          const isOwnPr = currentUser?.login === pr.user.login
           return (
             <button
               key={`${repoName}/${pr.number}`}
@@ -399,7 +546,7 @@ function PrListItems({ prs, selectedPr, onSelect }: PrListItemsProps) {
                     {repoName} #{pr.number}
                   </p>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span>{pr.user.login}</span>
+                    {!isOwnPr && <span>{pr.user.login}</span>}
                     {pr.review_comments > 0 && (
                       <span className="flex items-center gap-0.5">
                         <MessageSquare className="size-3" />
@@ -411,6 +558,7 @@ function PrListItems({ prs, selectedPr, onSelect }: PrListItemsProps) {
                         Draft
                       </span>
                     )}
+                    <PrListChecksBadge owner={pr.base.repo.owner.login} repo={pr.base.repo.name} headSha={pr.head.sha} />
                     <span className="ml-auto">
                       +{pr.additions} -{pr.deletions}
                     </span>
@@ -423,6 +571,248 @@ function PrListItems({ prs, selectedPr, onSelect }: PrListItemsProps) {
       </div>
     </ScrollArea>
   )
+}
+
+// ─── CI checks badge for PR list items ───────────────────────────────────────
+
+function PrListChecksBadge({ owner, repo, headSha }: { owner: string; repo: string; headSha: string }) {
+  const { data: checks = [] } = useGitHubPrChecks(owner, repo, headSha)
+  if (checks.length === 0) return null
+
+  const summary = summarizeChecks(checks)
+  return <ChecksIcon status={summary} size="sm" />
+}
+
+// ─── PR description + review status (collapsible detail bar) ─────────────────
+
+interface PrDetailBarProps {
+  pr: GitHubPullRequest
+  reviews: GitHubReview[]
+  isOpen: boolean
+  onToggle: () => void
+}
+
+function PrDetailBar({ pr, reviews, isOpen, onToggle }: PrDetailBarProps) {
+  const latestReviews = useMemo(() => getLatestReviews(reviews), [reviews])
+  const pendingReviewers = pr.requested_reviewers
+
+  const hasReviewInfo = latestReviews.length > 0 || pendingReviewers.length > 0
+  const hasDescription = !!pr.body?.trim()
+
+  if (!hasDescription && !hasReviewInfo) return null
+
+  return (
+    <div className="shrink-0 border-b">
+      <button
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/30 transition-colors"
+        onClick={onToggle}
+      >
+        <span className="flex-1 text-[11px] text-muted-foreground">
+          {hasReviewInfo && (
+            <span className="inline-flex items-center gap-1.5">
+              {latestReviews.map((r) => (
+                <ReviewStatusDot key={r.user.id} review={r} />
+              ))}
+              {pendingReviewers.map((u) => (
+                <Tooltip key={u.id}>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+                      <Clock className="size-2.5" />
+                      <span className="text-[10px]">{u.login}</span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Review pending from {u.login}</TooltipContent>
+                </Tooltip>
+              ))}
+            </span>
+          )}
+        </span>
+        {isOpen ? <ChevronUp className="size-3 text-muted-foreground" /> : <ChevronDown className="size-3 text-muted-foreground" />}
+      </button>
+      {isOpen && (
+        <div className="px-3 pb-2 space-y-2">
+          {hasDescription && (
+            <div className="rounded-md bg-muted/30 px-3 py-2 text-xs text-foreground whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+              {pr.body}
+            </div>
+          )}
+          {hasReviewInfo && (
+            <div className="space-y-1">
+              {latestReviews.map((r) => (
+                <div key={r.id} className="flex items-center gap-2 text-[11px]">
+                  <ReviewStatusBadge state={r.state} />
+                  <span className="text-foreground">{r.user.login}</span>
+                </div>
+              ))}
+              {pendingReviewers.map((u) => (
+                <div key={u.id} className="flex items-center gap-2 text-[11px]">
+                  <Badge variant="outline" className="h-4 px-1 text-[10px] text-muted-foreground">
+                    <Clock className="mr-0.5 size-2.5" />
+                    Pending
+                  </Badge>
+                  <span className="text-foreground">{u.login}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Review status helpers ───────────────────────────────────────────────────
+
+function ReviewStatusDot({ review }: { review: GitHubReview }) {
+  const config = getReviewStateConfig(review.state)
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn("inline-flex items-center gap-0.5", config.textColor)}>
+          <config.Icon className="size-2.5" />
+          <span className="text-[10px]">{review.user.login}</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{config.label} by {review.user.login}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+function ReviewStatusBadge({ state }: { state: GitHubReview["state"] }) {
+  const config = getReviewStateConfig(state)
+  return (
+    <Badge variant="outline" className={cn("h-4 px-1 text-[10px]", config.textColor)}>
+      <config.Icon className="mr-0.5 size-2.5" />
+      {config.label}
+    </Badge>
+  )
+}
+
+function getReviewStateConfig(state: GitHubReview["state"]) {
+  switch (state) {
+    case "APPROVED":
+      return { Icon: Check, label: "Approved", textColor: "text-green-500" }
+    case "CHANGES_REQUESTED":
+      return { Icon: X, label: "Changes requested", textColor: "text-yellow-600" }
+    case "COMMENTED":
+      return { Icon: MessageSquare, label: "Commented", textColor: "text-muted-foreground" }
+    case "DISMISSED":
+      return { Icon: X, label: "Dismissed", textColor: "text-muted-foreground" }
+    default:
+      return { Icon: Circle, label: "Pending", textColor: "text-muted-foreground" }
+  }
+}
+
+function getLatestReviews(reviews: GitHubReview[]): GitHubReview[] {
+  const byUser = new Map<number, GitHubReview>()
+  for (const review of reviews) {
+    // skip PENDING reviews (draft reviews not yet submitted)
+    if (review.state === "PENDING") continue
+    const existing = byUser.get(review.user.id)
+    if (!existing || (review.submitted_at && existing.submitted_at && review.submitted_at > existing.submitted_at)) {
+      byUser.set(review.user.id, review)
+    }
+  }
+  return Array.from(byUser.values())
+}
+
+// ─── CI checks status ───────────────────────────────────────────────────────
+
+type ChecksSummary = "success" | "pending" | "failure" | "neutral"
+
+function summarizeChecks(checks: GitHubCheckRun[]): ChecksSummary {
+  if (checks.length === 0) return "neutral"
+  const hasFailure = checks.some(
+    (c) => c.conclusion === "failure" || c.conclusion === "timed_out" || c.conclusion === "action_required"
+  )
+  if (hasFailure) return "failure"
+  const hasPending = checks.some((c) => c.status !== "completed")
+  if (hasPending) return "pending"
+  return "success"
+}
+
+function ChecksIcon({ status, size = "md" }: { status: ChecksSummary; size?: "sm" | "md" }) {
+  const iconSize = size === "sm" ? "size-3" : "size-3.5"
+  switch (status) {
+    case "success":
+      return <Check className={cn(iconSize, "text-green-500")} />
+    case "pending":
+      return <CircleDot className={cn(iconSize, "text-yellow-500 animate-pulse")} />
+    case "failure":
+      return <AlertCircle className={cn(iconSize, "text-red-500")} />
+    default:
+      return null
+  }
+}
+
+function ChecksStatusBadge({ checks }: { checks: GitHubCheckRun[] }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  if (checks.length === 0) return null
+
+  const summary = summarizeChecks(checks)
+
+  return (
+    <div className="relative">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsExpanded((prev) => !prev)
+            }}
+          >
+            <ChecksIcon status={summary} />
+            <span>{checks.length}</span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {summary === "success" && "All checks passed"}
+          {summary === "pending" && "Checks in progress"}
+          {summary === "failure" && "Some checks failed"}
+          {summary === "neutral" && "No checks"}
+        </TooltipContent>
+      </Tooltip>
+      {isExpanded && (
+        <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover p-2 shadow-md">
+          <div className="space-y-1">
+            {checks.map((check) => (
+              <a
+                key={check.id}
+                href={check.html_url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 rounded-sm px-2 py-1 text-[11px] hover:bg-accent/50 transition-colors"
+              >
+                <CheckRunIcon check={check} />
+                <span className="truncate flex-1">{check.name}</span>
+                <ExternalLink className="size-2.5 shrink-0 text-muted-foreground" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CheckRunIcon({ check }: { check: GitHubCheckRun }) {
+  if (check.status !== "completed") {
+    return <CircleDot className="size-3 shrink-0 text-yellow-500 animate-pulse" />
+  }
+  switch (check.conclusion) {
+    case "success":
+      return <Check className="size-3 shrink-0 text-green-500" />
+    case "failure":
+    case "timed_out":
+    case "action_required":
+      return <X className="size-3 shrink-0 text-red-500" />
+    case "skipped":
+    case "neutral":
+      return <Circle className="size-3 shrink-0 text-muted-foreground" />
+    default:
+      return <Circle className="size-3 shrink-0 text-muted-foreground" />
+  }
 }
 
 // ─── Review submission bar ────────────────────────────────────────────────────
@@ -539,6 +929,110 @@ function ReviewSubmitBar({ onSubmit, isSubmitting, commentCount }: ReviewSubmitB
           </TooltipTrigger>
           <TooltipContent>Approve this pull request</TooltipContent>
         </Tooltip>
+      </div>
+    </div>
+  )
+}
+
+// ─── Merge action bar ─────────────────────────────────────────────────────────
+
+interface MergeActionBarProps {
+  pr: GitHubPullRequest
+  checks: GitHubCheckRun[]
+  reviews: GitHubReview[]
+  onMerge: (method: GitHubMergeMethod) => void
+  isMerging: boolean
+}
+
+function MergeActionBar({ pr, checks, reviews, onMerge, isMerging }: MergeActionBarProps) {
+  const [mergeMethod, setMergeMethod] = useState<GitHubMergeMethod>("squash")
+
+  const checksSummary = summarizeChecks(checks)
+  const latestReviews = useMemo(() => getLatestReviews(reviews), [reviews])
+  const hasChangesRequested = latestReviews.some((r) => r.state === "CHANGES_REQUESTED")
+  const hasConflicts = pr.mergeable === false || pr.mergeable_state === "dirty"
+  const isChecksFailing = checksSummary === "failure"
+  const isBlocked = pr.mergeable_state === "blocked"
+  const isBehind = pr.mergeable_state === "behind"
+  const isUnstable = pr.mergeable_state === "unstable"
+  const isClean = pr.mergeable_state === "clean"
+
+  // "blocked" means branch protection rules aren't satisfied (e.g. required reviews missing)
+  const isMergeDisabled = isMerging || hasConflicts || pr.draft || isBlocked
+
+  return (
+    <div className="shrink-0 border-t bg-muted/10 px-3 py-2">
+      <div className="flex items-center gap-2">
+        {/* Status warnings */}
+        <div className="flex flex-1 items-center gap-2 text-[11px] flex-wrap">
+          {hasConflicts && (
+            <span className="flex items-center gap-1 text-red-500">
+              <AlertCircle className="size-3" />
+              Conflicts
+            </span>
+          )}
+          {isChecksFailing && (
+            <span className="flex items-center gap-1 text-red-500">
+              <X className="size-3" />
+              Checks failing
+            </span>
+          )}
+          {hasChangesRequested && (
+            <span className="flex items-center gap-1 text-yellow-600">
+              <AlertCircle className="size-3" />
+              Changes requested
+            </span>
+          )}
+          {isBlocked && !hasConflicts && (
+            <span className="flex items-center gap-1 text-yellow-600">
+              <AlertCircle className="size-3" />
+              Required checks not met
+            </span>
+          )}
+          {isBehind && (
+            <span className="flex items-center gap-1 text-yellow-600">
+              <AlertCircle className="size-3" />
+              Branch behind base
+            </span>
+          )}
+          {isUnstable && !isChecksFailing && (
+            <span className="flex items-center gap-1 text-yellow-600">
+              <CircleDot className="size-3" />
+              Checks pending
+            </span>
+          )}
+          {isClean && !hasChangesRequested && (
+            <span className="flex items-center gap-1 text-green-500">
+              <Check className="size-3" />
+              Ready to merge
+            </span>
+          )}
+        </div>
+
+        {/* Merge method selector + button */}
+        <Select value={mergeMethod} onValueChange={(v) => setMergeMethod(v as GitHubMergeMethod)}>
+          <SelectTrigger className="h-7 w-auto gap-1 text-xs border-r-0 rounded-r-none">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="squash">Squash and merge</SelectItem>
+            <SelectItem value="merge">Merge commit</SelectItem>
+            <SelectItem value="rebase">Rebase and merge</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          size="sm"
+          className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white rounded-l-none -ml-px"
+          onClick={() => onMerge(mergeMethod)}
+          disabled={isMergeDisabled}
+        >
+          {isMerging ? (
+            <Loader2 className="size-3 mr-1 animate-spin" />
+          ) : (
+            <GitMerge className="size-3 mr-1" />
+          )}
+          Merge
+        </Button>
       </div>
     </div>
   )

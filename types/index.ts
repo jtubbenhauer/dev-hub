@@ -380,6 +380,9 @@ export interface GitHubPullRequest {
   additions: number
   deletions: number
   changed_files: number
+  mergeable: boolean | null
+  mergeable_state: string
+  merge_commit_sha: string | null
 }
 
 export type GitHubPullRequestFileStatus =
@@ -444,6 +447,30 @@ export interface GitHubPrFileContent {
   path: string
   language: string
   patch: string | undefined
+}
+
+export type GitHubMergeMethod = "merge" | "squash" | "rebase"
+
+export type GitHubCheckStatus = "queued" | "in_progress" | "completed"
+
+export type GitHubCheckConclusion =
+  | "success"
+  | "failure"
+  | "neutral"
+  | "cancelled"
+  | "skipped"
+  | "timed_out"
+  | "action_required"
+  | null
+
+export interface GitHubCheckRun {
+  id: number
+  name: string
+  status: GitHubCheckStatus
+  conclusion: GitHubCheckConclusion
+  html_url: string
+  started_at: string | null
+  completed_at: string | null
 }
 
 // Workspace Provider types

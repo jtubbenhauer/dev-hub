@@ -10,6 +10,8 @@ import type {
   GitHubReviewEvent,
   GitHubPrFileContent,
   GitHubUser,
+  GitHubCheckRun,
+  GitHubMergeMethod,
 } from "@/types"
 
 const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
@@ -87,6 +89,27 @@ export function useGitHubPrsAwaitingReview() {
   })
 }
 
+export function useGitHubPrsCreatedByMe() {
+  return useQuery<GitHubPullRequest[]>({
+    queryKey: ["github", "prs-created-by-me"],
+    queryFn: async () => {
+      const data = await githubFetch<{ items: GitHubPullRequest[] }>(
+        "search/issues?q=is:open+is:pr+author:@me&per_page=50"
+      )
+      const items = data.items.slice(0, 20)
+      const prs = await Promise.all(
+        items.map((item) => {
+          const url = (item as unknown as { pull_request: { url: string } }).pull_request?.url ?? ""
+          const path = url.replace("https://api.github.com/", "")
+          return path ? githubFetch<GitHubPullRequest>(path) : Promise.resolve(item as unknown as GitHubPullRequest)
+        })
+      )
+      return prs
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useGitHubPrFiles(owner: string | null, repo: string | null, prNumber: number | null) {
   return useQuery<GitHubPullRequestFile[]>({
     queryKey: ["github", "pr-files", owner, repo, prNumber],
@@ -128,6 +151,20 @@ export function useGitHubCurrentUser() {
     queryKey: ["github", "current-user"],
     queryFn: () => githubFetch<GitHubUser>("user"),
     staleTime: 300_000,
+  })
+}
+
+export function useGitHubPrChecks(owner: string | null, repo: string | null, headSha: string | null) {
+  return useQuery<GitHubCheckRun[]>({
+    queryKey: ["github", "pr-checks", owner, repo, headSha],
+    queryFn: async () => {
+      const data = await githubFetch<{ check_runs: GitHubCheckRun[] }>(
+        `repos/${owner}/${repo}/commits/${headSha}/check-runs?per_page=100`
+      )
+      return data.check_runs
+    },
+    enabled: !!(owner && repo && headSha),
+    staleTime: 30_000,
   })
 }
 
@@ -306,6 +343,43 @@ export function useGitHubSubmitReview(owner: string | null, repo: string | null,
             ? "Changes requested"
             : "Review submitted"
       toast.success(label)
+    },
+    onError: (err: Error) => {
+      toast.error(err.message)
+    },
+  })
+}
+
+interface MergePrInput {
+  owner: string
+  repo: string
+  prNumber: number
+  mergeMethod: GitHubMergeMethod
+  commitTitle?: string
+  commitMessage?: string
+}
+
+export function useGitHubMergePr() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: MergePrInput) =>
+      githubFetch<{ sha: string; merged: boolean; message: string }>(
+        `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/merge`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            merge_method: input.mergeMethod,
+            commit_title: input.commitTitle,
+            commit_message: input.commitMessage,
+          }),
+        }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["github", "prs-awaiting-review"] })
+      queryClient.invalidateQueries({ queryKey: ["github", "prs-created-by-me"] })
+      toast.success("Pull request merged")
     },
     onError: (err: Error) => {
       toast.error(err.message)

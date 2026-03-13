@@ -9,7 +9,7 @@ import {
   drawSelection,
   rectangularSelection,
 } from "@codemirror/view"
-import { EditorState, type Extension } from "@codemirror/state"
+import { EditorState, type Extension, Compartment } from "@codemirror/state"
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands"
 import {
   syntaxHighlighting,
@@ -22,13 +22,14 @@ import {
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search"
 import { lintKeymap } from "@codemirror/lint"
-import { githubDark } from "@fsegurai/codemirror-theme-github-dark"
 import { unifiedMergeView, goToNextChunk, goToPreviousChunk } from "@codemirror/merge"
 import { vim, Vim } from "@replit/codemirror-vim"
 import { Check, ChevronRight, Loader2, Save, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VimToggle } from "@/components/editor/vim-toggle"
 import { useEditorStore } from "@/stores/editor-store"
+import { getCM6Theme } from "@/lib/editor/catppuccin-theme"
+import { useTheme } from "@/components/providers/theme-provider"
 import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
@@ -76,12 +77,14 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
 }, ref) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const themeCompartmentRef = useRef(new Compartment())
 
   useImperativeHandle(ref, () => ({
     focus: () => viewRef.current?.focus(),
     blur: () => viewRef.current?.contentDOM.blur(),
   }), [])
   const isVimMode = useEditorStore((s) => s.isVimMode)
+  const { theme } = useTheme()
   const { fontSize } = useFontSizeSetting()
   const { mobileFontSize } = useMobileFontSizeSetting()
   const { tabSize } = useTabSizeSetting()
@@ -139,7 +142,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
         closeBrackets(),
         highlightSelectionMatches(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        githubDark,
+        themeCompartmentRef.current.of(getCM6Theme(theme)),
         keymap.of([
           ...closeBracketsKeymap,
           ...defaultKeymap,
@@ -184,14 +187,14 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
           "del, del *": { textDecoration: "none !important" },
           // Line-level backgrounds: very subtle tints, no text color change
           ".cm-insertedLine": {
-            backgroundColor: "rgba(46, 160, 67, 0.03)",
+            backgroundColor: "var(--diff-add-line)",
             color: "inherit",
             textDecoration: "none",
             padding: "0",
             borderRadius: "0",
           },
           "ins.cm-insertedLine, ins.cm-insertedLine:not(:has(.cm-changedText))": {
-            backgroundColor: "rgba(46, 160, 67, 0.03) !important",
+            backgroundColor: "var(--diff-add-line) !important",
             color: "inherit !important",
             textDecoration: "none !important",
             border: "none !important",
@@ -199,7 +202,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
             borderRadius: "0 !important",
           },
           ".cm-deletedLine": {
-            backgroundColor: "rgba(248, 81, 73, 0.03)",
+            backgroundColor: "var(--diff-remove-line)",
             color: "inherit",
             textDecoration: "none",
             padding: "0",
@@ -207,7 +210,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
           },
           // The fsegurai `del, del:not(:has(.cm-deletedText))` selector is very broad — match it
           "del.cm-deletedLine, del, del:not(:has(.cm-deletedText))": {
-            backgroundColor: "rgba(248, 81, 73, 0.03) !important",
+            backgroundColor: "var(--diff-remove-line) !important",
             color: "inherit !important",
             textDecoration: "none !important",
             border: "none !important",
@@ -215,18 +218,18 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
             borderRadius: "0 !important",
           },
           // Changed lines (modified but not purely added/removed)
-          "&.cm-merge-b .cm-changedLine": { backgroundColor: "rgba(46, 160, 67, 0.02)" },
-          "&.cm-merge-a .cm-changedLine": { backgroundColor: "rgba(248, 81, 73, 0.02)" },
-          ".cm-deletedChunk": { backgroundColor: "rgba(248, 81, 73, 0.02)" },
+          "&.cm-merge-b .cm-changedLine": { backgroundColor: "var(--diff-add-line)" },
+          "&.cm-merge-a .cm-changedLine": { backgroundColor: "var(--diff-remove-line)" },
+          ".cm-deletedChunk": { backgroundColor: "var(--diff-remove-line)" },
           // Word-level inline highlights: slightly more visible than line backgrounds
-          "&.cm-merge-b .cm-changedText": { background: "rgba(46, 160, 67, 0.10)" },
-          "ins.cm-insertedLine .cm-changedText": { background: "rgba(46, 160, 67, 0.10) !important" },
-          "&.cm-merge-b .cm-deletedText": { background: "rgba(248, 81, 73, 0.10)" },
-          ".cm-deletedChunk .cm-deletedText": { background: "rgba(248, 81, 73, 0.10)" },
-          "del .cm-deletedText, del .cm-changedText": { background: "rgba(248, 81, 73, 0.10) !important" },
+          "&.cm-merge-b .cm-changedText": { background: "var(--diff-add-bg)" },
+          "ins.cm-insertedLine .cm-changedText": { background: "var(--diff-add-bg) !important" },
+          "&.cm-merge-b .cm-deletedText": { background: "var(--diff-remove-bg)" },
+          ".cm-deletedChunk .cm-deletedText": { background: "var(--diff-remove-bg)" },
+          "del .cm-deletedText, del .cm-changedText": { background: "var(--diff-remove-bg) !important" },
           // Gutter change indicators: keep colored but toned down
-          ".cm-changedLineGutter": { background: "rgba(46, 160, 67, 0.5)" },
-          ".cm-deletedLineGutter": { background: "rgba(248, 81, 73, 0.5)" },
+          ".cm-changedLineGutter": { background: "var(--diff-add-bg)" },
+          ".cm-deletedLineGutter": { background: "var(--diff-remove-bg)" },
         }),
       ]
 
@@ -241,7 +244,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
 
       return extensions
     },
-    [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, handleSave]
+    [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, handleSave, theme]
   )
 
   // Rebuild editor when file changes or vim mode toggles
@@ -272,6 +275,13 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
     // are handled by sync effect below. Vim mode rebuild is covered by buildExtensions dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileContent.path, fileContent.language, buildExtensions])
+
+  useEffect(() => {
+    if (!viewRef.current) return
+    viewRef.current.dispatch({
+      effects: themeCompartmentRef.current.reconfigure(getCM6Theme(theme)),
+    })
+  }, [theme])
 
   // Sync content from outside when it changes without a path/language change
   useEffect(() => {

@@ -20,7 +20,7 @@ import {
   type DecorationSet,
   WidgetType,
 } from "@codemirror/view"
-import { EditorState, type Extension, StateField, StateEffect, RangeSet } from "@codemirror/state"
+import { EditorState, type Extension, StateField, StateEffect, RangeSet, Compartment } from "@codemirror/state"
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands"
 import {
   syntaxHighlighting,
@@ -33,13 +33,14 @@ import {
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search"
 import { lintKeymap } from "@codemirror/lint"
-import { githubDark } from "@fsegurai/codemirror-theme-github-dark"
 import { unifiedMergeView, goToNextChunk, goToPreviousChunk } from "@codemirror/merge"
 import { vim, Vim } from "@replit/codemirror-vim"
 import { MessageSquare, Send, X, ChevronRight, Loader2, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VimToggle } from "@/components/editor/vim-toggle"
 import { useEditorStore } from "@/stores/editor-store"
+import { getCM6Theme } from "@/lib/editor/catppuccin-theme"
+import { useTheme } from "@/components/providers/theme-provider"
 import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
@@ -228,6 +229,7 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
   ) {
     const editorRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
+    const themeCompartmentRef = useRef(new Compartment())
 
     useImperativeHandle(
       ref,
@@ -239,6 +241,7 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
     )
 
     const isVimMode = useEditorStore((s) => s.isVimMode)
+    const { theme } = useTheme()
     const { fontSize } = useFontSizeSetting()
     const { mobileFontSize } = useMobileFontSizeSetting()
     const { tabSize } = useTabSizeSetting()
@@ -285,7 +288,7 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
           closeBrackets(),
           highlightSelectionMatches(),
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-          githubDark,
+          themeCompartmentRef.current.of(getCM6Theme(theme)),
           commentDecorationsField,
           // Readonly — PR diffs are not editable
           EditorState.readOnly.of(true),
@@ -325,12 +328,12 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
           EditorView.theme({
             "del, del *": { textDecoration: "none !important" },
             ".cm-insertedLine": {
-              backgroundColor: "rgba(46, 160, 67, 0.03)",
+              backgroundColor: "var(--diff-add-line)",
               color: "inherit",
               textDecoration: "none",
             },
             "ins.cm-insertedLine, ins.cm-insertedLine:not(:has(.cm-changedText))": {
-              backgroundColor: "rgba(46, 160, 67, 0.03) !important",
+              backgroundColor: "var(--diff-add-line) !important",
               color: "inherit !important",
               textDecoration: "none !important",
               border: "none !important",
@@ -338,32 +341,32 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
               borderRadius: "0 !important",
             },
             ".cm-deletedLine": {
-              backgroundColor: "rgba(248, 81, 73, 0.03)",
+              backgroundColor: "var(--diff-remove-line)",
               color: "inherit",
               textDecoration: "none",
             },
             "del.cm-deletedLine, del, del:not(:has(.cm-deletedText))": {
-              backgroundColor: "rgba(248, 81, 73, 0.03) !important",
+              backgroundColor: "var(--diff-remove-line) !important",
               color: "inherit !important",
               textDecoration: "none !important",
               border: "none !important",
               padding: "0 !important",
               borderRadius: "0 !important",
             },
-            "&.cm-merge-b .cm-changedLine": { backgroundColor: "rgba(46, 160, 67, 0.02)" },
-            "&.cm-merge-a .cm-changedLine": { backgroundColor: "rgba(248, 81, 73, 0.02)" },
-            ".cm-deletedChunk": { backgroundColor: "rgba(248, 81, 73, 0.02)" },
-            "&.cm-merge-b .cm-changedText": { background: "rgba(46, 160, 67, 0.10)" },
+            "&.cm-merge-b .cm-changedLine": { backgroundColor: "var(--diff-add-line)" },
+            "&.cm-merge-a .cm-changedLine": { backgroundColor: "var(--diff-remove-line)" },
+            ".cm-deletedChunk": { backgroundColor: "var(--diff-remove-line)" },
+            "&.cm-merge-b .cm-changedText": { background: "var(--diff-add-bg)" },
             "ins.cm-insertedLine .cm-changedText": {
-              background: "rgba(46, 160, 67, 0.10) !important",
+              background: "var(--diff-add-bg) !important",
             },
-            "&.cm-merge-b .cm-deletedText": { background: "rgba(248, 81, 73, 0.10)" },
-            ".cm-deletedChunk .cm-deletedText": { background: "rgba(248, 81, 73, 0.10)" },
+            "&.cm-merge-b .cm-deletedText": { background: "var(--diff-remove-bg)" },
+            ".cm-deletedChunk .cm-deletedText": { background: "var(--diff-remove-bg)" },
             "del .cm-deletedText, del .cm-changedText": {
-              background: "rgba(248, 81, 73, 0.10) !important",
+              background: "var(--diff-remove-bg) !important",
             },
-            ".cm-changedLineGutter": { background: "rgba(46, 160, 67, 0.5)" },
-            ".cm-deletedLineGutter": { background: "rgba(248, 81, 73, 0.5)" },
+            ".cm-changedLineGutter": { background: "var(--diff-add-bg)" },
+            ".cm-deletedLineGutter": { background: "var(--diff-remove-bg)" },
           }),
           EditorState.tabSize.of(tabSize),
           // Add comment button on each line via gutter mouseover
@@ -407,7 +410,7 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
 
         return extensions
       },
-      [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, handleOpenCommentAt]
+      [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, handleOpenCommentAt, theme]
     )
 
     useEffect(() => {
@@ -441,6 +444,13 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fileContent.path, fileContent.language, buildExtensions])
+
+    useEffect(() => {
+      if (!viewRef.current) return
+      viewRef.current.dispatch({
+        effects: themeCompartmentRef.current.reconfigure(getCM6Theme(theme)),
+      })
+    }, [theme])
 
     // Sync content changes without full rebuild
     useEffect(() => {

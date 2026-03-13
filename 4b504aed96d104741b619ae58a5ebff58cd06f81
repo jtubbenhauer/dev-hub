@@ -1,0 +1,23 @@
+instrumentation.ts
+  b4f9792b81c9cb7d 1-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "4b504aed96d104741b619ae58a5ebff58cd06f81",
+  "prompts": {
+    "b4f9792b81c9cb7d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31a855521ffeHchGN3r9pQzU4w",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 70,
+      "total_deletions": 20,
+      "accepted_lines": 50,
+      "overriden_lines": 0
+    }
+  }
+}

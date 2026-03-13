@@ -1,0 +1,31 @@
+components/dashboard/task-worktree-dialog.tsx
+  b4f9792b81c9cb7d 3,17-18,23,78-79,82-88,113,117,151-152,262-333
+app/api/workspaces/[id]/symlinks/route.ts
+  b4f9792b81c9cb7d 1-62
+lib/git/worktrees.ts
+  b4f9792b81c9cb7d 150-179
+app/api/workspaces/worktrees/route.ts
+  b4f9792b81c9cb7d 9,39,85-97,129,177,197-219,246
+components/workspace/create-worktree-dialog.tsx
+  b4f9792b81c9cb7d 3,25-26,28,31-32,46,49-55,95,109,114,133,177-178,254-255,276-277,285,403-472
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "5af03b3d443b2e2045b1f241498db9d554c9188d",
+  "prompts": {
+    "b4f9792b81c9cb7d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31a855521ffeHchGN3r9pQzU4w",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 317,
+      "overriden_lines": 0
+    }
+  }
+}

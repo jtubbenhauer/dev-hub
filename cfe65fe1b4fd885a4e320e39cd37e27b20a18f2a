@@ -1,0 +1,46 @@
+components/chat/plan-panel.tsx
+  e25ba43810a9292b 284
+components/dashboard/task-worktree-dialog.tsx
+  e25ba43810a9292b 43
+components/chat/prompt-input.tsx
+  b4f9792b81c9cb7d 276
+app/api/files/plans/route.ts
+  e25ba43810a9292b 8,44-45,47-57,59,61-62,64-66
+stores/chat-store.ts
+  b4f9792b81c9cb7d 77-78,87-88,154-155,158-160,164-166,168,238-239,242-244,248-250,252,595-599,666,689-690,696-700,769,792-793,1016-1027,1049-1053,1057-1061,1364
+vitest.config.ts
+  b4f9792b81c9cb7d 9-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "cfe65fe1b4fd885a4e320e39cd37e27b20a18f2a",
+  "prompts": {
+    "b4f9792b81c9cb7d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31a855521ffeHchGN3r9pQzU4w",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 85,
+      "total_deletions": 51,
+      "accepted_lines": 65,
+      "overriden_lines": 0
+    },
+    "e25ba43810a9292b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31aeffd19ffe57tJxqiECLHoDx",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 18,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    }
+  }
+}

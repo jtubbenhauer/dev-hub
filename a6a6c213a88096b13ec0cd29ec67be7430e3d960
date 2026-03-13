@@ -1,0 +1,23 @@
+AGENTS.md
+  b4f9792b81c9cb7d 1-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "a6a6c213a88096b13ec0cd29ec67be7430e3d960",
+  "prompts": {
+    "b4f9792b81c9cb7d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31a855521ffeHchGN3r9pQzU4w",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 194,
+      "total_deletions": 0,
+      "accepted_lines": 194,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback, useState, useMemo, Component } from "re
 import type { ReactNode } from "react"
 import { Virtuoso } from "react-virtuoso"
 import type { VirtuosoHandle } from "react-virtuoso"
+import { useQueries } from "@tanstack/react-query"
 import { AlertCircle, ShieldAlert, Check, X, MessageCircleQuestion, ScrollText, Plus, MessageSquare, ArrowDown, GripVertical, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -106,6 +107,32 @@ export function ChatInterface() {
     return map
   }, [allWorkspaces])
 
+  const branchQueryResults = useQueries({
+    queries: allWorkspaces.map((ws) => ({
+      queryKey: ["git-status", ws.id],
+      queryFn: async () => {
+        const params = new URLSearchParams({ action: "status" })
+        const res = await fetch(`/api/workspaces/${ws.id}/git?${params}`)
+        if (!res.ok) return null
+        return res.json() as Promise<{ branch: string }>
+      },
+      enabled: isUnifiedMode,
+      staleTime: 30_000,
+      retry: false,
+    })),
+  })
+
+  const workspaceBranches = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (let i = 0; i < allWorkspaces.length; i++) {
+      const data = branchQueryResults[i]?.data
+      if (data?.branch) {
+        map[allWorkspaces[i].id] = data.branch
+      }
+    }
+    return map
+  }, [allWorkspaces, branchQueryResults])
+
   const workspaceOptions = useMemo(() => {
     return allWorkspaces.map((ws) => ({ id: ws.id, name: ws.name, backend: ws.backend }))
   }, [allWorkspaces])
@@ -175,9 +202,20 @@ export function ChatInterface() {
   const streamingStatus = useChatStore(getStreamingStatus)
 
   const sessions = useChatStore(getActiveWorkspaceSessions)
+  const [unifiedLimit, setUnifiedLimit] = useState(20)
   const unifiedSessions = useChatStore((state) =>
-    state.getRecentSessionsAcrossWorkspaces(10)
+    state.getRecentSessionsAcrossWorkspaces(unifiedLimit)
   )
+  const totalUnifiedCount = useChatStore((state) => {
+    let count = 0
+    for (const ws of Object.values(state.workspaceStates)) {
+      for (const session of Object.values(ws.sessions)) {
+        if (!session.parentID) count++
+      }
+    }
+    return count
+  })
+  const hasMoreUnifiedSessions = totalUnifiedCount > unifiedLimit
   const sessionStatus = useChatStore(getActiveSessionStatus)
   const commands: Command[] = useChatStore((state) => state.commands)
   // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
@@ -592,6 +630,9 @@ export function ChatInterface() {
               mode="unified"
               sessions={unifiedSessions}
               workspaceNames={workspaceNames}
+              workspaceBranches={workspaceBranches}
+              hasMore={hasMoreUnifiedSessions}
+              onLoadMore={() => setUnifiedLimit((n) => n + 20)}
               workspaces={workspaceOptions}
               activeWorkspaceId={activeWorkspaceId}
               onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
@@ -631,6 +672,9 @@ export function ChatInterface() {
                 mode="unified"
                 sessions={unifiedSessions}
                 workspaceNames={workspaceNames}
+                workspaceBranches={workspaceBranches}
+                hasMore={hasMoreUnifiedSessions}
+                onLoadMore={() => setUnifiedLimit((n) => n + 20)}
                 workspaces={workspaceOptions}
                 activeWorkspaceId={activeWorkspaceId}
                 onCreateSessionInWorkspace={handleCreateSessionInWorkspace}

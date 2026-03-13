@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check } from "lucide-react"
+import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +34,9 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
   mode: "unified"
   sessions: SessionWithWorkspace[]
   workspaceNames: Record<string, string>
+  workspaceBranches: Record<string, string>
+  hasMore?: boolean
+  onLoadMore?: () => void
   onSelectSession: (sessionId: string, workspaceId: string) => void
   workspaces?: { id: string; name: string; backend: string }[]
   activeWorkspaceId?: string | null
@@ -136,15 +139,26 @@ export function SessionList(props: SessionListProps) {
                 session={session}
                 isActive={session.id === activeSessionId}
                 status={sessionStatuses[session.id] ?? null}
-                workspaceName={
+                workspaceBranch={
                   props.mode === "unified"
-                    ? props.workspaceNames[(session as SessionWithWorkspace).workspaceId]
+                    ? props.workspaceBranches[(session as SessionWithWorkspace).workspaceId] ??
+                      props.workspaceNames[(session as SessionWithWorkspace).workspaceId]
                     : undefined
                 }
                 onSelect={() => handleSelect(session)}
                 onDelete={() => onDeleteSession(session.id)}
               />
             ))}
+            {props.mode === "unified" && props.hasMore && props.onLoadMore && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs text-muted-foreground"
+                onClick={props.onLoadMore}
+              >
+                Load more
+              </Button>
+            )}
           </div>
         )}
       </ScrollArea>
@@ -156,7 +170,7 @@ interface SessionItemProps {
   session: Session
   isActive: boolean
   status: SessionStatus | null
-  workspaceName?: string
+  workspaceBranch?: string
   onSelect: () => void
   onDelete: () => void
 }
@@ -165,7 +179,7 @@ function SessionItem({
   session,
   isActive,
   status,
-  workspaceName,
+  workspaceBranch,
   onSelect,
   onDelete,
 }: SessionItemProps) {
@@ -204,9 +218,10 @@ function SessionItem({
         </p>
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-xs text-muted-foreground">{formattedTime}</p>
-          {workspaceName && (
-            <Badge variant="outline" className="text-xs px-1 py-0 font-normal">
-              {workspaceName}
+          {workspaceBranch && (
+            <Badge variant="outline" className="text-xs px-1 py-0 font-normal gap-0.5">
+              <GitBranch className="size-2.5" />
+              {workspaceBranch}
             </Badge>
           )}
         </div>

@@ -10,10 +10,19 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   useLeaderKeyBindings,
   useLeaderWhichKeySetting,
+  useLeaderTimeoutSetting,
   useSettingsMutation,
   SETTINGS_KEYS,
+  DEFAULT_LEADER_TIMEOUT,
 } from "@/hooks/use-settings"
 import { BUILTIN_ACTIONS, DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults"
 import type { LeaderAction, LeaderBindingsMap } from "@/types/leader-key"
@@ -29,6 +38,7 @@ const PAGE_ORDER = ["global", "chat", "git"]
 export function KeybindingsSettings() {
   const { bindings, isLoading: isLoadingBindings } = useLeaderKeyBindings()
   const { isWhichKeyEnabled, isLoading: isLoadingWhichKey } = useLeaderWhichKeySetting()
+  const { leaderTimeout, isLoading: isLoadingTimeout } = useLeaderTimeoutSetting()
   const mutation = useSettingsMutation()
 
   const [localBindings, setLocalBindings] = useState<LeaderBindingsMap>({})
@@ -40,12 +50,20 @@ export function KeybindingsSettings() {
     if (!isLoadingBindings) setLocalBindings({ ...bindings })
   }, [bindings, isLoadingBindings])
 
-  const isLoading = isLoadingBindings || isLoadingWhichKey
+  const isLoading = isLoadingBindings || isLoadingWhichKey || isLoadingTimeout
 
   const handleWhichKeyToggle = (checked: boolean) => {
     mutation.mutate(
       { key: SETTINGS_KEYS.LEADER_WHICH_KEY, value: checked },
       { onSuccess: () => toast.success(checked ? "Which-key popup enabled" : "Which-key popup disabled") }
+    )
+  }
+
+  const handleTimeoutChange = (value: string) => {
+    const next = value === "never" ? null : Number(value)
+    mutation.mutate(
+      { key: SETTINGS_KEYS.LEADER_TIMEOUT, value: next },
+      { onSuccess: () => toast.success(next === null ? "Leader key will never auto-hide" : `Leader key timeout set to ${next}s`) }
     )
   }
 
@@ -147,7 +165,7 @@ export function KeybindingsSettings() {
             Show a popup after pressing the leader key (Ctrl+Space) that lists available bindings.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <Label htmlFor="which-key-toggle">Enable which-key popup</Label>
             <Switch
@@ -156,6 +174,32 @@ export function KeybindingsSettings() {
               onCheckedChange={handleWhichKeyToggle}
               disabled={mutation.isPending}
             />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="leader-timeout">Auto-hide timeout</Label>
+              <p className="text-xs text-muted-foreground">
+                How long the leader key popup stays visible before auto-closing
+              </p>
+            </div>
+            <Select
+              value={leaderTimeout === null ? "never" : String(leaderTimeout)}
+              onValueChange={handleTimeoutChange}
+              disabled={mutation.isPending}
+            >
+              <SelectTrigger id="leader-timeout" className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 second</SelectItem>
+                <SelectItem value="2">2 seconds{DEFAULT_LEADER_TIMEOUT === 2 ? " (default)" : ""}</SelectItem>
+                <SelectItem value="3">3 seconds</SelectItem>
+                <SelectItem value="5">5 seconds</SelectItem>
+                <SelectItem value="10">10 seconds</SelectItem>
+                <SelectItem value="never">Never</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

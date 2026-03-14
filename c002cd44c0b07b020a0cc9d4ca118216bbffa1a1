@@ -1,0 +1,23 @@
+components/tasks/task-detail-panel.tsx
+  b004fa097b3d5ee2 3,24,61,64-69,119,123-130,146-163,175,213-214,223-226,316
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "c002cd44c0b07b020a0cc9d4ca118216bbffa1a1",
+  "prompts": {
+    "b004fa097b3d5ee2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_316a7c8e3ffeA9yHgwij89Lman",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 48,
+      "total_deletions": 8,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  }
+}

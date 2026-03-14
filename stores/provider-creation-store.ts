@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import type { LinkedTaskMeta } from "@/types"
 
 export type ProviderCreationPhase = "idle" | "running" | "done" | "error"
 
@@ -24,6 +25,8 @@ interface ProviderCreationState {
     branch?: string
     name?: string
     context?: string
+    linkedTaskId?: string
+    linkedTaskMeta?: LinkedTaskMeta
     onSuccess: (workspaceName: string) => void
   }) => void
 
@@ -60,6 +63,8 @@ export const useProviderCreationStore = create<ProviderCreationState>()(
       branch,
       name,
       context,
+      linkedTaskId,
+      linkedTaskMeta,
       onSuccess,
     }) => {
       // Abort any previous run
@@ -83,6 +88,8 @@ export const useProviderCreationStore = create<ProviderCreationState>()(
         branch,
         name,
         context,
+        linkedTaskId,
+        linkedTaskMeta,
         controller,
         onSuccess,
         set,
@@ -144,6 +151,8 @@ async function streamCreation({
   branch,
   name,
   context,
+  linkedTaskId,
+  linkedTaskMeta,
   controller,
   onSuccess,
   set,
@@ -154,6 +163,8 @@ async function streamCreation({
   branch?: string
   name?: string
   context?: string
+  linkedTaskId?: string
+  linkedTaskMeta?: LinkedTaskMeta
   controller: AbortController
   onSuccess: (workspaceName: string) => void
   set: (
@@ -175,6 +186,8 @@ async function streamCreation({
         branch: branch?.trim() || undefined,
         name: name?.trim() || undefined,
         context: context?.trim() || undefined,
+        linkedTaskId: linkedTaskId || undefined,
+        linkedTaskMeta: linkedTaskMeta || undefined,
       }),
       signal: controller.signal,
     })

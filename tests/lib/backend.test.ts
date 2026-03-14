@@ -18,6 +18,8 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     agentUrl: null,
     providerMeta: null,
     worktreeSymlinks: null,
+    linkedTaskId: null,
+    linkedTaskMeta: null,
     createdAt: new Date("2025-01-01"),
     lastAccessedAt: new Date("2025-01-01"),
     ...overrides,
@@ -68,6 +70,45 @@ describe("toWorkspace", () => {
   it("returns null for providerMeta that is a string", () => {
     const ws = toWorkspace(makeRow({ providerMeta: "nope" }))
     expect(ws.providerMeta).toBeNull()
+  })
+})
+
+describe("toWorkspace linkedTaskMeta", () => {
+  it("passes through null linkedTaskMeta", () => {
+    const ws = toWorkspace(makeRow({ linkedTaskMeta: null }))
+    expect(ws.linkedTaskMeta).toBeNull()
+  })
+
+  it("parses valid linkedTaskMeta", () => {
+    const meta = {
+      name: "Fix login bug",
+      customId: "DEV-123",
+      url: "https://app.clickup.com/t/abc123",
+      status: "in progress",
+      provider: "clickup",
+    }
+    const ws = toWorkspace(makeRow({ linkedTaskMeta: meta }))
+    expect(ws.linkedTaskMeta).toEqual(meta)
+  })
+
+  it("returns null for linkedTaskMeta missing required fields", () => {
+    const ws = toWorkspace(makeRow({ linkedTaskMeta: { name: "oops" } }))
+    expect(ws.linkedTaskMeta).toBeNull()
+  })
+
+  it("returns null for linkedTaskMeta that is an array", () => {
+    const ws = toWorkspace(makeRow({ linkedTaskMeta: [1, 2, 3] }))
+    expect(ws.linkedTaskMeta).toBeNull()
+  })
+
+  it("returns null for linkedTaskMeta that is a string", () => {
+    const ws = toWorkspace(makeRow({ linkedTaskMeta: "nope" }))
+    expect(ws.linkedTaskMeta).toBeNull()
+  })
+
+  it("preserves linkedTaskId as-is", () => {
+    const ws = toWorkspace(makeRow({ linkedTaskId: "task-abc-123" }))
+    expect(ws.linkedTaskId).toBe("task-abc-123")
   })
 })
 

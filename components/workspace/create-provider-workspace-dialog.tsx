@@ -37,16 +37,17 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useWorkspaceProviders } from "@/hooks/use-settings"
 import { useProviderCreationStore } from "@/stores/provider-creation-store"
-import type { Workspace } from "@/types"
+import type { Workspace, ClickUpTask, LinkedTaskMeta } from "@/types"
 
 interface CreateProviderWorkspaceDialogProps {
   workspaces: Workspace[]
   initialRepo?: string
   initialBranch?: string
   triggerSize?: "sm" | "default"
+  task?: ClickUpTask
 }
 
-export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initialBranch, triggerSize }: CreateProviderWorkspaceDialogProps) {
+export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initialBranch, triggerSize, task }: CreateProviderWorkspaceDialogProps) {
   const queryClient = useQueryClient()
   const { providers } = useWorkspaceProviders()
 
@@ -129,6 +130,16 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
 
     setFormOpen(false)
 
+    const taskMeta: LinkedTaskMeta | undefined = task
+      ? {
+          name: task.name,
+          customId: task.custom_id,
+          url: task.url,
+          status: task.status.status,
+          provider: "clickup",
+        }
+      : undefined
+
     creationStore.startCreation({
       providerId,
       providerName: selectedProvider.name,
@@ -136,12 +147,14 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
       branch: branch.trim() || undefined,
       name: name.trim() || undefined,
       context: context.trim() || undefined,
+      linkedTaskId: task?.id,
+      linkedTaskMeta: taskMeta,
       onSuccess: (workspaceName) => {
         queryClient.invalidateQueries({ queryKey: ["workspaces"] })
         toast.success(`Created workspace "${workspaceName}" via ${selectedProvider.name}`)
       },
     })
-  }, [canSubmit, selectedProvider, providerId, repo, branch, name, context, queryClient, creationStore])
+  }, [canSubmit, selectedProvider, providerId, repo, branch, name, context, task, queryClient, creationStore])
 
   function resetFormState() {
     setProviderId(providers.length === 1 ? providers[0].id : "")

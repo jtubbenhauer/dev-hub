@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { Fragment, useState, useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import {
@@ -222,6 +222,7 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
                   initialRepo={firstLinkedRepo}
                   initialBranch={suggestedBranch}
                   triggerSize="sm"
+                  task={task}
                 />
               )}
               <a href={task.url} target="_blank" rel="noopener noreferrer">
@@ -285,14 +286,14 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                   {nonEmptyCustomFields.map((field) => (
-                    <>
-                      <span key={`label-${field.id}`} className="text-muted-foreground truncate" title={field.name}>
+                    <Fragment key={field.id}>
+                      <span className="text-muted-foreground truncate" title={field.name}>
                         {field.name}
                       </span>
-                      <div key={`value-${field.id}`}>
+                      <div>
                         <CustomFieldValue field={field} />
                       </div>
-                    </>
+                    </Fragment>
                   ))}
                 </div>
               </div>

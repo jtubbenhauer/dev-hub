@@ -15,6 +15,14 @@ export type {
 
 export type WorkspaceBackendType = "local" | "remote"
 
+export interface LinkedTaskMeta {
+  name: string
+  customId: string | null
+  url: string
+  status: string
+  provider: "clickup"
+}
+
 export interface Workspace {
   id: string
   userId: string
@@ -30,6 +38,8 @@ export interface Workspace {
   agentUrl: string | null
   providerMeta: Record<string, unknown> | null
   worktreeSymlinks: string[] | null
+  linkedTaskId: string | null
+  linkedTaskMeta: LinkedTaskMeta | null
   createdAt: Date
   lastAccessedAt: Date
 }
@@ -49,6 +59,8 @@ export interface WorkspaceCreateInput {
   opencodeUrl?: string
   agentUrl?: string
   providerMeta?: Record<string, unknown>
+  linkedTaskId?: string
+  linkedTaskMeta?: LinkedTaskMeta
 }
 
 export interface CpuStats {

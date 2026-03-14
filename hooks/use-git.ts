@@ -10,6 +10,7 @@ import type {
   ReviewFileContent,
   ReviewChangedFile,
   WorktreeInfo,
+  LinkedTaskMeta,
 } from "@/types"
 
 async function gitGet<T>(workspaceId: string, action: string, params?: Record<string, string>): Promise<T> {
@@ -409,6 +410,8 @@ export function useCreateWorktree() {
       startPoint?: string
       name?: string
       symlinkPaths?: string[]
+      linkedTaskId?: string
+      linkedTaskMeta?: LinkedTaskMeta
     }) => {
       const res = await fetch("/api/workspaces/worktrees", {
         method: "POST",

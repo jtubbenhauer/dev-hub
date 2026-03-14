@@ -51,10 +51,11 @@ import {
   X,
   Settings2,
   Pencil,
+  CheckSquare,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import type { Workspace, QuickCommand } from "@/types"
+import type { Workspace, QuickCommand, LinkedTaskMeta } from "@/types"
 
 interface WorkspaceCardProps {
   workspace: Workspace
@@ -135,6 +136,24 @@ export function WorkspaceCard({
         <p className="text-xs text-muted-foreground truncate font-mono">
           {workspace.path}
         </p>
+
+        {workspace.linkedTaskMeta && (
+          <a
+            href={(workspace.linkedTaskMeta as LinkedTaskMeta).url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group/task"
+          >
+            <CheckSquare className="size-3 shrink-0 text-purple-500" />
+            <span className="truncate group-hover/task:underline">
+              {(workspace.linkedTaskMeta as LinkedTaskMeta).customId
+                ? `${(workspace.linkedTaskMeta as LinkedTaskMeta).customId} · `
+                : ""}
+              {(workspace.linkedTaskMeta as LinkedTaskMeta).name}
+            </span>
+          </a>
+        )}
 
         {gitStatus?.isRepo && (
           <div className="space-y-2">

@@ -1,6 +1,7 @@
 import type {
   Workspace,
   QuickCommand,
+  LinkedTaskMeta,
   FileTreeEntry,
   FileGitStatus,
   GitStatusResult,
@@ -577,11 +578,20 @@ function parseProviderMeta(raw: unknown): Record<string, unknown> | null {
   return raw as Record<string, unknown>
 }
 
+function parseLinkedTaskMeta(raw: unknown): LinkedTaskMeta | null {
+  if (raw === null || raw === undefined) return null
+  if (typeof raw !== "object" || Array.isArray(raw)) return null
+  const obj = raw as Record<string, unknown>
+  if (typeof obj.name !== "string" || typeof obj.url !== "string" || typeof obj.provider !== "string") return null
+  return raw as LinkedTaskMeta
+}
+
 export function toWorkspace(row: WorkspaceRow): Workspace {
   return {
     ...row,
     quickCommands: parseQuickCommands(row.quickCommands),
     providerMeta: parseProviderMeta(row.providerMeta),
+    linkedTaskMeta: parseLinkedTaskMeta(row.linkedTaskMeta),
   }
 }
 

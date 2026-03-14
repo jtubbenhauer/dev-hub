@@ -1,0 +1,23 @@
+tests/components/session-list.test.tsx
+  b004fa097b3d5ee2 38,81,101,129,156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "67494860726d305d93993102b0badbce0fc12fdd",
+  "prompts": {
+    "b004fa097b3d5ee2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_316a7c8e3ffeA9yHgwij89Lman",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 0,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

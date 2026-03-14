@@ -35,6 +35,7 @@ describe("SessionList — unified mode workspace picker", () => {
         mode="unified"
         sessions={[]}
         workspaceNames={{}}
+        workspaceBranches={{}}
         onSelectSession={vi.fn()}
         workspaces={[
           { id: "ws-1", name: "My Workspace", backend: "local" },
@@ -77,6 +78,7 @@ describe("SessionList — unified mode workspace picker", () => {
         mode="unified"
         sessions={[]}
         workspaceNames={{}}
+        workspaceBranches={{}}
         onSelectSession={vi.fn()}
         onCreateSession={onCreateSession}
       />
@@ -96,6 +98,7 @@ describe("SessionList — unified mode workspace picker", () => {
         mode="unified"
         sessions={[]}
         workspaceNames={{}}
+        workspaceBranches={{}}
         onSelectSession={vi.fn()}
         workspaces={[
           { id: "ws-1", name: "Local Project", backend: "local" },
@@ -123,6 +126,7 @@ describe("SessionList — unified mode workspace picker", () => {
         mode="unified"
         sessions={[]}
         workspaceNames={{}}
+        workspaceBranches={{}}
         onSelectSession={vi.fn()}
         workspaces={[
           { id: "ws-1", name: "Local Project", backend: "local" },
@@ -149,6 +153,7 @@ describe("SessionList — unified mode workspace picker", () => {
         mode="unified"
         sessions={[makeUnifiedSession("sess-1", "ws-1", { title: "Test Session" })]}
         workspaceNames={{ "ws-1": "My Workspace" }}
+        workspaceBranches={{}}
         onSelectSession={vi.fn()}
         workspaces={[{ id: "ws-1", name: "My Workspace", backend: "local" }]}
         activeWorkspaceId="ws-1"

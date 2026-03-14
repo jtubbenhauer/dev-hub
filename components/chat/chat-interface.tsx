@@ -12,6 +12,7 @@ import { VariantSelector } from "@/components/chat/variant-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import { useCommand } from "@/hooks/use-command";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -22,7 +23,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useQueries } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, Check, GripVertical, Loader2, MessageCircleQuestion, MessageSquare, Plus, ScrollText, ShieldAlert, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Check, GripVertical, LayoutList, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
@@ -83,6 +84,11 @@ export function ChatInterface() {
   const [isUnifiedMode, setIsUnifiedMode] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("dev-hub:chat-unified-mode") === "true";
+  });
+  const [questionViewMode, setQuestionViewMode] = useState<"list" | "tabs">(() => {
+    if (typeof window === "undefined") return "list";
+    const stored = localStorage.getItem("dev-hub:chat-question-view");
+    return stored === "tabs" ? "tabs" : "list";
   });
 
   const {
@@ -943,6 +949,42 @@ export function ChatInterface() {
         {/* Question requests */}
         {activeQuestions.length > 0 && (
           <div className="shrink-0 border-t bg-indigo-500/10 px-4 py-2 space-y-2">
+            <div className="flex justify-end">
+              <div className="flex rounded-md border border-indigo-500/30 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuestionViewMode("list");
+                    localStorage.setItem("dev-hub:chat-question-view", "list");
+                  }}
+                  className={cn(
+                    "px-1.5 py-1 transition-colors",
+                    questionViewMode === "list"
+                      ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                  title="List view"
+                >
+                  <LayoutList className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuestionViewMode("tabs");
+                    localStorage.setItem("dev-hub:chat-question-view", "tabs");
+                  }}
+                  className={cn(
+                    "px-1.5 py-1 transition-colors",
+                    questionViewMode === "tabs"
+                      ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                  title="Tab view"
+                >
+                  <PanelTop className="size-3.5" />
+                </button>
+              </div>
+            </div>
             <QuestionErrorBoundary
               key={activeQuestions.map((q) => q.id).join(",")}
               onDismissAll={() => {
@@ -956,6 +998,7 @@ export function ChatInterface() {
                 <QuestionBanner
                   key={question.id}
                   request={question}
+                  viewMode={questionViewMode}
                   onReply={(answers) => {
                     if (!activeWorkspaceId) return;
                     replyToQuestion(question.id, answers, activeWorkspaceId);
@@ -1146,14 +1189,17 @@ function PermissionBanner({
 
 function QuestionBanner({
   request,
+  viewMode = "list",
   onReply,
   onReject,
 }: {
   request: QuestionRequest;
+  viewMode?: "list" | "tabs";
   onReply: (answers: QuestionAnswer[]) => void;
   onReject: () => void;
 }) {
   const questionList = request.questions ?? [];
+  const [activeTab, setActiveTab] = useState(0);
 
   // One selection state per question in the request
   const [selections, setSelections] = useState<string[][]>(() =>
@@ -1204,27 +1250,75 @@ function QuestionBanner({
     }
   };
 
+  const useTabs = viewMode === "tabs" && questionList.length > 1;
+
   return (
     <div className="rounded-lg border border-indigo-500/50 bg-indigo-500/5 px-3 py-2 space-y-3">
-      {questionList.map((q, questionIndex) => (
-        <QuestionItem
-          key={questionIndex}
-          question={q}
-          selected={selections[questionIndex]}
-          customInput={customInputs[questionIndex]}
-          onToggleOption={(label) =>
-            toggleOption(questionIndex, label, q.multiple === true)
-          }
-          onCustomInputChange={(value) => {
-            setCustomInputs((prev) => {
-              const next = [...prev];
-              next[questionIndex] = value;
-              return next;
-            });
-          }}
-          onSubmitOnEnter={handleInputKeyDown}
-        />
-      ))}
+      {useTabs ? (
+        <>
+          <div className="flex gap-1 overflow-x-auto border-b border-indigo-500/20 -mx-3 px-3">
+            {questionList.map((q, i) => {
+              const hasSelection =
+                (selections[i]?.length ?? 0) > 0 ||
+                (customInputs[i]?.trim().length ?? 0) > 0;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setActiveTab(i)}
+                  className={cn(
+                    "shrink-0 px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors",
+                    activeTab === i
+                      ? "border-indigo-500 text-indigo-700 dark:text-indigo-300"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {q.header}
+                  {hasSelection && (
+                    <span className="ml-1.5 inline-block size-1.5 rounded-full bg-indigo-500" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <QuestionItem
+            question={questionList[activeTab]}
+            selected={selections[activeTab]}
+            customInput={customInputs[activeTab]}
+            onToggleOption={(label) =>
+              toggleOption(activeTab, label, questionList[activeTab].multiple === true)
+            }
+            onCustomInputChange={(value) => {
+              setCustomInputs((prev) => {
+                const next = [...prev];
+                next[activeTab] = value;
+                return next;
+              });
+            }}
+            onSubmitOnEnter={handleInputKeyDown}
+          />
+        </>
+      ) : (
+        questionList.map((q, questionIndex) => (
+          <QuestionItem
+            key={questionIndex}
+            question={q}
+            selected={selections[questionIndex]}
+            customInput={customInputs[questionIndex]}
+            onToggleOption={(label) =>
+              toggleOption(questionIndex, label, q.multiple === true)
+            }
+            onCustomInputChange={(value) => {
+              setCustomInputs((prev) => {
+                const next = [...prev];
+                next[questionIndex] = value;
+                return next;
+              });
+            }}
+            onSubmitOnEnter={handleInputKeyDown}
+          />
+        ))
+      )}
       <div className="flex justify-end gap-1.5">
         <Button
           size="sm"

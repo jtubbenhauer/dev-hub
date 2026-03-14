@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { FolderGit2, Globe } from "lucide-react"
+import { FolderGit2, Globe, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Workspace } from "@/types"
 import type { AgentHealthStatus } from "@/hooks/use-git"
@@ -64,6 +64,29 @@ function useRemoteWorkspaceHealthStatuses(workspaces: Workspace[]): Record<strin
   return statuses
 }
 
+function useWorkspaceBranches(workspaces: Workspace[]): Record<string, string> {
+  const results = useQueries({
+    queries: workspaces.map((w) => ({
+      queryKey: ["git-status", w.id],
+      queryFn: async () => {
+        const params = new URLSearchParams({ action: "status" })
+        const res = await fetch(`/api/workspaces/${w.id}/git?${params}`)
+        if (!res.ok) return null
+        return res.json() as Promise<{ branch: string }>
+      },
+      staleTime: 30_000,
+      retry: false,
+    })),
+  })
+
+  const branches: Record<string, string> = {}
+  for (let i = 0; i < workspaces.length; i++) {
+    const data = results[i]?.data
+    if (data?.branch) branches[workspaces[i].id] = data.branch
+  }
+  return branches
+}
+
 export function WorkspaceSwitcher() {
   const { workspaces, activeWorkspaceId, isLoadingWorkspaces, setActiveWorkspaceId } =
     useWorkspaceStore()
@@ -71,6 +94,7 @@ export function WorkspaceSwitcher() {
   const workspaceIds = workspaces.map((w) => w.id)
   const activities = useAllWorkspaceActivities(workspaceIds)
   const healthStatuses = useRemoteWorkspaceHealthStatuses(workspaces)
+  const branches = useWorkspaceBranches(workspaces)
 
   if (isLoadingWorkspaces) {
     return <Skeleton className="h-9 w-36 sm:w-48" />
@@ -113,6 +137,12 @@ export function WorkspaceSwitcher() {
                   )}
                 />
                 <span className="truncate">{workspace.name}</span>
+                {branches[workspace.id] && (
+                  <span className="flex items-center gap-0.5 text-xs text-muted-foreground shrink-0">
+                    <GitBranch className="size-3" />
+                    {branches[workspace.id]}
+                  </span>
+                )}
                 {isRemote && (
                   <Globe className="size-3 shrink-0 text-blue-500" />
                 )}

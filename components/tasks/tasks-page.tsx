@@ -229,7 +229,7 @@ export function TasksPage() {
         </>
       )}
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         {/* Mobile toolbar */}
         {isMobile && (
           <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">

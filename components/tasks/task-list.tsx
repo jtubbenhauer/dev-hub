@@ -181,7 +181,7 @@ export function TaskList({
 }: TaskListProps) {
   if (isLoading) {
     return (
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 min-w-0 overflow-auto p-2">
         {contextLabel && (
           <div className="px-2 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {contextLabel}
@@ -194,7 +194,7 @@ export function TaskList({
 
   if (error) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
+      <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-3 p-8 text-center">
         <AlertTriangle className="size-8 text-destructive" />
         <p className="text-sm text-muted-foreground">{error.message}</p>
       </div>
@@ -203,7 +203,7 @@ export function TaskList({
 
   if (!tasks || tasks.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8 text-center">
+      <div className="flex-1 min-w-0 flex items-center justify-center p-8 text-center">
         <p className="text-sm text-muted-foreground">No tasks found.</p>
       </div>
     )
@@ -220,7 +220,7 @@ export function TaskList({
   const gridTemplate = getGridTemplate(hasScores)
 
   return (
-    <div className="flex-1 overflow-auto p-2">
+    <div className="flex-1 min-w-0 overflow-auto p-2">
       {contextLabel && (
         <div className="px-2 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
           {contextLabel}

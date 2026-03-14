@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import {
@@ -21,6 +21,7 @@ import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-pro
 import { useClickUpTaskDetail, useClickUpTaskComments } from "@/hooks/use-clickup"
 import { useWorkspaceProviders } from "@/hooks/use-settings"
 import { cn } from "@/lib/utils"
+import { useWorkspaceStore } from "@/stores/workspace-store"
 import type { ClickUpTask, ClickUpCustomField } from "@/types"
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -57,8 +58,14 @@ function formatDuration(ms: number): string {
   return `${minutes}m`
 }
 
-function CustomFieldValue({ field }: { field: ClickUpCustomField }) {
+export function CustomFieldValue({ field }: { field: ClickUpCustomField }) {
   if (field.value == null || field.value === "") return <span className="text-muted-foreground">—</span>
+
+  if (typeof field.value === "object" && field.value !== null && "percent_completed" in field.value) {
+    const v = field.value as { percent_completed?: number; current?: string }
+    const pct = v.percent_completed ?? Number(v.current) / 100
+    return <span>{isNaN(pct) ? "—" : `${Math.round(pct * 100)}%`}</span>
+  }
 
   switch (field.type) {
     case "number":
@@ -109,8 +116,18 @@ function CustomFieldValue({ field }: { field: ClickUpCustomField }) {
       )
     }
     default:
-      return <span className="text-xs text-muted-foreground break-all">{JSON.stringify(field.value)}</span>
+      return <span className="text-xs text-muted-foreground break-all">{typeof field.value === "string" ? field.value : JSON.stringify(field.value)}</span>
   }
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60)
 }
 
 interface TaskDetailPanelProps {
@@ -126,6 +143,24 @@ export function TaskDetailPanel({ task, onClose, style, className }: TaskDetailP
   const { data: detail, isLoading: isLoadingDetail, error: detailError } = useClickUpTaskDetail(task.id)
   const { data: comments, isLoading: isLoadingComments } = useClickUpTaskComments(task.id)
   const { providers } = useWorkspaceProviders()
+  const workspaces = useWorkspaceStore((s) => s.workspaces)
+
+  const firstLinkedRepo = useMemo(() => {
+    for (const ws of workspaces) {
+      if (ws.backend === "remote" && ws.providerMeta) {
+        const meta = ws.providerMeta as Record<string, unknown>
+        if (typeof meta.repo === "string" && meta.repo.trim()) {
+          return meta.repo
+        }
+      }
+    }
+    return undefined
+  }, [workspaces])
+
+  const suggestedBranch = useMemo(() => {
+    const prefix = task.custom_id ? `${task.custom_id.toLowerCase()}/` : ""
+    return prefix + slugify(task.name)
+  }, [task.custom_id, task.name])
 
   const priorityColor = task.priority
     ? (PRIORITY_COLORS[task.priority.priority] ?? "bg-gray-400")
@@ -137,7 +172,7 @@ export function TaskDetailPanel({ task, onClose, style, className }: TaskDetailP
 
   return (
     <>
-      <div className={cn("flex flex-col h-full border-l shrink-0 bg-background", className)} style={style}>
+      <div className={cn("flex flex-col h-full min-w-0 overflow-hidden border-l shrink-0 bg-background", className)} style={style}>
         {/* Header */}
         <div className="flex items-start gap-2 p-3 border-b">
           <div className="flex-1 min-w-0">
@@ -175,8 +210,8 @@ export function TaskDetailPanel({ task, onClose, style, className }: TaskDetailP
           </button>
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="p-3 space-y-5">
+        <ScrollArea className="flex-1 min-w-0 [&_[data-slot=scroll-area-viewport]>div]:!block">
+          <div className="p-3 space-y-5 overflow-hidden">
             {/* Actions */}
             <div className="flex items-center gap-2 flex-wrap">
               <Button size="sm" variant="outline" onClick={() => setWorktreeOpen(true)}>
@@ -184,7 +219,12 @@ export function TaskDetailPanel({ task, onClose, style, className }: TaskDetailP
                 Create Worktree
               </Button>
               {providers.length > 0 && (
-                <CreateProviderWorkspaceDialog workspaces={[]} />
+                <CreateProviderWorkspaceDialog
+                  workspaces={workspaces}
+                  initialRepo={firstLinkedRepo}
+                  initialBranch={suggestedBranch}
+                  triggerSize="sm"
+                />
               )}
               <a href={task.url} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" variant="ghost" className="text-muted-foreground">
@@ -273,7 +313,7 @@ export function TaskDetailPanel({ task, onClose, style, className }: TaskDetailP
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Description
                 </div>
-                <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+                <div className="prose prose-sm dark:prose-invert max-w-none text-sm break-words">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {detail.markdown_description}
                   </ReactMarkdown>

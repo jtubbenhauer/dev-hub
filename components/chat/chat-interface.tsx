@@ -1,66 +1,32 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useCallback,
-  useState,
-  useMemo,
-  Component,
-} from "react";
-import type { ReactNode } from "react";
-import { Virtuoso } from "react-virtuoso";
-import type { VirtuosoHandle } from "react-virtuoso";
-import {
-  AlertCircle,
-  ShieldAlert,
-  Check,
-  X,
-  MessageCircleQuestion,
-  ScrollText,
-  Plus,
-  MessageSquare,
-  ArrowDown,
-  GripVertical,
-  Loader2,
-} from "lucide-react";
+import { AgentSelector, useAgents } from "@/components/chat/agent-selector";
+import type { SlashCommand } from "@/components/chat/command-picker";
+import { ChatMessage } from "@/components/chat/message";
+import { ModelSelector, loadPersistedModel } from "@/components/chat/model-selector";
+import { PlanPanel } from "@/components/chat/plan-panel";
+import type { PromptInputHandle } from "@/components/chat/prompt-input";
+import { PromptInput } from "@/components/chat/prompt-input";
+import { SessionList } from "@/components/chat/session-list";
+import { VariantSelector } from "@/components/chat/variant-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { useChatStore } from "@/stores/chat-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
-import { usePendingChatStore } from "@/stores/pending-chat-store";
-import { ChatMessage } from "@/components/chat/message";
-import { PromptInput } from "@/components/chat/prompt-input";
-import type { PromptInputHandle } from "@/components/chat/prompt-input";
-import type { SlashCommand } from "@/components/chat/command-picker";
-import { SessionList } from "@/components/chat/session-list";
-import {
-  ModelSelector,
-  loadPersistedModel,
-} from "@/components/chat/model-selector";
-import { useAgents, AgentSelector } from "@/components/chat/agent-selector";
-import { VariantSelector } from "@/components/chat/variant-selector";
-import { PlanPanel } from "@/components/chat/plan-panel";
-import { useModelAgentBindings } from "@/hooks/use-settings";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useCommand } from "@/hooks/use-command";
-import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useLeaderAction } from "@/hooks/use-leader-action";
-import type {
-  PermissionRequest,
-  QuestionRequest,
-  QuestionInfo,
-  QuestionAnswer,
-  MessageWithParts,
-  SessionStatus,
-  Command,
-} from "@/lib/opencode/types";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useResizablePanel } from "@/hooks/use-resizable-panel";
+import { useModelAgentBindings } from "@/hooks/use-settings";
+import type { Command, MessageWithParts, PermissionRequest, QuestionAnswer, QuestionInfo, QuestionRequest, SessionStatus } from "@/lib/opencode/types";
+import { useChatStore } from "@/stores/chat-store";
+import { usePendingChatStore } from "@/stores/pending-chat-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useQueries } from "@tanstack/react-query";
+import { AlertCircle, ArrowDown, Check, GripVertical, Loader2, MessageCircleQuestion, MessageSquare, Plus, ScrollText, ShieldAlert, X } from "lucide-react";
+import type { ReactNode } from "react";
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { VirtuosoHandle } from "react-virtuoso";
+import { Virtuoso } from "react-virtuoso";
 
 interface SelectedModel {
   providerID: string;
@@ -150,6 +116,32 @@ export function ChatInterface() {
     return map;
   }, [allWorkspaces]);
 
+  const branchQueryResults = useQueries({
+    queries: allWorkspaces.map((ws) => ({
+      queryKey: ["git-status", ws.id],
+      queryFn: async () => {
+        const params = new URLSearchParams({ action: "status" })
+        const res = await fetch(`/api/workspaces/${ws.id}/git?${params}`)
+        if (!res.ok) return null
+        return res.json() as Promise<{ branch: string }>
+      },
+      enabled: isUnifiedMode,
+      staleTime: 30_000,
+      retry: false,
+    })),
+  })
+
+  const workspaceBranches = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (let i = 0; i < allWorkspaces.length; i++) {
+      const data = branchQueryResults[i]?.data
+      if (data?.branch) {
+        map[allWorkspaces[i].id] = data.branch
+      }
+    }
+    return map
+  }, [allWorkspaces, branchQueryResults])
+
   const workspaceOptions = useMemo(() => {
     return allWorkspaces.map((ws) => ({
       id: ws.id,
@@ -224,12 +216,23 @@ export function ChatInterface() {
   const streamingStatus = useChatStore(getStreamingStatus);
   const isMobile = useIsMobile();
 
-  const sessions = useChatStore(getActiveWorkspaceSessions);
+  const sessions = useChatStore(getActiveWorkspaceSessions)
+  const [unifiedLimit, setUnifiedLimit] = useState(20)
   const unifiedSessions = useChatStore((state) =>
-    state.getRecentSessionsAcrossWorkspaces(10),
-  );
-  const sessionStatus = useChatStore(getActiveSessionStatus);
-  const commands: Command[] = useChatStore((state) => state.commands);
+    state.getRecentSessionsAcrossWorkspaces(unifiedLimit)
+  )
+  const totalUnifiedCount = useChatStore((state) => {
+    let count = 0
+    for (const ws of Object.values(state.workspaceStates)) {
+      for (const session of Object.values(ws.sessions)) {
+        if (!session.parentID) count++
+      }
+    }
+    return count
+  })
+  const hasMoreUnifiedSessions = totalUnifiedCount > unifiedLimit
+  const sessionStatus = useChatStore(getActiveSessionStatus)
+  const commands: Command[] = useChatStore((state) => state.commands)
   // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
   // We filter by sessionID here with useMemo so we never create a new array reference
   // on every render — that would violate useSyncExternalStore's snapshot contract and
@@ -692,6 +695,9 @@ export function ChatInterface() {
               mode="unified"
               sessions={unifiedSessions}
               workspaceNames={workspaceNames}
+              workspaceBranches={workspaceBranches}
+              hasMore={hasMoreUnifiedSessions}
+              onLoadMore={() => setUnifiedLimit((n) => n + 20)}
               workspaces={workspaceOptions}
               activeWorkspaceId={activeWorkspaceId}
               onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
@@ -731,6 +737,9 @@ export function ChatInterface() {
                 mode="unified"
                 sessions={unifiedSessions}
                 workspaceNames={workspaceNames}
+                workspaceBranches={workspaceBranches}
+                hasMore={hasMoreUnifiedSessions}
+                onLoadMore={() => setUnifiedLimit((n) => n + 20)}
                 workspaces={workspaceOptions}
                 activeWorkspaceId={activeWorkspaceId}
                 onCreateSessionInWorkspace={handleCreateSessionInWorkspace}

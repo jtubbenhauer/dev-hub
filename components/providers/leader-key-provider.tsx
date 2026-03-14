@@ -15,7 +15,7 @@ import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults"
 import { buildTrie, matchKeys, getNodeAtBuffer } from "@/lib/leader-key-trie"
 import type { TrieNode } from "@/lib/leader-key-trie"
 
-const LEADER_TIMEOUT_MS = 2000
+const DEFAULT_LEADER_TIMEOUT_MS = 2000
 const LEAF_WITH_CHILDREN_TIMEOUT_MS = 300
 
 interface LeaderKeyContextValue {
@@ -40,6 +40,7 @@ export function useLeaderKey() {
 interface LeaderKeyProviderProps {
   children: React.ReactNode
   bindings?: LeaderBindingsMap
+  timeoutMs?: number | null
 }
 
 function pageFromPathname(pathname: string): string {
@@ -51,7 +52,7 @@ function pageFromPathname(pathname: string): string {
   return "unknown"
 }
 
-export function LeaderKeyProvider({ children, bindings = DEFAULT_LEADER_BINDINGS }: LeaderKeyProviderProps) {
+export function LeaderKeyProvider({ children, bindings = DEFAULT_LEADER_BINDINGS, timeoutMs = DEFAULT_LEADER_TIMEOUT_MS }: LeaderKeyProviderProps) {
   const pathname = usePathname()
   const activePage = pageFromPathname(pathname)
 
@@ -110,13 +111,19 @@ export function LeaderKeyProvider({ children, bindings = DEFAULT_LEADER_BINDINGS
     entry?.handler()
   }, [cancel])
 
+  const armLeaderTimeout = useCallback(() => {
+    if (timeoutMs !== null) {
+      leaderTimeoutRef.current = setTimeout(() => cancel(), timeoutMs)
+    }
+  }, [timeoutMs, cancel])
+
   // Stable ref so keydown handler always sees latest trie/state without re-subscribing
-  const stateRef = useRef({ isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction })
-  stateRef.current = { isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction }
+  const stateRef = useRef({ isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction, armLeaderTimeout })
+  stateRef.current = { isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction, armLeaderTimeout }
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const { isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction } = stateRef.current
+      const { isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction, armLeaderTimeout } = stateRef.current
 
       // Activate leader mode: Ctrl+Space
       if (!isLeaderActive) {
@@ -126,9 +133,8 @@ export function LeaderKeyProvider({ children, bindings = DEFAULT_LEADER_BINDINGS
           setKeyBuffer([])
           setCurrentNode(trie)
 
-          // Auto-cancel after LEADER_TIMEOUT_MS of inactivity
           clearAllTimers()
-          leaderTimeoutRef.current = setTimeout(() => cancel(), LEADER_TIMEOUT_MS)
+          armLeaderTimeout()
         }
         return
       }
@@ -176,15 +182,14 @@ export function LeaderKeyProvider({ children, bindings = DEFAULT_LEADER_BINDINGS
           fireAction(capturedActionId)
         }, LEAF_WITH_CHILDREN_TIMEOUT_MS)
 
-        // Still arm the overall inactivity timeout
-        leaderTimeoutRef.current = setTimeout(() => cancel(), LEADER_TIMEOUT_MS)
+        armLeaderTimeout()
         return
       }
 
       // prefix match — update which-key panel and wait
       const newNode = getNodeAtBuffer(trie, newBuffer)
       setCurrentNode(newNode)
-      leaderTimeoutRef.current = setTimeout(() => cancel(), LEADER_TIMEOUT_MS)
+      armLeaderTimeout()
     }
 
     window.addEventListener("keydown", handleKeyDown, { capture: true })

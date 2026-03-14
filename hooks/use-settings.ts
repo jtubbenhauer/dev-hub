@@ -32,6 +32,7 @@ export const SETTINGS_KEYS = {
   LEADER_WHICH_KEY: "leader-which-key",
   CLICKUP_PINNED_VIEWS: "clickup-pinned-views",
   WORKSPACE_PROVIDERS: "workspace-providers",
+  LEADER_TIMEOUT: "leader-timeout",
   THEME: "theme",
 } as const
 
@@ -267,6 +268,20 @@ export function useLeaderKeyBindings(): {
     [JSON.stringify(stored)]
   )
   return { bindings, isLoading }
+}
+
+export const DEFAULT_LEADER_TIMEOUT = 2
+
+export function useLeaderTimeoutSetting(): {
+  /** Seconds before auto-cancel, or null for "never hide" */
+  leaderTimeout: number | null
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.LEADER_TIMEOUT]
+  if (raw === null) return { leaderTimeout: null, isLoading }
+  if (typeof raw === "number" && raw > 0) return { leaderTimeout: raw, isLoading }
+  return { leaderTimeout: DEFAULT_LEADER_TIMEOUT, isLoading }
 }
 
 export function useLeaderWhichKeySetting(): {

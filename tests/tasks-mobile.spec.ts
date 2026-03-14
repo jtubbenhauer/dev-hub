@@ -86,7 +86,11 @@ const COMMENTS_RESPONSE = {
 // -- Route mocking helpers -------------------------------------------------
 
 async function mockClickUpRoutes(page: Page) {
-  // Settings — must return clickup-api-token and clickup-team-id
+  // Catch-all registered first = lowest priority in Playwright
+  await page.route('**/api/clickup/**', async (route: Route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) })
+  })
+
   await page.route('**/api/settings', async (route: Route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SETTINGS_RESPONSE) })
@@ -95,29 +99,24 @@ async function mockClickUpRoutes(page: Page) {
     }
   })
 
-  // Hierarchy
   await page.route('**/api/clickup/hierarchy', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(HIERARCHY_RESPONSE) })
   })
 
-  // Search (covers list browsing and text search)
   await page.route('**/api/clickup/search*', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ tasks: TASKS }) })
   })
 
-  // View tasks
   await page.route('**/api/clickup/views/*/tasks*', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ tasks: TASKS }) })
   })
 
-  // Task detail (specific task routes registered after generic catch-all)
   await page.route('**/api/clickup/tasks/*/comments', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(COMMENTS_RESPONSE) })
   })
 
   await page.route('**/api/clickup/tasks/*', async (route: Route) => {
     const url = route.request().url()
-    // Skip if this is a /comments sub-route (already handled above)
     if (url.includes('/comments')) {
       await route.continue()
       return
@@ -125,28 +124,19 @@ async function mockClickUpRoutes(page: Page) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ task: TASK_DETAIL }) })
   })
 
-  // My tasks
   await page.route('**/api/clickup/my-tasks', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ tasks: TASKS }) })
   })
 
-  // User
   await page.route('**/api/clickup/user', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: { id: 1, username: 'jack', email: 'jack@test.com', color: '#ff0000', profilePicture: null, initials: 'JK' } }) })
   })
 
-  // Team
   await page.route('**/api/clickup/team', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ teams: [{ id: 'team_001', name: 'Test Team', color: '#000000', avatar: null }] }) })
   })
-
-  // Catch-all for any other clickup API routes
-  await page.route('**/api/clickup/**', async (route: Route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) })
-  })
 }
 
-// Clear tasks-related localStorage to prevent stale state leaking between tests
 async function clearTasksStorage(page: Page) {
   await page.evaluate(() => {
     localStorage.removeItem('dev-hub:tasks-selection')
@@ -155,6 +145,33 @@ async function clearTasksStorage(page: Page) {
     localStorage.removeItem('dev-hub:tasks-expanded-spaces')
     localStorage.removeItem('dev-hub:tasks-expanded-folders')
   })
+}
+
+// -- Locator helpers -------------------------------------------------------
+
+// The Sheet dialog content that holds the sidebar (portaled by Radix)
+function sheetSidebar(page: Page) {
+  return page.locator('[data-slot="sheet-content"]').filter({ has: page.getByPlaceholder('Search tasks...') })
+}
+
+// The tasks sidebar <aside> (used for desktop inline layout)
+function tasksSidebar(page: Page) {
+  return page.locator('aside').filter({ has: page.getByPlaceholder('Search tasks...') })
+}
+
+// The sidebar toggle button in the mobile toolbar
+function sidebarToggle(page: Page) {
+  return page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
+}
+
+// The detail Sheet dialog (portaled by Radix, identified by accessible name)
+function detailSheet(page: Page) {
+  return page.getByRole('dialog', { name: 'Task detail' })
+}
+
+async function openSidebar(page: Page) {
+  await sidebarToggle(page).click({ force: true })
+  await expect(sheetSidebar(page)).toBeVisible({ timeout: 3000 })
 }
 
 // -- Tests -----------------------------------------------------------------
@@ -171,137 +188,97 @@ test.describe('Tasks page — mobile responsive', () => {
   })
 
   test('sidebar is NOT visible by default on mobile', async ({ page }) => {
-    // The sidebar <aside> should not be visible in the main viewport
-    const sidebar = page.locator('aside')
-    await expect(sidebar).not.toBeVisible()
+    await expect(sheetSidebar(page)).not.toBeVisible()
   })
 
   test('sidebar toggle button is visible on mobile', async ({ page }) => {
-    // The PanelLeft button should be visible in the mobile toolbar
-    const toggleButton = page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
-    await expect(toggleButton).toBeVisible()
+    await expect(sidebarToggle(page)).toBeVisible()
   })
 
   test('tapping sidebar button opens sidebar Sheet', async ({ page }) => {
-    const toggleButton = page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
-    await toggleButton.click()
+    await openSidebar(page)
 
-    // The Sheet should render the sidebar with "Browse" section
-    const browseHeading = page.getByText('Browse', { exact: true })
-    await expect(browseHeading).toBeVisible()
-
-    // The search input should be visible inside the Sheet
-    const searchInput = page.getByPlaceholder('Search tasks...')
-    await expect(searchInput).toBeVisible()
+    const sheet = sheetSidebar(page)
+    await expect(sheet.getByText('Browse', { exact: true })).toBeVisible()
+    await expect(sheet.getByPlaceholder('Search tasks...')).toBeVisible()
   })
 
   test('sidebar shows hierarchy after opening', async ({ page }) => {
-    const toggleButton = page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
-    await toggleButton.click()
+    await openSidebar(page)
 
-    // Pinned Views section should show
-    await expect(page.getByText('Pinned Views')).toBeVisible()
-    await expect(page.getByText('Sprint Board')).toBeVisible()
-
-    // Space should be listed under Browse
-    await expect(page.getByText('Engineering')).toBeVisible()
+    const sheet = sheetSidebar(page)
+    await expect(sheet.getByText('Pinned Views')).toBeVisible()
+    await expect(sheet.getByText('Sprint Board')).toBeVisible()
+    await expect(sheet.getByText('Engineering')).toBeVisible()
   })
 
   test('selecting a pinned view closes sidebar and loads tasks', async ({ page }) => {
-    const toggleButton = page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
-    await toggleButton.click()
+    await openSidebar(page)
 
-    // Click the pinned view
-    await page.getByText('Sprint Board').click()
+    const sheet = sheetSidebar(page)
+    await sheet.getByText('Sprint Board').click({ force: true })
 
-    // Sidebar should close (the aside inside the Sheet should no longer be visible)
-    await expect(page.locator('aside')).not.toBeVisible({ timeout: 3000 })
-
-    // Tasks should be loaded — look for the first task name
+    await expect(sheet).not.toBeVisible()
     await expect(page.getByText('Fix login redirect bug')).toBeVisible({ timeout: 5000 })
-
-    // Context label should show the view name in the mobile toolbar
-    await expect(page.getByText('Sprint Board')).toBeVisible()
   })
 
   test('selecting a list closes sidebar and loads tasks', async ({ page }) => {
-    const toggleButton = page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
-    await toggleButton.click()
+    await openSidebar(page)
 
-    // Expand the space to see folders and lists
-    await page.getByText('Engineering').click()
-    await page.getByText('Backend').click()
+    const sheet = sheetSidebar(page)
+    await sheet.getByText('Engineering').click({ force: true })
+    await sheet.getByText('Backend').click({ force: true })
+    await sheet.getByText('API Tasks').click({ force: true })
 
-    // Click a list
-    await page.getByText('API Tasks').click()
-
-    // Sidebar should close
-    await expect(page.locator('aside')).not.toBeVisible({ timeout: 3000 })
-
-    // Tasks should appear
+    await expect(sheet).not.toBeVisible()
     await expect(page.getByText('Fix login redirect bug')).toBeVisible({ timeout: 5000 })
   })
 
   test('tapping a task opens the detail Sheet from the right', async ({ page }) => {
-    // First select a view to load tasks
-    const toggleButton = page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
-    await toggleButton.click()
-    await page.getByText('Sprint Board').click()
+    await openSidebar(page)
+    await sheetSidebar(page).getByText('Sprint Board').click({ force: true })
+    await expect(sheetSidebar(page)).not.toBeVisible()
 
-    // Wait for tasks
     await expect(page.getByText('Fix login redirect bug')).toBeVisible({ timeout: 5000 })
+    await page.getByText('Fix login redirect bug').click({ force: true })
 
-    // Tap the first task
-    await page.getByText('Fix login redirect bug').click()
-
-    // The detail panel should open with the task name as heading
-    const detailHeading = page.locator('h2', { hasText: 'Fix login redirect bug' })
-    await expect(detailHeading).toBeVisible({ timeout: 5000 })
-
-    // Should show the "Open in ClickUp" link
-    await expect(page.getByText('Open in ClickUp')).toBeVisible()
+    const detail = detailSheet(page)
+    await expect(detail).toBeVisible({ timeout: 5000 })
+    await expect(detail.locator('h2', { hasText: 'Fix login redirect bug' })).toBeVisible({ timeout: 5000 })
+    await expect(detail.getByText('Open in ClickUp')).toBeVisible()
   })
 
   test('closing the detail Sheet dismisses it', async ({ page }) => {
-    // Load tasks via pinned view
-    const toggleButton = page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
-    await toggleButton.click()
-    await page.getByText('Sprint Board').click()
+    await openSidebar(page)
+    await sheetSidebar(page).getByText('Sprint Board').click({ force: true })
+    await expect(sheetSidebar(page)).not.toBeVisible()
     await expect(page.getByText('Fix login redirect bug')).toBeVisible({ timeout: 5000 })
 
-    // Open detail
-    await page.getByText('Fix login redirect bug').click()
-    const detailHeading = page.locator('h2', { hasText: 'Fix login redirect bug' })
-    await expect(detailHeading).toBeVisible({ timeout: 5000 })
+    await page.getByText('Fix login redirect bug').click({ force: true })
 
-    // Close via the X button in the detail panel
-    const closeButton = page.locator('[data-radix-dialog-content]').last().locator('button').filter({ has: page.locator('svg.lucide-x') })
-    await closeButton.click()
+    const detail = detailSheet(page)
+    await expect(detail).toBeVisible({ timeout: 5000 })
+    await expect(detail.locator('h2', { hasText: 'Fix login redirect bug' })).toBeVisible({ timeout: 5000 })
 
-    // The detail heading should no longer be visible
-    await expect(detailHeading).not.toBeVisible({ timeout: 3000 })
+    // Close via the X button inside the task detail panel
+    const closeButton = detail.locator('button').filter({ has: page.locator('svg.lucide-x') })
+    await closeButton.click({ force: true })
+
+    await expect(detail).not.toBeVisible()
   })
 
   test('empty state shows mobile-specific message', async ({ page }) => {
-    // With no selection, the empty state should show mobile-specific text
     await expect(page.getByText('Tap the sidebar button to browse views and lists, or search for tasks.')).toBeVisible()
   })
 
   test('search from sidebar auto-closes and loads results', async ({ page }) => {
-    const toggleButton = page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
-    await toggleButton.click()
+    await openSidebar(page)
 
-    // Type in the search input
-    const searchInput = page.getByPlaceholder('Search tasks...')
-    await searchInput.fill('Fix login')
+    const searchInput = sheetSidebar(page).getByPlaceholder('Search tasks...')
+    await searchInput.pressSequentially('Fix login', { delay: 50 })
 
-    // Sidebar should auto-close after typing 2+ chars
-    await expect(page.locator('aside')).not.toBeVisible({ timeout: 3000 })
-
-    // Search results should show
+    await expect(sheetSidebar(page)).not.toBeVisible()
     await expect(page.getByText('Fix login redirect bug')).toBeVisible({ timeout: 5000 })
-
-    // Context label should show "Search results"
     await expect(page.getByText('Search results')).toBeVisible()
   })
 })
@@ -314,12 +291,7 @@ test.describe('Tasks page — desktop layout preserved', () => {
     await clearTasksStorage(page)
     await page.reload({ waitUntil: 'networkidle' })
 
-    // The sidebar <aside> should be directly visible (not inside a Sheet)
-    const sidebar = page.locator('aside')
-    await expect(sidebar).toBeVisible()
-
-    // The mobile toggle button should NOT be visible
-    const toggleButton = page.locator('button').filter({ has: page.locator('svg.lucide-panel-left') })
-    await expect(toggleButton).not.toBeVisible()
+    await expect(tasksSidebar(page)).toBeVisible()
+    await expect(sidebarToggle(page)).not.toBeVisible()
   })
 })

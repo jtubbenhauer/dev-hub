@@ -22,6 +22,9 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'tests/.auth/user.json',
+        contextOptions: {
+          reducedMotion: 'reduce',
+        },
       },
       dependencies: ['setup'],
     },

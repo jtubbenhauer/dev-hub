@@ -344,6 +344,17 @@
   --chart-info: oklch(0.785 0.112 198.6);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

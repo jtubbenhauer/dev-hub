@@ -1,0 +1,27 @@
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-verifone-settings/verifone-configuration/verifone-configuration.component.ts
+  4af94fa5a070018e 4,8,27,60
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-verifone-settings/practice-verifone-terminals/practice-verifone-terminals.component.html
+  4af94fa5a070018e 9
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-verifone-settings/practice-verifone-terminals/practice-verifone-terminals.component.ts
+  4af94fa5a070018e 4-5,67,163,194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "b879f2a91e455f6d6d206b0d06ea11bb28ab246e",
+  "prompts": {
+    "4af94fa5a070018e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30c2be81dffeCaTJxIZNWuo1L2",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 9,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}

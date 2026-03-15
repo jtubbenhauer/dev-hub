@@ -405,26 +405,6 @@ export function SoundSettingsCard() {
     }
   }
 
-  const handleAgentToggle = (checked: boolean) => {
-    mutation.mutate(
-      { key: SETTINGS_KEYS.SOUND_AGENT_ENABLED, value: checked },
-      { onSuccess: () => toast.success(checked ? "Agent sound enabled" : "Agent sound disabled") }
-    )
-  }
-
-  const handlePermissionsToggle = (checked: boolean) => {
-    mutation.mutate(
-      { key: SETTINGS_KEYS.SOUND_PERMISSIONS_ENABLED, value: checked },
-      { onSuccess: () => toast.success(checked ? "Permissions sound enabled" : "Permissions sound disabled") }
-    )
-  }
-
-  const handleErrorsToggle = (checked: boolean) => {
-    mutation.mutate(
-      { key: SETTINGS_KEYS.SOUND_ERRORS_ENABLED, value: checked },
-      { onSuccess: () => toast.success(checked ? "Errors sound enabled" : "Errors sound disabled") }
-    )
-  }
 
   if (isLoading) {
     return (
@@ -452,35 +432,28 @@ export function SoundSettingsCard() {
               Play sound when the agent completes or needs attention
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Select
-              value={agentEnabled ? agentSoundId : "none"}
-              onValueChange={handleAgentSelect}
-              disabled={mutation.isPending}
-            >
-              <SelectTrigger id="sound-agent" className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {SOUND_CATEGORIES.map((cat) => (
-                  <SelectGroup key={cat.key}>
-                    <SelectLabel>{cat.label}</SelectLabel>
-                    {SOUND_OPTIONS.filter((o) => o.category === cat.key).map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-            <Switch
-              checked={agentEnabled}
-              onCheckedChange={handleAgentToggle}
-              disabled={mutation.isPending}
-            />
-          </div>
+          <Select
+            value={agentEnabled ? agentSoundId : "none"}
+            onValueChange={handleAgentSelect}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="sound-agent" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {SOUND_CATEGORIES.map((cat) => (
+                <SelectGroup key={cat.key}>
+                  <SelectLabel>{cat.label}</SelectLabel>
+                  {SOUND_OPTIONS.filter((o) => o.category === cat.key).map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center justify-between">
@@ -490,35 +463,28 @@ export function SoundSettingsCard() {
               Play sound when a permission is required
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Select
-              value={permissionsEnabled ? permissionsSoundId : "none"}
-              onValueChange={handlePermissionsSelect}
-              disabled={mutation.isPending}
-            >
-              <SelectTrigger id="sound-permissions" className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {SOUND_CATEGORIES.map((cat) => (
-                  <SelectGroup key={cat.key}>
-                    <SelectLabel>{cat.label}</SelectLabel>
-                    {SOUND_OPTIONS.filter((o) => o.category === cat.key).map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-            <Switch
-              checked={permissionsEnabled}
-              onCheckedChange={handlePermissionsToggle}
-              disabled={mutation.isPending}
-            />
-          </div>
+          <Select
+            value={permissionsEnabled ? permissionsSoundId : "none"}
+            onValueChange={handlePermissionsSelect}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="sound-permissions" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {SOUND_CATEGORIES.map((cat) => (
+                <SelectGroup key={cat.key}>
+                  <SelectLabel>{cat.label}</SelectLabel>
+                  {SOUND_OPTIONS.filter((o) => o.category === cat.key).map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center justify-between">
@@ -528,35 +494,28 @@ export function SoundSettingsCard() {
               Play sound when an error occurs
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Select
-              value={errorsEnabled ? errorsSoundId : "none"}
-              onValueChange={handleErrorsSelect}
-              disabled={mutation.isPending}
-            >
-              <SelectTrigger id="sound-errors" className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {SOUND_CATEGORIES.map((cat) => (
-                  <SelectGroup key={cat.key}>
-                    <SelectLabel>{cat.label}</SelectLabel>
-                    {SOUND_OPTIONS.filter((o) => o.category === cat.key).map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-            <Switch
-              checked={errorsEnabled}
-              onCheckedChange={handleErrorsToggle}
-              disabled={mutation.isPending}
-            />
-          </div>
+          <Select
+            value={errorsEnabled ? errorsSoundId : "none"}
+            onValueChange={handleErrorsSelect}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="sound-errors" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {SOUND_CATEGORIES.map((cat) => (
+                <SelectGroup key={cat.key}>
+                  <SelectLabel>{cat.label}</SelectLabel>
+                  {SOUND_OPTIONS.filter((o) => o.category === cat.key).map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </CardContent>
     </Card>

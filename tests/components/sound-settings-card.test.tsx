@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 import { SoundSettingsCard } from "@/components/settings/general-settings"
 
 const mockMutate = vi.fn()
@@ -70,12 +69,6 @@ describe("SoundSettingsCard", () => {
     expect(screen.getByText("Play sound when an error occurs")).toBeInTheDocument()
   })
 
-  it("renders 3 switches", () => {
-    render(<SoundSettingsCard />)
-    const switches = screen.getAllByRole("switch")
-    expect(switches).toHaveLength(3)
-  })
-
   it("renders 3 select triggers", () => {
     render(<SoundSettingsCard />)
     const combos = screen.getAllByRole("combobox")
@@ -96,28 +89,6 @@ describe("SoundSettingsCard", () => {
     render(<SoundSettingsCard />)
     expect(document.querySelector(".animate-spin")).toBeInTheDocument()
     expect(screen.queryByText("Sound Effects")).not.toBeInTheDocument()
-  })
-
-  it("toggleing a switch calls mutation with the enabled key", async () => {
-    const user = userEvent.setup()
-    render(<SoundSettingsCard />)
-    const switches = screen.getAllByRole("switch")
-    await user.click(switches[0])
-    expect(mockMutate).toHaveBeenCalledWith(
-      { key: "sound-agent-enabled", value: true },
-      expect.any(Object)
-    )
-  })
-
-  it("switches are disabled while mutation is pending", async () => {
-    const { useSettingsMutation } = await import("@/hooks/use-settings")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(useSettingsMutation).mockReturnValueOnce({ mutate: mockMutate, isPending: true } as any)
-    render(<SoundSettingsCard />)
-    const switches = screen.getAllByRole("switch")
-    for (const sw of switches) {
-      expect(sw).toBeDisabled()
-    }
   })
 
   it("selects are disabled while mutation is pending", async () => {

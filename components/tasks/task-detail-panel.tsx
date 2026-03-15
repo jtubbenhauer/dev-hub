@@ -31,6 +31,7 @@ import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog"
 import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-provider-workspace-dialog"
 import { useClickUpTaskDetail, useClickUpTaskComments } from "@/hooks/use-clickup"
 import { useWorkspaceProviders } from "@/hooks/use-settings"
+import { cn } from "@/lib/utils"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import type { ClickUpTask, ClickUpCustomField, Workspace } from "@/types"
 
@@ -176,9 +177,10 @@ interface TaskDetailPanelProps {
   task: ClickUpTask
   onClose: () => void
   style?: React.CSSProperties
+  className?: string
 }
 
-export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ task, onClose, style, className }: TaskDetailPanelProps) {
   const [worktreeOpen, setWorktreeOpen] = useState(false)
 
   const { data: detail, isLoading: isLoadingDetail, error: detailError } = useClickUpTaskDetail(task.id)
@@ -220,7 +222,7 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
 
   return (
     <>
-      <div className="flex flex-col h-full min-w-0 overflow-hidden border-l shrink-0 bg-background" style={style}>
+      <div className={cn("flex flex-col h-full min-w-0 overflow-hidden border-l shrink-0 bg-background", className)} style={style}>
         {/* Header */}
         <div className="flex items-start gap-2 p-3 border-b">
           <div className="flex-1 min-w-0">

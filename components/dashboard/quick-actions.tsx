@@ -212,6 +212,12 @@ function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: Editor
         <DialogHeader>
           <DialogTitle>Edit Quick Actions</DialogTitle>
         </DialogHeader>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground px-0.5">
+          <span className="w-32 shrink-0">Icon</span>
+          <span className="flex-1">Label</span>
+          <span className="flex-1">Path</span>
+          <span className="w-8 shrink-0" />
+        </div>
         <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
           {draft.map((action) => (
             <div key={action.id} className="flex items-center gap-2">
@@ -219,7 +225,7 @@ function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: Editor
                 value={action.icon}
                 onValueChange={(value) => updateAction(action.id, { icon: value })}
               >
-                <SelectTrigger className="w-20 h-8 shrink-0">
+                <SelectTrigger className="w-32 h-8 shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -255,11 +261,6 @@ function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: Editor
               </Button>
             </div>
           ))}
-        </div>
-        <div className="text-xs text-muted-foreground px-0.5 space-y-0.5">
-          <Label className="text-xs text-muted-foreground">
-            Icon &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Label &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Path
-          </Label>
         </div>
         <div className="flex justify-between pt-1">
           <Button variant="ghost" size="sm" onClick={addAction} className="gap-1.5">

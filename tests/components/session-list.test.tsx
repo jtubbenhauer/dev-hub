@@ -153,7 +153,7 @@ describe("SessionList — unified mode workspace picker", () => {
         mode="unified"
         sessions={[makeUnifiedSession("sess-1", "ws-1", { title: "Test Session" })]}
         workspaceNames={{ "ws-1": "My Workspace" }}
-        workspaceBranches={{}}
+        workspaceBranches={{ "ws-1": "main" }}
         onSelectSession={vi.fn()}
         workspaces={[{ id: "ws-1", name: "My Workspace", backend: "local" }]}
         activeWorkspaceId="ws-1"
@@ -162,6 +162,7 @@ describe("SessionList — unified mode workspace picker", () => {
     )
 
     expect(screen.getByText("Test Session")).toBeInTheDocument()
-    expect(screen.getByText("My Workspace")).toBeInTheDocument()
+    // Branch name is shown when workspaceBranches provides it; falls back to workspace name
+    expect(screen.getByText("main")).toBeInTheDocument()
   })
 })

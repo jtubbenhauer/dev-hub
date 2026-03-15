@@ -18,6 +18,7 @@ import type { PlanFile } from "@/app/api/files/plans/route"
 interface PlanPanelProps {
   workspaceId: string
   workspaceName: string
+  sessionDirectory?: string
   isOpen: boolean
   onClose: () => void
   onPlanFilesChange: (hasFiles: boolean) => void
@@ -27,8 +28,9 @@ interface FileContentResponse {
   content: string
 }
 
-async function fetchPlanFiles(workspaceId: string): Promise<PlanFile[]> {
+async function fetchPlanFiles(workspaceId: string, directory?: string): Promise<PlanFile[]> {
   const params = new URLSearchParams({ workspaceId })
+  if (directory) params.set("directory", directory)
   const response = await fetch(`/api/files/plans?${params.toString()}`)
   if (!response.ok) return []
   const data = await response.json()
@@ -61,6 +63,7 @@ function pickBestPlanFile(files: PlanFile[], workspaceName: string): PlanFile {
 export function PlanPanel({
   workspaceId,
   workspaceName,
+  sessionDirectory,
   isOpen,
   onClose,
   onPlanFilesChange,
@@ -80,7 +83,7 @@ export function PlanPanel({
   const loadPlanFiles = useCallback(async () => {
     setIsLoadingFiles(true)
     try {
-      const files = await fetchPlanFiles(workspaceId)
+      const files = await fetchPlanFiles(workspaceId, sessionDirectory)
       setPlanFiles(files)
       onPlanFilesChange(files.length > 0)
 
@@ -94,9 +97,8 @@ export function PlanPanel({
     } finally {
       setIsLoadingFiles(false)
     }
-  }, [workspaceId, workspaceName, onPlanFilesChange])
+  }, [workspaceId, sessionDirectory, workspaceName, onPlanFilesChange])
 
-  // Reload file list when workspace changes
   useEffect(() => {
     hasAutoSelected.current = false
     setPlanFiles([])
@@ -104,7 +106,7 @@ export function PlanPanel({
     setContent("")
     setSavedContent("")
     loadPlanFiles()
-  }, [workspaceId, loadPlanFiles])
+  }, [loadPlanFiles])
 
   // Load content when active file changes
   useEffect(() => {

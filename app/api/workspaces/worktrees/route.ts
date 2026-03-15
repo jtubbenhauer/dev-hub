@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
     startPoint,
     name,
     symlinkPaths,
+    linkedTaskId,
+    linkedTaskMeta,
   } = body
 
   // Validate required fields
@@ -102,6 +104,9 @@ export async function POST(request: NextRequest) {
     const parentName = path.basename(resolvedParent)
     const workspaceName = name || `${parentName}/${branch}`
 
+    const resolvedTaskId = typeof linkedTaskId === "string" ? linkedTaskId : null
+    const resolvedTaskMeta = linkedTaskMeta && typeof linkedTaskMeta === "object" ? linkedTaskMeta : null
+
     const workspace = {
       id: crypto.randomUUID(),
       userId: session.user.id,
@@ -115,6 +120,8 @@ export async function POST(request: NextRequest) {
       agentUrl: parentWorkspace.agentUrl,
       opencodeUrl: parentWorkspace.opencodeUrl,
       provider: parentWorkspace.provider,
+      linkedTaskId: resolvedTaskId,
+      linkedTaskMeta: resolvedTaskMeta,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
     }
@@ -174,7 +181,10 @@ export async function POST(request: NextRequest) {
     opencodeUrl: null,
     agentUrl: null,
     providerMeta: null,
+    color: null,
     worktreeSymlinks: null,
+    linkedTaskId: null,
+    linkedTaskMeta: null,
     createdAt: new Date(),
     lastAccessedAt: new Date(),
   })
@@ -222,6 +232,9 @@ export async function POST(request: NextRequest) {
     const parentName = path.basename(resolvedParent)
     const workspaceName = name || `${parentName}/${branch}`
 
+    const legacyTaskId = typeof linkedTaskId === "string" ? linkedTaskId : null
+    const legacyTaskMeta = linkedTaskMeta && typeof linkedTaskMeta === "object" ? linkedTaskMeta : null
+
     const workspace = {
       id: crypto.randomUUID(),
       userId: session.user.id,
@@ -232,6 +245,8 @@ export async function POST(request: NextRequest) {
       packageManager,
       quickCommands: null,
       backend: "local" as const,
+      linkedTaskId: legacyTaskId,
+      linkedTaskMeta: legacyTaskMeta,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
     }

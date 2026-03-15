@@ -111,6 +111,11 @@ export async function POST(request: NextRequest) {
   const branch = typeof body.branch === "string" ? body.branch : "main"
   const name = typeof body.name === "string" ? body.name : undefined
   const context = typeof body.context === "string" ? body.context : ""
+  const color = typeof body.color === "string" ? body.color : null
+  const linkedTaskId = typeof body.linkedTaskId === "string" ? body.linkedTaskId : null
+  const linkedTaskMeta = body.linkedTaskMeta && typeof body.linkedTaskMeta === "object"
+    ? (body.linkedTaskMeta as Record<string, unknown>)
+    : null
 
   const [settingRow] = await db
     .select()
@@ -210,6 +215,9 @@ export async function POST(request: NextRequest) {
           repo,
           branch,
           userId,
+          color,
+          linkedTaskId,
+          linkedTaskMeta,
           emit,
           createOutput: createStdout,
         }).then(() => {
@@ -239,11 +247,14 @@ interface PostSpawnParams {
   repo: string
   branch: string
   userId: string
+  color: string | null
+  linkedTaskId: string | null
+  linkedTaskMeta: Record<string, unknown> | null
   emit: (event: string, data: Record<string, unknown>) => void
   createOutput: string
 }
 
-async function handlePostSpawn({ provider, derivedName, id, repo, branch, userId, emit, createOutput }: PostSpawnParams) {
+async function handlePostSpawn({ provider, derivedName, id, repo, branch, userId, color, linkedTaskId, linkedTaskMeta, emit, createOutput }: PostSpawnParams) {
   emit("status", { message: "Processing create output..." })
 
   const parsed = extractTrailingJson(createOutput)
@@ -281,7 +292,7 @@ async function handlePostSpawn({ provider, derivedName, id, repo, branch, userId
     id: crypto.randomUUID(),
     userId,
     name: id,
-    path: "/workspace",
+    path: createResult.metadata.codePath ?? "/workspace",
     type: "repo" as const,
     parentRepoPath: null,
     packageManager: null,
@@ -297,6 +308,9 @@ async function handlePostSpawn({ provider, derivedName, id, repo, branch, userId
       branch,
       ...createResult.metadata,
     },
+    color,
+    linkedTaskId,
+    linkedTaskMeta,
     createdAt: new Date(),
     lastAccessedAt: new Date(),
   }

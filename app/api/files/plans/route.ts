@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { workspaces } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
-import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
+import { getBackend, LocalBackend, toWorkspace } from "@/lib/workspaces/backend"
 
 const PLAN_DIRECTORIES = [".opencode/plans", ".sisyphus/plans"]
 
@@ -39,7 +39,12 @@ export async function GET(request: NextRequest) {
   }
 
   const workspace = toWorkspace(row)
-  const backend = getBackend(workspace)
+
+  const directory = request.nextUrl.searchParams.get("directory")
+  const backend =
+    directory && workspace.backend !== "remote"
+      ? new LocalBackend(directory)
+      : getBackend(workspace)
 
   const seen = new Set<string>()
   const allFiles: PlanFile[] = []

@@ -213,7 +213,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
 
   if (isPrsLoading && !selectedPr) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex min-h-0 flex-1 items-center justify-center">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
     )
@@ -238,7 +238,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const isSubmittingComment = addCommentMutation.isPending || replyToCommentMutation.isPending
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* PR header */}
       <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
         <button
@@ -444,7 +444,7 @@ function PrListView({
   currentUser,
 }: PrListViewProps) {
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-medium">
           <GitPullRequest className="size-4" />
@@ -477,7 +477,7 @@ function PrListView({
             )}
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="for-review" className="min-h-0 flex-1">
+        <TabsContent value="for-review" className="flex min-h-0 flex-1 flex-col">
           {isReviewLoading ? (
             <div className="flex flex-1 items-center justify-center py-12">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -492,7 +492,7 @@ function PrListView({
             <PrListItems prs={reviewPrs} selectedPr={null} onSelect={onSelect} currentUser={currentUser} />
           )}
         </TabsContent>
-        <TabsContent value="my-prs" className="min-h-0 flex-1">
+        <TabsContent value="my-prs" className="flex min-h-0 flex-1 flex-col">
           {isMyPrsLoading ? (
             <div className="flex flex-1 items-center justify-center py-12">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />

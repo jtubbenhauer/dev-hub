@@ -27,6 +27,7 @@ interface BaseSessionListProps {
 interface WorkspaceSessionListProps extends BaseSessionListProps {
   mode: "workspace"
   sessions: Record<string, Session>
+  workspaceColor?: string
   onSelectSession: (sessionId: string) => void
 }
 
@@ -35,6 +36,7 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
   sessions: SessionWithWorkspace[]
   workspaceNames: Record<string, string>
   workspaceBranches: Record<string, string>
+  workspaceColors?: Record<string, string>
   hasMore?: boolean
   onLoadMore?: () => void
   onSelectSession: (sessionId: string, workspaceId: string) => void
@@ -145,6 +147,13 @@ export function SessionList(props: SessionListProps) {
                       props.workspaceNames[(session as SessionWithWorkspace).workspaceId]
                     : undefined
                 }
+                workspaceColor={
+                  props.mode === "unified"
+                    ? props.workspaceColors?.[(session as SessionWithWorkspace).workspaceId]
+                    : props.mode === "workspace"
+                      ? props.workspaceColor
+                      : undefined
+                }
                 onSelect={() => handleSelect(session)}
                 onDelete={() => onDeleteSession(session.id)}
               />
@@ -171,6 +180,7 @@ interface SessionItemProps {
   isActive: boolean
   status: SessionStatus | null
   workspaceBranch?: string
+  workspaceColor?: string
   onSelect: () => void
   onDelete: () => void
 }
@@ -180,6 +190,7 @@ function SessionItem({
   isActive,
   status,
   workspaceBranch,
+  workspaceColor,
   onSelect,
   onDelete,
 }: SessionItemProps) {
@@ -207,7 +218,10 @@ function SessionItem({
       )}
     >
       <div className="relative mt-0.5 shrink-0">
-        <MessageSquare className="size-3.5 text-muted-foreground" />
+        <MessageSquare
+          className={cn("size-3.5", !workspaceColor && "text-muted-foreground")}
+          style={workspaceColor ? { color: workspaceColor } : undefined}
+        />
         {isRunning && (
           <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-emerald-500 animate-pulse" />
         )}

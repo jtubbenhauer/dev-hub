@@ -32,21 +32,24 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Terminal, Loader2, ChevronsUpDown, Check, Plus, GitBranch, Minus } from "lucide-react"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils"
 import { useWorkspaceProviders } from "@/hooks/use-settings"
 import { useProviderCreationStore } from "@/stores/provider-creation-store"
-import type { Workspace } from "@/types"
+import type { Workspace, ClickUpTask, LinkedTaskMeta } from "@/types"
 
 interface CreateProviderWorkspaceDialogProps {
   workspaces: Workspace[]
   initialRepo?: string
   initialBranch?: string
   triggerSize?: "sm" | "default"
+  task?: ClickUpTask
+  dropdownItem?: boolean
 }
 
-export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initialBranch, triggerSize }: CreateProviderWorkspaceDialogProps) {
+export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initialBranch, triggerSize, task, dropdownItem }: CreateProviderWorkspaceDialogProps) {
   const queryClient = useQueryClient()
   const { providers } = useWorkspaceProviders()
 
@@ -62,6 +65,12 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
   const [repoSearch, setRepoSearch] = useState("")
   const [branchPopoverOpen, setBranchPopoverOpen] = useState(false)
   const [branchSearch, setBranchSearch] = useState("")
+
+  const autoColor = useMemo(() => {
+    const usedColors = new Set(workspaces.map((ws) => ws.color).filter(Boolean))
+    return WORKSPACE_PRESET_COLORS.find((c) => !usedColors.has(c)) ?? WORKSPACE_PRESET_COLORS[0]
+  }, [workspaces])
+  const [selectedColor, setSelectedColor] = useState<string | null>(autoColor)
 
   const creationStore = useProviderCreationStore()
   const phase = creationStore.phase
@@ -129,6 +138,16 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
 
     setFormOpen(false)
 
+    const taskMeta: LinkedTaskMeta | undefined = task
+      ? {
+          name: task.name,
+          customId: task.custom_id,
+          url: task.url,
+          status: task.status.status,
+          provider: "clickup",
+        }
+      : undefined
+
     creationStore.startCreation({
       providerId,
       providerName: selectedProvider.name,
@@ -136,12 +155,15 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
       branch: branch.trim() || undefined,
       name: name.trim() || undefined,
       context: context.trim() || undefined,
+      color: selectedColor ?? undefined,
+      linkedTaskId: task?.id,
+      linkedTaskMeta: taskMeta,
       onSuccess: (workspaceName) => {
         queryClient.invalidateQueries({ queryKey: ["workspaces"] })
         toast.success(`Created workspace "${workspaceName}" via ${selectedProvider.name}`)
       },
     })
-  }, [canSubmit, selectedProvider, providerId, repo, branch, name, context, queryClient, creationStore])
+  }, [canSubmit, selectedProvider, providerId, repo, branch, name, context, task, queryClient, creationStore])
 
   function resetFormState() {
     setProviderId(providers.length === 1 ? providers[0].id : "")
@@ -151,6 +173,7 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
     setContext("")
     setRepoSearch("")
     setBranchSearch("")
+    setSelectedColor(autoColor)
   }
 
   const handleKeyDown = useCallback(
@@ -182,7 +205,12 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
   return (
     <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
       <DialogTrigger asChild>
-        {triggerSize === "sm" ? (
+        {dropdownItem ? (
+          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+            <Terminal className="mr-2 size-3.5" />
+            Create via Provider
+          </DropdownMenuItem>
+        ) : triggerSize === "sm" ? (
           <Button size="sm" variant="outline">
             <Terminal className="mr-2 size-3.5" />
             Create via Provider
@@ -427,6 +455,24 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                   className="text-sm"
                   onKeyDown={handleKeyDown}
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Color</Label>
+                <div className="flex items-center gap-1.5">
+                  {WORKSPACE_PRESET_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={cn(
+                        "size-5 rounded-full border border-transparent transition-transform hover:scale-110",
+                        selectedColor === color && "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                      )}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setSelectedColor(selectedColor === color ? null : color)}
+                    />
+                  ))}
+                </div>
               </div>
 
               {selectedProvider && repo.trim() && (

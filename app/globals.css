@@ -344,6 +344,48 @@
   --chart-info: oklch(0.785 0.112 198.6);
 }
 
+.github-dark {
+  --background: oklch(0.178 0.014 256.8);
+  --foreground: oklch(0.945 0.008 250.0);
+  --card: oklch(0.214 0.014 258.0);
+  --card-foreground: oklch(0.945 0.008 250.0);
+  --popover: oklch(0.214 0.014 258.0);
+  --popover-foreground: oklch(0.945 0.008 250.0);
+  --primary: oklch(0.690 0.155 260.0);
+  --primary-foreground: oklch(0.178 0.014 256.8);
+  --secondary: oklch(0.261 0.013 256.5);
+  --secondary-foreground: oklch(0.945 0.008 250.0);
+  --muted: oklch(0.261 0.013 256.5);
+  --muted-foreground: oklch(0.654 0.016 252.0);
+  --accent: oklch(0.261 0.013 256.5);
+  --accent-foreground: oklch(0.945 0.008 250.0);
+  --destructive: oklch(0.640 0.230 25.0);
+  --border: oklch(0.327 0.011 252.0);
+  --input: oklch(0.327 0.011 252.0);
+  --ring: oklch(0.690 0.155 260.0);
+  --chart-1: oklch(0.690 0.155 260.0);
+  --chart-2: oklch(0.685 0.175 145.0);
+  --chart-3: oklch(0.720 0.155 80.0);
+  --chart-4: oklch(0.700 0.160 300.0);
+  --chart-5: oklch(0.720 0.160 55.0);
+  --sidebar: oklch(0.214 0.014 258.0);
+  --sidebar-foreground: oklch(0.945 0.008 250.0);
+  --sidebar-primary: oklch(0.690 0.155 260.0);
+  --sidebar-primary-foreground: oklch(0.178 0.014 256.8);
+  --sidebar-accent: oklch(0.261 0.013 256.5);
+  --sidebar-accent-foreground: oklch(0.945 0.008 250.0);
+  --sidebar-border: oklch(0.327 0.011 252.0);
+  --sidebar-ring: oklch(0.690 0.155 260.0);
+  --diff-add-bg: oklch(0.685 0.175 145.0 / 0.18);
+  --diff-add-line: oklch(0.685 0.175 145.0 / 0.06);
+  --diff-remove-bg: oklch(0.640 0.230 25.0 / 0.18);
+  --diff-remove-line: oklch(0.640 0.230 25.0 / 0.06);
+  --chart-error: oklch(0.640 0.230 25.0);
+  --chart-warning: oklch(0.720 0.155 80.0);
+  --chart-success: oklch(0.685 0.175 145.0);
+  --chart-info: oklch(0.690 0.155 260.0);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

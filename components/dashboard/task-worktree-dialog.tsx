@@ -18,7 +18,7 @@ import { GitFork, FolderGit2, Loader2, Plus, Link, X } from "lucide-react"
 import { useCreateWorktree, useWorktreeSymlinks } from "@/hooks/use-git"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { usePendingChatStore } from "@/stores/pending-chat-store"
-import type { ClickUpTask, Workspace } from "@/types"
+import type { ClickUpTask, Workspace, LinkedTaskMeta } from "@/types"
 
 const SYMLINK_SUGGESTIONS = [".npmrc", ".env", ".env.local", ".opencode/plans"]
 
@@ -108,6 +108,14 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
   function handleCreate() {
     if (!selectedRepo || !branchName) return
 
+    const taskMeta: LinkedTaskMeta = {
+      name: task.name,
+      customId: task.custom_id,
+      url: task.url,
+      status: task.status.status,
+      provider: "clickup",
+    }
+
     createWorktree.mutate(
       {
         parentWorkspaceId: selectedRepo.id,
@@ -115,6 +123,8 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
         newBranch: true,
         name: customName || undefined,
         symlinkPaths: symlinkPaths.length > 0 ? symlinkPaths : undefined,
+        linkedTaskId: task.id,
+        linkedTaskMeta: taskMeta,
       },
       {
         onSuccess: (data: { workspace: Workspace }) => {

@@ -37,7 +37,10 @@ export function readDirectoryTree(
   workspacePath: string,
   depth: number = 1
 ): FileTreeEntry[] {
-  const resolvedDir = validatePathWithinWorkspace(workspacePath, dirPath === workspacePath ? "." : path.relative(workspacePath, dirPath))
+  const relativePath = dirPath === workspacePath
+    ? "."
+    : path.isAbsolute(dirPath) ? path.relative(workspacePath, dirPath) : dirPath
+  const resolvedDir = validatePathWithinWorkspace(workspacePath, relativePath)
 
   let entries: fs.Dirent[]
   try {

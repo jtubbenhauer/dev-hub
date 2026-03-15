@@ -1,0 +1,15 @@
+services:
+  dev-hub:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_URL=${AUTH_URL:-http://localhost:3000}
+      - DB_PATH=/data/dev-hub.db
+    volumes:
+      - dev-hub-data:/data
+    restart: unless-stopped
+
+volumes:
+  dev-hub-data:

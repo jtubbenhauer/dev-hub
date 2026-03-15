@@ -51,10 +51,11 @@ import {
   X,
   Settings2,
   Pencil,
+  CheckSquare,
 } from "lucide-react"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
-import type { Workspace, QuickCommand } from "@/types"
+import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils"
+import type { Workspace, QuickCommand, LinkedTaskMeta } from "@/types"
 
 interface WorkspaceCardProps {
   workspace: Workspace
@@ -96,7 +97,10 @@ export function WorkspaceCard({
     <Card className="overflow-hidden hover:border-primary/50">
       <CardHeader className="pb-2">
         <div className="flex min-w-0 items-center justify-between">
-          <EditableWorkspaceName workspace={workspace} />
+          <div className="flex min-w-0 items-center gap-2">
+            <WorkspaceColorPicker workspace={workspace} />
+            <EditableWorkspaceName workspace={workspace} />
+          </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {workspace.backend === "remote" && (
               <Tooltip>
@@ -135,6 +139,24 @@ export function WorkspaceCard({
         <p className="text-xs text-muted-foreground truncate font-mono">
           {workspace.path}
         </p>
+
+        {workspace.linkedTaskMeta && (
+          <a
+            href={(workspace.linkedTaskMeta as LinkedTaskMeta).url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group/task"
+          >
+            <CheckSquare className="size-3 shrink-0 text-purple-500" />
+            <span className="truncate group-hover/task:underline">
+              {(workspace.linkedTaskMeta as LinkedTaskMeta).customId
+                ? `${(workspace.linkedTaskMeta as LinkedTaskMeta).customId} · `
+                : ""}
+              {(workspace.linkedTaskMeta as LinkedTaskMeta).name}
+            </span>
+          </a>
+        )}
 
         {gitStatus?.isRepo && (
           <div className="space-y-2">
@@ -349,6 +371,85 @@ export function WorkspaceCard({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function WorkspaceColorPicker({ workspace }: { workspace: Workspace }) {
+  const queryClient = useQueryClient()
+  const [isOpen, setIsOpen] = useState(false)
+
+  const updateMutation = useMutation({
+    mutationFn: async (color: string | null) => {
+      const res = await fetch(`/api/workspaces/${workspace.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Failed to update color")
+      }
+      return res.json()
+    },
+    onSuccess: (_, color) => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
+      useWorkspaceStore.getState().updateWorkspace(workspace.id, { color })
+      setIsOpen(false)
+    },
+    onError: (err: Error) => {
+      toast.error(err.message)
+    },
+  })
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "size-3 shrink-0 rounded-full border transition-colors hover:opacity-80",
+            workspace.color ? "border-transparent" : "border-muted-foreground/30 bg-transparent"
+          )}
+          style={workspace.color ? { backgroundColor: workspace.color } : undefined}
+          onClick={(e) => {
+            e.stopPropagation()
+          }}
+        />
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-auto p-2"
+        align="start"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-5 gap-1.5">
+            {WORKSPACE_PRESET_COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={cn(
+                  "size-5 rounded-full border border-transparent transition-transform hover:scale-110",
+                  workspace.color === color && "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                )}
+                style={{ backgroundColor: color }}
+                onClick={() => updateMutation.mutate(color)}
+                disabled={updateMutation.isPending}
+              />
+            ))}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs w-full justify-start text-muted-foreground"
+            onClick={() => updateMutation.mutate(null)}
+            disabled={updateMutation.isPending || !workspace.color}
+          >
+            <X className="size-3 mr-1.5" />
+            Clear color
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

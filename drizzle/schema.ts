@@ -37,6 +37,9 @@ export const workspaces = sqliteTable("workspaces", {
   agentUrl: text("agent_url"),
   providerMeta: text("provider_meta", { mode: "json" }),
   worktreeSymlinks: text("worktree_symlinks", { mode: "json" }).$type<string[]>(),
+  linkedTaskId: text("linked_task_id"),
+  linkedTaskMeta: text("linked_task_meta", { mode: "json" }),
+  color: text("color"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

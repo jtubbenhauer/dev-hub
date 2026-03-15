@@ -3,6 +3,7 @@
 import { Fragment, useState, useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import Link from "next/link"
 import {
   X,
   ExternalLink,
@@ -11,17 +12,27 @@ import {
   AlertTriangle,
   Clock,
   User,
+  MoreHorizontal,
+  FolderOpen,
+  Cloud,
+  MessageSquare,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog"
 import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-provider-workspace-dialog"
 import { useClickUpTaskDetail, useClickUpTaskComments } from "@/hooks/use-clickup"
 import { useWorkspaceProviders } from "@/hooks/use-settings"
 import { useWorkspaceStore } from "@/stores/workspace-store"
-import type { ClickUpTask, ClickUpCustomField } from "@/types"
+import type { ClickUpTask, ClickUpCustomField, Workspace } from "@/types"
 
 const PRIORITY_LABELS: Record<string, string> = {
   urgent: "Urgent",
@@ -129,6 +140,38 @@ function slugify(text: string): string {
     .slice(0, 60)
 }
 
+function LinkedWorkspaceRow({ workspace }: { workspace: Workspace }) {
+  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId)
+  const isRemote = workspace.backend === "remote"
+
+  return (
+    <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+      <button
+        type="button"
+        onClick={() => setActiveWorkspaceId(workspace.id)}
+        className="flex items-center gap-2 flex-1 min-w-0 text-left hover:text-foreground transition-colors"
+      >
+        {isRemote
+          ? <Cloud className="size-3.5 shrink-0 text-muted-foreground" />
+          : <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" />
+        }
+        <span className="truncate font-medium">{workspace.name}</span>
+        <Badge variant="secondary" className="text-xs ml-auto shrink-0">
+          {workspace.type}
+        </Badge>
+      </button>
+      <Link
+        href="/chat"
+        onClick={() => setActiveWorkspaceId(workspace.id)}
+        className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        title="Open chat"
+      >
+        <MessageSquare className="size-3.5" />
+      </Link>
+    </div>
+  )
+}
+
 interface TaskDetailPanelProps {
   task: ClickUpTask
   onClose: () => void
@@ -164,6 +207,13 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
     ? (PRIORITY_COLORS[task.priority.priority] ?? "bg-gray-400")
     : null
 
+  const linkedWorkspaces = useMemo(
+    () => workspaces.filter((ws) => ws.linkedTaskId === task.id),
+    [workspaces, task.id]
+  )
+
+  const hasLinkedWorkspaces = linkedWorkspaces.length > 0
+
   const nonEmptyCustomFields = (detail?.custom_fields ?? []).filter(
     (f) => f.value != null && f.value !== "" && !(Array.isArray(f.value) && f.value.length === 0)
   )
@@ -193,6 +243,7 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
               {task.custom_id && (
                 <span className="text-xs text-muted-foreground font-mono">{task.custom_id}</span>
               )}
+              <span className="text-xs text-muted-foreground font-mono">{task.id}</span>
             </div>
             <h2 className="text-sm font-semibold mt-1 leading-snug">{task.name}</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -210,20 +261,58 @@ export function TaskDetailPanel({ task, onClose, style }: TaskDetailPanelProps) 
 
         <ScrollArea className="flex-1 min-w-0 [&_[data-slot=scroll-area-viewport]>div]:!block">
           <div className="p-3 space-y-5 overflow-hidden">
+            {/* Linked workspaces */}
+            {hasLinkedWorkspaces && (
+              <div className="space-y-1.5">
+                {linkedWorkspaces.map((ws) => (
+                  <LinkedWorkspaceRow key={ws.id} workspace={ws} />
+                ))}
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex items-center gap-2 flex-wrap">
-              <Button size="sm" variant="outline" onClick={() => setWorktreeOpen(true)}>
-                <GitFork className="mr-2 size-3.5" />
-                Create Worktree
-              </Button>
-              {providers.length > 0 && (
-                <CreateProviderWorkspaceDialog
-                  workspaces={workspaces}
-                  initialRepo={firstLinkedRepo}
-                  initialBranch={suggestedBranch}
-                  triggerSize="sm"
-                  task={task}
-                />
+              {hasLinkedWorkspaces ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <MoreHorizontal className="mr-2 size-3.5" />
+                      New Workspace
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => setWorktreeOpen(true)}>
+                      <GitFork className="mr-2 size-3.5" />
+                      Create Worktree
+                    </DropdownMenuItem>
+                    {providers.length > 0 && (
+                      <CreateProviderWorkspaceDialog
+                        workspaces={workspaces}
+                        initialRepo={firstLinkedRepo}
+                        initialBranch={suggestedBranch}
+                        triggerSize="sm"
+                        task={task}
+                        dropdownItem
+                      />
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setWorktreeOpen(true)}>
+                    <GitFork className="mr-2 size-3.5" />
+                    Create Worktree
+                  </Button>
+                  {providers.length > 0 && (
+                    <CreateProviderWorkspaceDialog
+                      workspaces={workspaces}
+                      initialRepo={firstLinkedRepo}
+                      initialBranch={suggestedBranch}
+                      triggerSize="sm"
+                      task={task}
+                    />
+                  )}
+                </>
               )}
               <a href={task.url} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" variant="ghost" className="text-muted-foreground">

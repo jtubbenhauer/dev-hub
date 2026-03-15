@@ -21,5 +21,14 @@ NEXT_PID=$!
 trap cleanup INT TERM
 
 sleep 2
-echo "Starting cloudflared tunnel..."
-cloudflared tunnel run dev-hub
+if command -v cloudflared &> /dev/null; then
+  echo "Starting cloudflared tunnel..."
+  cloudflared tunnel run dev-hub
+elif command -v tailscale &> /dev/null; then
+  echo "Starting tailscale funnel..."
+  tailscale funnel --bg 3000
+  wait "$NEXT_PID"
+else
+  echo "No tunnel command found (cloudflared or tailscale), running without tunnel."
+  wait "$NEXT_PID"
+fi

@@ -36,7 +36,7 @@ function getFlavor(theme: AppTheme): string | null {
 function applyThemeClasses(theme: AppTheme) {
   if (typeof document === "undefined") return
   const root = document.documentElement
-  root.classList.remove("light", "dark", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "dracula")
+  root.classList.remove("light", "dark", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "dracula", "github-dark")
 
   switch (theme) {
     case "catppuccin-mocha":       root.classList.add("dark", "catppuccin-mocha"); break
@@ -44,6 +44,7 @@ function applyThemeClasses(theme: AppTheme) {
     case "catppuccin-frappe":      root.classList.add("dark", "catppuccin-frappe"); break
     case "catppuccin-latte":       root.classList.add("light", "catppuccin-latte"); break
     case "dracula":                root.classList.add("dark", "dracula"); break
+    case "github-dark":            root.classList.add("dark", "github-dark"); break
     case "default-dark":           root.classList.add("dark"); break
     case "default-light":          root.classList.add("light"); break
     default: {
@@ -59,7 +60,7 @@ function migrateStoredTheme(raw: string | null): AppTheme {
   if (!raw) return "system"
   if (raw === "dark") return "default-dark"
   if (raw === "light") return "default-light"
-  const valid: AppTheme[] = ["system", "default-dark", "default-light", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "dracula"]
+  const valid: AppTheme[] = ["system", "default-dark", "default-light", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "dracula", "github-dark"]
   return valid.includes(raw as AppTheme) ? (raw as AppTheme) : "system"
 }
 

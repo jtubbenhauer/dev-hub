@@ -143,6 +143,8 @@ export function getCM6Theme(theme: string): Extension {
       return catppuccinLatte
     case "dracula":
       return dracula
+    case "github-dark":
+      return githubDark
     case "default-light":
       return defaultLight
     case "default-dark":

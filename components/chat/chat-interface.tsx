@@ -23,7 +23,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useQueries } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, Brain, Check, GripVertical, LayoutList, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Check, GripVertical, LayoutList, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
@@ -84,10 +84,6 @@ export function ChatInterface() {
   const [isUnifiedMode, setIsUnifiedMode] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("dev-hub:chat-unified-mode") === "true";
-  });
-  const [showThinking, setShowThinking] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("dev-hub:chat-show-thinking") === "true";
   });
   const [questionViewMode, setQuestionViewMode] = useState<"list" | "tabs">(() => {
     if (typeof window === "undefined") return "list";
@@ -840,21 +836,6 @@ export function ChatInterface() {
 
           <Button
             size="icon-sm"
-            variant={showThinking ? "secondary" : "outline"}
-            onClick={() => {
-              setShowThinking((prev) => {
-                const next = !prev;
-                localStorage.setItem("dev-hub:chat-show-thinking", String(next));
-                return next;
-              });
-            }}
-            title="Toggle thinking blocks"
-          >
-            <Brain className="size-4" />
-          </Button>
-
-          <Button
-            size="icon-sm"
             variant={isPlanPanelOpen ? "secondary" : "outline"}
             onClick={() => setIsPlanPanelOpen(!isPlanPanelOpen)}
             title="Plan notes"
@@ -924,7 +905,7 @@ export function ChatInterface() {
                     activeMessages.length - 1,
                   )}
                   itemContent={(_index, msg) => (
-                    <ChatMessage key={msg.info.id} message={msg} showThinking={showThinking} />
+                    <ChatMessage key={msg.info.id} message={msg} />
                   )}
                   followOutput={handleFollowOutput}
                   atBottomStateChange={handleAtBottomStateChange}

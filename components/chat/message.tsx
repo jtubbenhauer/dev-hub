@@ -32,11 +32,10 @@ type SubtaskPart = Extract<Part, { type: "subtask" }>
 
 interface ChatMessageProps {
   message: MessageWithParts
-  showThinking?: boolean
 }
 
 export const ChatMessage = memo(
-  function ChatMessage({ message, showThinking = true }: ChatMessageProps) {
+  function ChatMessage({ message }: ChatMessageProps) {
     const { info, parts } = message
   const isUser = info.role === "user"
   const isAssistant = info.role === "assistant"
@@ -95,13 +94,9 @@ export const ChatMessage = memo(
           </div>
         ) : (
           <div className="min-w-0 w-full space-y-3 overflow-hidden">
-            {showThinking
-              ? reasoningParts.map((part) => (
-                  <InlineReasoning key={part.id} part={part} />
-                ))
-              : reasoningParts.map((part) => (
-                  <ReasoningBlock key={part.id} part={part} />
-                ))}
+            {reasoningParts.map((part) => (
+              <ReasoningBlock key={part.id} part={part} />
+            ))}
 
             {toolParts.map((part) => (
               <MessageToolUse key={part.id} part={part} />
@@ -152,31 +147,7 @@ export const ChatMessage = memo(
 },
 (prev, next) =>
   prev.message.parts === next.message.parts &&
-  prev.message.info === next.message.info &&
-  prev.showThinking === next.showThinking
-)
-
-const InlineReasoning = memo(function InlineReasoning({ part }: { part: ReasoningPart }) {
-  const duration =
-    part.time.end != null
-      ? formatDuration(part.time.end - part.time.start)
-      : null
-
-  return (
-    <div className="border-l-2 border-muted-foreground/20 pl-3">
-      <div className="mb-1 flex items-center gap-1.5">
-        <Brain className="size-3 text-muted-foreground/60" />
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
-          Thinking{duration ? ` · ${duration}` : ""}
-        </span>
-      </div>
-      <p className="whitespace-pre-wrap text-xs italic text-muted-foreground">
-        {part.text}
-      </p>
-    </div>
-  )
-},
-(prev, next) => prev.part.id === next.part.id && prev.part.text === next.part.text && prev.part.time === next.part.time
+  prev.message.info === next.message.info
 )
 
 const ReasoningBlock = memo(function ReasoningBlock({ part }: { part: ReasoningPart }) {

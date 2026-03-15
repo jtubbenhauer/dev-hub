@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { LeaderBindingsMap } from "@/types/leader-key"
 import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults"
+import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds"
 import type { WorkspaceProvider } from "@/types"
 
 interface SelectedModel {
@@ -34,6 +35,12 @@ export const SETTINGS_KEYS = {
   WORKSPACE_PROVIDERS: "workspace-providers",
   LEADER_TIMEOUT: "leader-timeout",
   THEME: "theme",
+  SOUND_AGENT_ENABLED: "sound-agent-enabled",
+  SOUND_AGENT_ID: "sound-agent-id",
+  SOUND_PERMISSIONS_ENABLED: "sound-permissions-enabled",
+  SOUND_PERMISSIONS_ID: "sound-permissions-id",
+  SOUND_ERRORS_ENABLED: "sound-errors-enabled",
+  SOUND_ERRORS_ID: "sound-errors-id",
 } as const
 
 export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
@@ -342,4 +349,40 @@ export function useThemeSetting(): { theme: AppTheme; isLoading: boolean } {
   const raw = data?.[SETTINGS_KEYS.THEME]
   const isValid = typeof raw === "string" && APP_THEMES.some(t => t.value === raw)
   return { theme: isValid ? (raw as AppTheme) : "system", isLoading }
+}
+
+export function useSoundSettings(): {
+  agentEnabled: boolean
+  agentSoundId: string
+  permissionsEnabled: boolean
+  permissionsSoundId: string
+  errorsEnabled: boolean
+  errorsSoundId: string
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const agentEnabled = data?.[SETTINGS_KEYS.SOUND_AGENT_ENABLED] === true
+  const agentSoundId =
+    typeof data?.[SETTINGS_KEYS.SOUND_AGENT_ID] === "string"
+      ? (data[SETTINGS_KEYS.SOUND_AGENT_ID] as string)
+      : DEFAULT_SOUND_SETTINGS.agentSoundId
+  const permissionsEnabled = data?.[SETTINGS_KEYS.SOUND_PERMISSIONS_ENABLED] === true
+  const permissionsSoundId =
+    typeof data?.[SETTINGS_KEYS.SOUND_PERMISSIONS_ID] === "string"
+      ? (data[SETTINGS_KEYS.SOUND_PERMISSIONS_ID] as string)
+      : DEFAULT_SOUND_SETTINGS.permissionsSoundId
+  const errorsEnabled = data?.[SETTINGS_KEYS.SOUND_ERRORS_ENABLED] === true
+  const errorsSoundId =
+    typeof data?.[SETTINGS_KEYS.SOUND_ERRORS_ID] === "string"
+      ? (data[SETTINGS_KEYS.SOUND_ERRORS_ID] as string)
+      : DEFAULT_SOUND_SETTINGS.errorsSoundId
+  return {
+    agentEnabled,
+    agentSoundId,
+    permissionsEnabled,
+    permissionsSoundId,
+    errorsEnabled,
+    errorsSoundId,
+    isLoading,
+  }
 }

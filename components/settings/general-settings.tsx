@@ -1,20 +1,22 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { useEditorStore } from "@/stores/editor-store"
 import {
   useVimModeSetting,
@@ -23,6 +25,7 @@ import {
   useTabSizeSetting,
   useShellRcPathSetting,
   useSettingsMutation,
+  useSoundSettings,
   SETTINGS_KEYS,
   FONT_SIZE_OPTIONS,
   MOBILE_FONT_SIZE_OPTIONS,
@@ -34,6 +37,7 @@ import {
 } from "@/hooks/use-settings"
 import type { FontSize, MobileFontSize, TabSize, AppTheme } from "@/hooks/use-settings"
 import { useTheme } from "@/components/providers/theme-provider"
+import { SOUND_OPTIONS, soundSrc, playSound } from "@/lib/sounds"
 
 export function GeneralSettings() {
   return (
@@ -41,6 +45,7 @@ export function GeneralSettings() {
       <AppearanceSettingsCard />
       <EditorSettingsCard />
       <CommandSettingsCard />
+      <SoundSettingsCard />
     </div>
   )
 }
@@ -316,6 +321,202 @@ function CommandSettingsCard() {
               Save
             </Button>
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+const SOUND_CATEGORIES: Array<{ key: string; label: string }> = [
+  { key: "alerts", label: "Alerts" },
+  { key: "bip-bops", label: "Bip Bops" },
+  { key: "staplebops", label: "Staplebops" },
+  { key: "nopes", label: "Nopes" },
+  { key: "yups", label: "Yups" },
+]
+
+export function SoundSettingsCard() {
+  const {
+    agentEnabled,
+    agentSoundId,
+    permissionsEnabled,
+    permissionsSoundId,
+    errorsEnabled,
+    errorsSoundId,
+    isLoading,
+  } = useSoundSettings()
+  const mutation = useSettingsMutation()
+  const previewCleanupRef = useRef<(() => void) | undefined>(undefined)
+
+  const playPreview = (soundId: string) => {
+    if (previewCleanupRef.current) {
+      previewCleanupRef.current()
+      previewCleanupRef.current = undefined
+    }
+    setTimeout(() => {
+      previewCleanupRef.current = playSound(soundSrc(soundId)) ?? undefined
+    }, 100)
+  }
+
+  const handleAgentSelect = (value: string) => {
+    if (value === "none") {
+      mutation.mutate(
+        { key: SETTINGS_KEYS.SOUND_AGENT_ENABLED, value: false },
+        { onSuccess: () => toast.success("Agent sound updated") }
+      )
+    } else {
+      mutation.mutate({ key: SETTINGS_KEYS.SOUND_AGENT_ENABLED, value: true })
+      mutation.mutate(
+        { key: SETTINGS_KEYS.SOUND_AGENT_ID, value },
+        { onSuccess: () => toast.success("Agent sound updated") }
+      )
+      playPreview(value)
+    }
+  }
+
+  const handlePermissionsSelect = (value: string) => {
+    if (value === "none") {
+      mutation.mutate(
+        { key: SETTINGS_KEYS.SOUND_PERMISSIONS_ENABLED, value: false },
+        { onSuccess: () => toast.success("Permissions sound updated") }
+      )
+    } else {
+      mutation.mutate({ key: SETTINGS_KEYS.SOUND_PERMISSIONS_ENABLED, value: true })
+      mutation.mutate(
+        { key: SETTINGS_KEYS.SOUND_PERMISSIONS_ID, value },
+        { onSuccess: () => toast.success("Permissions sound updated") }
+      )
+      playPreview(value)
+    }
+  }
+
+  const handleErrorsSelect = (value: string) => {
+    if (value === "none") {
+      mutation.mutate(
+        { key: SETTINGS_KEYS.SOUND_ERRORS_ENABLED, value: false },
+        { onSuccess: () => toast.success("Errors sound updated") }
+      )
+    } else {
+      mutation.mutate({ key: SETTINGS_KEYS.SOUND_ERRORS_ENABLED, value: true })
+      mutation.mutate(
+        { key: SETTINGS_KEYS.SOUND_ERRORS_ID, value },
+        { onSuccess: () => toast.success("Errors sound updated") }
+      )
+      playPreview(value)
+    }
+  }
+
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sound Effects</CardTitle>
+        <CardDescription>
+          Configure notification sounds for different events.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="sound-agent">Agent</Label>
+            <p className="text-xs text-muted-foreground">
+              Play sound when the agent completes or needs attention
+            </p>
+          </div>
+          <Select
+            value={agentEnabled ? agentSoundId : "none"}
+            onValueChange={handleAgentSelect}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="sound-agent" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {SOUND_CATEGORIES.map((cat) => (
+                <SelectGroup key={cat.key}>
+                  <SelectLabel>{cat.label}</SelectLabel>
+                  {SOUND_OPTIONS.filter((o) => o.category === cat.key).map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="sound-permissions">Permissions</Label>
+            <p className="text-xs text-muted-foreground">
+              Play sound when a permission is required
+            </p>
+          </div>
+          <Select
+            value={permissionsEnabled ? permissionsSoundId : "none"}
+            onValueChange={handlePermissionsSelect}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="sound-permissions" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {SOUND_CATEGORIES.map((cat) => (
+                <SelectGroup key={cat.key}>
+                  <SelectLabel>{cat.label}</SelectLabel>
+                  {SOUND_OPTIONS.filter((o) => o.category === cat.key).map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="sound-errors">Errors</Label>
+            <p className="text-xs text-muted-foreground">
+              Play sound when an error occurs
+            </p>
+          </div>
+          <Select
+            value={errorsEnabled ? errorsSoundId : "none"}
+            onValueChange={handleErrorsSelect}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="sound-errors" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {SOUND_CATEGORIES.map((cat) => (
+                <SelectGroup key={cat.key}>
+                  <SelectLabel>{cat.label}</SelectLabel>
+                  {SOUND_OPTIONS.filter((o) => o.category === cat.key).map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </CardContent>
     </Card>

@@ -13,6 +13,7 @@ import type {
   QuestionAnswer,
   Command,
 } from "@/lib/opencode/types"
+import { playSoundForEvent } from "@/lib/sounds"
 
 export type StreamingStatus = "idle" | "connecting" | "streaming" | "waiting" | "error"
 
@@ -1252,6 +1253,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         if (sessionID === activeSessionId && wsId === activeWorkspaceId) {
           get().clearStreamingPoll()
         }
+        playSoundForEvent("agent")
         break
       }
 
@@ -1272,6 +1274,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             streamingError: errorObj?.data?.message ?? "Session error",
           })
         }
+        playSoundForEvent("errors")
         break
       }
 
@@ -1287,6 +1290,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
               : [...ws.permissions, permission],
           }))
         )
+        playSoundForEvent("permissions")
         break
       }
 

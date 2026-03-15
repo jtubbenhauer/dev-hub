@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { Header } from "@/components/layout/header"
 import { WorkspaceCommands } from "@/components/command-palette/workspace-commands"
+import { SoundSettingsSync } from "@/components/providers/sound-settings-sync"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { useChatStore } from "@/stores/chat-store"
 import { useDefaultWorkspaceSetting } from "@/hooks/use-settings"
@@ -103,6 +104,7 @@ export function AuthenticatedLayout({
       </div>
       <MobileNav />
       <WorkspaceCommands />
+      <SoundSettingsSync />
     </div>
   )
 }

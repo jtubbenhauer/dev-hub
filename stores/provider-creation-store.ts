@@ -25,6 +25,7 @@ interface ProviderCreationState {
     branch?: string
     name?: string
     context?: string
+    color?: string
     linkedTaskId?: string
     linkedTaskMeta?: LinkedTaskMeta
     onSuccess: (workspaceName: string) => void
@@ -63,6 +64,7 @@ export const useProviderCreationStore = create<ProviderCreationState>()(
       branch,
       name,
       context,
+      color,
       linkedTaskId,
       linkedTaskMeta,
       onSuccess,
@@ -88,6 +90,7 @@ export const useProviderCreationStore = create<ProviderCreationState>()(
         branch,
         name,
         context,
+        color,
         linkedTaskId,
         linkedTaskMeta,
         controller,
@@ -151,6 +154,7 @@ async function streamCreation({
   branch,
   name,
   context,
+  color,
   linkedTaskId,
   linkedTaskMeta,
   controller,
@@ -163,6 +167,7 @@ async function streamCreation({
   branch?: string
   name?: string
   context?: string
+  color?: string
   linkedTaskId?: string
   linkedTaskMeta?: LinkedTaskMeta
   controller: AbortController
@@ -186,6 +191,7 @@ async function streamCreation({
         branch: branch?.trim() || undefined,
         name: name?.trim() || undefined,
         context: context?.trim() || undefined,
+        color: color || undefined,
         linkedTaskId: linkedTaskId || undefined,
         linkedTaskMeta: linkedTaskMeta || undefined,
       }),

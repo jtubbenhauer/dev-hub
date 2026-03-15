@@ -20,6 +20,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     worktreeSymlinks: null,
     linkedTaskId: null,
     linkedTaskMeta: null,
+    color: null,
     createdAt: new Date("2025-01-01"),
     lastAccessedAt: new Date("2025-01-01"),
     ...overrides,

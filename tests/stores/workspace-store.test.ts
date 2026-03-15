@@ -20,6 +20,7 @@ function makeWorkspace(id: string, name?: string): Workspace {
     worktreeSymlinks: null,
     linkedTaskId: null,
     linkedTaskMeta: null,
+    color: null,
     createdAt: new Date("2025-01-01"),
     lastAccessedAt: new Date("2025-01-01"),
   }

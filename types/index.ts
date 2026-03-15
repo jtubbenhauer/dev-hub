@@ -40,6 +40,7 @@ export interface Workspace {
   worktreeSymlinks: string[] | null
   linkedTaskId: string | null
   linkedTaskMeta: LinkedTaskMeta | null
+  color: string | null
   createdAt: Date
   lastAccessedAt: Date
 }
@@ -504,5 +505,7 @@ export interface WorkspaceProviderCreateResult {
     opencode: string
     agent: string
   }
-  metadata: Record<string, unknown>
+  metadata: Record<string, unknown> & {
+    codePath?: string
+  }
 }

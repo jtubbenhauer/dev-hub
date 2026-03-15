@@ -23,7 +23,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useQueries } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, Check, GripVertical, LayoutList, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Brain, Check, GripVertical, LayoutList, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
@@ -85,6 +85,10 @@ export function ChatInterface() {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("dev-hub:chat-unified-mode") === "true";
   });
+  const [showThinking, setShowThinking] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("dev-hub:chat-show-thinking") === "true";
+  });
   const [questionViewMode, setQuestionViewMode] = useState<"list" | "tabs">(() => {
     if (typeof window === "undefined") return "list";
     const stored = localStorage.getItem("dev-hub:chat-question-view");
@@ -116,9 +120,23 @@ export function ChatInterface() {
   );
   const allWorkspaces = useWorkspaceStore((state) => state.workspaces);
 
+  const activeWorkspaceColor = useMemo(() => {
+    if (!activeWorkspaceId) return undefined;
+    const ws = allWorkspaces.find((w) => w.id === activeWorkspaceId);
+    return ws?.color ?? undefined;
+  }, [allWorkspaces, activeWorkspaceId]);
+
   const workspaceNames = useMemo(() => {
     const map: Record<string, string> = {};
     for (const ws of allWorkspaces) map[ws.id] = ws.name;
+    return map;
+  }, [allWorkspaces]);
+
+  const workspaceColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const ws of allWorkspaces) {
+      if (ws.color) map[ws.id] = ws.color;
+    }
     return map;
   }, [allWorkspaces]);
 
@@ -223,6 +241,9 @@ export function ChatInterface() {
   const isMobile = useIsMobile();
 
   const sessions = useChatStore(getActiveWorkspaceSessions)
+  const activeSessionDirectory = activeSessionId
+    ? sessions[activeSessionId]?.directory
+    : undefined
   const [unifiedLimit, setUnifiedLimit] = useState(20)
   const unifiedSessions = useChatStore((state) =>
     state.getRecentSessionsAcrossWorkspaces(unifiedLimit)
@@ -702,6 +723,7 @@ export function ChatInterface() {
               sessions={unifiedSessions}
               workspaceNames={workspaceNames}
               workspaceBranches={workspaceBranches}
+              workspaceColors={workspaceColors}
               hasMore={hasMoreUnifiedSessions}
               onLoadMore={() => setUnifiedLimit((n) => n + 20)}
               workspaces={workspaceOptions}
@@ -719,6 +741,7 @@ export function ChatInterface() {
             <SessionList
               mode="workspace"
               sessions={sessions}
+              workspaceColor={activeWorkspaceColor}
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
               onSelectSession={handleMobileSelectSession}
@@ -744,6 +767,7 @@ export function ChatInterface() {
                 sessions={unifiedSessions}
                 workspaceNames={workspaceNames}
                 workspaceBranches={workspaceBranches}
+                workspaceColors={workspaceColors}
                 hasMore={hasMoreUnifiedSessions}
                 onLoadMore={() => setUnifiedLimit((n) => n + 20)}
                 workspaces={workspaceOptions}
@@ -761,6 +785,7 @@ export function ChatInterface() {
               <SessionList
                 mode="workspace"
                 sessions={sessions}
+                workspaceColor={activeWorkspaceColor}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
                 onSelectSession={handleSelectSession}
@@ -815,6 +840,21 @@ export function ChatInterface() {
 
           <Button
             size="icon-sm"
+            variant={showThinking ? "secondary" : "outline"}
+            onClick={() => {
+              setShowThinking((prev) => {
+                const next = !prev;
+                localStorage.setItem("dev-hub:chat-show-thinking", String(next));
+                return next;
+              });
+            }}
+            title="Toggle thinking blocks"
+          >
+            <Brain className="size-4" />
+          </Button>
+
+          <Button
+            size="icon-sm"
             variant={isPlanPanelOpen ? "secondary" : "outline"}
             onClick={() => setIsPlanPanelOpen(!isPlanPanelOpen)}
             title="Plan notes"
@@ -857,6 +897,7 @@ export function ChatInterface() {
             <PlanPanel
               workspaceId={activeWorkspaceId}
               workspaceName={activeWorkspaceName}
+              sessionDirectory={activeSessionDirectory}
               isOpen={isPlanPanelOpen}
               onClose={() => setIsPlanPanelOpen(false)}
               onPlanFilesChange={setHasPlanFiles}
@@ -883,7 +924,7 @@ export function ChatInterface() {
                     activeMessages.length - 1,
                   )}
                   itemContent={(_index, msg) => (
-                    <ChatMessage key={msg.info.id} message={msg} />
+                    <ChatMessage key={msg.info.id} message={msg} showThinking={showThinking} />
                   )}
                   followOutput={handleFollowOutput}
                   atBottomStateChange={handleAtBottomStateChange}

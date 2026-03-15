@@ -1,0 +1,23 @@
+app/api/workspaces/worktrees/route.ts
+  404294fe8b8d1b81 184
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "3d265327edb2571b6c0954587b16e7d8176b376a",
+  "prompts": {
+    "404294fe8b8d1b81": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31039ee1cffeGgPcfgXS4cTb5v",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useMemo, useState } from "react"
+import { memo, useMemo, useState, useRef, useEffect } from "react"
 import {
   User,
   Bot,
@@ -20,6 +20,41 @@ import type {
   TextPart,
   ReasoningPart,
 } from "@/lib/opencode/types"
+
+const THROTTLE_MS = 200
+
+function useThrottledValue<T>(value: T, delayMs: number): T {
+  const [throttled, setThrottled] = useState(value)
+  const lastUpdated = useRef(0)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const now = Date.now()
+    const elapsed = now - lastUpdated.current
+
+    if (elapsed >= delayMs) {
+      lastUpdated.current = now
+      setThrottled(value)
+      return
+    }
+
+    if (timerRef.current !== null) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null
+      lastUpdated.current = Date.now()
+      setThrottled(value)
+    }, delayMs - elapsed)
+
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [value, delayMs])
+
+  return throttled
+}
 
 interface ChatMessageProps {
   message: MessageWithParts
@@ -107,6 +142,8 @@ export const ChatMessage = memo(
     [parts]
   )
 
+  // Throttle markdown re-parses during streaming (~200ms intervals)
+  const throttledTextContent = useThrottledValue(textContent, THROTTLE_MS)
   const hasError = isAssistant && "error" in info && info.error
 
   return (
@@ -147,9 +184,9 @@ export const ChatMessage = memo(
               <MessageToolUse key={part.id} part={part} />
             ))}
 
-            {textContent && (
+            {throttledTextContent && (
               <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
-                <MarkdownContent content={textContent} />
+                <MarkdownContent content={throttledTextContent} />
               </div>
             )}
 

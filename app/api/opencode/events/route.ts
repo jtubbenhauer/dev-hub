@@ -8,6 +8,7 @@ import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
 export const maxDuration = 300
 
 const KEEPALIVE_INTERVAL_MS = 30_000
+const MAX_BUFFER_SIZE = 1024 * 1024 // 1 MB
 
 interface UpstreamTarget {
   workspaceId: string
@@ -79,6 +80,11 @@ async function readUpstream(
       if (done) break
 
       buffer += decoder.decode(value, { stream: true })
+
+      if (buffer.length > MAX_BUFFER_SIZE) {
+        buffer = ""
+        continue
+      }
 
       for (
         let idx = buffer.indexOf("\n\n");

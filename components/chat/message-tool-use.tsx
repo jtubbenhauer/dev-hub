@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState, useEffect, useRef, useMemo, useCallback } from "react"
+import { memo, useState, useEffect, useMemo, useCallback } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -15,7 +15,7 @@ import AnsiToHtml from "ansi-to-html"
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/chat-store"
 import { MarkdownContent } from "@/components/chat/markdown-content"
-import type { ToolPart } from "@/lib/opencode/types"
+import type { ToolPart, MessageWithParts } from "@/lib/opencode/types"
 
 const MAX_OUTPUT_LINES = 10
 const AGENT_TOOL_NAMES = new Set(["agent", "task"])
@@ -158,25 +158,55 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
       : null
 
   const childSessionId = part.callID
-  const childMessages = useChatStore((s) => s.getSessionMessages(childSessionId))
-  const fetchMessages = useChatStore((s) => s.fetchMessages)
   const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId)
-  const hasFetched = useRef(false)
+  const [childMessages, setChildMessages] = useState<MessageWithParts[]>([])
 
   useEffect(() => {
     if (!childSessionId || !activeWorkspaceId) return
-    if (childMessages.length === 0 && !hasFetched.current) {
-      hasFetched.current = true
-      fetchMessages(childSessionId, activeWorkspaceId)
-    }
-  }, [childSessionId, activeWorkspaceId, childMessages.length, fetchMessages])
+
+    const controller = new AbortController()
+    const params = new URLSearchParams({ workspaceId: activeWorkspaceId })
+    const url = `/api/opencode/session/${childSessionId}/message?${params}`
+
+    fetch(url, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) return
+        return res.json() as Promise<MessageWithParts[]>
+      })
+      .then((data) => {
+        if (data) setChildMessages(data)
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return
+        console.warn("[AgentToolCall] failed to fetch child messages:", err)
+      })
+
+    return () => controller.abort()
+  }, [childSessionId, activeWorkspaceId])
 
   useEffect(() => {
     if (!childSessionId || !activeWorkspaceId) return
-    if (state.status === "completed" || state.status === "error") {
-      fetchMessages(childSessionId, activeWorkspaceId)
-    }
-  }, [state.status, childSessionId, activeWorkspaceId, fetchMessages])
+    if (state.status !== "completed" && state.status !== "error") return
+
+    const controller = new AbortController()
+    const params = new URLSearchParams({ workspaceId: activeWorkspaceId })
+    const url = `/api/opencode/session/${childSessionId}/message?${params}`
+
+    fetch(url, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) return
+        return res.json() as Promise<MessageWithParts[]>
+      })
+      .then((data) => {
+        if (data) setChildMessages(data)
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return
+        console.warn("[AgentToolCall] failed to re-fetch child messages on completion:", err)
+      })
+
+    return () => controller.abort()
+  }, [state.status, childSessionId, activeWorkspaceId])
 
   const childToolParts = useMemo(() => {
     const toolParts: ToolPart[] = []

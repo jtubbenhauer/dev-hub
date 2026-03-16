@@ -11,6 +11,7 @@ import {
   Brain,
   MessageSquareText,
 } from "lucide-react"
+import AnsiToHtml from "ansi-to-html"
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/chat-store"
 import { MarkdownContent } from "@/components/chat/markdown-content"
@@ -18,6 +19,16 @@ import type { ToolPart } from "@/lib/opencode/types"
 
 const MAX_OUTPUT_LINES = 10
 const AGENT_TOOL_NAMES = new Set(["agent", "task"])
+function containsAnsi(text: string): boolean {
+  return text.includes("\u001b[")
+}
+
+const ansiConverter = new AnsiToHtml({
+  fg: "currentColor",
+  bg: "transparent",
+  newline: false,
+  escapeXML: true,
+})
 
 interface MessageToolUseProps {
   part: ToolPart
@@ -317,15 +328,24 @@ function ToolOutput({ toolName, output, input }: { toolName: string; output: str
   const isTruncated = lines.length > MAX_OUTPUT_LINES
   const displayOutput = showAll ? output : lines.slice(0, MAX_OUTPUT_LINES).join("\n")
   const lang = getOutputLanguage(toolName, input)
+  const hasAnsi = useMemo(() => containsAnsi(output), [output])
+  const ansiHtml = useMemo(
+    () => (hasAnsi ? ansiConverter.toHtml(displayOutput) : ""),
+    [hasAnsi, displayOutput]
+  )
 
   return (
     <div className="overflow-hidden rounded bg-muted/50">
       <pre className={cn(
         "overflow-x-auto whitespace-pre-wrap break-words p-2 text-xs font-mono",
-        lang && "text-muted-foreground"
+        lang && !hasAnsi && "text-muted-foreground"
       )}>
         {lang && <code className="text-[10px] uppercase tracking-wider text-muted-foreground/50 block mb-1">{lang}</code>}
-        {displayOutput}
+        {hasAnsi ? (
+          <span dangerouslySetInnerHTML={{ __html: ansiHtml }} />
+        ) : (
+          displayOutput
+        )}
       </pre>
       {isTruncated && (
         <button

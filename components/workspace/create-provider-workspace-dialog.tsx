@@ -110,6 +110,12 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
     }))
   }, [workspaces])
 
+  useEffect(() => {
+    if (formOpen && !repo && !initialRepo && linkedRepos.length > 0) {
+      setRepo(linkedRepos[0].url)
+    }
+  }, [formOpen, repo, initialRepo, linkedRepos])
+
   const trimmedRepo = repo.trim()
 
   const { data: remoteBranches = [], isFetching: isFetchingBranches } = useQuery<string[]>({

@@ -21,8 +21,14 @@ vi.mock("@/hooks/use-mobile", () => ({
 }))
 
 vi.mock("@/stores/editor-store", () => ({
-  useEditorStore: (selector: (s: { isVimMode: boolean }) => boolean) =>
-    selector({ isVimMode: false }),
+  useEditorStore: (selector?: (s: Record<string, unknown>) => unknown) => {
+    const state = {
+      isVimMode: false,
+      diffViewMode: "unified" as const,
+      toggleDiffViewMode: vi.fn(),
+    }
+    return selector ? selector(state) : state
+  },
 }))
 
 vi.mock("@/lib/editor/catppuccin-theme", () => ({
@@ -35,6 +41,10 @@ vi.mock("@/lib/editor/language", () => ({
 
 vi.mock("@/components/editor/vim-toggle", () => ({
   VimToggle: () => null,
+}))
+
+vi.mock("@/components/editor/diff-view-toggle", () => ({
+  DiffViewToggle: () => null,
 }))
 
 let capturedCommentCallbacks: {

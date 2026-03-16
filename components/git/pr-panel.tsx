@@ -390,7 +390,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
         )}
 
         {/* Diff editor */}
-        <div className="flex min-h-0 flex-1 flex-col">
+<div className="flex h-full min-h-0 flex-1 flex-col">
           {fileContent ? (
             <PrDiffEditor
               ref={editorHandleRef}

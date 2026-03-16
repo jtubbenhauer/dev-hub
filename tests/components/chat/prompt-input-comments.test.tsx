@@ -39,6 +39,7 @@ const baseProps = {
   isStreaming: false,
   disabled: false,
   workspaceId: "ws-1",
+  sessionId: "session-1",
   commands: [],
   onCommandSelect: vi.fn(),
 }

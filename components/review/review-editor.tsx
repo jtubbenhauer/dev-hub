@@ -489,9 +489,6 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
         )}
       </div>
 
-      {/* CodeMirror editor */}
-      <div ref={editorRef} className="min-h-0 flex-1 overflow-hidden" />
-
       {commentInput && (
         <div className="shrink-0 border-t p-2">
           <CommentInput

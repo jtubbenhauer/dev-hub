@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/chat-store"
+import { MarkdownContent } from "@/components/chat/markdown-content"
 import type { ToolPart } from "@/lib/opencode/types"
 
 const MAX_OUTPUT_LINES = 10
@@ -292,8 +293,10 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
           )}
 
           {hasSubText && (
-            <div className="rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap max-h-60 overflow-y-auto">
-              {childTextContent}
+            <div className="rounded-md bg-muted/30 px-3 py-2 max-h-60 overflow-y-auto">
+              <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
+                <MarkdownContent content={childTextContent} />
+              </div>
             </div>
           )}
 

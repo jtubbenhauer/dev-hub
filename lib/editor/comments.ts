@@ -1,50 +1,5 @@
-import {
-  StateEffect,
-  StateField,
-  type Extension,
-} from "@codemirror/state"
-import {
-  EditorView,
-  WidgetType,
-  Decoration,
-  type DecorationSet,
-  gutter,
-  GutterMarker,
-} from "@codemirror/view"
-
-export const setCommentDecorations = StateEffect.define<DecorationSet>()
-
-export const commentDecorationsField = StateField.define<DecorationSet>({
-  create() {
-    return Decoration.none
-  },
-  update(deco, tr) {
-    deco = deco.map(tr.changes)
-    for (const e of tr.effects) {
-      if (e.is(setCommentDecorations)) deco = e.value
-    }
-    return deco
-  },
-  provide: (f) => EditorView.decorations.from(f),
-})
-
-export class AddCommentWidget extends WidgetType {
-  constructor(readonly line: number) {
-    super()
-  }
-
-  toDOM(): HTMLElement {
-    const btn = document.createElement("button")
-    btn.className = "cm-comment-add-btn"
-    btn.textContent = "+"
-    btn.setAttribute("aria-label", "Add comment")
-    return btn
-  }
-
-  eq(other: AddCommentWidget): boolean {
-    return other.line === this.line
-  }
-}
+import { type Extension } from "@codemirror/state"
+import { EditorView, gutter, GutterMarker } from "@codemirror/view"
 
 class CommentGutterMarker extends GutterMarker {
   toDOM(): Node {
@@ -57,18 +12,32 @@ class CommentGutterMarker extends GutterMarker {
 
 const commentDot = new CommentGutterMarker()
 
+export class AddCommentGutterMarker extends GutterMarker {
+  toDOM(): Node {
+    const btn = document.createElement("button")
+    btn.className = "cm-comment-add-btn"
+    btn.textContent = "+"
+    btn.setAttribute("aria-label", "Add comment")
+    return btn
+  }
+}
+
+const addCommentBtn = new AddCommentGutterMarker()
+
 export function createCommentGutterMarkers(options: {
   commentedLines: Set<number>
   onClickComment: (line: number) => void
+  onAddComment: (startLine: number, endLine: number) => void
 }): Extension {
   return gutter({
     class: "cm-comment-gutter",
+    renderEmptyElements: true,
     lineMarker(view, line) {
       const lineNumber = view.state.doc.lineAt(line.from).number
       if (options.commentedLines.has(lineNumber)) {
         return commentDot
       }
-      return null
+      return addCommentBtn
     },
     domEventHandlers: {
       mousedown(_view, line, event) {
@@ -78,78 +47,47 @@ export function createCommentGutterMarkers(options: {
           options.onClickComment(lineNumber)
           return true
         }
-        return false
+        event.preventDefault()
+        options.onAddComment(lineNumber, lineNumber)
+        return true
       },
     },
   })
 }
+
+const commentGutterTheme = EditorView.baseTheme({
+  ".cm-comment-gutter .cm-comment-add-btn": {
+    opacity: "0",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: "0 2px",
+    color: "inherit",
+    fontSize: "14px",
+    lineHeight: "1",
+  },
+  ".cm-comment-gutter .cm-gutterElement:hover .cm-comment-add-btn": {
+    opacity: "0.5",
+  },
+  ".cm-comment-gutter .cm-comment-add-btn:hover": {
+    opacity: "1",
+  },
+  ".cm-comment-gutter .cm-comment-gutter-dot": {
+    cursor: "pointer",
+  },
+})
 
 export function buildCommentExtensions(options: {
   onAddComment: (startLine: number, endLine: number) => void
   onClickComment: (line: number) => void
   commentedLines: Set<number>
 }): Extension[] {
-  let hoveredLine: number | null = null
-
   return [
-    commentDecorationsField,
-
-    EditorView.domEventHandlers({
-      mousemove(event, view) {
-        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
-        if (pos === null) return
-
-        const line = view.state.doc.lineAt(pos)
-        const lineNumber = line.number
-
-        if (hoveredLine === lineNumber) return
-        hoveredLine = lineNumber
-
-        const decoration = Decoration.widget({
-          widget: new AddCommentWidget(lineNumber),
-          side: 1,
-        }).range(line.to)
-
-        view.dispatch({
-          effects: [setCommentDecorations.of(Decoration.set([decoration]))],
-        })
-      },
-      mouseleave(_event, view) {
-        hoveredLine = null
-        view.dispatch({
-          effects: [setCommentDecorations.of(Decoration.none)],
-        })
-      },
-      mousedown(event, view) {
-        const target = event.target as HTMLElement
-        if (!target.classList.contains("cm-comment-add-btn")) return false
-
-        event.preventDefault()
-        event.stopPropagation()
-
-        const sel = view.state.selection.main
-        const hasSelection = sel.from !== sel.to
-        let startLine: number
-        let endLine: number
-
-        if (hasSelection) {
-          startLine = view.state.doc.lineAt(sel.from).number
-          endLine = view.state.doc.lineAt(sel.to).number
-        } else if (hoveredLine !== null) {
-          startLine = hoveredLine
-          endLine = hoveredLine
-        } else {
-          return false
-        }
-
-        options.onAddComment(startLine, endLine)
-        return true
-      },
-    }),
-
     createCommentGutterMarkers({
-      commentedLines: options.commentedLines,
+      onAddComment: options.onAddComment,
       onClickComment: options.onClickComment,
+      commentedLines: options.commentedLines,
     }),
+    commentGutterTheme,
   ]
 }

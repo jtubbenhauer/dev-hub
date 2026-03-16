@@ -39,79 +39,35 @@ vi.mock("@codemirror/view", () => {
   return {
     EditorView: {
       decorations: { from: vi.fn() },
-      domEventHandlers: vi.fn((handlers: Record<string, unknown>) => ({
-        _type: "domEventHandlers",
-        handlers,
-      })),
+      baseTheme: vi.fn((styles: unknown) => ({ _type: "baseTheme", styles })),
     },
     WidgetType: MockWidgetType,
     Decoration: {
       none: {},
-      widget: vi.fn(() => ({ range: vi.fn() })),
-      set: vi.fn(),
     },
     gutter: vi.fn((config: Record<string, unknown>) => ({
       _type: "gutter",
       ...config,
     })),
     GutterMarker: MockGutterMarker,
-    ViewPlugin: { fromClass: vi.fn() },
   }
 })
 
 import {
-  setCommentDecorations,
-  commentDecorationsField,
-  AddCommentWidget,
+  AddCommentGutterMarker,
   createCommentGutterMarkers,
   buildCommentExtensions,
 } from "@/lib/editor/comments"
 
 describe("lib/editor/comments", () => {
-  describe("setCommentDecorations", () => {
-    it("is defined as a StateEffect", () => {
-      expect(setCommentDecorations).toBeDefined()
-      expect(setCommentDecorations).not.toBeNull()
-    })
-
-    it("has an of() method for creating effect instances", () => {
-      expect(typeof setCommentDecorations.of).toBe("function")
-    })
-  })
-
-  describe("commentDecorationsField", () => {
-    it("is defined as a StateField", () => {
-      expect(commentDecorationsField).toBeDefined()
-      expect(commentDecorationsField).not.toBeNull()
-    })
-  })
-
-  describe("AddCommentWidget", () => {
-    it("toDOM returns an HTMLButtonElement with class cm-comment-add-btn", () => {
-      const widget = new AddCommentWidget(5)
-      const el = widget.toDOM()
-
+  describe("AddCommentGutterMarker", () => {
+    it("toDOM returns a button with class cm-comment-add-btn", () => {
+      const marker = new AddCommentGutterMarker()
+      const el = marker.toDOM()
       expect(el).toBeInstanceOf(HTMLButtonElement)
-      expect(el.className).toBe("cm-comment-add-btn")
-      expect(el.textContent).toBe("+")
-      expect(el.getAttribute("aria-label")).toBe("Add comment")
-    })
-
-    it("eq returns true for same line number", () => {
-      const a = new AddCommentWidget(10)
-      const b = new AddCommentWidget(10)
-      expect(a.eq(b)).toBe(true)
-    })
-
-    it("eq returns false for different line number", () => {
-      const a = new AddCommentWidget(10)
-      const b = new AddCommentWidget(20)
-      expect(a.eq(b)).toBe(false)
-    })
-
-    it("stores the line number", () => {
-      const widget = new AddCommentWidget(42)
-      expect(widget.line).toBe(42)
+      expect((el as HTMLElement).className).toBe("cm-comment-add-btn")
+      expect((el as HTMLElement).textContent).toBe("+")
+      expect((el as HTMLElement).getAttribute("aria-label")).toBe("Add comment")
     })
   })
 
@@ -120,6 +76,7 @@ describe("lib/editor/comments", () => {
       const ext = createCommentGutterMarkers({
         commentedLines: new Set([1, 5]),
         onClickComment: vi.fn(),
+        onAddComment: vi.fn(),
       })
       expect(ext).toBeDefined()
     })
@@ -134,7 +91,7 @@ describe("lib/editor/comments", () => {
       })
 
       expect(Array.isArray(extensions)).toBe(true)
-      expect(extensions.length).toBeGreaterThanOrEqual(3)
+      expect(extensions.length).toBeGreaterThanOrEqual(2)
     })
 
     it("works with empty commentedLines set", () => {
@@ -145,39 +102,41 @@ describe("lib/editor/comments", () => {
       })
 
       expect(Array.isArray(extensions)).toBe(true)
-      expect(extensions.length).toBeGreaterThanOrEqual(3)
+      expect(extensions.length).toBeGreaterThanOrEqual(2)
     })
 
-    it("includes commentDecorationsField in returned extensions", () => {
+    it("first element is a gutter extension", () => {
       const extensions = buildCommentExtensions({
         onAddComment: vi.fn(),
         onClickComment: vi.fn(),
         commentedLines: new Set(),
       })
 
-      expect(extensions[0]).toBe(commentDecorationsField)
-    })
-
-    it("includes dom event handlers extension", () => {
-      const extensions = buildCommentExtensions({
-        onAddComment: vi.fn(),
-        onClickComment: vi.fn(),
-        commentedLines: new Set(),
-      })
-
-      const domHandlers = extensions[1] as { _type?: string }
-      expect(domHandlers._type).toBe("domEventHandlers")
-    })
-
-    it("includes gutter extension", () => {
-      const extensions = buildCommentExtensions({
-        onAddComment: vi.fn(),
-        onClickComment: vi.fn(),
-        commentedLines: new Set(),
-      })
-
-      const gutterExt = extensions[2] as { _type?: string }
+      const gutterExt = extensions[0] as { _type?: string }
       expect(gutterExt._type).toBe("gutter")
+    })
+
+    it("gutter has renderEmptyElements: true", () => {
+      const extensions = buildCommentExtensions({
+        onAddComment: vi.fn(),
+        onClickComment: vi.fn(),
+        commentedLines: new Set(),
+      })
+
+      const gutterExt = extensions[0] as { renderEmptyElements?: boolean }
+      expect(gutterExt.renderEmptyElements).toBe(true)
+    })
+
+    it("gutter has domEventHandlers with mousedown", () => {
+      const extensions = buildCommentExtensions({
+        onAddComment: vi.fn(),
+        onClickComment: vi.fn(),
+        commentedLines: new Set(),
+      })
+
+      const gutterExt = extensions[0] as { domEventHandlers?: Record<string, unknown> }
+      expect(gutterExt.domEventHandlers).toBeDefined()
+      expect(typeof gutterExt.domEventHandlers?.mousedown).toBe("function")
     })
   })
 })

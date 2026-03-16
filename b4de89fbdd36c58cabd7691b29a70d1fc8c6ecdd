@@ -1,0 +1,23 @@
+apps/tinker/src/app/scripts/move-appointments-to-practice.ts
+  417488ebc8883243 1-35,37-95,98-127,130-176,182-226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "b4de89fbdd36c58cabd7691b29a70d1fc8c6ecdd",
+  "prompts": {
+    "417488ebc8883243": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30cc0ff9dffeM685qpFDUehfOa",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 424,
+      "total_deletions": 70,
+      "accepted_lines": 357,
+      "overriden_lines": 2
+    }
+  }
+}

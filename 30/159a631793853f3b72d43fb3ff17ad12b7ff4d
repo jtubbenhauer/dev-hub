@@ -1,0 +1,23 @@
+components/chat/message-tool-use.tsx
+  81c3dd85d00456b0 174-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "30159a631793853f3b72d43fb3ff17ad12b7ff4d",
+  "prompts": {
+    "81c3dd85d00456b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_309ed7276ffeIB7Mrd09zbYT9O-b5c7815f-78ca-40ed-9ff6-cb3ad9a80c12",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 0,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}

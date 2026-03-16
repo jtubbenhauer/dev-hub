@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useCallback, useMemo, useRef } from "react"
+import { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import {
+  ArrowLeft,
   ExternalLink,
   GitPullRequest,
   GitMerge,
@@ -17,6 +18,8 @@ import {
   CircleDot,
   AlertCircle,
   Clock,
+  FileDiff,
+  RotateCcw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -74,6 +77,16 @@ interface PrPanelProps {
   onClose: () => void
 }
 
+function encodePrParam(pr: GitHubPullRequest): string {
+  return `${pr.base.repo.full_name}/${pr.number}`
+}
+
+function parsePrParam(param: string): { fullName: string; number: number } | null {
+  const match = param.match(/^(.+?)\/(\d+)$/)
+  if (!match) return null
+  return { fullName: match[1], number: parseInt(match[2], 10) }
+}
+
 export function PrPanel({ onClose }: PrPanelProps) {
   const [activeTab, setActiveTab] = useState<PrTab>("for-review")
   const [selectedPr, setSelectedPr] = useState<GitHubPullRequest | null>(null)
@@ -82,6 +95,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false)
   const [isPrListOpen, setIsPrListOpen] = useState(false)
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false)
+  const restoredPrRef = useRef(false)
 
   const isMobile = useIsMobile()
   const editorHandleRef = useRef<PrDiffEditorHandle>(null)
@@ -94,6 +108,26 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const { data: reviewPrs = [], isLoading: isReviewPrsLoading } = useGitHubPrsAwaitingReview()
   const { data: myPrs = [], isLoading: isMyPrsLoading } = useGitHubPrsCreatedByMe()
   const { data: currentUser } = useGitHubCurrentUser()
+
+  useEffect(() => {
+    if (restoredPrRef.current || selectedPr) return
+    try {
+      const stored = localStorage.getItem("dev-hub:git-selected-pr")
+      if (!stored) { restoredPrRef.current = true; return }
+      const parsed = parsePrParam(stored)
+      if (!parsed) { restoredPrRef.current = true; return }
+      const allPrs = [...reviewPrs, ...myPrs]
+      const match = allPrs.find(
+        (pr) => pr.base.repo.full_name === parsed.fullName && pr.number === parsed.number
+      )
+      if (match) {
+        setSelectedPr(match)
+        if (reviewPrs.includes(match)) setActiveTab("for-review")
+        else setActiveTab("my-prs")
+        restoredPrRef.current = true
+      }
+    } catch { restoredPrRef.current = true }
+  }, [reviewPrs, myPrs, selectedPr])
 
   const owner = selectedPr?.base.repo.owner.login ?? null
   const repo = selectedPr?.base.repo.name ?? null
@@ -142,6 +176,15 @@ export function PrPanel({ onClose }: PrPanelProps) {
     setReviewedFilenames(new Set())
     setIsPrListOpen(false)
     setIsDescriptionOpen(false)
+    try { localStorage.setItem("dev-hub:git-selected-pr", encodePrParam(pr)) } catch {}
+  }, [])
+
+  const handleBackToList = useCallback(() => {
+    setSelectedPr(null)
+    setSelectedFilename(null)
+    setReviewedFilenames(new Set())
+    setIsDescriptionOpen(false)
+    try { localStorage.removeItem("dev-hub:git-selected-pr") } catch {}
   }, [])
 
   const handleSelectFile = useCallback((filename: string) => {
@@ -241,6 +284,14 @@ export function PrPanel({ onClose }: PrPanelProps) {
     <div className="flex min-h-0 flex-1 flex-col">
       {/* PR header */}
       <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-xs" onClick={handleBackToList}>
+              <ArrowLeft className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Back to PR list</TooltipContent>
+        </Tooltip>
         <button
           className="flex min-w-0 flex-1 items-start gap-1.5 text-left hover:opacity-80 transition-opacity"
           onClick={() => setIsPrListOpen(true)}
@@ -489,7 +540,7 @@ function PrListView({
               <p className="text-xs text-muted-foreground">No PRs are waiting for your review.</p>
             </div>
           ) : (
-            <PrListItems prs={reviewPrs} selectedPr={null} onSelect={onSelect} currentUser={currentUser} />
+            <PrListItems prs={reviewPrs} selectedPr={null} onSelect={onSelect} currentUser={currentUser} showMyReviewStatus />
           )}
         </TabsContent>
         <TabsContent value="my-prs" className="flex min-h-0 flex-1 flex-col">
@@ -519,9 +570,10 @@ interface PrListItemsProps {
   selectedPr: GitHubPullRequest | null
   onSelect: (pr: GitHubPullRequest) => void
   currentUser: GitHubUser | null
+  showMyReviewStatus?: boolean
 }
 
-function PrListItems({ prs, selectedPr, onSelect, currentUser }: PrListItemsProps) {
+function PrListItems({ prs, selectedPr, onSelect, currentUser, showMyReviewStatus }: PrListItemsProps) {
   return (
     <ScrollArea className="min-h-0 flex-1">
       <div className="space-y-px p-2">
@@ -547,6 +599,9 @@ function PrListItems({ prs, selectedPr, onSelect, currentUser }: PrListItemsProp
                   </p>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                     {!isOwnPr && <span>{pr.user.login}</span>}
+                    {showMyReviewStatus && currentUser && (
+                      <MyReviewStatus pr={pr} currentUserId={currentUser.id} />
+                    )}
                     {pr.review_comments > 0 && (
                       <span className="flex items-center gap-0.5">
                         <MessageSquare className="size-3" />
@@ -570,6 +625,35 @@ function PrListItems({ prs, selectedPr, onSelect, currentUser }: PrListItemsProp
         })}
       </div>
     </ScrollArea>
+  )
+}
+
+// ─── My review status for PR list items ──────────────────────────────────────
+
+function MyReviewStatus({ pr, currentUserId }: { pr: GitHubPullRequest; currentUserId: number }) {
+  const owner = pr.base.repo.owner.login
+  const repo = pr.base.repo.name
+  const { data: reviews = [] } = useGitHubPrReviews(owner, repo, pr.number)
+
+  const myState: ReviewDisplayState = useMemo(() => {
+    const latestReviews = getLatestReviews(reviews)
+    const myReview = latestReviews.find((r) => r.user.id === currentUserId)
+    if (!myReview) return "PENDING"
+    const isReRequested = pr.requested_reviewers.some((u) => u.id === currentUserId)
+    return isReRequested ? "RE_REQUESTED" : myReview.state
+  }, [reviews, pr.requested_reviewers, currentUserId])
+
+  const config = getReviewStateConfig(myState)
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn("inline-flex", config.textColor)}>
+          <config.Icon className="size-3" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{config.label}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -610,20 +694,18 @@ function PrDetailBar({ pr, reviews, isOpen, onToggle }: PrDetailBarProps) {
         <span className="flex-1 text-[11px] text-muted-foreground">
           {hasReviewInfo && (
             <span className="inline-flex items-center gap-1.5">
-              {latestReviews.map((r) => (
-                <ReviewStatusDot key={r.user.id} review={r} />
-              ))}
-              {pendingReviewers.map((u) => (
-                <Tooltip key={u.id}>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex items-center gap-0.5 text-muted-foreground">
-                      <Clock className="size-2.5" />
-                      <span className="text-[10px]">{u.login}</span>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>Review pending from {u.login}</TooltipContent>
-                </Tooltip>
-              ))}
+              {latestReviews.map((r) => {
+                const isReRequested = pendingReviewers.some((u) => u.id === r.user.id)
+                const displayState: ReviewDisplayState = isReRequested ? "RE_REQUESTED" : r.state
+                return (
+                  <ReviewStatusDot key={r.user.id} state={displayState} login={r.user.login} />
+                )
+              })}
+              {pendingReviewers
+                .filter((u) => !latestReviews.some((r) => r.user.id === u.id))
+                .map((u) => (
+                  <ReviewStatusDot key={u.id} state="PENDING" login={u.login} />
+                ))}
             </span>
           )}
         </span>
@@ -638,21 +720,24 @@ function PrDetailBar({ pr, reviews, isOpen, onToggle }: PrDetailBarProps) {
           )}
           {hasReviewInfo && (
             <div className="space-y-1">
-              {latestReviews.map((r) => (
-                <div key={r.id} className="flex items-center gap-2 text-[11px]">
-                  <ReviewStatusBadge state={r.state} />
-                  <span className="text-foreground">{r.user.login}</span>
-                </div>
-              ))}
-              {pendingReviewers.map((u) => (
-                <div key={u.id} className="flex items-center gap-2 text-[11px]">
-                  <Badge variant="outline" className="h-4 px-1 text-[10px] text-muted-foreground">
-                    <Clock className="mr-0.5 size-2.5" />
-                    Pending
-                  </Badge>
-                  <span className="text-foreground">{u.login}</span>
-                </div>
-              ))}
+              {latestReviews.map((r) => {
+                const isReRequested = pendingReviewers.some((u) => u.id === r.user.id)
+                const displayState: ReviewDisplayState = isReRequested ? "RE_REQUESTED" : r.state
+                return (
+                  <div key={r.id} className="flex items-center gap-2 text-[11px]">
+                    <ReviewStatusBadge state={displayState} />
+                    <span className="text-foreground">{r.user.login}</span>
+                  </div>
+                )
+              })}
+              {pendingReviewers
+                .filter((u) => !latestReviews.some((r) => r.user.id === u.id))
+                .map((u) => (
+                  <div key={u.id} className="flex items-center gap-2 text-[11px]">
+                    <ReviewStatusBadge state="PENDING" />
+                    <span className="text-foreground">{u.login}</span>
+                  </div>
+                ))}
             </div>
           )}
         </div>
@@ -663,22 +748,22 @@ function PrDetailBar({ pr, reviews, isOpen, onToggle }: PrDetailBarProps) {
 
 // ─── Review status helpers ───────────────────────────────────────────────────
 
-function ReviewStatusDot({ review }: { review: GitHubReview }) {
-  const config = getReviewStateConfig(review.state)
+function ReviewStatusDot({ state, login }: { state: ReviewDisplayState; login: string }) {
+  const config = getReviewStateConfig(state)
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className={cn("inline-flex items-center gap-0.5", config.textColor)}>
           <config.Icon className="size-2.5" />
-          <span className="text-[10px]">{review.user.login}</span>
+          <span className="text-[10px]">{login}</span>
         </span>
       </TooltipTrigger>
-      <TooltipContent>{config.label} by {review.user.login}</TooltipContent>
+      <TooltipContent>{config.label} by {login}</TooltipContent>
     </Tooltip>
   )
 }
 
-function ReviewStatusBadge({ state }: { state: GitHubReview["state"] }) {
+function ReviewStatusBadge({ state }: { state: ReviewDisplayState }) {
   const config = getReviewStateConfig(state)
   return (
     <Badge variant="outline" className={cn("h-4 px-1 text-[10px]", config.textColor)}>
@@ -688,18 +773,22 @@ function ReviewStatusBadge({ state }: { state: GitHubReview["state"] }) {
   )
 }
 
-function getReviewStateConfig(state: GitHubReview["state"]) {
+type ReviewDisplayState = GitHubReview["state"] | "RE_REQUESTED"
+
+function getReviewStateConfig(state: ReviewDisplayState) {
   switch (state) {
     case "APPROVED":
       return { Icon: Check, label: "Approved", textColor: "text-green-500" }
     case "CHANGES_REQUESTED":
-      return { Icon: X, label: "Changes requested", textColor: "text-yellow-600" }
+      return { Icon: FileDiff, label: "Changes requested", textColor: "text-red-500" }
+    case "RE_REQUESTED":
+      return { Icon: RotateCcw, label: "Re-requested review", textColor: "text-yellow-500" }
     case "COMMENTED":
       return { Icon: MessageSquare, label: "Commented", textColor: "text-muted-foreground" }
     case "DISMISSED":
       return { Icon: X, label: "Dismissed", textColor: "text-muted-foreground" }
     default:
-      return { Icon: Circle, label: "Pending", textColor: "text-muted-foreground" }
+      return { Icon: Circle, label: "Pending", textColor: "text-yellow-500" }
   }
 }
 
@@ -897,7 +986,7 @@ function ReviewSubmitBar({ onSubmit, isSubmitting, commentCount }: ReviewSubmitB
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs text-yellow-600 border-yellow-600/30 hover:bg-yellow-500/10"
+              className="h-7 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10"
               onClick={() => handleSubmit("REQUEST_CHANGES")}
               disabled={isSubmitting}
             >
@@ -978,8 +1067,8 @@ function MergeActionBar({ pr, checks, reviews, onMerge, isMerging }: MergeAction
             </span>
           )}
           {hasChangesRequested && (
-            <span className="flex items-center gap-1 text-yellow-600">
-              <AlertCircle className="size-3" />
+            <span className="flex items-center gap-1 text-red-500">
+              <FileDiff className="size-3" />
               Changes requested
             </span>
           )}

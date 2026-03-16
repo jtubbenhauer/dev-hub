@@ -83,6 +83,9 @@ const pendingMessageUpdates = new Map<string, Map<string, PendingMessageUpdate>>
 let messageFlushScheduled = false
 let messageFlushHandle: number | null = null
 
+// Fallback for routing events for child sessions not yet in ws.sessions
+const sessionSourceWorkspace = new Map<string, string>()
+
 function flushPendingPartUpdates(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void
 ): void {
@@ -107,9 +110,11 @@ function flushPendingPartUpdates(
 
     for (const [sessionId, byMessage] of snapshot) {
       const wsId = findWorkspaceForSession(state.workspaceStates, sessionId)
+        ?? sessionSourceWorkspace.get(sessionId)
       if (!wsId) continue
 
       const ws = nextWorkspaceStates[wsId]
+      if (!ws) continue
       const sessionMessages = ws.messages[sessionId]
       if (!sessionMessages) continue
 
@@ -1085,6 +1090,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       case "message.updated": {
         const info = properties.info as Message
         if (!info) return
+        sessionSourceWorkspace.set(info.sessionID, sourceWorkspaceId)
 
         let byMessage = pendingMessageUpdates.get(info.sessionID)
         if (!byMessage) {
@@ -1118,6 +1124,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       case "message.part.updated": {
         const part = properties.part as Part
         if (!part) return
+        sessionSourceWorkspace.set(part.sessionID, sourceWorkspaceId)
 
         let byMessage = pendingPartUpdates.get(part.sessionID)
         if (!byMessage) {

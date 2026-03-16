@@ -171,6 +171,13 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
     }
   }, [childSessionId, activeWorkspaceId, childMessages.length, fetchMessages])
 
+  useEffect(() => {
+    if (!childSessionId || !activeWorkspaceId) return
+    if (state.status === "completed" || state.status === "error") {
+      fetchMessages(childSessionId, activeWorkspaceId)
+    }
+  }, [state.status, childSessionId, activeWorkspaceId, fetchMessages])
+
   const childToolParts = useMemo(() => {
     const toolParts: ToolPart[] = []
     for (const msg of childMessages) {

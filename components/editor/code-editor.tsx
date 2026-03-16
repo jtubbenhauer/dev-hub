@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useCallback, useState } from "react"
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, rectangularSelection } from "@codemirror/view"
 import { EditorState, type Extension, Compartment } from "@codemirror/state"
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands"
@@ -15,8 +15,12 @@ import { useTheme } from "@/components/providers/theme-provider"
 import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
+import { buildCommentExtensions } from "@/lib/editor/comments"
+import { useFileComments, useCreateFileComment, useResolveFileComment, useDeleteFileComment, useUpdateFileComment } from "@/hooks/use-file-comments"
+import { CommentThread } from "@/components/editor/comment-thread"
+import { CommentInput } from "@/components/editor/comment-input"
+import { attachCommentToChat } from "@/lib/comment-chat-bridge"
 
-// Global vim config — runs once
 Vim.noremap("jk", "<Esc>", "insert")
 
 interface CodeEditorProps {
@@ -24,6 +28,8 @@ interface CodeEditorProps {
   language: string
   onChange: (content: string) => void
   onSave?: () => void
+  workspaceId?: string
+  filePath?: string
 }
 
 export function CodeEditor({
@@ -31,16 +37,42 @@ export function CodeEditor({
   language,
   onChange,
   onSave,
+  workspaceId,
+  filePath,
 }: CodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const themeCompartmentRef = useRef(new Compartment())
+  const commentCompartmentRef = useRef(new Compartment())
   const isVimMode = useEditorStore((s) => s.isVimMode)
   const { theme } = useTheme()
   const { fontSize } = useFontSizeSetting()
   const { mobileFontSize } = useMobileFontSizeSetting()
   const { tabSize } = useTabSizeSetting()
   const isMobile = useIsMobile()
+
+  const isCommentMode = !!(workspaceId && filePath)
+  const { data: commentsData } = useFileComments(workspaceId ?? null, filePath)
+  const { mutate: createComment } = useCreateFileComment()
+  const { mutate: resolveComment } = useResolveFileComment()
+  const { mutate: deleteComment } = useDeleteFileComment()
+  const { mutate: updateComment } = useUpdateFileComment()
+
+  const [commentInput, setCommentInput] = useState<{ startLine: number; endLine: number } | null>(null)
+  const [activeCommentLine, setActiveCommentLine] = useState<number | null>(null)
+
+  const commentedLines = new Set<number>()
+  if (isCommentMode && commentsData) {
+    for (const c of commentsData) {
+      for (let ln = c.startLine; ln <= c.endLine; ln++) {
+        commentedLines.add(ln)
+      }
+    }
+  }
+
+  const lineComments = isCommentMode && commentsData && activeCommentLine !== null
+    ? commentsData.filter((c) => c.startLine <= activeCommentLine && c.endLine >= activeCommentLine)
+    : []
 
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -113,8 +145,12 @@ export function CodeEditor({
       extensions.push(langExt)
     }
 
+    if (isCommentMode) {
+      extensions.push(commentCompartmentRef.current.of([]))
+    }
+
     return extensions
-  }, [isVimMode, language, fontSize, mobileFontSize, isMobile, tabSize, theme])
+  }, [isVimMode, language, fontSize, mobileFontSize, isMobile, tabSize, theme, isCommentMode])
 
   // Create or recreate the editor when vim mode or language changes
   useEffect(() => {
@@ -150,6 +186,20 @@ export function CodeEditor({
     })
   }, [theme])
 
+  useEffect(() => {
+    if (!viewRef.current || !isCommentMode) return
+    viewRef.current.dispatch({
+      effects: commentCompartmentRef.current.reconfigure(
+        buildCommentExtensions({
+          onAddComment: (startLine, endLine) => setCommentInput({ startLine, endLine }),
+          onClickComment: (line) => setActiveCommentLine(line),
+          commentedLines,
+        })
+      ),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commentsData, isCommentMode])
+
   // Sync content from outside without rebuilding the editor
   useEffect(() => {
     const view = viewRef.current
@@ -167,5 +217,57 @@ export function CodeEditor({
     }
   }, [content])
 
-  return <div ref={editorRef} className="h-full w-full overflow-hidden" />
+  function handleCommentSubmit(body: string) {
+    if (!workspaceId || !filePath || !commentInput) return
+    const contentSnapshot = viewRef.current?.state.doc.toString() ?? null
+    createComment({
+      workspaceId,
+      filePath,
+      startLine: commentInput.startLine,
+      endLine: commentInput.endLine,
+      body,
+      contentSnapshot,
+      resolved: false,
+    })
+    setCommentInput(null)
+  }
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      <div ref={editorRef} className="h-full w-full overflow-hidden" />
+
+      {isCommentMode && commentInput && filePath && (
+        <div className="absolute bottom-4 left-1/2 z-20 w-96 -translate-x-1/2">
+          <CommentInput
+            startLine={commentInput.startLine}
+            endLine={commentInput.endLine}
+            filePath={filePath}
+            onSubmit={handleCommentSubmit}
+            onCancel={() => setCommentInput(null)}
+          />
+        </div>
+      )}
+
+      {isCommentMode && activeCommentLine !== null && lineComments.length > 0 && (
+        <div className="absolute right-2 top-2 z-20 w-80">
+          <CommentThread
+            comments={lineComments}
+            onResolve={(id) => resolveComment({ id, resolved: true })}
+            onDelete={(id) => deleteComment(id)}
+            onUpdate={(id, body) => updateComment({ id, body })}
+            onAttachToChat={(comment) => {
+              attachCommentToChat({
+                id: comment.id,
+                filePath: comment.filePath,
+                startLine: comment.startLine,
+                endLine: comment.endLine,
+                body: comment.body,
+              })
+              setActiveCommentLine(null)
+            }}
+          />
+        </div>
+      )}
+    </div>
+  )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useCallback, useState, useImperativeHandle, forwardRef } from "react"
+import { useEffect, useRef, useCallback, useState, useMemo, useImperativeHandle, forwardRef } from "react"
 import {
   EditorView,
   keymap,
@@ -34,6 +34,11 @@ import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
 import { toast } from "sonner"
+import { buildCommentExtensions } from "@/lib/editor/comments"
+import { useFileComments, useCreateFileComment, useResolveFileComment, useDeleteFileComment, useUpdateFileComment } from "@/hooks/use-file-comments"
+import { CommentThread } from "@/components/editor/comment-thread"
+import { CommentInput } from "@/components/editor/comment-input"
+import { attachCommentToChat } from "@/lib/comment-chat-bridge"
 import type { ReviewFile } from "@/types"
 
 // Register ]c / [c vim bindings for chunk navigation — runs once at module load
@@ -78,6 +83,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const themeCompartmentRef = useRef(new Compartment())
+  const commentCompartmentRef = useRef(new Compartment())
 
   useImperativeHandle(ref, () => ({
     focus: () => viewRef.current?.focus(),
@@ -90,6 +96,26 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
   const { tabSize } = useTabSizeSetting()
   const isMobile = useIsMobile()
   const [isSaving, setIsSaving] = useState(false)
+  const [commentInput, setCommentInput] = useState<{ startLine: number; endLine: number } | null>(null)
+  const [activeCommentLine, setActiveCommentLine] = useState<number | null>(null)
+
+  const { data: fileCommentsData } = useFileComments(workspaceId, fileContent.path)
+  const createCommentMutation = useCreateFileComment()
+  const resolveCommentMutation = useResolveFileComment()
+  const deleteCommentMutation = useDeleteFileComment()
+  const updateCommentMutation = useUpdateFileComment()
+
+  const commentedLines = useMemo(() => {
+    const lines = new Set<number>()
+    if (fileCommentsData) {
+      for (const c of fileCommentsData) {
+        for (let l = c.startLine; l <= c.endLine; l++) {
+          lines.add(l)
+        }
+      }
+    }
+    return lines
+  }, [fileCommentsData])
 
   const currentContentRef = useRef(fileContent.current)
   const workspaceIdRef = useRef(workspaceId)
@@ -99,6 +125,16 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
   currentContentRef.current = fileContent.current
   workspaceIdRef.current = workspaceId
   filePathRef.current = fileContent.path
+
+  const onAddComment = useCallback((startLine: number, endLine: number) => {
+    setCommentInput({ startLine, endLine })
+    setActiveCommentLine(null)
+  }, [])
+
+  const onClickComment = useCallback((line: number) => {
+    setActiveCommentLine(line)
+    setCommentInput(null)
+  }, [])
 
   const handleSave = useCallback(async () => {
     const view = viewRef.current
@@ -141,6 +177,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
         bracketMatching(),
         closeBrackets(),
         highlightSelectionMatches(),
+        commentCompartmentRef.current.of(buildCommentExtensions({ onAddComment, onClickComment, commentedLines })),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         themeCompartmentRef.current.of(getCM6Theme(theme)),
         keymap.of([
@@ -244,7 +281,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
 
       return extensions
     },
-    [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, handleSave, theme]
+    [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, handleSave, theme, onAddComment, onClickComment, commentedLines]
   )
 
   // Rebuild editor when file changes or vim mode toggles
@@ -283,6 +320,15 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
     })
   }, [theme])
 
+  useEffect(() => {
+    if (!viewRef.current) return
+    viewRef.current.dispatch({
+      effects: commentCompartmentRef.current.reconfigure(
+        buildCommentExtensions({ onAddComment, onClickComment, commentedLines })
+      ),
+    })
+  }, [commentedLines, onAddComment, onClickComment])
+
   // Sync content from outside when it changes without a path/language change
   useEffect(() => {
     const view = viewRef.current
@@ -295,6 +341,54 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
       })
     }
   }, [fileContent.current])
+
+  const handleCommentSubmit = useCallback((body: string) => {
+    if (!commentInput) return
+    const view = viewRef.current
+    let contentSnapshot: string | null = null
+    if (view) {
+      try {
+        const doc = view.state.doc
+        const startLineObj = doc.line(commentInput.startLine)
+        const endLineObj = doc.line(commentInput.endLine)
+        contentSnapshot = doc.sliceString(startLineObj.from, endLineObj.to)
+      } catch {
+        contentSnapshot = null
+      }
+    }
+    createCommentMutation.mutate({
+      workspaceId,
+      filePath: fileContent.path,
+      startLine: commentInput.startLine,
+      endLine: commentInput.endLine,
+      body,
+      contentSnapshot,
+    })
+    setCommentInput(null)
+  }, [commentInput, workspaceId, fileContent.path, createCommentMutation])
+
+  const handleCommentResolve = useCallback((id: number) => {
+    resolveCommentMutation.mutate({ id, resolved: true })
+  }, [resolveCommentMutation])
+
+  const handleCommentDelete = useCallback((id: number) => {
+    deleteCommentMutation.mutate(id)
+  }, [deleteCommentMutation])
+
+  const handleCommentUpdate = useCallback((id: number, body: string) => {
+    updateCommentMutation.mutate({ id, body })
+  }, [updateCommentMutation])
+
+  const handleAttachToChat = useCallback((comment: { id: number; filePath: string; startLine: number; endLine: number; body: string }) => {
+    attachCommentToChat(comment)
+  }, [])
+
+  const activeComments = useMemo(() => {
+    if (activeCommentLine === null || !fileCommentsData) return []
+    return fileCommentsData.filter(
+      (c) => c.startLine <= activeCommentLine && c.endLine >= activeCommentLine
+    )
+  }, [activeCommentLine, fileCommentsData])
 
   if (isLoading) {
     return (
@@ -370,6 +464,30 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
 
       {/* CodeMirror editor */}
       <div ref={editorRef} className="min-h-0 flex-1 overflow-hidden" />
+
+      {commentInput && (
+        <div className="shrink-0 border-t p-2">
+          <CommentInput
+            startLine={commentInput.startLine}
+            endLine={commentInput.endLine}
+            filePath={fileContent.path}
+            onSubmit={handleCommentSubmit}
+            onCancel={() => setCommentInput(null)}
+          />
+        </div>
+      )}
+
+      {activeCommentLine !== null && activeComments.length > 0 && (
+        <div className="shrink-0 border-t p-2">
+          <CommentThread
+            comments={activeComments}
+            onResolve={handleCommentResolve}
+            onDelete={handleCommentDelete}
+            onUpdate={handleCommentUpdate}
+            onAttachToChat={handleAttachToChat}
+          />
+        </div>
+      )}
     </div>
   )
 })

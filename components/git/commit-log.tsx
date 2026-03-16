@@ -115,7 +115,7 @@ function CommitEntry({
       </div>
       {isExpanded && (
         <div className="ml-6 max-h-80 overflow-hidden border-l-2 border-border/50 pl-2">
-          <DiffViewer diff={diff ?? ""} isLoading={isDiffLoading} />
+          <DiffViewer diff={diff ?? ""} isLoading={isDiffLoading} workspaceId={workspaceId} />
         </div>
       )}
     </div>

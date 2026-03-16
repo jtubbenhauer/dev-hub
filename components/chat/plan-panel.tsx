@@ -293,6 +293,8 @@ export function PlanPanel({
             language="markdown"
             onChange={setContent}
             onSave={handleSave}
+            workspaceId={workspaceId}
+            filePath={activePlanPath ?? undefined}
           />
         )}
       </div>

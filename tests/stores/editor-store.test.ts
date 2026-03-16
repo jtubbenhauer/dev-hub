@@ -19,6 +19,7 @@ function resetStore() {
     activeFilePath: null,
     isVimMode: false,
     isFileTreeOpen: true,
+    diffViewMode: "unified",
   })
 }
 
@@ -223,5 +224,27 @@ describe("closeAllFiles", () => {
 
     expect(useEditorStore.getState().openFiles).toHaveLength(0)
     expect(useEditorStore.getState().activeFilePath).toBeNull()
+  })
+})
+
+describe("toggleDiffViewMode / setDiffViewMode", () => {
+  beforeEach(resetStore)
+
+  it("defaults to unified", () => {
+    expect(useEditorStore.getState().diffViewMode).toBe("unified")
+  })
+
+  it("toggles between unified and side-by-side", () => {
+    useEditorStore.getState().toggleDiffViewMode()
+    expect(useEditorStore.getState().diffViewMode).toBe("side-by-side")
+    useEditorStore.getState().toggleDiffViewMode()
+    expect(useEditorStore.getState().diffViewMode).toBe("unified")
+  })
+
+  it("sets diff view mode directly", () => {
+    useEditorStore.getState().setDiffViewMode("side-by-side")
+    expect(useEditorStore.getState().diffViewMode).toBe("side-by-side")
+    useEditorStore.getState().setDiffViewMode("unified")
+    expect(useEditorStore.getState().diffViewMode).toBe("unified")
   })
 })

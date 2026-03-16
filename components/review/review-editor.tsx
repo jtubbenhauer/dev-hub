@@ -22,11 +22,12 @@ import {
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search"
 import { lintKeymap } from "@codemirror/lint"
-import { unifiedMergeView, goToNextChunk, goToPreviousChunk } from "@codemirror/merge"
+import { MergeView, unifiedMergeView, goToNextChunk, goToPreviousChunk } from "@codemirror/merge"
 import { vim, Vim } from "@replit/codemirror-vim"
 import { Check, ChevronRight, Loader2, Save, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VimToggle } from "@/components/editor/vim-toggle"
+import { DiffViewToggle } from "@/components/editor/diff-view-toggle"
 import { useEditorStore } from "@/stores/editor-store"
 import { getCM6Theme } from "@/lib/editor/catppuccin-theme"
 import { useTheme } from "@/components/providers/theme-provider"
@@ -45,6 +46,50 @@ Vim.defineAction("goToPreviousChunk", (cm) => {
 })
 Vim.mapCommand("]c", "action", "goToNextChunk", {}, { context: "normal" })
 Vim.mapCommand("[c", "action", "goToPreviousChunk", {}, { context: "normal" })
+
+const diffColorTheme = EditorView.theme({
+  "del, del *": { textDecoration: "none !important" },
+  ".cm-insertedLine": {
+    backgroundColor: "var(--diff-add-line)",
+    color: "inherit",
+    textDecoration: "none",
+    padding: "0",
+    borderRadius: "0",
+  },
+  "ins.cm-insertedLine, ins.cm-insertedLine:not(:has(.cm-changedText))": {
+    backgroundColor: "var(--diff-add-line) !important",
+    color: "inherit !important",
+    textDecoration: "none !important",
+    border: "none !important",
+    padding: "0 !important",
+    borderRadius: "0 !important",
+  },
+  ".cm-deletedLine": {
+    backgroundColor: "var(--diff-remove-line)",
+    color: "inherit",
+    textDecoration: "none",
+    padding: "0",
+    borderRadius: "0",
+  },
+  "del.cm-deletedLine, del, del:not(:has(.cm-deletedText))": {
+    backgroundColor: "var(--diff-remove-line) !important",
+    color: "inherit !important",
+    textDecoration: "none !important",
+    border: "none !important",
+    padding: "0 !important",
+    borderRadius: "0 !important",
+  },
+  "&.cm-merge-b .cm-changedLine": { backgroundColor: "var(--diff-add-line)" },
+  "&.cm-merge-a .cm-changedLine": { backgroundColor: "var(--diff-remove-line)" },
+  ".cm-deletedChunk": { backgroundColor: "var(--diff-remove-line)" },
+  "&.cm-merge-b .cm-changedText": { background: "var(--diff-add-bg)" },
+  "ins.cm-insertedLine .cm-changedText": { background: "var(--diff-add-bg) !important" },
+  "&.cm-merge-b .cm-deletedText": { background: "var(--diff-remove-bg)" },
+  ".cm-deletedChunk .cm-deletedText": { background: "var(--diff-remove-bg)" },
+  "del .cm-deletedText, del .cm-changedText": { background: "var(--diff-remove-bg) !important" },
+  ".cm-changedLineGutter": { background: "var(--diff-add-bg)" },
+  ".cm-deletedLineGutter": { background: "var(--diff-remove-bg)" },
+})
 
 export interface ReviewEditorHandle {
   focus: () => void
@@ -77,13 +122,11 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
 }, ref) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const mergeViewRef = useRef<MergeView | null>(null)
   const themeCompartmentRef = useRef(new Compartment())
 
-  useImperativeHandle(ref, () => ({
-    focus: () => viewRef.current?.focus(),
-    blur: () => viewRef.current?.contentDOM.blur(),
-  }), [])
   const isVimMode = useEditorStore((s) => s.isVimMode)
+  const diffViewMode = useEditorStore((s) => s.diffViewMode)
   const { theme } = useTheme()
   const { fontSize } = useFontSizeSetting()
   const { mobileFontSize } = useMobileFontSizeSetting()
@@ -100,8 +143,17 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
   workspaceIdRef.current = workspaceId
   filePathRef.current = fileContent.path
 
+  const getActiveView = useCallback((): EditorView | null => {
+    return viewRef.current ?? mergeViewRef.current?.b ?? null
+  }, [])
+
+  useImperativeHandle(ref, () => ({
+    focus: () => getActiveView()?.focus(),
+    blur: () => getActiveView()?.contentDOM.blur(),
+  }), [getActiveView])
+
   const handleSave = useCallback(async () => {
-    const view = viewRef.current
+    const view = viewRef.current ?? mergeViewRef.current?.b
     if (!view) return
 
     const content = view.state.doc.toString()
@@ -128,8 +180,8 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
     }
   }, [])
 
-  const buildExtensions = useCallback(
-    (original: string, language: string): Extension[] => {
+  const buildBaseExtensions = useCallback(
+    (language: string): Extension[] => {
       const extensions: Extension[] = [
         lineNumbers(),
         highlightActiveLineGutter(),
@@ -159,13 +211,6 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
             },
           },
         ]),
-        unifiedMergeView({
-          original,
-          highlightChanges: true,
-          gutter: true,
-          collapseUnchanged: { margin: 3, minSize: 4 },
-          mergeControls: false,
-        }),
         EditorView.theme({
           "&": { height: "100%", fontSize: `${isMobile ? mobileFontSize : fontSize}px !important` },
           ".cm-scroller": { overflow: "auto" },
@@ -178,59 +223,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
           },
         }),
         EditorState.tabSize.of(tabSize),
-        // Override @codemirror/merge and @fsegurai/codemirror-theme-github-dark diff decorations.
-        // The fsegurai theme applies heavy line-level backgrounds, bright text color changes,
-        // strikethrough, and borders — all with !important on <ins>/<del> selectors.
-        // We match that specificity here to produce subtle, readable diff indicators.
-        EditorView.theme({
-          // Kill strikethrough on all <del> elements and their children
-          "del, del *": { textDecoration: "none !important" },
-          // Line-level backgrounds: very subtle tints, no text color change
-          ".cm-insertedLine": {
-            backgroundColor: "var(--diff-add-line)",
-            color: "inherit",
-            textDecoration: "none",
-            padding: "0",
-            borderRadius: "0",
-          },
-          "ins.cm-insertedLine, ins.cm-insertedLine:not(:has(.cm-changedText))": {
-            backgroundColor: "var(--diff-add-line) !important",
-            color: "inherit !important",
-            textDecoration: "none !important",
-            border: "none !important",
-            padding: "0 !important",
-            borderRadius: "0 !important",
-          },
-          ".cm-deletedLine": {
-            backgroundColor: "var(--diff-remove-line)",
-            color: "inherit",
-            textDecoration: "none",
-            padding: "0",
-            borderRadius: "0",
-          },
-          // The fsegurai `del, del:not(:has(.cm-deletedText))` selector is very broad — match it
-          "del.cm-deletedLine, del, del:not(:has(.cm-deletedText))": {
-            backgroundColor: "var(--diff-remove-line) !important",
-            color: "inherit !important",
-            textDecoration: "none !important",
-            border: "none !important",
-            padding: "0 !important",
-            borderRadius: "0 !important",
-          },
-          // Changed lines (modified but not purely added/removed)
-          "&.cm-merge-b .cm-changedLine": { backgroundColor: "var(--diff-add-line)" },
-          "&.cm-merge-a .cm-changedLine": { backgroundColor: "var(--diff-remove-line)" },
-          ".cm-deletedChunk": { backgroundColor: "var(--diff-remove-line)" },
-          // Word-level inline highlights: slightly more visible than line backgrounds
-          "&.cm-merge-b .cm-changedText": { background: "var(--diff-add-bg)" },
-          "ins.cm-insertedLine .cm-changedText": { background: "var(--diff-add-bg) !important" },
-          "&.cm-merge-b .cm-deletedText": { background: "var(--diff-remove-bg)" },
-          ".cm-deletedChunk .cm-deletedText": { background: "var(--diff-remove-bg)" },
-          "del .cm-deletedText, del .cm-changedText": { background: "var(--diff-remove-bg) !important" },
-          // Gutter change indicators: keep colored but toned down
-          ".cm-changedLineGutter": { background: "var(--diff-add-bg)" },
-          ".cm-deletedLineGutter": { background: "var(--diff-remove-bg)" },
-        }),
+        diffColorTheme,
       ]
 
       if (isVimMode) {
@@ -247,45 +240,78 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
     [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, handleSave, theme]
   )
 
-  // Rebuild editor when file changes or vim mode toggles
   useEffect(() => {
     if (!editorRef.current) return
 
     try { viewRef.current?.destroy() } catch { /* vim cleanup race */ }
+    try { mergeViewRef.current?.destroy() } catch { /* vim cleanup race */ }
+    viewRef.current = null
+    mergeViewRef.current = null
 
-    const state = EditorState.create({
-      doc: fileContent.current,
-      extensions: buildExtensions(fileContent.original, fileContent.language),
-    })
+    const baseExts = buildBaseExtensions(fileContent.language)
 
-    const view = new EditorView({
-      state,
-      parent: editorRef.current,
-    })
+    if (diffViewMode === "side-by-side") {
+      const mv = new MergeView({
+        a: {
+          doc: fileContent.original,
+          extensions: [...baseExts, EditorState.readOnly.of(true)],
+        },
+        b: {
+          doc: fileContent.current,
+          extensions: baseExts,
+        },
+        parent: editorRef.current,
+        highlightChanges: true,
+        gutter: true,
+        collapseUnchanged: { margin: 3, minSize: 4 },
+      })
+      mergeViewRef.current = mv
+    } else {
+      const state = EditorState.create({
+        doc: fileContent.current,
+        extensions: [
+          ...baseExts,
+          unifiedMergeView({
+            original: fileContent.original,
+            highlightChanges: true,
+            gutter: true,
+            collapseUnchanged: { margin: 3, minSize: 4 },
+            mergeControls: false,
+          }),
+        ],
+      })
 
-    viewRef.current = view
+      const view = new EditorView({
+        state,
+        parent: editorRef.current,
+      })
+
+      viewRef.current = view
+    }
 
     return () => {
-      // Wrap destroy in try/catch — @replit/codemirror-vim has a known bug where
-      // leaveVimMode nulls cm.state.vim then getOnPasteFn dereferences it.
-      try { view.destroy() } catch { /* vim cleanup race */ }
+      try { viewRef.current?.destroy() } catch { /* vim cleanup race */ }
+      try { mergeViewRef.current?.destroy() } catch { /* vim cleanup race */ }
       viewRef.current = null
+      mergeViewRef.current = null
     }
-    // Intentionally depend on path+language as stable identifiers; content changes
-    // are handled by sync effect below. Vim mode rebuild is covered by buildExtensions dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileContent.path, fileContent.language, buildExtensions])
+  }, [fileContent.path, fileContent.language, buildBaseExtensions, diffViewMode])
 
   useEffect(() => {
-    if (!viewRef.current) return
-    viewRef.current.dispatch({
-      effects: themeCompartmentRef.current.reconfigure(getCM6Theme(theme)),
-    })
+    const newTheme = getCM6Theme(theme)
+    const effect = themeCompartmentRef.current.reconfigure(newTheme)
+    if (viewRef.current) {
+      viewRef.current.dispatch({ effects: effect })
+    }
+    if (mergeViewRef.current) {
+      mergeViewRef.current.a.dispatch({ effects: effect })
+      mergeViewRef.current.b.dispatch({ effects: effect })
+    }
   }, [theme])
 
-  // Sync content from outside when it changes without a path/language change
   useEffect(() => {
-    const view = viewRef.current
+    const view = viewRef.current ?? mergeViewRef.current?.b
     if (!view) return
 
     const currentDoc = view.state.doc.toString()
@@ -326,6 +352,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
           {fileName}
         </span>
 
+        <DiffViewToggle />
         <VimToggle />
 
         <Button
@@ -369,7 +396,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
       </div>
 
       {/* CodeMirror editor */}
-      <div ref={editorRef} className="min-h-0 flex-1 overflow-hidden" />
+      <div ref={editorRef} className="min-h-0 flex-1 overflow-hidden [&_.cm-mergeView]:h-full [&_.cm-mergeViewEditor]:h-full" />
     </div>
   )
 })

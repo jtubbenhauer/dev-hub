@@ -13,6 +13,8 @@ export type {
   WorktreeInfo,
 } from "@devhub/shared"
 
+import type { fileComments } from "@/drizzle/schema"
+
 export type WorkspaceBackendType = "local" | "remote"
 
 export interface LinkedTaskMeta {
@@ -509,3 +511,6 @@ export interface WorkspaceProviderCreateResult {
     codePath?: string
   }
 }
+
+export type FileComment = typeof fileComments.$inferSelect
+export type NewFileComment = typeof fileComments.$inferInsert

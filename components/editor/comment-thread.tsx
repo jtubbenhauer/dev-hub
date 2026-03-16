@@ -62,7 +62,7 @@ function CommentItem({ comment, onResolve, onDelete, onUpdate, onAttachToChat }:
         </span>
         {comment.createdAt && (
           <span className="text-xs text-muted-foreground">
-            {comment.createdAt.toLocaleDateString()}
+            {new Date(comment.createdAt).toLocaleDateString()}
           </span>
         )}
       </div>

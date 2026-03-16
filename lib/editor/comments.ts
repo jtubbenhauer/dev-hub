@@ -59,18 +59,23 @@ const commentGutterTheme = EditorView.baseTheme({
   ".cm-comment-gutter .cm-comment-add-btn": {
     opacity: "0",
     background: "none",
-    border: "none",
+    border: "1px solid transparent",
+    borderRadius: "4px",
     cursor: "pointer",
-    padding: "0 2px",
-    color: "inherit",
+    padding: "0 4px",
+    color: "#3b82f6",
     fontSize: "14px",
+    fontWeight: "700",
     lineHeight: "1",
+    transition: "opacity 120ms, background 120ms, border-color 120ms",
   },
   ".cm-comment-gutter .cm-gutterElement:hover .cm-comment-add-btn": {
-    opacity: "0.5",
+    opacity: "0.6",
   },
   ".cm-comment-gutter .cm-comment-add-btn:hover": {
     opacity: "1",
+    background: "rgba(59, 130, 246, 0.1)",
+    borderColor: "rgba(59, 130, 246, 0.3)",
   },
   ".cm-comment-gutter .cm-comment-gutter-dot": {
     cursor: "pointer",

@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { FileComment, NewFileComment } from "@/types"
+import { attachCommentToChat } from "@/lib/comment-chat-bridge"
 
 async function fileCommentsGet<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -72,8 +73,15 @@ export function useCreateFileComment() {
 
   return useMutation<FileComment, Error, NewFileComment>({
     mutationFn: (input) => fileCommentsPost<FileComment>("/api/file-comments", input),
-    onSuccess: () => {
+    onSuccess: (comment) => {
       queryClient.invalidateQueries({ queryKey: ["file-comments"] })
+      attachCommentToChat({
+        id: comment.id,
+        filePath: comment.filePath,
+        startLine: comment.startLine,
+        endLine: comment.endLine,
+        body: comment.body,
+      })
       toast.success("Comment created")
     },
     onError: (err) => {

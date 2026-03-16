@@ -1,0 +1,128 @@
+components/chat/markdown-content.tsx
+  247b4ecb89c9ffb2 15
+  12598362a3489213 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "e4c9409651c6a0a7a9ef9afbd4af25177215292b",
+  "prompts": {
+    "12598362a3489213": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3099c6d25ffe2VVcgvB0PNL9Yc-653509df-1b6e-449d-81ef-137ff5d90ac2",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "247b4ecb89c9ffb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3099c6d25ffe2VVcgvB0PNL9Yc-b411d8d3-37f7-4a26-a382-de73a6725ec4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "4490835258bfd451": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3099c6d25ffe2VVcgvB0PNL9Yc-a5ea445a-5ca0-4ed0-994b-9e7d28fab70f",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 50,
+      "overriden_lines": 0
+    },
+    "89d394476bfceb3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3099c6d25ffe2VVcgvB0PNL9Yc-edf700df-58d8-4048-9551-4e18ab3bdc38",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "90ebe798ffe42f8e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3099c6d25ffe2VVcgvB0PNL9Yc-3a104f95-edda-4098-af72-a52ed9e6a9d1",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    },
+    "92f1c775ff16de9d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3099c6d25ffe2VVcgvB0PNL9Yc-05e678b9-cf22-4699-999d-40cfd2ae7902",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 49,
+      "overriden_lines": 0
+    },
+    "963ae37a931871fc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3099c6d25ffe2VVcgvB0PNL9Yc-12944a45-f404-4b86-b45b-c66d18a609f9",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "cd1cbab8f5623318": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3099c6d25ffe2VVcgvB0PNL9Yc-435317c8-d268-4835-b9c5-f5ae5a150a10",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "ceb7da1303f382bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3099c6d25ffe2VVcgvB0PNL9Yc-e567f350-9a25-44c4-b684-ded21db84b74",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

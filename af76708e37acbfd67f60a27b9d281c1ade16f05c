@@ -1,0 +1,25 @@
+libs/principle-core/src/lib/models/integrations/verifone.spec.ts
+  9e6198666ea29f33 107-150
+libs/principle-core/src/lib/models/integrations/verifone.ts
+  9e6198666ea29f33 89-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "af76708e37acbfd67f60a27b9d281c1ade16f05c",
+  "prompts": {
+    "9e6198666ea29f33": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30acf74d3ffemBiL0P9DwQ3VYt",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 49,
+      "total_deletions": 3,
+      "accepted_lines": 49,
+      "overriden_lines": 0
+    }
+  }
+}

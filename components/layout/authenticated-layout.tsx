@@ -26,8 +26,8 @@ export function AuthenticatedLayout({
   const { setWorkspaces, setIsLoadingWorkspaces, activeWorkspaceId, setActiveWorkspaceId } =
     useWorkspaceStore()
   const { defaultWorkspaceId } = useDefaultWorkspaceSetting()
-  const connectSSE = useChatStore((s) => s.connectSSE)
-  const disconnectAllSSE = useChatStore((s) => s.disconnectAllSSE)
+  const connectGlobalSSE = useChatStore((s) => s.connectGlobalSSE)
+  const disconnectGlobalSSE = useChatStore((s) => s.disconnectGlobalSSE)
   const handleVisibilityRestored = useChatStore((s) => s.handleVisibilityRestored)
   const isKeyboardVisible = useKeyboardVisible()
 
@@ -55,16 +55,12 @@ export function AuthenticatedLayout({
         : data[0].id
       setActiveWorkspaceId(preferred)
     }
-    // Open SSE connections for all workspaces so activity is visible globally
-    for (const workspace of data) {
-      connectSSE(workspace.id)
-    }
-  }, [data, activeWorkspaceId, defaultWorkspaceId, setWorkspaces, setActiveWorkspaceId, connectSSE])
+    connectGlobalSSE(data.map((w) => w.id))
+  }, [data, activeWorkspaceId, defaultWorkspaceId, setWorkspaces, setActiveWorkspaceId, connectGlobalSSE])
 
-  // Clean up all SSE connections when the layout unmounts (page close / sign-out)
   useEffect(() => {
-    return () => disconnectAllSSE()
-  }, [disconnectAllSSE])
+    return () => disconnectGlobalSSE()
+  }, [disconnectGlobalSSE])
 
   // When the user returns to this tab, flush any part updates that were buffered
   // while the tab was hidden (browsers suspend requestAnimationFrame in background

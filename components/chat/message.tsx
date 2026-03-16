@@ -13,53 +13,98 @@ import {
   ChevronDown,
   ChevronRight,
   Brain,
-  GitBranch,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useChatDisplay } from "@/components/chat/chat-display-context"
 import { MessageToolUse } from "@/components/chat/message-tool-use"
 import type { MessageWithParts } from "@/lib/opencode/types"
 import type {
-  Part,
   ToolPart,
   TextPart,
   ReasoningPart,
 } from "@/lib/opencode/types"
 
-// Inline subtask type — not a named export in the SDK
-type SubtaskPart = Extract<Part, { type: "subtask" }>
-
 interface ChatMessageProps {
   message: MessageWithParts
+  showAvatar?: boolean
+}
+
+export function isMessageVisible(
+  message: MessageWithParts,
+  options: { showThinking: boolean; showToolCalls: boolean }
+): boolean {
+  const { info, parts } = message
+  if (info.role === "user") {
+    if (isSystemReminder(parts)) return false
+    return parts.some((p) => p.type === "text" && "text" in p && !(("ignored" in p) && p.ignored))
+  }
+  const hasText = parts.some((p) => p.type === "text" && !("ignored" in p && p.ignored) && "text" in p && (p as { text: string }).text)
+  const hasThinking = options.showThinking && parts.some((p) => p.type === "reasoning")
+  const hasTools = options.showToolCalls && parts.some((p) => p.type === "tool")
+  const hasCompaction = parts.some((p) => p.type === "compaction")
+  const hasError = "error" in info && Boolean(info.error)
+  return hasText || hasThinking || hasTools || hasCompaction || hasError
+}
+
+function isSystemReminder(messageParts: readonly { type: string }[]): boolean {
+  for (const p of messageParts) {
+    if (p.type === "text" && "text" in p) {
+      const text = (p as { text: string }).text
+      if (text.includes("<system-reminder>") || text.includes("OMO_INTERNAL_INITIATOR")) {
+        return true
+      }
+    }
+  }
+  return false
 }
 
 export const ChatMessage = memo(
-  function ChatMessage({ message }: ChatMessageProps) {
+  function ChatMessage({ message, showAvatar = true }: ChatMessageProps) {
     const { info, parts } = message
+  const { showThinking, showToolCalls, showTokens } = useChatDisplay()
   const isUser = info.role === "user"
   const isAssistant = info.role === "assistant"
 
-  const textContent = useMemo(() => {
-    return parts
+  const { textContent, inlineThinkingParts } = useMemo(() => {
+    const raw = parts
       .filter((p): p is TextPart => p.type === "text" && !p.ignored)
       .map((p) => p.text)
       .join("")
-  }, [parts])
+
+    const extracted: ReasoningPart[] = []
+    const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g
+    let idx = 0
+    for (const match of raw.matchAll(thinkingRegex)) {
+      const content = match[1].trim()
+      if (content) {
+        extracted.push({
+          id: `inline-thinking-${info.id}-${idx++}`,
+          sessionID: info.sessionID,
+          messageID: info.id,
+          type: "reasoning",
+          text: content,
+          time: { start: info.time.created, end: info.time.created },
+        })
+      }
+    }
+
+    const cleaned = raw.replace(/<thinking>[\s\S]*?<\/thinking>\s*/g, "").trim()
+    return { textContent: cleaned, inlineThinkingParts: extracted }
+  }, [parts, info.id, info.sessionID, info.time.created])
 
   const toolParts = useMemo(
     () => parts.filter((p): p is ToolPart => p.type === "tool"),
     [parts]
   )
 
-  const subtaskParts = useMemo(
-    () => parts.filter((p): p is SubtaskPart => p.type === "subtask"),
-    [parts]
-  )
-
   const reasoningParts = useMemo(
-    () => parts.filter((p): p is ReasoningPart => p.type === "reasoning"),
-    [parts]
+    () => [
+      ...parts.filter((p): p is ReasoningPart => p.type === "reasoning"),
+      ...inlineThinkingParts,
+    ],
+    [parts, inlineThinkingParts]
   )
 
   const compactionParts = useMemo(
@@ -72,14 +117,19 @@ export const ChatMessage = memo(
   return (
     <div
       className={cn(
-        "group flex gap-3 px-4 py-4",
+        "group flex gap-3 px-4",
+        showAvatar ? "py-4" : "py-1",
         isUser ? "justify-end" : "justify-start"
       )}
     >
       {!isUser && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-          <Bot className="size-4 text-primary" />
-        </div>
+        showAvatar ? (
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <Bot className="size-4 text-primary" />
+          </div>
+        ) : (
+          <div className="size-8 shrink-0" />
+        )
       )}
 
         <div
@@ -94,16 +144,12 @@ export const ChatMessage = memo(
           </div>
         ) : (
           <div className="min-w-0 w-full space-y-3 overflow-hidden">
-            {reasoningParts.map((part) => (
+            {showThinking && reasoningParts.map((part) => (
               <ReasoningBlock key={part.id} part={part} />
             ))}
 
-            {toolParts.map((part) => (
+            {showToolCalls && toolParts.map((part) => (
               <MessageToolUse key={part.id} part={part} />
-            ))}
-
-            {subtaskParts.map((part) => (
-              <SubtaskCard key={part.id} part={part} />
             ))}
 
             {textContent && (
@@ -121,7 +167,7 @@ export const ChatMessage = memo(
               </div>
             )}
 
-            {isAssistant && "tokens" in info && (
+            {showTokens && isAssistant && "tokens" in info && (
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs font-normal">
                   {info.tokens.input + info.tokens.output} tokens
@@ -138,34 +184,52 @@ export const ChatMessage = memo(
       </div>
 
       {isUser && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-          <User className="size-4 text-muted-foreground" />
-        </div>
+        showAvatar ? (
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+            <User className="size-4 text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="size-8 shrink-0" />
+        )
       )}
     </div>
   )
 },
 (prev, next) =>
   prev.message.parts === next.message.parts &&
-  prev.message.info === next.message.info
+  prev.message.info === next.message.info &&
+  prev.showAvatar === next.showAvatar
 )
 
 const ReasoningBlock = memo(function ReasoningBlock({ part }: { part: ReasoningPart }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const isThinking = part.time.end == null
+  const [isExpanded, setIsExpanded] = useState(true)
+
   const duration =
     part.time.end != null
       ? formatDuration(part.time.end - part.time.start)
       : null
 
   return (
-    <div className="rounded-lg border border-dashed bg-muted/20">
+    <div className={cn(
+      "rounded-lg border border-dashed",
+      isThinking ? "bg-amber-500/5 border-amber-500/30" : "bg-muted/20"
+    )}>
       <button
+        type="button"
         onClick={() => setIsExpanded((prev) => !prev)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/30 transition-colors rounded-lg"
       >
-        <Brain className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="flex-1 text-xs font-medium text-muted-foreground">
-          Thinking{duration ? ` · ${duration}` : ""}
+        {isThinking ? (
+          <Brain className="size-3.5 shrink-0 text-amber-500 animate-pulse" />
+        ) : (
+          <Brain className="size-3.5 shrink-0 text-muted-foreground" />
+        )}
+        <span className={cn(
+          "flex-1 text-xs font-medium",
+          isThinking ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"
+        )}>
+          {isThinking ? "Thinking…" : `Thinking${duration ? ` · ${duration}` : ""}`}
         </span>
         {isExpanded ? (
           <ChevronDown className="size-3.5 text-muted-foreground" />
@@ -173,34 +237,23 @@ const ReasoningBlock = memo(function ReasoningBlock({ part }: { part: ReasoningP
           <ChevronRight className="size-3.5 text-muted-foreground" />
         )}
       </button>
-      {isExpanded && (
-        <div className="border-t px-3 py-2">
-          <p className="whitespace-pre-wrap text-xs italic text-muted-foreground">
-            {part.text}
-          </p>
+      <div className={cn(
+        "grid transition-[grid-template-rows] duration-300 ease-in-out",
+        isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+      )}>
+        <div className="overflow-hidden">
+          <div className="border-t px-3 py-2">
+            <p className="whitespace-pre-wrap text-xs italic text-muted-foreground">
+              {part.text || (isThinking ? "…" : "")}
+            </p>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 },
 (prev, next) => prev.part.id === next.part.id && prev.part.text === next.part.text && prev.part.time === next.part.time
 )
-
-const SubtaskCard = memo(function SubtaskCard({ part }: { part: SubtaskPart }) {
-  return (
-    <div className="flex items-start gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-2 overflow-hidden">
-      <GitBranch className="mt-0.5 size-3.5 shrink-0 text-violet-500" />
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-violet-700 dark:text-violet-300 truncate">
-          Subagent · {part.agent}
-        </p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {part.description || part.prompt}
-        </p>
-      </div>
-    </div>
-  )
-})
 
 function CompactionDivider() {
   return (

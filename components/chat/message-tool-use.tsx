@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState } from "react"
+import { memo, useState, useEffect, useRef, useMemo, useCallback } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -8,18 +8,35 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Wrench,
+  Brain,
+  MessageSquareText,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useChatStore } from "@/stores/chat-store"
 import type { ToolPart } from "@/lib/opencode/types"
+
+const MAX_OUTPUT_LINES = 10
+const AGENT_TOOL_NAMES = new Set(["agent", "task"])
 
 interface MessageToolUseProps {
   part: ToolPart
+  nested?: boolean
 }
 
-export const MessageToolUse = memo(function MessageToolUse({ part }: MessageToolUseProps) {
+export const MessageToolUse = memo(function MessageToolUse({ part, nested }: MessageToolUseProps) {
+  const isAgentTool = AGENT_TOOL_NAMES.has(part.tool)
+
+  if (isAgentTool) {
+    return <AgentToolCall part={part} nested={nested} />
+  }
+
+  return <StandardToolCall part={part} nested={nested} />
+},
+(prev, next) => prev.part.id === next.part.id && prev.part.state === next.part.state && prev.nested === next.nested
+)
+
+function StandardToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
   const { state } = part
-  // Auto-expand while running/pending, collapse once done — user toggle overrides
   const isActiveStatus = state.status === "running" || state.status === "pending"
   const [userToggled, setUserToggled] = useState(false)
   const [manualExpanded, setManualExpanded] = useState(false)
@@ -27,91 +44,473 @@ export const MessageToolUse = memo(function MessageToolUse({ part }: MessageTool
 
   const statusIcon = getStatusIcon(state.status)
   const statusColor = getStatusColor(state.status)
-  const title = getToolTitle(part)
+  const toolDisplayName = getToolDisplayName(part.tool)
+  const paramsSummary = formatParamsSummary(part.tool, state.input)
+  const duration =
+    (state.status === "completed" || state.status === "error") && state.time
+      ? formatDuration(state.time.end - state.time.start)
+      : null
 
   const handleToggle = () => {
     if (userToggled) {
       setManualExpanded((prev) => !prev)
     } else {
-      // First manual toggle: take over from auto state, flipping it
       setUserToggled(true)
       setManualExpanded(!isActiveStatus)
     }
   }
 
   return (
-    <div className="min-w-0 w-full overflow-hidden rounded-lg border bg-muted/30">
+    <div className={cn(
+      "min-w-0 w-full overflow-hidden py-0.5",
+      nested
+        ? "pl-1"
+        : "border-l-2 border-muted-foreground/30 pl-3 py-1"
+    )}>
+      {nested && (
+        <span className="text-muted-foreground/40 text-xs mr-1 select-none">└</span>
+      )}
       <button
+        type="button"
         onClick={handleToggle}
         className={cn(
-          "flex w-full min-w-0 overflow-hidden items-center gap-2 px-3 py-2 text-left text-sm",
-          "hover:bg-muted/50 transition-colors rounded-lg"
+          "flex min-w-0 items-center gap-1.5 text-left text-xs hover:bg-muted/30 rounded px-1 py-0.5 transition-colors",
+          nested ? "inline-flex" : "w-full"
         )}
       >
         {isExpanded ? (
-          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+          <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" />
         ) : (
-          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+          <ChevronRight className="size-3 shrink-0 text-muted-foreground/60" />
         )}
-        <Wrench className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="flex-1 truncate font-medium">{title}</span>
+
         <span className={cn("shrink-0", statusColor)}>{statusIcon}</span>
+
+        <span className="shrink-0 font-medium text-muted-foreground">
+          {toolDisplayName}
+        </span>
+
+        {isActiveStatus && !paramsSummary && (
+          <span className="truncate text-muted-foreground/70 italic">
+            {getToolAction(part.tool)}
+          </span>
+        )}
+
+        {paramsSummary && (
+          <span className="truncate text-muted-foreground/70">
+            {paramsSummary}
+          </span>
+        )}
+
+        {duration && (
+          <span className="ml-auto shrink-0 text-muted-foreground/50 tabular-nums">
+            {duration}
+          </span>
+        )}
       </button>
 
       {isExpanded && (
-        <div className="border-t px-3 py-2 text-xs overflow-hidden">
-          {state.input && Object.keys(state.input).length > 0 && (
-            <div className="mb-2">
-              <span className="font-medium text-muted-foreground">Input:</span>
-              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-muted p-2 text-xs break-all max-w-full">
-                {formatToolData(state.input)}
-              </pre>
-            </div>
+        <div className="mt-1 space-y-1.5 text-xs">
+          {state.status === "error" && (
+            <p className="truncate text-destructive px-1">
+              Error: {typeof state.error === "string" ? state.error.replaceAll("\n", " ") : JSON.stringify(state.error)}
+            </p>
           )}
 
           {state.status === "completed" && state.output && (
-            <div>
-              <span className="font-medium text-muted-foreground">
-                Output:
-              </span>
-              <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 text-xs max-w-full">
-                {truncateOutput(state.output)}
-              </pre>
-            </div>
+            <ToolOutput toolName={part.tool} output={state.output} input={state.input} />
           )}
 
-          {state.status === "error" && (
-            <div className="text-destructive">
-              <span className="font-medium">Error:</span>{" "}
-              {typeof state.error === "string" ? state.error : JSON.stringify(state.error)}
-            </div>
+          {isActiveStatus && state.input && Object.keys(state.input).length > 0 && (
+            <ToolParams input={state.input} />
           )}
-
-          {(state.status === "completed" || state.status === "error") &&
-            state.time && (
-              <div className="mt-2 text-muted-foreground">
-                Duration:{" "}
-                {formatDuration(state.time.end - state.time.start)}
-              </div>
-            )}
         </div>
       )}
     </div>
   )
-},
-(prev, next) => prev.part.id === next.part.id && prev.part.state === next.part.state
-)
+}
+
+function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
+  const { state } = part
+  const isActiveStatus = state.status === "running" || state.status === "pending"
+  const [userToggled, setUserToggled] = useState(false)
+  const [manualExpanded, setManualExpanded] = useState(false)
+  const isExpanded = userToggled ? manualExpanded : true
+  const [showSubThinking, setShowSubThinking] = useState(false)
+
+  const statusIcon = getStatusIcon(state.status)
+  const statusColor = getStatusColor(state.status)
+  const duration =
+    (state.status === "completed" || state.status === "error") && state.time
+      ? formatDuration(state.time.end - state.time.start)
+      : null
+
+  const childSessionId = part.callID
+  const childMessages = useChatStore((s) => s.getSessionMessages(childSessionId))
+  const fetchMessages = useChatStore((s) => s.fetchMessages)
+  const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId)
+  const hasFetched = useRef(false)
+
+  useEffect(() => {
+    if (!childSessionId || !activeWorkspaceId) return
+    if (childMessages.length === 0 && !hasFetched.current) {
+      hasFetched.current = true
+      fetchMessages(childSessionId, activeWorkspaceId)
+    }
+  }, [childSessionId, activeWorkspaceId, childMessages.length, fetchMessages])
+
+  const childToolParts = useMemo(() => {
+    const toolParts: ToolPart[] = []
+    for (const msg of childMessages) {
+      for (const p of msg.parts) {
+        if (p.type === "tool") {
+          toolParts.push(p)
+        }
+      }
+    }
+    return toolParts
+  }, [childMessages])
+
+  const childTextContent = useMemo(() => {
+    const texts: string[] = []
+    for (const msg of childMessages) {
+      if (msg.info.role === "assistant") {
+        for (const p of msg.parts) {
+          if (p.type === "text" && "text" in p && !("ignored" in p && p.ignored)) {
+            texts.push((p as { text: string }).text)
+          }
+        }
+      }
+    }
+    return texts.join("\n\n").trim()
+  }, [childMessages])
+
+  const childReasoningContent = useMemo(() => {
+    const reasonings: string[] = []
+    for (const msg of childMessages) {
+      if (msg.info.role === "assistant") {
+        for (const p of msg.parts) {
+          if (p.type === "reasoning" && "text" in p) {
+            reasonings.push((p as { text: string }).text)
+          }
+        }
+      }
+    }
+    return reasonings.join("\n\n").trim()
+  }, [childMessages])
+
+  const handleToggle = useCallback(() => {
+    if (userToggled) {
+      setManualExpanded((prev) => !prev)
+    } else {
+      setUserToggled(true)
+      setManualExpanded(false)
+    }
+  }, [userToggled])
+
+  const hasSubText = childTextContent.length > 0
+  const hasSubThinking = childReasoningContent.length > 0
+
+  const description = typeof state.input?.description === "string"
+    ? state.input.description
+    : formatParamsSummary(part.tool, state.input)
+
+  return (
+    <div className={cn(
+      "min-w-0 w-full overflow-hidden",
+      nested
+        ? "py-0.5 pl-2"
+        : "border-l-2 border-violet-500/50 pl-3 py-1.5"
+    )}>
+      <button
+        type="button"
+        onClick={handleToggle}
+        className={cn(
+          "flex min-w-0 items-center gap-1.5 text-left text-xs hover:bg-muted/30 rounded px-1 py-0.5 transition-colors",
+          nested ? "inline-flex" : "w-full"
+        )}
+      >
+        {isExpanded ? (
+          <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" />
+        ) : (
+          <ChevronRight className="size-3 shrink-0 text-muted-foreground/60" />
+        )}
+
+        <span className={cn("shrink-0", statusColor)}>{statusIcon}</span>
+
+        <span className="shrink-0 font-medium text-violet-600 dark:text-violet-400">
+          Task
+        </span>
+
+        <span className="truncate text-muted-foreground/70">
+          {description}
+        </span>
+
+        {duration && (
+          <span className="ml-auto shrink-0 text-muted-foreground/50 tabular-nums">
+            {duration}
+          </span>
+        )}
+      </button>
+
+      {isExpanded && (
+        <div className="mt-0.5 space-y-1.5 pl-2">
+          {childToolParts.map((childPart) => (
+            <MessageToolUse key={childPart.id} part={childPart} nested />
+          ))}
+
+          {isActiveStatus && childToolParts.length === 0 && (
+            <div className="flex items-center gap-1.5 py-1 pl-1 text-xs text-muted-foreground/60 italic">
+              <Loader2 className="size-3 animate-spin" />
+              Working…
+            </div>
+          )}
+
+          {hasSubThinking && (
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => setShowSubThinking((prev) => !prev)}
+                className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors w-fit"
+              >
+                <Brain className="size-3" />
+                {showSubThinking ? "Hide thinking" : "Show thinking"}
+              </button>
+              <div
+                className={cn(
+                  "grid transition-[grid-template-rows] duration-300 ease-in-out",
+                  showSubThinking ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                )}
+              >
+                <div className="overflow-hidden">
+                  <div className="rounded bg-amber-500/5 border border-amber-500/20 px-2 py-1.5 text-xs text-muted-foreground whitespace-pre-wrap max-h-60 overflow-y-auto mt-1">
+                    {childReasoningContent}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {hasSubText && (
+            <div className="rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap max-h-60 overflow-y-auto">
+              {childTextContent}
+            </div>
+          )}
+
+          {state.status === "error" && (
+            <p className="truncate text-destructive px-1 text-xs">
+              Error: {typeof state.error === "string" ? state.error.replaceAll("\n", " ") : JSON.stringify(state.error)}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ToolOutput({ toolName, output, input }: { toolName: string; output: string; input: Record<string, unknown> }) {
+  const [showAll, setShowAll] = useState(false)
+  const lines = output.split("\n")
+  const isTruncated = lines.length > MAX_OUTPUT_LINES
+  const displayOutput = showAll ? output : lines.slice(0, MAX_OUTPUT_LINES).join("\n")
+  const lang = getOutputLanguage(toolName, input)
+
+  return (
+    <div className="overflow-hidden rounded bg-muted/50">
+      <pre className={cn(
+        "overflow-x-auto whitespace-pre-wrap break-words p-2 text-xs font-mono",
+        lang && "text-muted-foreground"
+      )}>
+        {lang && <code className="text-[10px] uppercase tracking-wider text-muted-foreground/50 block mb-1">{lang}</code>}
+        {displayOutput}
+      </pre>
+      {isTruncated && (
+        <button
+          type="button"
+          onClick={() => setShowAll((prev) => !prev)}
+          className="w-full border-t border-muted px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-muted/80 transition-colors"
+        >
+          {showAll ? "Show less" : `Show all (${lines.length} lines)`}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ToolParams({ input }: { input: Record<string, unknown> }) {
+  return (
+    <div className="rounded bg-muted/50 px-2 py-1.5">
+      {Object.entries(input).map(([key, value]) => (
+        <div key={key} className="flex gap-2 text-xs leading-relaxed">
+          <span className="shrink-0 text-muted-foreground/70">{key}:</span>
+          <span className="truncate text-muted-foreground">{formatValue(value)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function getToolDisplayName(tool: string): string {
+  const names: Record<string, string> = {
+    bash: "Bash",
+    read: "Read",
+    write: "Write",
+    edit: "Edit",
+    glob: "Glob",
+    grep: "Grep",
+    fetch: "Fetch",
+    agent: "Task",
+    task: "Task",
+    view: "View",
+    list: "List",
+    search: "Search",
+    todowrite: "Todo",
+    lsp_diagnostics: "Diagnostics",
+    lsp_goto_definition: "Go to Definition",
+    lsp_find_references: "Find References",
+    lsp_symbols: "Symbols",
+    lsp_rename: "Rename",
+    lsp_prepare_rename: "Prepare Rename",
+    ast_grep_search: "AST Search",
+    ast_grep_replace: "AST Replace",
+    webfetch: "Web Fetch",
+    web_search_exa: "Web Search",
+    searchGitHub: "GitHub Search",
+    google_search: "Google Search",
+    look_at: "Look At",
+    interactive_bash: "Terminal",
+  }
+  return names[tool] ?? tool
+}
+
+function getToolAction(tool: string): string {
+  const actions: Record<string, string> = {
+    bash: "Building command…",
+    read: "Reading file…",
+    write: "Writing file…",
+    edit: "Editing file…",
+    glob: "Finding files…",
+    grep: "Searching content…",
+    fetch: "Fetching URL…",
+    agent: "Preparing prompt…",
+    task: "Preparing task…",
+    view: "Viewing file…",
+    list: "Listing…",
+    search: "Searching…",
+    todowrite: "Updating todos…",
+    webfetch: "Fetching page…",
+    web_search_exa: "Searching web…",
+    searchGitHub: "Searching GitHub…",
+    google_search: "Searching Google…",
+    look_at: "Analyzing…",
+    interactive_bash: "Running terminal…",
+    lsp_diagnostics: "Checking diagnostics…",
+    lsp_goto_definition: "Finding definition…",
+    lsp_find_references: "Finding references…",
+    lsp_symbols: "Finding symbols…",
+    lsp_rename: "Renaming…",
+    ast_grep_search: "Searching AST…",
+    ast_grep_replace: "Replacing AST…",
+  }
+  return actions[tool] ?? "Working…"
+}
+
+function getOutputLanguage(tool: string, input: Record<string, unknown>): string | null {
+  if (tool === "bash" || tool === "interactive_bash") return "bash"
+  if (tool === "read" || tool === "write" || tool === "view") {
+    const filePath = (input.filePath ?? input.path ?? input.file ?? "") as string
+    return getLangFromPath(filePath)
+  }
+  return null
+}
+
+function getLangFromPath(filePath: string): string | null {
+  const ext = filePath.split(".").pop()?.toLowerCase()
+  if (!ext) return null
+  const langMap: Record<string, string> = {
+    ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx",
+    py: "python", go: "go", rs: "rust", rb: "ruby",
+    java: "java", kt: "kotlin", swift: "swift", c: "c", cpp: "cpp",
+    css: "css", scss: "scss", html: "html", json: "json",
+    yaml: "yaml", yml: "yaml", toml: "toml", md: "markdown",
+    sql: "sql", sh: "bash", bash: "bash", zsh: "bash",
+  }
+  return langMap[ext] ?? null
+}
+
+function formatParamsSummary(tool: string, input: Record<string, unknown>): string {
+  if (!input || Object.keys(input).length === 0) return ""
+
+  const primaryKeys: Record<string, string[]> = {
+    bash: ["command"],
+    read: ["filePath"],
+    write: ["filePath"],
+    edit: ["filePath"],
+    glob: ["pattern"],
+    grep: ["pattern", "path"],
+    fetch: ["url"],
+    webfetch: ["url"],
+    view: ["filePath"],
+    agent: ["description"],
+    task: ["description"],
+    search: ["query"],
+    web_search_exa: ["query"],
+    searchGitHub: ["query"],
+    google_search: ["query"],
+    lsp_diagnostics: ["filePath"],
+    lsp_goto_definition: ["filePath"],
+    lsp_find_references: ["filePath"],
+    lsp_symbols: ["filePath"],
+    lsp_rename: ["filePath", "newName"],
+    ast_grep_search: ["pattern"],
+    ast_grep_replace: ["pattern", "rewrite"],
+    look_at: ["goal"],
+  }
+
+  const keys = primaryKeys[tool]
+  if (!keys) {
+    const entries = Object.entries(input).slice(0, 3)
+    return entries.map(([k, v]) => `${k}=${formatValue(v)}`).join(", ")
+  }
+
+  const primaryVal = input[keys[0]]
+  if (primaryVal == null) return ""
+
+  const primary = formatValue(primaryVal)
+  const extras = keys.slice(1)
+    .filter((k) => input[k] != null)
+    .map((k) => `${k}=${formatValue(input[k])}`)
+
+  const otherKeys = Object.keys(input).filter((k) => !keys.includes(k))
+  const otherParams = otherKeys.slice(0, 2).map((k) => `${k}=${formatValue(input[k])}`)
+  const allExtras = [...extras, ...otherParams]
+
+  if (allExtras.length > 0) {
+    return `${primary} (${allExtras.join(", ")})`
+  }
+  return primary
+}
+
+function formatValue(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "string") {
+    const singleLine = value.replaceAll("\n", " ")
+    return singleLine.length > 80 ? singleLine.slice(0, 77) + "…" : singleLine
+  }
+  if (typeof value === "boolean" || typeof value === "number") return String(value)
+  return JSON.stringify(value)
+}
 
 function getStatusIcon(status: string) {
   switch (status) {
     case "pending":
-      return <Clock className="size-3.5" />
+      return <Clock className="size-3" />
     case "running":
-      return <Loader2 className="size-3.5 animate-spin" />
+      return <Loader2 className="size-3 animate-spin" />
     case "completed":
-      return <CheckCircle2 className="size-3.5" />
+      return <CheckCircle2 className="size-3" />
     case "error":
-      return <XCircle className="size-3.5" />
+      return <XCircle className="size-3" />
     default:
       return null
   }
@@ -130,29 +529,6 @@ function getStatusColor(status: string): string {
     default:
       return "text-muted-foreground"
   }
-}
-
-function getToolTitle(part: ToolPart): string {
-  if (part.state.status === "completed" && part.state.title) {
-    return part.state.title
-  }
-  if (part.state.status === "running" && part.state.title) {
-    return part.state.title
-  }
-  return part.tool
-}
-
-function formatToolData(data: Record<string, unknown>): string {
-  try {
-    return JSON.stringify(data, null, 2)
-  } catch {
-    return String(data)
-  }
-}
-
-function truncateOutput(output: string, maxLength = 2000): string {
-  if (output.length <= maxLength) return output
-  return output.slice(0, maxLength) + "\n... (truncated)"
 }
 
 function formatDuration(ms: number): string {

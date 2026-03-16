@@ -27,7 +27,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useQueries } from "@tanstack/react-query";
 import { AlertCircle, ArrowDown, Brain, Check, Coins, GripVertical, LayoutList, ListTodo, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, Wrench, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { Virtuoso } from "react-virtuoso";
 
@@ -75,7 +75,6 @@ class QuestionErrorBoundary extends Component<
 }
 
 const EMPTY_LAST_VIEWED: Record<string, number> = {}
-const EMPTY_SESSION_STATUSES: Record<string, SessionStatus> = {}
 
 export function ChatInterface() {
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(() =>
@@ -246,6 +245,8 @@ export function ChatInterface() {
     getStreamingStatus,
     getRecentSessionsAcrossWorkspaces,
     getActiveTodos,
+    getUnifiedSessionStatuses,
+    getUnifiedLastViewedAt,
     setSessionAgent,
     getSessionAgent,
   } = useChatStore();
@@ -303,23 +304,10 @@ export function ChatInterface() {
     if (!wsId) return EMPTY_LAST_VIEWED
     return s.workspaceStates[wsId]?.lastViewedAt ?? EMPTY_LAST_VIEWED
   });
-  const workspaceStates = useChatStore((s) => s.workspaceStates);
-  const sessionStatuses = useMemo(() => {
-    if (!isUnifiedMode) return activeWsSessionStatuses
-    const merged: Record<string, SessionStatus> = {}
-    for (const ws of Object.values(workspaceStates)) {
-      Object.assign(merged, ws.sessionStatuses)
-    }
-    return merged
-  }, [isUnifiedMode, activeWsSessionStatuses, workspaceStates]);
-  const lastViewedAt = useMemo(() => {
-    if (!isUnifiedMode) return activeWsLastViewedAt
-    const merged: Record<string, number> = {}
-    for (const ws of Object.values(workspaceStates)) {
-      Object.assign(merged, ws.lastViewedAt)
-    }
-    return merged
-  }, [isUnifiedMode, activeWsLastViewedAt, workspaceStates]);
+  const unifiedStatuses = useChatStore(getUnifiedSessionStatuses);
+  const unifiedLastViewed = useChatStore(getUnifiedLastViewedAt);
+  const sessionStatuses = isUnifiedMode ? unifiedStatuses : activeWsSessionStatuses;
+  const lastViewedAt = isUnifiedMode ? unifiedLastViewed : activeWsLastViewedAt;
   const activeTodos = useChatStore(getActiveTodos);
 
   const activePermissions = useMemo(
@@ -1074,17 +1062,11 @@ export function ChatInterface() {
                     bottom: isMobile ? 100 : 400,
                   }}
                   className="h-full"
-                  components={{
-                    Footer:
-                      streamingStatus === "streaming"
-                        ? () => (
-                            <StreamingIndicator
-                              messages={activeMessages}
-                              sessionStatus={sessionStatus}
-                            />
-                          )
-                        : undefined,
-                  }}
+                  components={
+                    streamingStatus === "streaming"
+                      ? STREAMING_COMPONENTS
+                      : EMPTY_COMPONENTS
+                  }
                 />
               )}
             </div>
@@ -1259,7 +1241,7 @@ export function ChatInterface() {
   );
 }
 
-function StreamingIndicator({
+const StreamingIndicator = memo(function StreamingIndicator({
   messages,
   sessionStatus,
 }: {
@@ -1315,7 +1297,16 @@ function StreamingIndicator({
       <span className="text-xs text-muted-foreground">{label}</span>
     </div>
   );
-}
+})
+
+const VirtuosoFooter = memo(function VirtuosoFooter() {
+  const messages = useChatStore((s) => s.getActiveSessionMessages())
+  const sessionStatus = useChatStore((s) => s.getActiveSessionStatus())
+  return <StreamingIndicator messages={messages} sessionStatus={sessionStatus} />
+})
+
+const EMPTY_COMPONENTS = {} as const
+const STREAMING_COMPONENTS = { Footer: VirtuosoFooter } as const
 
 function EmptyChat({ onSend }: { onSend: (text: string) => void }) {
   const suggestions = [

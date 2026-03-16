@@ -17,6 +17,13 @@ import { playSoundForEvent } from "@/lib/sounds"
 
 export type StreamingStatus = "idle" | "connecting" | "streaming" | "waiting" | "error"
 
+const MAX_CACHED_SESSIONS = 5
+
+interface LruEntry {
+  sessionId: string
+  workspaceId: string
+}
+
 export interface SessionWithWorkspace extends Session {
   workspaceId: string
 }
@@ -59,6 +66,7 @@ const EMPTY_PERMISSIONS: PermissionRequest[] = []
 const EMPTY_QUESTIONS: QuestionRequest[] = []
 const EMPTY_TODOS: Todo[] = []
 const EMPTY_SESSION_STATUSES: Record<string, SessionStatus> = {}
+const EMPTY_LAST_VIEWED: Record<string, number> = {}
 const EMPTY_UNIFIED_SESSIONS: SessionWithWorkspace[] = []
 
 // Memoization cache for getRecentSessionsAcrossWorkspaces.
@@ -67,11 +75,23 @@ let _unifiedSessionsCache: SessionWithWorkspace[] = EMPTY_UNIFIED_SESSIONS
 let _unifiedSessionsCacheRefs = new Map<string, Record<string, Session>>()
 let _unifiedSessionsCacheLimit = 0
 
+// Memoization cache for getUnifiedSessionStatuses.
+let _unifiedStatusesCache: Record<string, SessionStatus> = EMPTY_SESSION_STATUSES
+let _unifiedStatusesCacheRefs = new Map<string, Record<string, SessionStatus>>()
+
+// Memoization cache for getUnifiedLastViewedAt.
+let _unifiedLastViewedCache: Record<string, number> = EMPTY_LAST_VIEWED
+let _unifiedLastViewedCacheRefs = new Map<string, Record<string, number>>()
+
 // RAF-batched buffer for message.part.updated events.
 // Keyed: sessionId → messageId → partId → Part
 const pendingPartUpdates = new Map<string, Map<string, Map<string, Part>>>()
 let partFlushScheduled = false
 let partFlushHandle: number | null = null
+
+// AbortController for in-flight SSE onopen fetch calls (permissions, questions).
+// Aborted when SSE reconnects or disconnects to prevent stale responses.
+let sseOnopenAbortController: AbortController | null = null
 
 // RAF-batched buffer for message.updated events.
 // Keyed: sessionId → Message (latest info wins)
@@ -267,6 +287,7 @@ function findWorkspaceForSession(
 interface ChatState {
   workspaceStates: Record<string, WorkspaceState>
   commands: Command[]
+  messageAccessOrder: LruEntry[]
 
   // UI focus
   activeWorkspaceId: string | null
@@ -325,6 +346,7 @@ interface ChatState {
 
   globalEventSource: EventSource | null
   sseReconnectAttempts: number
+  sseReconnectTimer: ReturnType<typeof setTimeout> | null
   sseWorkspaceIds: string[]
   connectGlobalSSE: (workspaceIds: string[]) => void
   disconnectGlobalSSE: () => void
@@ -348,9 +370,10 @@ interface ChatState {
   getActiveSessionStatuses: () => Record<string, SessionStatus>
   getActiveTodos: () => Todo[]
   getRecentSessionsAcrossWorkspaces: (limit: number) => SessionWithWorkspace[]
+  getUnifiedSessionStatuses: () => Record<string, SessionStatus>
+  getUnifiedLastViewedAt: () => Record<string, number>
   setSessionAgent: (sessionId: string, workspaceId: string, agent: string) => void
   getSessionAgent: (sessionId: string) => string | null
-  getSessionMessages: (sessionId: string) => MessageWithParts[]
 }
 
 function buildProxyUrl(
@@ -403,9 +426,38 @@ function updateWorkspace(
   }
 }
 
+// Moves a session to the front of the LRU access list and evicts the oldest
+// session's messages when the list exceeds MAX_CACHED_SESSIONS.
+function touchLru(
+  state: ChatState,
+  sessionId: string,
+  workspaceId: string
+): Partial<ChatState> {
+  const filtered = state.messageAccessOrder.filter((e) => e.sessionId !== sessionId)
+  const next: LruEntry[] = [{ sessionId, workspaceId }, ...filtered]
+
+  if (next.length <= MAX_CACHED_SESSIONS) {
+    return { messageAccessOrder: next }
+  }
+
+  const evicted = next.slice(MAX_CACHED_SESSIONS)
+  const kept = next.slice(0, MAX_CACHED_SESSIONS)
+  const nextWorkspaceStates = { ...state.workspaceStates }
+
+  for (const entry of evicted) {
+    const ws = nextWorkspaceStates[entry.workspaceId]
+    if (!ws?.messages[entry.sessionId]) continue
+    const { [entry.sessionId]: _, ...remainingMessages } = ws.messages
+    nextWorkspaceStates[entry.workspaceId] = { ...ws, messages: remainingMessages }
+  }
+
+  return { messageAccessOrder: kept, workspaceStates: nextWorkspaceStates }
+}
+
 export const useChatStore = create<ChatState>()((set, get) => ({
   workspaceStates: {},
   commands: [],
+  messageAccessOrder: [],
   activeWorkspaceId: null,
   activeSessionId: null,
   streamingError: null,
@@ -413,6 +465,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   optimisticStreamingSessionId: null,
   globalEventSource: null,
   sseReconnectAttempts: 0,
+  sseReconnectTimer: null,
   sseWorkspaceIds: [],
 
   setActiveSession: (sessionId) => {
@@ -420,11 +473,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     if (sessionId) {
       const wsId = get().activeWorkspaceId
       if (wsId) {
-        set((state) =>
-          updateWorkspace(state, wsId, (ws) => ({
+        set((state) => {
+          const wsUpdate = updateWorkspace(state, wsId, (ws) => ({
             lastViewedAt: { ...ws.lastViewedAt, [sessionId]: Date.now() },
           }))
-        )
+          const stateAfterWsUpdate = { ...state, ...wsUpdate }
+          const lruUpdate = touchLru(stateAfterWsUpdate, sessionId, wsId)
+          return { ...wsUpdate, ...lruUpdate }
+        })
       }
     }
   },
@@ -460,7 +516,32 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       for (const session of data) {
         sessionsMap[session.id] = session
       }
-      set((state) => updateWorkspace(state, workspaceId, () => ({ sessions: sessionsMap })))
+      set((state) => {
+        const wsUpdate = updateWorkspace(state, workspaceId, () => ({ sessions: sessionsMap }))
+        // Prune orphaned sub-records for sessions that no longer exist
+        const ws = wsUpdate.workspaceStates?.[workspaceId]
+        if (!ws) return wsUpdate
+        const validIds = new Set(Object.keys(sessionsMap))
+        const prune = <T,>(record: Record<string, T>): Record<string, T> => {
+          const pruned: Record<string, T> = {}
+          for (const id of Object.keys(record)) {
+            if (validIds.has(id)) pruned[id] = record[id]
+          }
+          return pruned
+        }
+        return {
+          workspaceStates: {
+            ...wsUpdate.workspaceStates,
+            [workspaceId]: {
+              ...ws,
+              sessionStatuses: prune(ws.sessionStatuses),
+              todos: prune(ws.todos),
+              sessionAgents: prune(ws.sessionAgents),
+              lastViewedAt: prune(ws.lastViewedAt),
+            },
+          },
+        }
+      })
 
       // Auto-select the most recently updated session if none is selected for this workspace
       const { activeWorkspaceId, activeSessionId } = get()
@@ -529,9 +610,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const { [sessionId]: _st, ...remainingStatuses } = ws.sessionStatuses
         const { [sessionId]: _t, ...remainingTodos } = ws.todos
         const { [sessionId]: _a, ...remainingSessionAgents } = ws.sessionAgents
+        const { [sessionId]: _lv, ...remainingLastViewedAt } = ws.lastViewedAt
         return {
           activeSessionId:
             state.activeSessionId === sessionId ? null : state.activeSessionId,
+          messageAccessOrder: state.messageAccessOrder.filter(
+            (e) => e.sessionId !== sessionId
+          ),
           workspaceStates: {
             ...state.workspaceStates,
             [workspaceId]: {
@@ -542,6 +627,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
               sessionStatuses: remainingStatuses,
               todos: remainingTodos,
               sessionAgents: remainingSessionAgents,
+              lastViewedAt: remainingLastViewedAt,
             },
           },
         }
@@ -566,8 +652,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
 
       const data: MessageWithParts[] = await response.json()
-      set((state) =>
-        updateWorkspace(state, workspaceId, (ws) => {
+      set((state) => {
+        const wsUpdate = updateWorkspace(state, workspaceId, (ws) => {
           const { [sessionId]: _, ...remainingOptimistic } = ws.optimisticMessageIds
           // Seed session agent from the last user message if not already tracked
           const seededAgent = ws.sessionAgents[sessionId]
@@ -587,7 +673,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             ...seededAgent,
           }
         })
-      )
+        const stateAfterWsUpdate = { ...state, ...wsUpdate }
+        const lruUpdate = touchLru(stateAfterWsUpdate, sessionId, workspaceId)
+        return { ...wsUpdate, ...lruUpdate }
+      })
     } catch {
       set((state) =>
         updateWorkspace(state, workspaceId, (ws) => ({
@@ -918,6 +1007,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       console.log(`[chat] Global SSE connected for ${workspaceIds.length} workspace(s)`)
       set({ sseReconnectAttempts: 0 })
 
+      if (sseOnopenAbortController) sseOnopenAbortController.abort()
+      sseOnopenAbortController = new AbortController()
+      const { signal } = sseOnopenAbortController
+
       if (get().streamingError) {
         set({ streamingError: null })
       }
@@ -929,7 +1022,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
 
       for (const wsId of workspaceIds) {
-        fetch(buildProxyUrl("permission", wsId))
+        fetch(buildProxyUrl("permission", wsId), { signal })
           .then((res) => res.json())
           .then((permissions: PermissionRequest[]) => {
             if (!Array.isArray(permissions)) return
@@ -945,7 +1038,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           })
           .catch(() => {})
 
-        fetch(buildProxyUrl("question", wsId))
+        fetch(buildProxyUrl("question", wsId), { signal })
           .then((res) => res.json())
           .then((questions: QuestionRequest[]) => {
             if (!Array.isArray(questions)) return
@@ -990,22 +1083,31 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       set({ sseReconnectAttempts: attempts + 1, globalEventSource: null })
 
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        set({ sseReconnectTimer: null })
         if (!get().globalEventSource) {
           get().connectGlobalSSE(workspaceIds)
         }
       }, backoffMs)
+      set({ sseReconnectTimer: timer })
     }
 
     set({ globalEventSource: eventSource, sseWorkspaceIds: workspaceIds })
   },
 
   disconnectGlobalSSE: () => {
-    const es = get().globalEventSource
-    if (es) {
-      es.close()
+    const { globalEventSource, sseReconnectTimer } = get()
+    if (globalEventSource) {
+      globalEventSource.close()
     }
-    set({ globalEventSource: null, sseWorkspaceIds: [] })
+    if (sseReconnectTimer !== null) {
+      clearTimeout(sseReconnectTimer)
+    }
+    if (sseOnopenAbortController) {
+      sseOnopenAbortController.abort()
+      sseOnopenAbortController = null
+    }
+    set({ globalEventSource: null, sseWorkspaceIds: [], sseReconnectTimer: null })
   },
 
   refreshActiveSessionStatus: async (workspaceId) => {
@@ -1181,12 +1283,30 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => {
           const ws = state.workspaceStates[sourceWorkspaceId] ?? emptyWorkspaceState()
           const { [info.id]: _s, ...remainingSessions } = ws.sessions
+          const { [info.id]: _m, ...remainingMessages } = ws.messages
+          const { [info.id]: _o, ...remainingOptimistic } = ws.optimisticMessageIds
+          const { [info.id]: _st, ...remainingStatuses } = ws.sessionStatuses
+          const { [info.id]: _t, ...remainingTodos } = ws.todos
+          const { [info.id]: _a, ...remainingSessionAgents } = ws.sessionAgents
+          const { [info.id]: _lv, ...remainingLastViewedAt } = ws.lastViewedAt
           return {
             activeSessionId:
               state.activeSessionId === info.id ? null : state.activeSessionId,
+            messageAccessOrder: state.messageAccessOrder.filter(
+              (e) => e.sessionId !== info.id
+            ),
             workspaceStates: {
               ...state.workspaceStates,
-              [sourceWorkspaceId]: { ...ws, sessions: remainingSessions },
+              [sourceWorkspaceId]: {
+                ...ws,
+                sessions: remainingSessions,
+                messages: remainingMessages,
+                optimisticMessageIds: remainingOptimistic,
+                sessionStatuses: remainingStatuses,
+                todos: remainingTodos,
+                sessionAgents: remainingSessionAgents,
+                lastViewedAt: remainingLastViewedAt,
+              },
             },
           }
         })
@@ -1517,6 +1637,56 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     return _unifiedSessionsCache
   },
 
+  getUnifiedSessionStatuses: () => {
+    const { workspaceStates } = get()
+    const entries = Object.entries(workspaceStates)
+
+    if (entries.length === 0) return EMPTY_SESSION_STATUSES
+
+    if (
+      entries.length === _unifiedStatusesCacheRefs.size &&
+      entries.every(([id, ws]) => _unifiedStatusesCacheRefs.get(id) === ws.sessionStatuses)
+    ) {
+      return _unifiedStatusesCache
+    }
+
+    const merged: Record<string, SessionStatus> = {}
+    const newRefs = new Map<string, Record<string, SessionStatus>>()
+    for (const [wsId, ws] of entries) {
+      newRefs.set(wsId, ws.sessionStatuses)
+      Object.assign(merged, ws.sessionStatuses)
+    }
+
+    _unifiedStatusesCache = merged
+    _unifiedStatusesCacheRefs = newRefs
+    return _unifiedStatusesCache
+  },
+
+  getUnifiedLastViewedAt: () => {
+    const { workspaceStates } = get()
+    const entries = Object.entries(workspaceStates)
+
+    if (entries.length === 0) return EMPTY_LAST_VIEWED
+
+    if (
+      entries.length === _unifiedLastViewedCacheRefs.size &&
+      entries.every(([id, ws]) => _unifiedLastViewedCacheRefs.get(id) === ws.lastViewedAt)
+    ) {
+      return _unifiedLastViewedCache
+    }
+
+    const merged: Record<string, number> = {}
+    const newRefs = new Map<string, Record<string, number>>()
+    for (const [wsId, ws] of entries) {
+      newRefs.set(wsId, ws.lastViewedAt)
+      Object.assign(merged, ws.lastViewedAt)
+    }
+
+    _unifiedLastViewedCache = merged
+    _unifiedLastViewedCacheRefs = newRefs
+    return _unifiedLastViewedCache
+  },
+
   setSessionAgent: (sessionId, workspaceId, agent) => {
     set((state) =>
       updateWorkspace(state, workspaceId, (ws) => ({
@@ -1530,11 +1700,5 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const wsId = activeWorkspaceId ?? findWorkspaceForSession(workspaceStates, sessionId)
     if (!wsId) return null
     return workspaceStates[wsId]?.sessionAgents[sessionId] ?? null
-  },
-
-  getSessionMessages: (sessionId) => {
-    const { activeWorkspaceId, workspaceStates } = get()
-    if (!activeWorkspaceId) return EMPTY_MESSAGES
-    return workspaceStates[activeWorkspaceId]?.messages[sessionId] ?? EMPTY_MESSAGES
   },
 }))

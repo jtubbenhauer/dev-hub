@@ -148,12 +148,7 @@ test.describe('File Comments E2E', () => {
     await page.waitForLoadState('networkidle')
 
     const clearedStorage = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)
-    if (clearedStorage === null) {
-      const fileName = filePath.split('/').pop() ?? filePath
-      const chipLabel = `Remove comment ${fileName}:${comment.startLine}`
-      const chip = page.locator(`button[aria-label="${chipLabel}"]`)
-      void chip
-    }
+    expect(clearedStorage).toBeNull()
 
     // When: resolving the comment
     const resolveRes = await request.put(`${baseURL}/api/file-comments/${comment.id}/resolve`, {

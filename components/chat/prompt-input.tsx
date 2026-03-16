@@ -54,6 +54,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   useEffect(() => {
     const chips = getPendingCommentChips()
     if (chips.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedComments(chips)
       clearPendingCommentChips()
     }

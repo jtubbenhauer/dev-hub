@@ -47,13 +47,6 @@ export function DiffViewer({ diff, fileName, isLoading, workspaceId }: DiffViewe
     [lines]
   )
 
-  const firstFilePath = uniqueFilePaths[0] ?? null
-
-  const { data: comments = [] } = useFileComments(
-    workspaceId ?? null,
-    firstFilePath ?? undefined
-  )
-
   const allCommentsMap = useAllComments(workspaceId ?? null, uniqueFilePaths)
 
   const createComment = useCreateFileComment()

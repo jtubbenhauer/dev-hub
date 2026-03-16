@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, MessageCircle, Pencil, Trash2, X } from "lucide-react"
+import { Check, MessageCircle, Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { FileComment } from "@/types"

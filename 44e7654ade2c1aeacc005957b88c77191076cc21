@@ -1,0 +1,38 @@
+.devcontainer/workspace/devcontainer.json
+  4f86a9d62561e6aa 4
+.devcontainer/opencode/devcontainer.json
+  cbbd3287fc2a4df0 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "44e7654ade2c1aeacc005957b88c77191076cc21",
+  "prompts": {
+    "4f86a9d62561e6aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_309f23012ffeB2j1mZseWqndcX-fa2ff782-fc84-4f36-b9cf-1176fa90e82a",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "cbbd3287fc2a4df0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_309f23012ffeB2j1mZseWqndcX-926b6f85-10b2-424b-9cdd-944a9cbbf4b7",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

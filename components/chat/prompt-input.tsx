@@ -21,12 +21,15 @@ export interface PromptInputHandle {
   focus: () => void
 }
 
+const sessionDrafts = new Map<string, string>()
+
 interface PromptInputProps {
   onSubmit: (text: string) => void
   onAbort: () => void
   isStreaming: boolean
   disabled?: boolean
   workspaceId: string | null
+  sessionId: string | null
   commands: Command[]
   onCommandSelect: (command: SlashCommand, args: string) => void
 }
@@ -37,15 +40,42 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   isStreaming,
   disabled,
   workspaceId,
+  sessionId,
   commands,
   onCommandSelect,
 }, ref) {
-  const [value, setValue] = useState("")
+  const [value, setValue] = useState(() => (sessionId ? sessionDrafts.get(sessionId) ?? "" : ""))
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])
   const [selectedComments, setSelectedComments] = useState<CommentChip[]>([])
   const [pickerQuery, setPickerQuery] = useState<string | null>(null)
   const [commandQuery, setCommandQuery] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const prevSessionIdRef = useRef(sessionId)
+
+  if (prevSessionIdRef.current !== sessionId) {
+    if (prevSessionIdRef.current && value) {
+      sessionDrafts.set(prevSessionIdRef.current, value)
+    }
+    prevSessionIdRef.current = sessionId
+    const restored = sessionId ? sessionDrafts.get(sessionId) ?? "" : ""
+    if (restored !== value) {
+      setValue(restored)
+      requestAnimationFrame(() => {
+        const textarea = textareaRef.current
+        if (!textarea) return
+        textarea.style.height = "auto"
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (sessionId && value) {
+      sessionDrafts.set(sessionId, value)
+    } else if (sessionId) {
+      sessionDrafts.delete(sessionId)
+    }
+  }, [sessionId, value])
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
@@ -83,6 +113,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
     textarea.style.height = "auto"
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
   }, [])
+
 
   const availableCommands = useCallback((): SlashCommand[] => {
     const builtins: SlashCommand[] = [

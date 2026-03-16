@@ -2,11 +2,14 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { OpenFile } from "@/types"
 
+export type DiffViewMode = "unified" | "side-by-side"
+
 interface EditorState {
   openFiles: OpenFile[]
   activeFilePath: string | null
   isVimMode: boolean
   isFileTreeOpen: boolean
+  diffViewMode: DiffViewMode
 
   openFile: (file: OpenFile) => void
   closeFile: (path: string) => void
@@ -17,6 +20,8 @@ interface EditorState {
   setVimMode: (enabled: boolean) => void
   toggleFileTree: () => void
   setFileTreeOpen: (open: boolean) => void
+  toggleDiffViewMode: () => void
+  setDiffViewMode: (mode: DiffViewMode) => void
   closeAllFiles: () => void
 }
 
@@ -27,6 +32,7 @@ export const useEditorStore = create<EditorState>()(
       activeFilePath: null,
       isVimMode: false,
       isFileTreeOpen: true,
+      diffViewMode: "unified" as DiffViewMode,
 
       openFile: (file) => {
         const existing = get().openFiles.find((f) => f.path === file.path)
@@ -86,6 +92,12 @@ export const useEditorStore = create<EditorState>()(
         set((state) => ({ isFileTreeOpen: !state.isFileTreeOpen })),
       setFileTreeOpen: (open) => set({ isFileTreeOpen: open }),
 
+      toggleDiffViewMode: () =>
+        set((state) => ({
+          diffViewMode: state.diffViewMode === "unified" ? "side-by-side" : "unified",
+        })),
+      setDiffViewMode: (mode) => set({ diffViewMode: mode }),
+
       closeAllFiles: () => set({ openFiles: [], activeFilePath: null }),
     }),
     {
@@ -93,6 +105,7 @@ export const useEditorStore = create<EditorState>()(
       partialize: (state) => ({
         isVimMode: state.isVimMode,
         isFileTreeOpen: state.isFileTreeOpen,
+        diffViewMode: state.diffViewMode,
       }),
     }
   )

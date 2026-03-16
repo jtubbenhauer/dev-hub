@@ -1218,6 +1218,7 @@ export function ChatInterface() {
           isStreaming={streamingStatus === "streaming"}
           disabled={!activeWorkspaceId}
           workspaceId={activeWorkspaceId}
+          sessionId={activeSessionId}
           commands={commands}
         />
       </div>

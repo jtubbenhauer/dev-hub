@@ -151,10 +151,13 @@ export function useModelAgentBindings(): {
 } {
   const { data, isLoading } = useSettings()
   const raw = data?.[SETTINGS_KEYS.MODEL_AGENT_BINDINGS]
-  const bindings =
-    raw && typeof raw === "object" && !Array.isArray(raw)
-      ? (raw as ModelAgentBindings)
-      : {}
+  const bindings = useMemo(
+    () =>
+      raw && typeof raw === "object" && !Array.isArray(raw)
+        ? (raw as ModelAgentBindings)
+        : {},
+    [raw],
+  )
   return { bindings, isLoading }
 }
 

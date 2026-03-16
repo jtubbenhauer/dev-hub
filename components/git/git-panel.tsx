@@ -74,6 +74,7 @@ import {
 import type { Workspace, ReviewChangedFile } from "@/types"
 
 type ViewMode = "working" | "branch" | "last-commit" | "pr"
+const VALID_VIEW_MODES: ViewMode[] = ["working", "branch", "last-commit", "pr"]
 type BottomPanel = "branches" | "log" | "stashes" | null
 
 const SORT_LABELS: Record<SortMode, string> = {
@@ -81,6 +82,21 @@ const SORT_LABELS: Record<SortMode, string> = {
   "name-desc": "Name Z-A",
   status: "Status",
   path: "Full path",
+}
+
+function formatRelativeDate(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMinutes = Math.floor(diffMs / 60_000)
+  const diffHours = Math.floor(diffMs / 3_600_000)
+  const diffDays = Math.floor(diffMs / 86_400_000)
+
+  if (diffMinutes < 1) return "just now"
+  if (diffMinutes < 60) return `${diffMinutes}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 30) return `${diffDays}d ago`
+  return date.toLocaleDateString()
 }
 
 const MIN_PANEL_WIDTH = 200
@@ -95,8 +111,19 @@ interface GitPanelProps {
 export function GitPanel({ workspace, onClose }: GitPanelProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [selectedStaged, setSelectedStaged] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>("working")
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const raw = localStorage.getItem("dev-hub:git-view-mode")
+      return raw && VALID_VIEW_MODES.includes(raw as ViewMode) ? (raw as ViewMode) : "working"
+    } catch { return "working" }
+  })
   const [compareBaseRef, setCompareBaseRef] = useState<string | null>(null)
+  const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(null)
+  const prevWorkspaceIdRef = useRef(workspace.id)
+  if (prevWorkspaceIdRef.current !== workspace.id) {
+    prevWorkspaceIdRef.current = workspace.id
+    setSelectedCommitHash(null)
+  }
   const [openPanel, setOpenPanel] = useState<BottomPanel>(null)
   const [sortMode, setSortMode] = useState<SortMode>("path")
   const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false)
@@ -120,7 +147,8 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   const { data: branches = [] } = useGitBranches(workspace.id)
   const { data: stashes = [] } = useGitStashList(workspace.id)
 
-  const lastCommitBaseRef = viewMode === "last-commit" ? "HEAD~1" : null
+  const commitRef = selectedCommitHash ?? "HEAD"
+  const lastCommitBaseRef = viewMode === "last-commit" ? `${commitRef}~1` : null
   const branchBaseRef = viewMode === "branch" ? compareBaseRef : null
 
   const { data: changedFiles = [], isLoading: isChangedFilesLoading } = useGitChangedFiles(
@@ -134,7 +162,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   )
 
   const activeBaseRef = branchBaseRef ?? lastCommitBaseRef
-  const lastCommitCurrentRef = viewMode === "last-commit" ? "HEAD" : null
+  const lastCommitCurrentRef = viewMode === "last-commit" ? commitRef : null
 
   const { data: workingFileContent, isLoading: isWorkingContentLoading } = useGitFileContent(
     viewMode === "working" ? workspace.id : null,
@@ -189,6 +217,10 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
         )
         return defaultBranch?.name ?? null
       })
+    }
+    try { localStorage.setItem("dev-hub:git-view-mode", mode) } catch {}
+    if (mode !== "pr") {
+      try { localStorage.removeItem("dev-hub:git-selected-pr") } catch {}
     }
   }, [])
 
@@ -643,8 +675,8 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           </TooltipTrigger>
           <TooltipContent>
             <div>
-              <p className="font-medium">Last Commit</p>
-              <p className="text-muted-foreground">Review what was in the most recent commit</p>
+              <p className="font-medium">Commit</p>
+              <p className="text-muted-foreground">Review changes from a specific commit</p>
             </div>
           </TooltipContent>
         </Tooltip>
@@ -684,6 +716,30 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
               {comparableBranches.map((branch) => (
                 <SelectItem key={branch.name} value={branch.name} className="text-xs">
                   {branch.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {viewMode === "last-commit" && log.length > 0 && (
+          <Select
+            value={selectedCommitHash ?? log[0]?.hash ?? ""}
+            onValueChange={(value) => {
+              setSelectedCommitHash(value || null)
+              setSelectedFile(null)
+            }}
+          >
+            <SelectTrigger className="h-6 text-xs ml-1 w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {log.map((entry) => (
+                <SelectItem key={entry.hash} value={entry.hash} className="text-xs">
+                  <span className="font-mono text-muted-foreground">{entry.abbrevHash}</span>
+                  {" "}
+                  <span className="truncate">{entry.message}</span>
+                  <span className="ml-1 text-muted-foreground">{formatRelativeDate(entry.date)}</span>
                 </SelectItem>
               ))}
             </SelectContent>

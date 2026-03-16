@@ -33,11 +33,12 @@ import {
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search"
 import { lintKeymap } from "@codemirror/lint"
-import { unifiedMergeView, goToNextChunk, goToPreviousChunk } from "@codemirror/merge"
+import { MergeView, unifiedMergeView, goToNextChunk, goToPreviousChunk } from "@codemirror/merge"
 import { vim, Vim } from "@replit/codemirror-vim"
 import { MessageSquare, Send, X, ChevronRight, Loader2, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VimToggle } from "@/components/editor/vim-toggle"
+import { DiffViewToggle } from "@/components/editor/diff-view-toggle"
 import { useEditorStore } from "@/stores/editor-store"
 import { getCM6Theme } from "@/lib/editor/catppuccin-theme"
 import { useTheme } from "@/components/providers/theme-provider"
@@ -204,6 +205,47 @@ class AddCommentWidget extends WidgetType {
   }
 }
 
+// Diff colour overrides shared by both view modes
+const diffColourOverrides = EditorView.theme({
+  "del, del *": { textDecoration: "none !important" },
+  ".cm-insertedLine": {
+    backgroundColor: "var(--diff-add-line)",
+    color: "inherit",
+    textDecoration: "none",
+  },
+  "ins.cm-insertedLine, ins.cm-insertedLine:not(:has(.cm-changedText))": {
+    backgroundColor: "var(--diff-add-line) !important",
+    color: "inherit !important",
+    textDecoration: "none !important",
+    border: "none !important",
+    padding: "0 !important",
+    borderRadius: "0 !important",
+  },
+  ".cm-deletedLine": {
+    backgroundColor: "var(--diff-remove-line)",
+    color: "inherit",
+    textDecoration: "none",
+  },
+  "del.cm-deletedLine, del, del:not(:has(.cm-deletedText))": {
+    backgroundColor: "var(--diff-remove-line) !important",
+    color: "inherit !important",
+    textDecoration: "none !important",
+    border: "none !important",
+    padding: "0 !important",
+    borderRadius: "0 !important",
+  },
+  "&.cm-merge-b .cm-changedLine": { backgroundColor: "var(--diff-add-line)" },
+  "&.cm-merge-a .cm-changedLine": { backgroundColor: "var(--diff-remove-line)" },
+  ".cm-deletedChunk": { backgroundColor: "var(--diff-remove-line)" },
+  "&.cm-merge-b .cm-changedText": { background: "var(--diff-add-bg)" },
+  "ins.cm-insertedLine .cm-changedText": { background: "var(--diff-add-bg) !important" },
+  "&.cm-merge-b .cm-deletedText": { background: "var(--diff-remove-bg)" },
+  ".cm-deletedChunk .cm-deletedText": { background: "var(--diff-remove-bg)" },
+  "del .cm-deletedText, del .cm-changedText": { background: "var(--diff-remove-bg) !important" },
+  ".cm-changedLineGutter": { background: "var(--diff-add-bg)" },
+  ".cm-deletedLineGutter": { background: "var(--diff-remove-bg)" },
+})
+
 interface PrDiffEditorProps {
   fileContent: GitHubPrFileContent
   comments: GitHubReviewComment[]
@@ -228,24 +270,37 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
     ref
   ) {
     const editorRef = useRef<HTMLDivElement>(null)
+
+    // Unified mode refs
     const viewRef = useRef<EditorView | null>(null)
     const themeCompartmentRef = useRef(new Compartment())
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        focus: () => viewRef.current?.focus(),
-        blur: () => viewRef.current?.contentDOM.blur(),
-      }),
-      []
-    )
+    // Side-by-side mode refs
+    const mergeViewRef = useRef<MergeView | null>(null)
+    const themeCompartmentARef = useRef(new Compartment())
+    const themeCompartmentBRef = useRef(new Compartment())
 
+    const diffViewMode = useEditorStore((s) => s.diffViewMode)
     const isVimMode = useEditorStore((s) => s.isVimMode)
     const { theme } = useTheme()
     const { fontSize } = useFontSizeSetting()
     const { mobileFontSize } = useMobileFontSizeSetting()
     const { tabSize } = useTabSizeSetting()
     const isMobile = useIsMobile()
+
+    // Return the active EditorView (panel B in side-by-side, single view in unified)
+    const getActiveView = useCallback((): EditorView | null => {
+      return mergeViewRef.current?.b ?? viewRef.current ?? null
+    }, [])
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        focus: () => getActiveView()?.focus(),
+        blur: () => getActiveView()?.contentDOM.blur(),
+      }),
+      [getActiveView]
+    )
 
     // Active comment thread: either a line with existing comments, or a new comment position
     const [activeCommentLine, setActiveCommentLine] = useState<number | null>(null)
@@ -274,8 +329,9 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
       return map
     }, [comments])
 
-    const buildExtensions = useCallback(
-      (original: string, language: string): Extension[] => {
+    // Build base extensions shared by all panels
+    const buildPanelExtensions = useCallback(
+      (themeCompartment: Compartment, language: string): Extension[] => {
         const extensions: Extension[] = [
           lineNumbers(),
           highlightActiveLineGutter(),
@@ -288,9 +344,7 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
           closeBrackets(),
           highlightSelectionMatches(),
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-          themeCompartmentRef.current.of(getCM6Theme(theme)),
-          commentDecorationsField,
-          // Readonly — PR diffs are not editable
+          themeCompartment.of(getCM6Theme(theme)),
           EditorState.readOnly.of(true),
           keymap.of([
             ...closeBracketsKeymap,
@@ -301,13 +355,6 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
             ...lintKeymap,
             indentWithTab,
           ]),
-          unifiedMergeView({
-            original,
-            highlightChanges: true,
-            gutter: true,
-            collapseUnchanged: { margin: 3, minSize: 4 },
-            mergeControls: false,
-          }),
           EditorView.theme({
             "&": {
               height: "100%",
@@ -324,79 +371,8 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
               ...(isMobile ? { fontSize: `${mobileFontSize - 1}px !important` } : {}),
             },
           }),
-          // Subtle diff colours (same overrides as ReviewEditor)
-          EditorView.theme({
-            "del, del *": { textDecoration: "none !important" },
-            ".cm-insertedLine": {
-              backgroundColor: "var(--diff-add-line)",
-              color: "inherit",
-              textDecoration: "none",
-            },
-            "ins.cm-insertedLine, ins.cm-insertedLine:not(:has(.cm-changedText))": {
-              backgroundColor: "var(--diff-add-line) !important",
-              color: "inherit !important",
-              textDecoration: "none !important",
-              border: "none !important",
-              padding: "0 !important",
-              borderRadius: "0 !important",
-            },
-            ".cm-deletedLine": {
-              backgroundColor: "var(--diff-remove-line)",
-              color: "inherit",
-              textDecoration: "none",
-            },
-            "del.cm-deletedLine, del, del:not(:has(.cm-deletedText))": {
-              backgroundColor: "var(--diff-remove-line) !important",
-              color: "inherit !important",
-              textDecoration: "none !important",
-              border: "none !important",
-              padding: "0 !important",
-              borderRadius: "0 !important",
-            },
-            "&.cm-merge-b .cm-changedLine": { backgroundColor: "var(--diff-add-line)" },
-            "&.cm-merge-a .cm-changedLine": { backgroundColor: "var(--diff-remove-line)" },
-            ".cm-deletedChunk": { backgroundColor: "var(--diff-remove-line)" },
-            "&.cm-merge-b .cm-changedText": { background: "var(--diff-add-bg)" },
-            "ins.cm-insertedLine .cm-changedText": {
-              background: "var(--diff-add-bg) !important",
-            },
-            "&.cm-merge-b .cm-deletedText": { background: "var(--diff-remove-bg)" },
-            ".cm-deletedChunk .cm-deletedText": { background: "var(--diff-remove-bg)" },
-            "del .cm-deletedText, del .cm-changedText": {
-              background: "var(--diff-remove-bg) !important",
-            },
-            ".cm-changedLineGutter": { background: "var(--diff-add-bg)" },
-            ".cm-deletedLineGutter": { background: "var(--diff-remove-bg)" },
-          }),
           EditorState.tabSize.of(tabSize),
-          // Add comment button on each line via gutter mouseover
-          EditorView.domEventHandlers({
-            mousemove(event, view) {
-              const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
-              if (pos === null) return
-
-              const line = view.state.doc.lineAt(pos)
-              const lineNumber = line.number
-
-              const widgets: { from: number; to: number; widget: AddCommentWidget }[] = []
-              widgets.push({
-                from: line.to,
-                to: line.to,
-                widget: new AddCommentWidget(lineNumber, handleOpenCommentAt),
-              })
-
-              const decorations = RangeSet.of(
-                widgets.map(({ from, widget }) =>
-                  Decoration.widget({ widget, side: 1 }).range(from)
-                )
-              )
-
-              view.dispatch({ effects: [setCommentDecorations.of(decorations)] })
-            },
-            mouseleave(_event, view) {
-              view.dispatch({ effects: [setCommentDecorations.of(Decoration.none)] })
-            },
-          }),
+          diffColourOverrides,
         ]
 
         if (isVimMode) {
@@ -410,57 +386,132 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
 
         return extensions
       },
-      [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, handleOpenCommentAt, theme]
+      [isVimMode, isMobile, fontSize, mobileFontSize, tabSize, theme]
     )
 
+    // Build comment-related extensions (for the editable / commentable panel)
+    const buildCommentExtensions = useCallback(
+      (): Extension[] => [
+        commentDecorationsField,
+        EditorView.domEventHandlers({
+          mousemove(event, view) {
+            const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
+            if (pos === null) return
+
+            const line = view.state.doc.lineAt(pos)
+            const lineNumber = line.number
+
+            const widgets: { from: number; to: number; widget: AddCommentWidget }[] = []
+            widgets.push({
+              from: line.to,
+              to: line.to,
+              widget: new AddCommentWidget(lineNumber, handleOpenCommentAt),
+            })
+
+            const decorations = RangeSet.of(
+              widgets.map(({ from, widget }) =>
+                Decoration.widget({ widget, side: 1 }).range(from)
+              )
+            )
+
+            view.dispatch({ effects: [setCommentDecorations.of(decorations)] })
+          },
+          mouseleave(_event, view) {
+            view.dispatch({ effects: [setCommentDecorations.of(Decoration.none)] })
+          },
+        }),
+      ],
+      [handleOpenCommentAt]
+    )
+
+    // Cleanup helper
+    const destroyEditors = useCallback(() => {
+      try { viewRef.current?.destroy() } catch { /* vim cleanup race */ }
+      try { mergeViewRef.current?.destroy() } catch { /* vim cleanup race */ }
+      viewRef.current = null
+      mergeViewRef.current = null
+    }, [])
+
+    // Rebuild editor when file, settings, or view mode changes
     useEffect(() => {
       if (!editorRef.current) return
 
-      try {
-        viewRef.current?.destroy()
-      } catch {
-        /* vim cleanup race */
+      destroyEditors()
+
+      if (diffViewMode === "unified") {
+        const extensions = buildPanelExtensions(themeCompartmentRef.current, fileContent.language)
+        extensions.push(
+          ...buildCommentExtensions(),
+          unifiedMergeView({
+            original: fileContent.original,
+            highlightChanges: true,
+            gutter: true,
+            collapseUnchanged: { margin: 3, minSize: 4 },
+            mergeControls: false,
+          })
+        )
+
+        const state = EditorState.create({
+          doc: fileContent.current,
+          extensions,
+        })
+
+        viewRef.current = new EditorView({ state, parent: editorRef.current })
+      } else {
+        // Side-by-side: original on left, current on right with comment support
+        const extA = buildPanelExtensions(themeCompartmentARef.current, fileContent.language)
+
+        const extB = buildPanelExtensions(themeCompartmentBRef.current, fileContent.language)
+        extB.push(...buildCommentExtensions())
+
+        mergeViewRef.current = new MergeView({
+          a: { doc: fileContent.original, extensions: extA },
+          b: { doc: fileContent.current, extensions: extB },
+          parent: editorRef.current,
+          highlightChanges: true,
+          gutter: true,
+          collapseUnchanged: { margin: 3, minSize: 4 },
+        })
       }
 
-      const state = EditorState.create({
-        doc: fileContent.current,
-        extensions: buildExtensions(fileContent.original, fileContent.language),
-      })
-
-      const view = new EditorView({
-        state,
-        parent: editorRef.current,
-      })
-
-      viewRef.current = view
-
-      return () => {
-        try {
-          view.destroy()
-        } catch {
-          /* vim cleanup race */
-        }
-        viewRef.current = null
-      }
+      return destroyEditors
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fileContent.path, fileContent.language, buildExtensions])
+    }, [fileContent.path, fileContent.language, diffViewMode, buildPanelExtensions, buildCommentExtensions])
 
+    // Hot-swap theme without rebuilding the editor
     useEffect(() => {
-      if (!viewRef.current) return
-      viewRef.current.dispatch({
-        effects: themeCompartmentRef.current.reconfigure(getCM6Theme(theme)),
-      })
+      if (viewRef.current) {
+        viewRef.current.dispatch({
+          effects: themeCompartmentRef.current.reconfigure(getCM6Theme(theme)),
+        })
+      }
+      if (mergeViewRef.current) {
+        mergeViewRef.current.a.dispatch({
+          effects: themeCompartmentARef.current.reconfigure(getCM6Theme(theme)),
+        })
+        mergeViewRef.current.b.dispatch({
+          effects: themeCompartmentBRef.current.reconfigure(getCM6Theme(theme)),
+        })
+      }
     }, [theme])
 
     // Sync content changes without full rebuild
     useEffect(() => {
-      const view = viewRef.current
-      if (!view) return
-      const currentDoc = view.state.doc.toString()
-      if (currentDoc !== fileContent.current) {
-        view.dispatch({
-          changes: { from: 0, to: currentDoc.length, insert: fileContent.current },
-        })
+      if (viewRef.current) {
+        const currentDoc = viewRef.current.state.doc.toString()
+        if (currentDoc !== fileContent.current) {
+          viewRef.current.dispatch({
+            changes: { from: 0, to: currentDoc.length, insert: fileContent.current },
+          })
+        }
+      }
+      if (mergeViewRef.current) {
+        const currentDoc = mergeViewRef.current.b.state.doc.toString()
+        if (currentDoc !== fileContent.current) {
+          mergeViewRef.current.b.dispatch({
+            changes: { from: 0, to: currentDoc.length, insert: fileContent.current },
+          })
+        }
       }
     }, [fileContent.current])
 
@@ -503,6 +554,7 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
             </span>
           )}
 
+          <DiffViewToggle />
           <VimToggle />
         </div>
 
@@ -560,7 +612,7 @@ export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
         )}
 
         {/* CodeMirror diff view */}
-        <div ref={editorRef} className="min-h-0 flex-1 overflow-hidden" />
+        <div ref={editorRef} className="min-h-0 flex-1 overflow-hidden [&_.cm-mergeView]:h-full [&_.cm-mergeViewEditor]:h-full" />
       </div>
     )
   }

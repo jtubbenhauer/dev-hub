@@ -29,16 +29,12 @@ export interface WorkspaceState {
   sessions: Record<string, Session>
   messages: Record<string, MessageWithParts[]>
   optimisticMessageIds: Record<string, string>
-  // Status tracked per session ID, not a single scalar
   sessionStatuses: Record<string, SessionStatus>
   permissions: PermissionRequest[]
   questions: QuestionRequest[]
-  // Todos keyed by session ID
   todos: Record<string, Todo[]>
-  // Last-used agent keyed by session ID
   sessionAgents: Record<string, string>
-  eventSource: EventSource | null
-  sseReconnectAttempts: number
+  lastViewedAt: Record<string, number>
 }
 
 function emptyWorkspaceState(): WorkspaceState {
@@ -51,8 +47,7 @@ function emptyWorkspaceState(): WorkspaceState {
     questions: [],
     todos: {},
     sessionAgents: {},
-    eventSource: null,
-    sseReconnectAttempts: 0,
+    lastViewedAt: {},
   }
 }
 
@@ -323,10 +318,11 @@ interface ChatState {
   ) => Promise<void>
   rejectQuestion: (requestId: string, workspaceId: string) => Promise<void>
 
-  // SSE management — per-workspace
-  connectSSE: (workspaceId: string) => void
-  disconnectSSE: (workspaceId: string) => void
-  disconnectAllSSE: () => void
+  globalEventSource: EventSource | null
+  sseReconnectAttempts: number
+  sseWorkspaceIds: string[]
+  connectGlobalSSE: (workspaceIds: string[]) => void
+  disconnectGlobalSSE: () => void
   refreshActiveSessionStatus: (workspaceId: string) => Promise<void>
   handleVisibilityRestored: () => void
 
@@ -349,6 +345,7 @@ interface ChatState {
   getRecentSessionsAcrossWorkspaces: (limit: number) => SessionWithWorkspace[]
   setSessionAgent: (sessionId: string, workspaceId: string, agent: string) => void
   getSessionAgent: (sessionId: string) => string | null
+  getSessionMessages: (sessionId: string) => MessageWithParts[]
 }
 
 function buildProxyUrl(
@@ -409,9 +406,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   streamingError: null,
   streamingPollInterval: null,
   optimisticStreamingSessionId: null,
+  globalEventSource: null,
+  sseReconnectAttempts: 0,
+  sseWorkspaceIds: [],
 
   setActiveSession: (sessionId) => {
     set({ activeSessionId: sessionId })
+    if (sessionId) {
+      const wsId = get().activeWorkspaceId
+      if (wsId) {
+        set((state) =>
+          updateWorkspace(state, wsId, (ws) => ({
+            lastViewedAt: { ...ws.lastViewedAt, [sessionId]: Date.now() },
+          }))
+        )
+      }
+    }
   },
 
   setActiveWorkspaceId: (workspaceId) => {
@@ -424,14 +434,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       streamingError: null,
     })
 
-    // Connect SSE for this workspace if not already connected or if the connection dropped
     if (workspaceId) {
       const ws = get().workspaceStates[workspaceId]
-      const es = ws?.eventSource
-      if (!es || es.readyState === EventSource.CLOSED) {
-        get().connectSSE(workspaceId)
-      }
-      // Fetch sessions if we don't have them yet
       if (!ws || Object.keys(ws.sessions).length === 0) {
         get().fetchSessions(workspaceId)
       }
@@ -882,82 +886,73 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
-  connectSSE: (workspaceId) => {
-    const existing = get().workspaceStates[workspaceId]?.eventSource
+  connectGlobalSSE: (workspaceIds) => {
+    const existing = get().globalEventSource
     if (existing) {
       existing.close()
     }
 
-    const url = buildProxyUrl("event", workspaceId)
+    if (workspaceIds.length === 0) return
+
+    const url = `/api/opencode/events?workspaceIds=${workspaceIds.join(",")}`
     const eventSource = new EventSource(url)
 
     eventSource.onopen = () => {
-      console.log(`[chat] SSE connected for workspace ${workspaceId}`)
-      set((state) =>
-        updateWorkspace(state, workspaceId, () => ({
-          sseReconnectAttempts: 0,
-        }))
-      )
+      console.log(`[chat] Global SSE connected for ${workspaceIds.length} workspace(s)`)
+      set({ sseReconnectAttempts: 0 })
 
-      // Reset streaming error on the active workspace if it was stuck
-      const { activeWorkspaceId } = get()
-      if (activeWorkspaceId === workspaceId && get().streamingError) {
+      if (get().streamingError) {
         set({ streamingError: null })
       }
 
-      // Re-fetch active session messages to catch anything missed during disconnect
-      // Guard: only use activeSessionId if this workspace is still the focused one
-      if (activeWorkspaceId === workspaceId) {
-        const { activeSessionId } = get()
-        if (activeSessionId) {
-          get().fetchMessages(activeSessionId, workspaceId)
-          get().refreshActiveSessionStatus(workspaceId)
-        }
+      const { activeWorkspaceId, activeSessionId } = get()
+      if (activeWorkspaceId && activeSessionId) {
+        get().fetchMessages(activeSessionId, activeWorkspaceId)
+        get().refreshActiveSessionStatus(activeWorkspaceId)
       }
 
-      // Reconcile permissions with server truth: add any missed, remove any stale
-      fetch(buildProxyUrl("permission", workspaceId))
-        .then((res) => res.json())
-        .then((permissions: PermissionRequest[]) => {
-          if (!Array.isArray(permissions)) return
-          const serverIds = new Set(permissions.map((p) => p.id))
-          set((state) =>
-            updateWorkspace(state, workspaceId, (ws) => {
-              const existing = new Set(ws.permissions.map((p) => p.id))
-              const incoming = permissions.filter((p) => !existing.has(p.id))
-              const reconciled = ws.permissions.filter((p) => serverIds.has(p.id))
-              return { permissions: [...reconciled, ...incoming] }
-            })
-          )
-        })
-        .catch(() => {
-          // Best effort — permissions will still arrive via SSE for new requests
-        })
+      for (const wsId of workspaceIds) {
+        fetch(buildProxyUrl("permission", wsId))
+          .then((res) => res.json())
+          .then((permissions: PermissionRequest[]) => {
+            if (!Array.isArray(permissions)) return
+            const serverIds = new Set(permissions.map((p) => p.id))
+            set((state) =>
+              updateWorkspace(state, wsId, (ws) => {
+                const known = new Set(ws.permissions.map((p) => p.id))
+                const incoming = permissions.filter((p) => !known.has(p.id))
+                const reconciled = ws.permissions.filter((p) => serverIds.has(p.id))
+                return { permissions: [...reconciled, ...incoming] }
+              })
+            )
+          })
+          .catch(() => {})
 
-      // Reconcile questions with server truth: add any missed, remove any stale
-      fetch(buildProxyUrl("question", workspaceId))
-        .then((res) => res.json())
-        .then((questions: QuestionRequest[]) => {
-          if (!Array.isArray(questions)) return
-          const serverIds = new Set(questions.map((q) => q.id))
-          set((state) =>
-            updateWorkspace(state, workspaceId, (ws) => {
-              const existing = new Set(ws.questions.map((q) => q.id))
-              const incoming = questions.filter((q) => !existing.has(q.id))
-              const reconciled = ws.questions.filter((q) => serverIds.has(q.id))
-              return { questions: [...reconciled, ...incoming] }
-            })
-          )
-        })
-        .catch(() => {
-          // Best effort — questions will still arrive via SSE for new requests
-        })
+        fetch(buildProxyUrl("question", wsId))
+          .then((res) => res.json())
+          .then((questions: QuestionRequest[]) => {
+            if (!Array.isArray(questions)) return
+            const serverIds = new Set(questions.map((q) => q.id))
+            set((state) =>
+              updateWorkspace(state, wsId, (ws) => {
+                const known = new Set(ws.questions.map((q) => q.id))
+                const incoming = questions.filter((q) => !known.has(q.id))
+                const reconciled = ws.questions.filter((q) => serverIds.has(q.id))
+                return { questions: [...reconciled, ...incoming] }
+              })
+            )
+          })
+          .catch(() => {})
+      }
     }
 
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = (evt) => {
       try {
-        const parsed = JSON.parse(event.data) as Record<string, unknown>
-        get().handleEvent(parsed, workspaceId)
+        const { workspaceId, event } = JSON.parse(evt.data) as {
+          workspaceId: string
+          event: Record<string, unknown>
+        }
+        get().handleEvent(event, workspaceId)
       } catch {
         // Ignore malformed events
       }
@@ -966,62 +961,34 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     eventSource.onerror = () => {
       eventSource.close()
 
-      const ws = get().workspaceStates[workspaceId]
-      const attempts = ws?.sseReconnectAttempts ?? 0
+      const attempts = get().sseReconnectAttempts
       const MAX_RECONNECT_ATTEMPTS = 20
       const backoffMs = Math.min(1000 * 2 ** Math.min(attempts, 5), 30000)
 
       if (attempts >= MAX_RECONNECT_ATTEMPTS) {
-        console.warn(`[chat] SSE reconnect limit reached for workspace ${workspaceId}`)
-        set((state) =>
-          updateWorkspace(state, workspaceId, () => ({ eventSource: null }))
-        )
+        console.warn("[chat] Global SSE reconnect limit reached")
+        set({ globalEventSource: null })
         return
       }
 
-      set((state) =>
-        updateWorkspace(state, workspaceId, () => ({
-          sseReconnectAttempts: attempts + 1,
-          eventSource: null,
-        }))
-      )
+      set({ sseReconnectAttempts: attempts + 1, globalEventSource: null })
 
       setTimeout(() => {
-        // Only reconnect if this workspace is still in state (not removed)
-        const currentWs = get().workspaceStates[workspaceId]
-        if (currentWs && !currentWs.eventSource) {
-          get().connectSSE(workspaceId)
+        if (!get().globalEventSource) {
+          get().connectGlobalSSE(workspaceIds)
         }
       }, backoffMs)
     }
 
-    set((state) =>
-      updateWorkspace(state, workspaceId, () => ({ eventSource }))
-    )
+    set({ globalEventSource: eventSource, sseWorkspaceIds: workspaceIds })
   },
 
-  disconnectSSE: (workspaceId) => {
-    const ws = get().workspaceStates[workspaceId]
-    if (ws?.eventSource) {
-      ws.eventSource.close()
+  disconnectGlobalSSE: () => {
+    const es = get().globalEventSource
+    if (es) {
+      es.close()
     }
-    set((state) =>
-      updateWorkspace(state, workspaceId, () => ({ eventSource: null }))
-    )
-  },
-
-  disconnectAllSSE: () => {
-    const { workspaceStates } = get()
-    for (const ws of Object.values(workspaceStates)) {
-      ws.eventSource?.close()
-    }
-    set((state) => {
-      const updated: Record<string, WorkspaceState> = {}
-      for (const [wsId, ws] of Object.entries(state.workspaceStates)) {
-        updated[wsId] = { ...ws, eventSource: null }
-      }
-      return { workspaceStates: updated }
-    })
+    set({ globalEventSource: null, sseWorkspaceIds: [] })
   },
 
   refreshActiveSessionStatus: async (workspaceId) => {
@@ -1083,18 +1050,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
     flushPendingMessageUpdates(set, get)
 
-    const { activeWorkspaceId, activeSessionId, workspaceStates } = get()
+    const { activeWorkspaceId, activeSessionId } = get()
 
     // Re-sync session status in case the SSE idle event arrived while backgrounded
     if (activeWorkspaceId && activeSessionId) {
       get().refreshActiveSessionStatus(activeWorkspaceId)
     }
 
-    // If any workspace's EventSource was silently dropped while the tab was hidden, reconnect all of them
-    for (const [wsId, ws] of Object.entries(workspaceStates)) {
-      if (ws.eventSource && ws.eventSource.readyState === EventSource.CLOSED) {
-        get().connectSSE(wsId)
-      }
+    const es = get().globalEventSource
+    if (es && es.readyState === EventSource.CLOSED) {
+      get().connectGlobalSSE(get().sseWorkspaceIds)
     }
   },
 
@@ -1546,5 +1511,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const wsId = activeWorkspaceId ?? findWorkspaceForSession(workspaceStates, sessionId)
     if (!wsId) return null
     return workspaceStates[wsId]?.sessionAgents[sessionId] ?? null
+  },
+
+  getSessionMessages: (sessionId) => {
+    const { activeWorkspaceId, workspaceStates } = get()
+    if (!activeWorkspaceId) return EMPTY_MESSAGES
+    return workspaceStates[activeWorkspaceId]?.messages[sessionId] ?? EMPTY_MESSAGES
   },
 }))

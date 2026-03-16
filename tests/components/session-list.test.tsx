@@ -23,6 +23,7 @@ function makeUnifiedSession(
 const baseProps = {
   activeSessionId: null,
   sessionStatuses: {},
+  lastViewedAt: {},
   onCreateSession: vi.fn(),
   onDeleteSession: vi.fn(),
 }

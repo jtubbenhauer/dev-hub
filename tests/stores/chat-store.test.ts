@@ -309,9 +309,8 @@ describe("workspace switching", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -358,9 +357,8 @@ describe("getStreamingStatus selector", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -382,9 +380,8 @@ describe("getStreamingStatus selector", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -404,9 +401,8 @@ describe("getStreamingStatus selector", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -427,9 +423,8 @@ describe("getStreamingStatus selector", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -450,9 +445,8 @@ describe("getStreamingStatus selector", () => {
           permissions: [makePermission("perm-1", "sess-a")],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -472,9 +466,8 @@ describe("getStreamingStatus selector", () => {
           permissions: [],
           questions: [makeQuestion("q-1", "sess-a")],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -494,9 +487,8 @@ describe("getStreamingStatus selector", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -517,9 +509,8 @@ describe("getStreamingStatus selector", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -605,9 +596,8 @@ describe("SSE event handling — session lifecycle", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -635,9 +625,8 @@ describe("SSE event handling — session lifecycle", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -665,9 +654,8 @@ describe("SSE event handling — session lifecycle", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -710,9 +698,8 @@ describe("cross-workspace SSE routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
         "ws-b": {
           sessions: { "sess-b": makeSession("sess-b") },
@@ -722,9 +709,8 @@ describe("cross-workspace SSE routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-b",
@@ -755,9 +741,8 @@ describe("cross-workspace SSE routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-b",
@@ -788,9 +773,8 @@ describe("cross-workspace SSE routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
         "ws-b": {
           sessions: {},
@@ -800,9 +784,8 @@ describe("cross-workspace SSE routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-b",
@@ -833,9 +816,8 @@ describe("cross-workspace SSE routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-b",
@@ -862,9 +844,8 @@ describe("cross-workspace SSE routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-b",
@@ -891,9 +872,8 @@ describe("cross-workspace SSE routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-b",
@@ -914,9 +894,8 @@ describe("cross-workspace SSE routing", () => {
           permissions: [makePermission("perm-1", "sess-a")],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-b",
@@ -1029,9 +1008,8 @@ describe("message routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1070,9 +1048,8 @@ describe("message routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1114,9 +1091,8 @@ describe("message routing", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1168,9 +1144,8 @@ describe("permission lifecycle", () => {
           permissions: [makePermission("perm-1", "sess-a")],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -1194,9 +1169,8 @@ describe("permission lifecycle", () => {
           permissions: [makePermission("perm-1", "sess-a")],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1217,9 +1191,8 @@ describe("permission lifecycle", () => {
           permissions: [makePermission("perm-1", "sess-a")],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1249,9 +1222,8 @@ describe("question lifecycle", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1278,9 +1250,8 @@ describe("question lifecycle", () => {
           permissions: [],
           questions: [makeQuestion("q-1", "sess-a")],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1317,9 +1288,8 @@ describe("question lifecycle", () => {
           permissions: [],
           questions: [makeQuestion("q-1", "sess-a")],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1346,9 +1316,8 @@ describe("question lifecycle", () => {
           permissions: [],
           questions: [makeQuestion("q-2", "sess-a")],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1375,9 +1344,8 @@ describe("question lifecycle", () => {
           permissions: [],
           questions: [makeQuestion("q-3", "sess-a")],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1403,98 +1371,54 @@ describe("question lifecycle", () => {
 describe("SSE connection management", () => {
   beforeEach(resetStore)
 
-  it("connectSSE stores an EventSource in the workspace state", () => {
-    useChatStore.getState().connectSSE("ws-a")
-    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).not.toBeNull()
+  it("connectGlobalSSE stores a globalEventSource", () => {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    expect(useChatStore.getState().globalEventSource).not.toBeNull()
   })
 
-  it("connectSSE closes any existing EventSource before creating a new one", () => {
-    useChatStore.getState().connectSSE("ws-a")
-    const first = useChatStore.getState().workspaceStates["ws-a"].eventSource!
+  it("connectGlobalSSE closes any existing globalEventSource before creating a new one", () => {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    const first = useChatStore.getState().globalEventSource!
     const closeSpy = vi.spyOn(first, "close")
 
-    useChatStore.getState().connectSSE("ws-a")
+    useChatStore.getState().connectGlobalSSE(["ws-a", "ws-b"])
 
     expect(closeSpy).toHaveBeenCalled()
   })
 
-  it("disconnectSSE closes and nulls the EventSource for a workspace", () => {
-    useChatStore.getState().connectSSE("ws-a")
-    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource!
+  it("disconnectGlobalSSE closes and nulls the globalEventSource", () => {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    const es = useChatStore.getState().globalEventSource!
     const closeSpy = vi.spyOn(es, "close")
 
-    useChatStore.getState().disconnectSSE("ws-a")
+    useChatStore.getState().disconnectGlobalSSE()
 
     expect(closeSpy).toHaveBeenCalled()
-    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBeNull()
-  })
-
-  it("disconnectAllSSE closes EventSources for every workspace", () => {
-    useChatStore.getState().connectSSE("ws-a")
-    useChatStore.getState().connectSSE("ws-b")
-
-    const esA = useChatStore.getState().workspaceStates["ws-a"].eventSource!
-    const esB = useChatStore.getState().workspaceStates["ws-b"].eventSource!
-    const closeA = vi.spyOn(esA, "close")
-    const closeB = vi.spyOn(esB, "close")
-
-    useChatStore.getState().disconnectAllSSE()
-
-    expect(closeA).toHaveBeenCalled()
-    expect(closeB).toHaveBeenCalled()
-    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBeNull()
-    expect(useChatStore.getState().workspaceStates["ws-b"].eventSource).toBeNull()
+    expect(useChatStore.getState().globalEventSource).toBeNull()
   })
 
   it("SSE onopen resets reconnect attempts counter", () => {
     useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: {},
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 5,
-          sessionAgents: {},
-        },
-      },
+      sseReconnectAttempts: 5,
     })
 
-    useChatStore.getState().connectSSE("ws-a")
-    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    const es = useChatStore.getState().globalEventSource as unknown as {
       simulateOpen: () => void
     }
     es.simulateOpen()
 
-    expect(useChatStore.getState().workspaceStates["ws-a"].sseReconnectAttempts).toBe(0)
+    expect(useChatStore.getState().sseReconnectAttempts).toBe(0)
   })
 
   it("SSE onopen clears a stale streamingError when it fires for the active workspace", () => {
     useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: {},
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
-          sessionAgents: {},
-        },
-      },
       activeWorkspaceId: "ws-a",
       streamingError: "previous error",
     })
 
-    useChatStore.getState().connectSSE("ws-a")
-    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    const es = useChatStore.getState().globalEventSource as unknown as {
       simulateOpen: () => void
     }
     es.simulateOpen()
@@ -1502,72 +1426,19 @@ describe("SSE connection management", () => {
     expect(useChatStore.getState().streamingError).toBeNull()
   })
 
-  it("SSE onerror increments reconnect attempts and nulls the eventSource", () => {
+  it("SSE onerror increments reconnect attempts and nulls the globalEventSource", () => {
     vi.useFakeTimers()
 
-    useChatStore.getState().connectSSE("ws-a")
-    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    const es = useChatStore.getState().globalEventSource as unknown as {
       simulateError: () => void
     }
     es.simulateError()
 
-    expect(useChatStore.getState().workspaceStates["ws-a"].sseReconnectAttempts).toBe(1)
-    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBeNull()
+    expect(useChatStore.getState().sseReconnectAttempts).toBe(1)
+    expect(useChatStore.getState().globalEventSource).toBeNull()
 
     vi.useRealTimers()
-  })
-
-  it("setActiveWorkspaceId connects SSE when no connection exists for the workspace", () => {
-    const connectSSESpy = vi.spyOn(useChatStore.getState(), "connectSSE")
-
-    useChatStore.getState().setActiveWorkspaceId("ws-new")
-
-    expect(connectSSESpy).toHaveBeenCalledWith("ws-new")
-  })
-
-  it("setActiveWorkspaceId does not reconnect SSE when a healthy connection already exists", () => {
-    // Give ws-a an open EventSource and make it the active workspace
-    useChatStore.getState().connectSSE("ws-a")
-    useChatStore.setState({ activeWorkspaceId: "ws-a" })
-    const originalEs = useChatStore.getState().workspaceStates["ws-a"].eventSource
-
-    // Switch to ws-b then back to ws-a (which has a healthy OPEN connection)
-    useChatStore.getState().setActiveWorkspaceId("ws-b")
-    useChatStore.getState().setActiveWorkspaceId("ws-a")
-
-    // The eventSource reference must be unchanged — no reconnect happened
-    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBe(originalEs)
-  })
-
-  // REGRESSION: a CLOSED EventSource is still truthy — switching to a workspace
-  // with a dropped SSE connection must reconnect.
-  it("REGRESSION: setActiveWorkspaceId reconnects SSE when existing EventSource is CLOSED", () => {
-    // Give ws-a a closed EventSource
-    const closedEs = new EventSource("/fake-url")
-    closedEs.close() // readyState → CLOSED
-
-    useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: {},
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          eventSource: closedEs,
-          sseReconnectAttempts: 0,
-          sessionAgents: {},
-        },
-      },
-      activeWorkspaceId: "ws-b",
-    })
-
-    const connectSSESpy = vi.spyOn(useChatStore.getState(), "connectSSE")
-    useChatStore.getState().setActiveWorkspaceId("ws-a")
-
-    expect(connectSSESpy).toHaveBeenCalledWith("ws-a")
   })
 
   it("SSE onopen seeds questions missed during disconnect", async () => {
@@ -1589,9 +1460,8 @@ describe("SSE connection management", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       // Not the active workspace — avoids fetchMessages/refreshActiveSessionStatus side effects
@@ -1599,8 +1469,8 @@ describe("SSE connection management", () => {
       activeSessionId: null,
     })
 
-    useChatStore.getState().connectSSE("ws-a")
-    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    const es = useChatStore.getState().globalEventSource as unknown as {
       simulateOpen: () => void
     }
     es.simulateOpen()
@@ -1634,17 +1504,16 @@ describe("SSE connection management", () => {
           permissions: [makePermission("perm-stale", "sess-a")],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: null,
       activeSessionId: null,
     })
 
-    useChatStore.getState().connectSSE("ws-a")
-    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    const es = useChatStore.getState().globalEventSource as unknown as {
       simulateOpen: () => void
     }
     es.simulateOpen()
@@ -1676,17 +1545,16 @@ describe("SSE connection management", () => {
           permissions: [],
           questions: [makeQuestion("q-stale", "sess-a")],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: null,
       activeSessionId: null,
     })
 
-    useChatStore.getState().connectSSE("ws-a")
-    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource as unknown as {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    const es = useChatStore.getState().globalEventSource as unknown as {
       simulateOpen: () => void
     }
     es.simulateOpen()
@@ -1738,9 +1606,8 @@ describe("streaming poll", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1783,9 +1650,8 @@ describe("refreshActiveSessionStatus", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1815,9 +1681,8 @@ describe("refreshActiveSessionStatus", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
       activeWorkspaceId: "ws-a",
@@ -1848,82 +1713,35 @@ describe("refreshActiveSessionStatus", () => {
 describe("handleVisibilityRestored", () => {
   beforeEach(resetStore)
 
-  it("reconnects a CLOSED EventSource for the active workspace", () => {
+  it("reconnects a CLOSED globalEventSource when visibility is restored", () => {
     const closedEs = new EventSource("/fake-url")
     closedEs.close()
 
     useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: { "sess-a": makeSession("sess-a") },
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          eventSource: closedEs,
-          sseReconnectAttempts: 0,
-          sessionAgents: {},
-        },
-      },
+      globalEventSource: closedEs as unknown as EventSource,
+      sseWorkspaceIds: ["ws-a"],
       activeWorkspaceId: "ws-a",
       activeSessionId: "sess-a",
     })
 
-    const connectSSESpy = vi.spyOn(useChatStore.getState(), "connectSSE")
+    const connectGlobalSSESpy = vi.spyOn(useChatStore.getState(), "connectGlobalSSE")
 
     useChatStore.getState().handleVisibilityRestored()
 
-    expect(connectSSESpy).toHaveBeenCalledWith("ws-a")
+    expect(connectGlobalSSESpy).toHaveBeenCalledWith(["ws-a"])
   })
 
-  it("does not reconnect when EventSource is already open", () => {
-    useChatStore.getState().connectSSE("ws-a")
-    // Simulate open state
-    const es = useChatStore.getState().workspaceStates["ws-a"].eventSource!
+  it("does not reconnect when globalEventSource is already open", () => {
+    useChatStore.getState().connectGlobalSSE(["ws-a"])
+    const es = useChatStore.getState().globalEventSource!
     Object.defineProperty(es, "readyState", { value: EventSource.OPEN, writable: true })
 
     useChatStore.setState({ activeWorkspaceId: "ws-a", activeSessionId: "sess-a" })
 
     useChatStore.getState().handleVisibilityRestored()
 
-    // The eventSource reference must be unchanged — no reconnect happened
-    expect(useChatStore.getState().workspaceStates["ws-a"].eventSource).toBe(es)
-  })
-
-  // REGRESSION: visibility restore currently only checks the active workspace.
-  // Background workspaces with dropped SSE connections are left broken until
-  // the user switches to them. The ideal behaviour is to reconnect all of them.
-  it("REGRESSION: reconnects CLOSED EventSource for background workspaces too", () => {
-    const closedEsB = new EventSource("/fake-url-b")
-    closedEsB.close()
-
-    useChatStore.getState().connectSSE("ws-a") // active workspace — open
-    useChatStore.setState({
-      workspaceStates: {
-        ...useChatStore.getState().workspaceStates,
-        "ws-b": {
-          sessions: {},
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          eventSource: closedEsB,
-          sseReconnectAttempts: 0,
-          sessionAgents: {},
-        },
-      },
-      activeWorkspaceId: "ws-a",
-      activeSessionId: null,
-    })
-
-    const connectSSESpy = vi.spyOn(useChatStore.getState(), "connectSSE")
-    useChatStore.getState().handleVisibilityRestored()
-
-    expect(connectSSESpy).toHaveBeenCalledWith("ws-b")
+    // The globalEventSource reference must be unchanged — no reconnect happened
+    expect(useChatStore.getState().globalEventSource).toBe(es)
   })
 })
 
@@ -1948,9 +1766,8 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
         "ws-b": {
           sessions: { "sess-b": makeSession("sess-b", { updated: 1500 }) },
@@ -1960,9 +1777,8 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -1986,9 +1802,8 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2012,9 +1827,8 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2034,9 +1848,8 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2104,9 +1917,8 @@ describe("createSession — message initialization", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2157,9 +1969,8 @@ describe("fetchMessages — error handling", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2183,9 +1994,8 @@ describe("fetchMessages — error handling", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2211,9 +2021,8 @@ describe("fetchMessages — error handling", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2240,9 +2049,8 @@ describe("fetchMessages — error handling", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2306,9 +2114,8 @@ describe("isMessagesLoaded selector logic", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2328,9 +2135,8 @@ describe("isMessagesLoaded selector logic", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })
@@ -2350,9 +2156,8 @@ describe("isMessagesLoaded selector logic", () => {
           permissions: [],
           questions: [],
           todos: {},
-          eventSource: null,
-          sseReconnectAttempts: 0,
           sessionAgents: {},
+          lastViewedAt: {},
         },
       },
     })

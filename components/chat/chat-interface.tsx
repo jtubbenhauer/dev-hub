@@ -2,12 +2,14 @@
 
 import { AgentSelector, useAgents } from "@/components/chat/agent-selector";
 import type { SlashCommand } from "@/components/chat/command-picker";
-import { ChatMessage } from "@/components/chat/message";
+import { ChatDisplayContext } from "@/components/chat/chat-display-context";
+import { ChatMessage, isMessageVisible } from "@/components/chat/message";
 import { ModelSelector, loadPersistedModel } from "@/components/chat/model-selector";
 import { PlanPanel } from "@/components/chat/plan-panel";
 import type { PromptInputHandle } from "@/components/chat/prompt-input";
 import { PromptInput } from "@/components/chat/prompt-input";
 import { SessionList } from "@/components/chat/session-list";
+import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { VariantSelector } from "@/components/chat/variant-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +25,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useQueries } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, Check, GripVertical, LayoutList, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Brain, Check, Coins, GripVertical, LayoutList, ListTodo, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, Wrench, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
@@ -72,6 +74,9 @@ class QuestionErrorBoundary extends Component<
   }
 }
 
+const EMPTY_LAST_VIEWED: Record<string, number> = {}
+const EMPTY_SESSION_STATUSES: Record<string, SessionStatus> = {}
+
 export function ChatInterface() {
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(() =>
     loadPersistedModel(),
@@ -99,6 +104,36 @@ export function ChatInterface() {
     maxWidth: 400,
     defaultWidth: 240,
     storageKey: "dev-hub:chat-panel-width",
+  });
+  const [showThinking, setShowThinking] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("dev-hub:chat-show-thinking") !== "false";
+  });
+  const [showToolCalls, setShowToolCalls] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("dev-hub:chat-show-tool-calls") !== "false";
+  });
+  const [showTokens, setShowTokens] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("dev-hub:chat-show-tokens") !== "false";
+  });
+  const chatDisplaySettings = useMemo(
+    () => ({ showThinking, showToolCalls, showTokens }),
+    [showThinking, showToolCalls, showTokens],
+  );
+  const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("dev-hub:chat-task-panel") === "true";
+  });
+  const {
+    width: taskPanelWidth,
+    handleDragStart: handleTaskPanelDragStart,
+  } = useResizablePanel({
+    minWidth: 200,
+    maxWidth: 400,
+    defaultWidth: 280,
+    storageKey: "dev-hub:chat-task-panel-width",
+    reverse: true,
   });
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false);
   const [hasPlanFiles, setHasPlanFiles] = useState(false);
@@ -202,7 +237,6 @@ export function ChatInterface() {
     respondToPermission,
     replyToQuestion,
     rejectQuestion,
-    connectSSE,
     getActiveWorkspaceSessions,
     getActiveSessionMessages,
     getActiveSessionStatus,
@@ -211,6 +245,7 @@ export function ChatInterface() {
     getActiveSessionStatuses,
     getStreamingStatus,
     getRecentSessionsAcrossWorkspaces,
+    getActiveTodos,
     setSessionAgent,
     getSessionAgent,
   } = useChatStore();
@@ -262,7 +297,30 @@ export function ChatInterface() {
   // cause "Maximum update depth exceeded" via the ScrollArea ref cascade.
   const allPermissions = useChatStore(getActivePermissions);
   const allQuestions = useChatStore(getActiveQuestions);
-  const sessionStatuses = useChatStore(getActiveSessionStatuses);
+  const activeWsSessionStatuses = useChatStore(getActiveSessionStatuses);
+  const activeWsLastViewedAt = useChatStore((s) => {
+    const wsId = s.activeWorkspaceId
+    if (!wsId) return EMPTY_LAST_VIEWED
+    return s.workspaceStates[wsId]?.lastViewedAt ?? EMPTY_LAST_VIEWED
+  });
+  const workspaceStates = useChatStore((s) => s.workspaceStates);
+  const sessionStatuses = useMemo(() => {
+    if (!isUnifiedMode) return activeWsSessionStatuses
+    const merged: Record<string, SessionStatus> = {}
+    for (const ws of Object.values(workspaceStates)) {
+      Object.assign(merged, ws.sessionStatuses)
+    }
+    return merged
+  }, [isUnifiedMode, activeWsSessionStatuses, workspaceStates]);
+  const lastViewedAt = useMemo(() => {
+    if (!isUnifiedMode) return activeWsLastViewedAt
+    const merged: Record<string, number> = {}
+    for (const ws of Object.values(workspaceStates)) {
+      Object.assign(merged, ws.lastViewedAt)
+    }
+    return merged
+  }, [isUnifiedMode, activeWsLastViewedAt, workspaceStates]);
+  const activeTodos = useChatStore(getActiveTodos);
 
   const activePermissions = useMemo(
     () => allPermissions.filter((p) => p.sessionID === activeSessionId),
@@ -278,19 +336,12 @@ export function ChatInterface() {
     setActiveWorkspaceId(activeWorkspaceId);
   }, [activeWorkspaceId, setActiveWorkspaceId]);
 
-  // Connect SSE when workspace changes (state switch + SSE happen inside setActiveWorkspaceId,
-  // but we also need to fetch sessions if the workspace is being visited for the first time)
   useEffect(() => {
     if (!activeWorkspaceId) return;
     fetchSessions(activeWorkspaceId);
     fetchCommands(activeWorkspaceId);
-    connectSSE(activeWorkspaceId);
-    // SSE connections now live per-workspace and are not torn down on unmount
-  }, [activeWorkspaceId, fetchSessions, fetchCommands, connectSSE]);
+  }, [activeWorkspaceId, fetchSessions, fetchCommands]);
 
-  // When unified mode is restored from persistence, lazy-fetch sessions for all workspaces.
-  // allWorkspaces is included so the effect re-fires after zustand persist hydrates the
-  // workspace store (initially empty on SSR / first client render).
   useEffect(() => {
     if (!isUnifiedMode) return;
     const { workspaceStates } = useChatStore.getState();
@@ -298,10 +349,9 @@ export function ChatInterface() {
       const state = workspaceStates[ws.id];
       if (!state || Object.keys(state.sessions).length === 0) {
         fetchSessions(ws.id);
-        connectSSE(ws.id);
       }
     }
-  }, [isUnifiedMode, allWorkspaces, fetchSessions, connectSSE]);
+  }, [isUnifiedMode, allWorkspaces, fetchSessions]);
 
   // Fetch messages when active session changes
   useEffect(() => {
@@ -334,7 +384,11 @@ export function ChatInterface() {
     sendMessage,
   ]);
 
-  const activeMessages = useChatStore(getActiveSessionMessages);
+  const activeMessagesRaw = useChatStore(getActiveSessionMessages);
+  const activeMessages = useMemo(
+    () => activeMessagesRaw.filter((m) => isMessageVisible(m, { showThinking, showToolCalls })),
+    [activeMessagesRaw, showThinking, showToolCalls]
+  );
   const isMessagesLoaded = useChatStore((state) => {
     const {
       activeSessionId: sid,
@@ -542,19 +596,17 @@ export function ChatInterface() {
       const next = !prev;
       localStorage.setItem("dev-hub:chat-unified-mode", String(next));
       if (next) {
-        // Lazy-fetch sessions for workspaces that haven't loaded yet
         const { workspaceStates } = useChatStore.getState();
         for (const ws of allWorkspaces) {
           const state = workspaceStates[ws.id];
           if (!state || Object.keys(state.sessions).length === 0) {
             fetchSessions(ws.id);
-            connectSSE(ws.id);
           }
         }
       }
       return next;
     });
-  }, [allWorkspaces, fetchSessions, connectSSE]);
+  }, [allWorkspaces, fetchSessions]);
 
   // Use refs so command closures stay stable but always call latest handlers
   const handleCreateSessionRef = useRef(handleCreateSession);
@@ -567,12 +619,44 @@ export function ChatInterface() {
   setIsModelSelectorOpenRef.current = setIsModelSelectorOpen;
   const setIsAgentSelectorOpenRef = useRef(setIsAgentSelectorOpen);
   setIsAgentSelectorOpenRef.current = setIsAgentSelectorOpen;
+  const setIsTaskPanelOpenRef = useRef(setIsTaskPanelOpen);
+  setIsTaskPanelOpenRef.current = setIsTaskPanelOpen;
+  const setShowThinkingRef = useRef(setShowThinking);
+  setShowThinkingRef.current = setShowThinking;
+  const setShowToolCallsRef = useRef(setShowToolCalls);
+  setShowToolCallsRef.current = setShowToolCalls;
+  const setShowTokensRef = useRef(setShowTokens);
+  setShowTokensRef.current = setShowTokens;
+
+  const toggleThinking = useCallback(() => {
+    setShowThinkingRef.current((prev) => {
+      const next = !prev;
+      localStorage.setItem("dev-hub:chat-show-thinking", String(next));
+      return next;
+    });
+  }, []);
+
+  const toggleToolCalls = useCallback(() => {
+    setShowToolCallsRef.current((prev) => {
+      const next = !prev;
+      localStorage.setItem("dev-hub:chat-show-tool-calls", String(next));
+      return next;
+    });
+  }, []);
+
+  const toggleTokens = useCallback(() => {
+    setShowTokensRef.current((prev) => {
+      const next = !prev;
+      localStorage.setItem("dev-hub:chat-show-tokens", String(next));
+      return next;
+    });
+  }, []);
 
   const chatCommands = useMemo(
     () => [
       {
         id: "chat:toggle-plan-panel",
-        label: "Toggle Plan Panel",
+        label: isPlanPanelOpen ? "Hide Plan Panel" : "Show Plan Panel",
         group: "Chat",
         icon: ScrollText,
         onSelect: () => setIsPlanPanelOpenRef.current((prev) => !prev),
@@ -584,8 +668,40 @@ export function ChatInterface() {
         icon: Plus,
         onSelect: () => handleCreateSessionRef.current(),
       },
+      {
+        id: "chat:toggle-task-panel",
+        label: isTaskPanelOpen ? "Hide Task Progress" : "Show Task Progress",
+        group: "Chat",
+        icon: ListTodo,
+        onSelect: () => setIsTaskPanelOpenRef.current((prev) => {
+          const next = !prev;
+          localStorage.setItem("dev-hub:chat-task-panel", String(next));
+          return next;
+        }),
+      },
+      {
+        id: "chat:toggle-thinking",
+        label: showThinking ? "Hide Thinking" : "Show Thinking",
+        group: "Chat",
+        icon: Brain,
+        onSelect: toggleThinking,
+      },
+      {
+        id: "chat:toggle-tool-calls",
+        label: showToolCalls ? "Hide Tool Calls" : "Show Tool Calls",
+        group: "Chat",
+        icon: Wrench,
+        onSelect: toggleToolCalls,
+      },
+      {
+        id: "chat:toggle-tokens",
+        label: showTokens ? "Hide Token Usage" : "Show Token Usage",
+        group: "Chat",
+        icon: Coins,
+        onSelect: toggleTokens,
+      },
     ],
-    [],
+    [toggleThinking, toggleToolCalls, toggleTokens, showThinking, showToolCalls, showTokens, isPlanPanelOpen, isTaskPanelOpen],
   );
 
   useCommand(chatCommands);
@@ -634,6 +750,42 @@ export function ChatInterface() {
       },
       {
         action: {
+          id: "chat:toggle-tasks",
+          label: "Toggle task progress",
+          page: "chat" as const,
+        },
+        handler: () => setIsTaskPanelOpenRef.current((prev) => {
+          const next = !prev;
+          localStorage.setItem("dev-hub:chat-task-panel", String(next));
+          return next;
+        }),
+      },
+      {
+        action: {
+          id: "chat:toggle-thinking",
+          label: "Toggle thinking",
+          page: "chat" as const,
+        },
+        handler: toggleThinking,
+      },
+      {
+        action: {
+          id: "chat:toggle-tool-calls",
+          label: "Toggle tool calls",
+          page: "chat" as const,
+        },
+        handler: toggleToolCalls,
+      },
+      {
+        action: {
+          id: "chat:toggle-tokens",
+          label: "Toggle token usage",
+          page: "chat" as const,
+        },
+        handler: toggleTokens,
+      },
+      {
+        action: {
           id: "chat:focus-prompt",
           label: "Focus prompt input",
           page: "chat" as const,
@@ -641,7 +793,7 @@ export function ChatInterface() {
         handler: () => promptInputRef.current?.focus(),
       },
     ],
-    [],
+    [toggleThinking, toggleToolCalls, toggleTokens],
   );
 
   useLeaderAction(chatLeaderActions);
@@ -727,6 +879,7 @@ export function ChatInterface() {
               onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
+              lastViewedAt={lastViewedAt}
               onSelectSession={handleSelectUnifiedSession}
               onCreateSession={handleMobileCreateSession}
               onDeleteSession={handleDeleteSession}
@@ -740,6 +893,7 @@ export function ChatInterface() {
               workspaceColor={activeWorkspaceColor}
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
+              lastViewedAt={lastViewedAt}
               onSelectSession={handleMobileSelectSession}
               onCreateSession={handleMobileCreateSession}
               onDeleteSession={handleDeleteSession}
@@ -771,6 +925,7 @@ export function ChatInterface() {
                 onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
+              lastViewedAt={lastViewedAt}
                 onSelectSession={handleSelectUnifiedSession}
                 onCreateSession={handleCreateSession}
                 onDeleteSession={handleDeleteSession}
@@ -784,6 +939,7 @@ export function ChatInterface() {
                 workspaceColor={activeWorkspaceColor}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
+              lastViewedAt={lastViewedAt}
                 onSelectSession={handleSelectSession}
                 onCreateSession={handleCreateSession}
                 onDeleteSession={handleDeleteSession}
@@ -802,6 +958,7 @@ export function ChatInterface() {
       )}
 
       {/* Main chat area */}
+      <ChatDisplayContext.Provider value={chatDisplaySettings}>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Chat toolbar */}
         <div className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center gap-2 border-b bg-background px-4 py-2">
@@ -904,9 +1061,11 @@ export function ChatInterface() {
                     0,
                     activeMessages.length - 1,
                   )}
-                  itemContent={(_index, msg) => (
-                    <ChatMessage key={msg.info.id} message={msg} />
-                  )}
+                  itemContent={(index, msg) => {
+                    const prev = index > 0 ? activeMessages[index - 1] : null
+                    const showAvatar = !prev || prev.info.role !== msg.info.role
+                    return <ChatMessage key={msg.info.id} message={msg} showAvatar={showAvatar} />
+                  }}
                   followOutput={handleFollowOutput}
                   atBottomStateChange={handleAtBottomStateChange}
                   atBottomThreshold={80}
@@ -1051,7 +1210,6 @@ export function ChatInterface() {
           </div>
         )}
 
-        {/* Prompt input */}
         <PromptInput
           ref={promptInputRef}
           onSubmit={handleSendMessage}
@@ -1063,6 +1221,39 @@ export function ChatInterface() {
           commands={commands}
         />
       </div>
+      </ChatDisplayContext.Provider>
+
+      {isTaskPanelOpen && activeTodos.length > 0 && (
+        <>
+          <div
+            className="hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors md:flex"
+            onMouseDown={handleTaskPanelDragStart}
+          >
+            <GripVertical className="size-3.5 text-muted-foreground/30" />
+          </div>
+          <div
+            className="hidden shrink-0 overflow-y-auto border-l md:block"
+            style={{ width: taskPanelWidth }}
+          >
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <span className="text-xs font-medium text-muted-foreground">Task Progress</span>
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                onClick={() => {
+                  setIsTaskPanelOpen(false);
+                  localStorage.setItem("dev-hub:chat-task-panel", "false");
+                }}
+              >
+                <X className="size-3" />
+              </Button>
+            </div>
+            <div className="p-3">
+              <TaskProgressPanel todos={activeTodos} />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch } from "lucide-react"
+import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch, Brain } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +18,7 @@ import type { SessionWithWorkspace } from "@/stores/chat-store"
 interface BaseSessionListProps {
   activeSessionId: string | null
   sessionStatuses: Record<string, SessionStatus>
+  lastViewedAt: Record<string, number>
   onCreateSession: () => void
   onDeleteSession: (sessionId: string) => void
   isUnifiedMode?: boolean
@@ -48,7 +49,7 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
 type SessionListProps = WorkspaceSessionListProps | UnifiedSessionListProps
 
 export function SessionList(props: SessionListProps) {
-  const { activeSessionId, sessionStatuses, onCreateSession, onDeleteSession } = props
+  const { activeSessionId, sessionStatuses, lastViewedAt, onCreateSession, onDeleteSession } = props
 
   const sortedSessions = useMemo(() => {
     if (props.mode === "workspace") {
@@ -141,6 +142,11 @@ export function SessionList(props: SessionListProps) {
                 session={session}
                 isActive={session.id === activeSessionId}
                 status={sessionStatuses[session.id] ?? null}
+                isUnread={!!(
+                  session.id !== activeSessionId &&
+                  lastViewedAt[session.id] != null &&
+                  session.time.updated > lastViewedAt[session.id]
+                )}
                 workspaceBranch={
                   props.mode === "unified"
                     ? props.workspaceBranches[(session as SessionWithWorkspace).workspaceId] ??
@@ -179,6 +185,7 @@ interface SessionItemProps {
   session: Session
   isActive: boolean
   status: SessionStatus | null
+  isUnread: boolean
   workspaceBranch?: string
   workspaceColor?: string
   onSelect: () => void
@@ -189,6 +196,7 @@ function SessionItem({
   session,
   isActive,
   status,
+  isUnread,
   workspaceBranch,
   workspaceColor,
   onSelect,
@@ -198,7 +206,7 @@ function SessionItem({
     return formatRelativeTime(session.time.updated)
   }, [session.time.updated])
 
-  const isRunning = status !== null && status.type !== "idle"
+  const isBusy = status !== null && status.type === "busy"
 
   return (
     <div
@@ -218,16 +226,22 @@ function SessionItem({
       )}
     >
       <div className="relative mt-0.5 shrink-0">
-        <MessageSquare
-          className={cn("size-3.5", !workspaceColor && "text-muted-foreground")}
-          style={workspaceColor ? { color: workspaceColor } : undefined}
-        />
-        {isRunning && (
-          <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        {isBusy ? (
+          <Brain
+            className="size-3.5 text-amber-500 animate-pulse"
+          />
+        ) : (
+          <MessageSquare
+            className={cn("size-3.5", !workspaceColor && "text-muted-foreground")}
+            style={workspaceColor ? { color: workspaceColor } : undefined}
+          />
+        )}
+        {isUnread && (
+          <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-blue-500" />
         )}
       </div>
       <div className="min-w-0 w-0 flex-1 overflow-hidden">
-        <p className="truncate font-medium" title={session.title || "Untitled"}>
+        <p className={cn("truncate", isUnread ? "font-semibold" : "font-medium")} title={session.title || "Untitled"}>
           {session.title || "Untitled"}
         </p>
         <div className="flex items-center gap-1.5 flex-wrap">

@@ -1125,7 +1125,7 @@ export function ChatInterface() {
 
         {/* Question requests */}
         {activeQuestions.length > 0 && (
-          <div className="shrink-0 border-t bg-indigo-500/10 px-4 py-2 space-y-2">
+          <div className={cn("shrink-0 border-t bg-indigo-500/10 px-4 py-2", !isQuestionsMinimized && "space-y-2")}>
             <div className="flex items-center justify-between">
               <button
                 type="button"

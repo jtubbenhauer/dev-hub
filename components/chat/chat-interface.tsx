@@ -1305,7 +1305,8 @@ const VirtuosoFooter = memo(function VirtuosoFooter() {
   return <StreamingIndicator messages={messages} sessionStatus={sessionStatus} />
 })
 
-const EMPTY_COMPONENTS = {} as const
+const VirtuosoSpacer = () => <div className="h-4" />
+const EMPTY_COMPONENTS = { Footer: VirtuosoSpacer } as const
 const STREAMING_COMPONENTS = { Footer: VirtuosoFooter } as const
 
 function EmptyChat({ onSend }: { onSend: (text: string) => void }) {

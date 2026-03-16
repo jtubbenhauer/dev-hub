@@ -23,7 +23,7 @@ trap cleanup INT TERM
 sleep 2
 if command -v cloudflared &> /dev/null; then
   echo "Starting cloudflared tunnel..."
-  cloudflared tunnel --loglevel warn run dev-hub
+  cloudflared tunnel --loglevel warn run dev-hub 2>&1 | grep -v --line-buffered "canceled by remote with error code 0"
 elif command -v tailscale &> /dev/null; then
   echo "Starting tailscale funnel..."
   tailscale funnel --bg 3000

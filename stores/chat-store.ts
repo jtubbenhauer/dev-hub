@@ -888,6 +888,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   connectGlobalSSE: (workspaceIds) => {
     const existing = get().globalEventSource
+    const currentIds = get().sseWorkspaceIds
+
+    // Skip reconnection if already connected with the same workspace IDs
+    if (
+      existing &&
+      existing.readyState !== EventSource.CLOSED &&
+      workspaceIds.length === currentIds.length &&
+      workspaceIds.every((id, i) => id === currentIds[i])
+    ) {
+      return
+    }
+
     if (existing) {
       existing.close()
     }

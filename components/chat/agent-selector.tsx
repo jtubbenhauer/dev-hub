@@ -49,8 +49,9 @@ export function useAgents(workspaceId: string | null): UseAgentsResult {
     fetchAgents()
   }, [fetchAgents])
 
-  const primaryAgents = agents.filter(
-    (a) => a.mode === "primary" || a.mode === "all"
+  const primaryAgents = useMemo(
+    () => agents.filter((a) => a.mode === "primary" || a.mode === "all"),
+    [agents],
   )
 
   return { agents, primaryAgents, isLoading }

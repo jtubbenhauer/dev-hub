@@ -1,0 +1,53 @@
+app/api/opencode/events/route.ts
+  0ca748821177ce06 10-11,46-59,63-65,77,100,108,138,142-161,164
+stores/chat-store.ts
+  0ca748821177ce06 891-902
+start.sh
+  0ca748821177ce06 26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "85dec593c5e599af15d0d55ed39c8d4a6677ee67",
+  "prompts": {
+    "0ca748821177ce06": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30ac72bb4ffegUjbFQw0sa8tzb",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 94,
+      "total_deletions": 50,
+      "accepted_lines": 57,
+      "overriden_lines": 0
+    },
+    "7c5ab68d170d76c9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30aa65a92ffe7gT9T2Pqja49yN",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 167,
+      "total_deletions": 118,
+      "accepted_lines": 112,
+      "overriden_lines": 0
+    },
+    "845bc9e3ae88312f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30adb9268ffebC1r5rcMBsfT87",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 36,
+      "total_deletions": 22,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}

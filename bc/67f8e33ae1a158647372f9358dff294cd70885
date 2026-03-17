@@ -1,0 +1,41 @@
+components/editor/file-tree.tsx
+  ab3f7ab768663111 7-8,114-134,136-139,143-160,164-177,180-217,355-439,458,466-475,479,481,484
+components/file-picker/file-picker.tsx
+  ab3f7ab768663111 18,107-124,135-137,143,153,158,179-182,186,217,220,224,231,234-236,239-240,273,277,287-291,304,327,333
+components/chat/chat-interface.tsx
+  ab3f7ab768663111 355-363,1010,1031,1064,1085
+lib/fuzzy-match.ts
+  ab3f7ab768663111 1-49
+lib/leader-key-defaults.ts
+  ab3f7ab768663111 14,57
+tests/lib/fuzzy-match.test.ts
+  ab3f7ab768663111 1-77
+components/providers/providers.tsx
+  ab3f7ab768663111 11,51-52,54-55,57-58
+stores/chat-store.ts
+  ab3f7ab768663111 37,51,528,538,577
+components/chat/session-list.tsx
+  ab3f7ab768663111 8,23,224-226,567-582
+components/layout/app-sidebar.tsx
+  ab3f7ab768663111 20,36,59-60,96-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "bc67f8e33ae1a158647372f9358dff294cd70885",
+  "prompts": {
+    "ab3f7ab768663111": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_304bd5925ffef8RtvZuY2VExRS",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 615,
+      "total_deletions": 239,
+      "accepted_lines": 432,
+      "overriden_lines": 0
+    }
+  }
+}

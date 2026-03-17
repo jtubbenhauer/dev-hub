@@ -1,0 +1,43 @@
+libs/practice-migrations/src/lib/destination/destination-entity-record/destination-entity-record.browser.ts
+  54a8ad42035ddfc5 1
+apps/tinker/src/app/scripts/practice-migrations/remove-duplicate-steps.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/source/source-entity/source-entity.browser.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/destination/destination-entity/destination-entity.browser.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/destination/destination-entity-record/destination-entity-record.node.ts
+  54a8ad42035ddfc5 1
+apps/tinker/src/app/scripts/remap-migrated-treatment-surfaces.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/source/connection/connection.node.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/source/source-entity/source-entity.node.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/translation-map/translation-map.node.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/source/source-entity-record.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/destination/destination-entity/destination-entity.node.ts
+  54a8ad42035ddfc5 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "e0400ebc395861c145307714fd1874e21f24ae3f",
+  "prompts": {
+    "54a8ad42035ddfc5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305e277d3ffezvZxIdXXzrF0Lm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 78,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}

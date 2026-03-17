@@ -1,0 +1,44 @@
+components/chat/session-list.tsx
+  73892b909873d3e5 384-405,413-414
+components/editor/editor-switcher.tsx
+  ab3f7ab768663111 3,6-10
+components/git/pr-diff-editor.tsx
+  ab3f7ab768663111 49,52-55
+components/review/review-editor.tsx
+  ab3f7ab768663111 44,47-50
+lib/leader-key-defaults.ts
+  ab3f7ab768663111 7,49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "94adb63cd0377e3afa82e6fa9fb260c5967bfb48",
+  "prompts": {
+    "73892b909873d3e5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_304a6a403ffe1VTlIVjVRDSRZ0",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 31,
+      "total_deletions": 7,
+      "accepted_lines": 24,
+      "overriden_lines": 0
+    },
+    "ab3f7ab768663111": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_304bd5925ffef8RtvZuY2VExRS",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 20,
+      "total_deletions": 3,
+      "accepted_lines": 20,
+      "overriden_lines": 0
+    }
+  }
+}

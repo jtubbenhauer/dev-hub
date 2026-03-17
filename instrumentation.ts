@@ -13,6 +13,8 @@ export async function register() {
 
 // DBs created via `db:push` have all tables but an empty __drizzle_migrations
 // journal. Seed the journal so `migrate()` doesn't re-run already-applied DDL.
+// Also handles the mixed case: some migrations tracked, but newer tables added
+// via `db:push` whose migrations aren't yet in the journal.
 function seedJournalForPushCreatedDb(
   db: import("drizzle-orm/better-sqlite3").BetterSQLite3Database<Record<string, unknown>>,
   migrationsFolder: string,
@@ -29,11 +31,6 @@ function seedJournalForPushCreatedDb(
     .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='__drizzle_migrations'")
     .get()
 
-  const journalEmpty = !hasJournal || !client
-    .prepare("SELECT 1 FROM __drizzle_migrations LIMIT 1")
-    .get()
-  if (!journalEmpty) return
-
   if (!hasJournal) {
     client.exec(`CREATE TABLE "__drizzle_migrations" (
       id SERIAL PRIMARY KEY,
@@ -43,8 +40,15 @@ function seedJournalForPushCreatedDb(
   }
 
   const migrations = readMigrationFiles({ migrationsFolder })
+  const existingHashes = new Set(
+    (client.prepare("SELECT hash FROM __drizzle_migrations").all() as { hash: string }[])
+      .map(r => r.hash),
+  )
+
   const insert = client.prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
   for (const m of migrations) {
-    insert.run(m.hash, m.folderMillis)
+    if (!existingHashes.has(m.hash)) {
+      insert.run(m.hash, m.folderMillis)
+    }
   }
 }

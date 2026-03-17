@@ -6,6 +6,7 @@ import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 import { cloneRepo, extractRepoName, getDefaultCloneBaseDir } from "@/lib/git/clone"
+import { getAutoColorForNewWorkspace } from "@/lib/workspace-colors"
 
 function detectPackageManager(
   dirPath: string
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
     const clonePath = await cloneRepo(url, targetDir, depth)
     const packageManager = detectPackageManager(clonePath)
     const workspaceName = name || repoName
+    const autoColor = await getAutoColorForNewWorkspace(session.user.id)
 
     const workspace = {
       id: crypto.randomUUID(),
@@ -68,6 +70,7 @@ export async function POST(request: NextRequest) {
       packageManager,
       quickCommands: null,
       backend: "local" as const,
+      color: autoColor,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
     }

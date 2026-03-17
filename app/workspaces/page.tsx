@@ -24,6 +24,7 @@ import {
   Plus,
   FolderSearch,
   Globe,
+  Palette,
 } from "lucide-react"
 import { DirectoryBrowser } from "@/components/workspace/directory-browser"
 import { WorkspaceCard } from "@/components/workspace/workspace-card"
@@ -33,6 +34,12 @@ import { ConnectRemoteDialog } from "@/components/workspace/connect-remote-dialo
 import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-provider-workspace-dialog"
 import { toast } from "sonner"
 import type { Workspace } from "@/types"
+import { assignColorsToUncolored } from "@/lib/workspace-color-utils"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export default function WorkspacesPage() {
   const queryClient = useQueryClient()
@@ -105,6 +112,32 @@ export default function WorkspacesPage() {
     },
   })
 
+  const uncoloredCount = workspaces.filter((ws) => !ws.color).length
+
+  const bulkColorMutation = useMutation({
+    mutationFn: async () => {
+      const assignments = assignColorsToUncolored(workspaces)
+      const updates = Array.from(assignments.entries()).map(([id, color]) =>
+        fetch(`/api/workspaces/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ color }),
+        }).then((res) => {
+          if (!res.ok) throw new Error(`Failed to update workspace ${id}`)
+        })
+      )
+      await Promise.all(updates)
+      return assignments.size
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
+      toast.success(`Assigned colors to ${count} workspace${count === 1 ? "" : "s"}`)
+    },
+    onError: () => {
+      toast.error("Failed to assign colors")
+    },
+  })
+
   function handleAdd() {
     if (!newPath) return
     addMutation.mutate({ name: newName, path: newPath })
@@ -116,6 +149,23 @@ export default function WorkspacesPage() {
         <div className="flex shrink-0 items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Workspaces</h1>
           <div className="flex items-center gap-2">
+            {uncoloredCount > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => bulkColorMutation.mutate()}
+                    disabled={bulkColorMutation.isPending}
+                  >
+                    <Palette className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Assign colors to {uncoloredCount} uncolored workspace{uncoloredCount === 1 ? "" : "s"}
+                </TooltipContent>
+              </Tooltip>
+            )}
             <CloneRepoDialog />
             <ConnectRemoteDialog />
             <CreateProviderWorkspaceDialog workspaces={workspaces} />

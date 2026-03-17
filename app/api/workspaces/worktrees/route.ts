@@ -8,6 +8,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { getWorktreeBaseDir, createSymlinks } from "@/lib/git/worktrees"
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend"
+import { getAutoColorForNewWorkspace } from "@/lib/workspace-colors"
 
 function detectPackageManager(
   dirPath: string
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
 
     const resolvedTaskId = typeof linkedTaskId === "string" ? linkedTaskId : null
     const resolvedTaskMeta = linkedTaskMeta && typeof linkedTaskMeta === "object" ? linkedTaskMeta : null
+    const autoColor = await getAutoColorForNewWorkspace(session.user.id)
 
     const workspace = {
       id: crypto.randomUUID(),
@@ -122,6 +124,7 @@ export async function POST(request: NextRequest) {
       provider: parentWorkspace.provider,
       linkedTaskId: resolvedTaskId,
       linkedTaskMeta: resolvedTaskMeta,
+      color: autoColor,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
     }
@@ -234,6 +237,7 @@ export async function POST(request: NextRequest) {
 
     const legacyTaskId = typeof linkedTaskId === "string" ? linkedTaskId : null
     const legacyTaskMeta = linkedTaskMeta && typeof linkedTaskMeta === "object" ? linkedTaskMeta : null
+    const autoColor = await getAutoColorForNewWorkspace(session.user.id)
 
     const workspace = {
       id: crypto.randomUUID(),
@@ -247,6 +251,7 @@ export async function POST(request: NextRequest) {
       backend: "local" as const,
       linkedTaskId: legacyTaskId,
       linkedTaskMeta: legacyTaskMeta,
+      color: autoColor,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
     }

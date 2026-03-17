@@ -7,6 +7,7 @@ import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 import type { WorkspaceBackendType } from "@/types"
+import { getAutoColorForNewWorkspace } from "@/lib/workspace-colors"
 
 function detectPackageManager(
   dirPath: string
@@ -138,6 +139,7 @@ async function createLocalWorkspace(
     : null
 
   const workspaceName = name || path.basename(resolvedPath)
+  const autoColor = await getAutoColorForNewWorkspace(userId)
 
   const workspace = {
     id: crypto.randomUUID(),
@@ -149,6 +151,7 @@ async function createLocalWorkspace(
     packageManager,
     quickCommands: null,
     backend: "local" as const,
+    color: autoColor,
     createdAt: new Date(),
     lastAccessedAt: new Date(),
   }
@@ -196,6 +199,7 @@ async function createRemoteWorkspace(
   // For remote workspaces, path is informational (the container's workspace path)
   const workspacePath = typeof body.path === "string" ? body.path : "/workspace"
   const workspaceName = name || "Remote Workspace"
+  const autoColor = await getAutoColorForNewWorkspace(userId)
 
   const workspace = {
     id: crypto.randomUUID(),
@@ -211,6 +215,7 @@ async function createRemoteWorkspace(
     opencodeUrl,
     agentUrl,
     providerMeta,
+    color: autoColor,
     createdAt: new Date(),
     lastAccessedAt: new Date(),
   }

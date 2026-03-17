@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -19,6 +20,7 @@ import {
   useDefaultWorkspaceSetting,
   useWorktreeBaseDirSetting,
   useCloneBaseDirSetting,
+  useAutoColorSetting,
   useSettingsMutation,
   SETTINGS_KEYS,
 } from "@/hooks/use-settings"
@@ -28,12 +30,13 @@ export function WorkspaceSettings() {
   const { defaultWorkspaceId, isLoading: isLoadingDefault } = useDefaultWorkspaceSetting()
   const { worktreeBaseDir, isLoading: isLoadingWorktree } = useWorktreeBaseDirSetting()
   const { cloneBaseDir, isLoading: isLoadingClone } = useCloneBaseDirSetting()
+  const { isAutoColorEnabled, isLoading: isLoadingAutoColor } = useAutoColorSetting()
   const mutation = useSettingsMutation()
 
   const [localWorktreeDir, setLocalWorktreeDir] = useState("")
   const [localCloneDir, setLocalCloneDir] = useState("")
 
-  const isLoading = isLoadingDefault || isLoadingWorktree || isLoadingClone
+  const isLoading = isLoadingDefault || isLoadingWorktree || isLoadingClone || isLoadingAutoColor
 
   useEffect(() => {
     if (!isLoadingWorktree) setLocalWorktreeDir(worktreeBaseDir)
@@ -62,6 +65,13 @@ export function WorkspaceSettings() {
     mutation.mutate(
       { key: SETTINGS_KEYS.CLONE_BASE_DIR, value: localCloneDir },
       { onSuccess: () => toast.success("Clone base directory updated") }
+    )
+  }
+
+  const handleAutoColorToggle = (checked: boolean) => {
+    mutation.mutate(
+      { key: SETTINGS_KEYS.AUTO_COLOR_WORKSPACES, value: checked },
+      { onSuccess: () => toast.success(checked ? "Auto-color enabled" : "Auto-color disabled") }
     )
   }
 
@@ -152,6 +162,21 @@ export function WorkspaceSettings() {
               Save
             </Button>
           </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="auto-color">Auto-assign colors</Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically assign a color to new workspaces
+            </p>
+          </div>
+          <Switch
+            id="auto-color"
+            checked={isAutoColorEnabled}
+            onCheckedChange={handleAutoColorToggle}
+            disabled={mutation.isPending}
+          />
         </div>
       </CardContent>
     </Card>

@@ -36,6 +36,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Terminal, Loader2, ChevronsUpDown, Check, Plus, GitBranch, Minus } from "lucide-react"
 import { toast } from "sonner"
 import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils"
+import { pickNextColor } from "@/lib/workspace-color-utils"
 import { useWorkspaceProviders } from "@/hooks/use-settings"
 import { useProviderCreationStore } from "@/stores/provider-creation-store"
 import type { Workspace, ClickUpTask, LinkedTaskMeta } from "@/types"
@@ -66,10 +67,7 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
   const [branchPopoverOpen, setBranchPopoverOpen] = useState(false)
   const [branchSearch, setBranchSearch] = useState("")
 
-  const autoColor = useMemo(() => {
-    const usedColors = new Set(workspaces.map((ws) => ws.color).filter(Boolean))
-    return WORKSPACE_PRESET_COLORS.find((c) => !usedColors.has(c)) ?? WORKSPACE_PRESET_COLORS[0]
-  }, [workspaces])
+  const autoColor = useMemo(() => pickNextColor(workspaces), [workspaces])
   const [selectedColor, setSelectedColor] = useState<string | null>(autoColor)
 
   const creationStore = useProviderCreationStore()

@@ -42,6 +42,7 @@ export const SETTINGS_KEYS = {
   SOUND_ERRORS_ENABLED: "sound-errors-enabled",
   SOUND_ERRORS_ID: "sound-errors-id",
   EDITOR_TYPE: "editor-type",
+  AUTO_COLOR_WORKSPACES: "auto-color-workspaces",
 } as const
 
 export type EditorType = "codemirror" | "monaco"
@@ -403,4 +404,14 @@ export function useEditorTypeSetting(): {
   const raw = data?.[SETTINGS_KEYS.EDITOR_TYPE]
   const isValid = typeof raw === "string" && EDITOR_TYPE_OPTIONS.includes(raw as EditorType)
   return { editorType: isValid ? (raw as EditorType) : DEFAULT_EDITOR_TYPE, isLoading }
+}
+
+export function useAutoColorSetting(): {
+  isAutoColorEnabled: boolean
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.AUTO_COLOR_WORKSPACES]
+  // Default: true (auto-color is on by default)
+  return { isAutoColorEnabled: raw !== false, isLoading }
 }

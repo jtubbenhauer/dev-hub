@@ -96,6 +96,12 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
     <Card className="overflow-hidden hover:border-primary/50 transition-colors">
       <CardHeader className="pb-2 pt-3 px-3">
         <div className="flex min-w-0 items-center justify-between gap-2">
+          {workspace.color && (
+            <span
+              className="size-3 shrink-0 rounded-full"
+              style={{ backgroundColor: workspace.color }}
+            />
+          )}
           <CardTitle className="min-w-0 text-sm truncate">{workspace.name}</CardTitle>
           <div className="flex items-center gap-1 shrink-0">
             <Badge variant="secondary" className="text-xs py-0">

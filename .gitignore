@@ -51,10 +51,5 @@ next-env.d.ts
 
 .opencode/
 
-# playwright
-test-results/
-playwright-report/
-tests/.auth/
-
 # sisyphus
 .sisyphus/

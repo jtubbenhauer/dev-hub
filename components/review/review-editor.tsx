@@ -41,8 +41,13 @@ import { CommentThread } from "@/components/editor/comment-thread"
 import { CommentInput } from "@/components/editor/comment-input"
 import { attachCommentToChat } from "@/lib/comment-chat-bridge"
 import { useChatStore } from "@/stores/chat-store"
-import { MonacoReviewEditor } from "@/components/review/monaco-review-editor"
+import dynamic from "next/dynamic"
 import type { ReviewFile } from "@/types"
+
+const MonacoReviewEditor = dynamic(
+  () => import("@/components/review/monaco-review-editor").then((m) => m.MonacoReviewEditor),
+  { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-muted" /> }
+)
 
 // Register ]c / [c vim bindings for chunk navigation — runs once at module load
 Vim.defineAction("goToNextChunk", (cm) => {

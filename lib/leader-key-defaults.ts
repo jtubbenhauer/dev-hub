@@ -4,6 +4,7 @@ import type { LeaderAction, LeaderBindingsMap } from "@/types/leader-key"
 export const BUILTIN_ACTIONS: LeaderAction[] = [
   // Global navigation
   { id: "nav:chat", label: "Go to Chat", page: "global" },
+  { id: "nav:files", label: "Go to Files", page: "global" },
   { id: "nav:git", label: "Go to Git", page: "global" },
   { id: "nav:tasks", label: "Go to Tasks", page: "global" },
   { id: "nav:dashboard", label: "Go to Dashboard", page: "global" },
@@ -45,6 +46,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
 export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   // Global navigation
   "nav:chat": "g c",
+  "nav:files": "g f",
   "nav:git": "g g",
   "nav:tasks": "g t",
   "nav:dashboard": "g d",

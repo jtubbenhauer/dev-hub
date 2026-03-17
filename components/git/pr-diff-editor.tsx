@@ -46,8 +46,13 @@ import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting, useEdi
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
 import { cn } from "@/lib/utils"
-import { MonacoPrDiffEditor } from "@/components/git/monaco-pr-diff-editor"
+import dynamic from "next/dynamic"
 import type { GitHubPrFileContent, GitHubReviewComment } from "@/types"
+
+const MonacoPrDiffEditor = dynamic(
+  () => import("@/components/git/monaco-pr-diff-editor").then((m) => m.MonacoPrDiffEditor),
+  { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-muted" /> }
+)
 
 // Register ]c / [c for chunk navigation (runs once at module load)
 Vim.defineAction("goToNextChunk", (cm) => {

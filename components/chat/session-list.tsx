@@ -381,13 +381,37 @@ function WorkspaceGroup({
         className="group/header flex min-w-0 cursor-grab items-center gap-1 px-1 pb-0.5 pt-2 first:pt-1 active:cursor-grabbing"
       >
         <GripVertical className="size-3 shrink-0 text-muted-foreground/0 transition-colors group-hover/header:text-muted-foreground/50" />
-        <FolderGit2
-          className="size-3 shrink-0"
-          style={workspaceColor ? { color: workspaceColor } : undefined}
-        />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
-          {workspaceName}
-        </span>
+        {canExpand && onToggleExpanded ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleExpanded()
+            }}
+            className="flex min-w-0 flex-1 items-center gap-1 cursor-pointer"
+          >
+            <ChevronRight
+              className={cn("size-2.5 shrink-0 text-muted-foreground/60 transition-transform", isExpanded && "rotate-90")}
+            />
+            <FolderGit2
+              className="size-3 shrink-0"
+              style={workspaceColor ? { color: workspaceColor } : undefined}
+            />
+            <span className="min-w-0 flex-1 truncate text-left text-xs font-medium text-muted-foreground">
+              {workspaceName}
+            </span>
+          </button>
+        ) : (
+          <>
+            <FolderGit2
+              className="size-3 shrink-0"
+              style={workspaceColor ? { color: workspaceColor } : undefined}
+            />
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
+              {workspaceName}
+            </span>
+          </>
+        )}
         {onCreateSession && (
           <Button
             size="icon-xs"

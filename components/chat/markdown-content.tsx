@@ -8,6 +8,7 @@ import rehypeHighlight from "rehype-highlight"
 import { Copy, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { isCodePath, FilePathCode } from "@/components/chat/file-path-code"
 
 export const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
   return (
@@ -17,12 +18,14 @@ export const MarkdownContent = memo(function MarkdownContent({ content }: { cont
       components={{
         pre({ children, ...props }) {
           return (
-            <div className="relative group/code overflow-x-auto">
-              <CopyButton
-                content={extractCodeFromPre(children)}
-                className="absolute right-2 top-2"
-              />
-              <pre {...props}>{children}</pre>
+            <div className="overflow-x-auto">
+              <pre {...props} className={cn(props.className, "relative group/code")}>
+                <CopyButton
+                  content={extractCodeFromPre(children)}
+                  className="absolute right-2 top-2 z-10"
+                />
+                {children}
+              </pre>
             </div>
           )
         },
@@ -36,6 +39,10 @@ export const MarkdownContent = memo(function MarkdownContent({ content }: { cont
         code({ children, className, ...props }) {
           const isInline = !className
           if (isInline) {
+            const text = typeof children === "string" ? children : String(children ?? "")
+            if (isCodePath(text)) {
+              return <FilePathCode text={text}>{children}</FilePathCode>
+            }
             return (
               <code
                 className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono"

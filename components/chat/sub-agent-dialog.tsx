@@ -224,7 +224,7 @@ export function SubAgentDialog({
   )
 
   const displaySettings = useMemo(
-    () => ({ showThinking: true, showToolCalls: true, showTokens: false }),
+    () => ({ showThinking: true, showToolCalls: true, showTokens: false, showTimestamps: false }),
     []
   )
 

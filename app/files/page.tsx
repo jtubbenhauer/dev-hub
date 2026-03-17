@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout"
 import { FileTree } from "@/components/editor/file-tree"
@@ -32,6 +32,14 @@ const MAX_PANEL_WIDTH = 500
 const DEFAULT_PANEL_WIDTH = 260
 
 export default function FilesPage() {
+  return (
+    <Suspense>
+      <FilesContent />
+    </Suspense>
+  )
+}
+
+function FilesContent() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const activeWorkspace = useMemo(

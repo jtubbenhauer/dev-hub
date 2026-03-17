@@ -1,0 +1,65 @@
+apps/dev-rig/cli/internal/state/state.go
+  cf7ba30e8e5f7cec 28-33
+apps/dev-rig/cli/internal/state/state_test.go
+  30389d7f007cd77f 521-624
+  dd46c802dd78f394 212-276
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "d1974756381f490241176cba43a4050770772a51",
+  "prompts": {
+    "30389d7f007cd77f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_305593094ffeaEBTi6sr1c1BQ1-ec7bb6a4-af77-4296-b5a0-d38354827c79",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 104,
+      "overriden_lines": 0
+    },
+    "8199dcae83799a5c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3054cae82ffeP97oAugzbwvuh7-1c4b8540-c2a7-4aa5-abb3-f67480f6ff07",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "cf7ba30e8e5f7cec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_305593094ffeaEBTi6sr1c1BQ1-7bf5a774-35ff-4b04-89a8-d132380668c5",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    },
+    "dd46c802dd78f394": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_305593094ffeaEBTi6sr1c1BQ1-6c6d5737-1bdf-4160-9a13-a734a4dcec8d",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 65,
+      "overriden_lines": 0
+    }
+  }
+}

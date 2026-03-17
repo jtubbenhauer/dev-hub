@@ -1,0 +1,38 @@
+apps/dev-rig/cli/internal/provider/docker/provider_test.go
+  0f913a226049f1bf 1-24
+apps/dev-rig/cli/internal/provider/docker/provider.go
+  a6863fbfc95d0f9a 1-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "f3c71c022574f1ed3bfe2a9a8f2452ecef0c8813",
+  "prompts": {
+    "0f913a226049f1bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_30544251affeYOkVov5yNSyfqw-18216ace-d019-4d2d-ab33-18d45a9ced7e",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 0,
+      "accepted_lines": 24,
+      "overriden_lines": 0
+    },
+    "a6863fbfc95d0f9a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_30544251affeYOkVov5yNSyfqw-658d3120-c83b-4ef7-bbaa-1d57372f8b2b",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 81,
+      "total_deletions": 0,
+      "accepted_lines": 81,
+      "overriden_lines": 0
+    }
+  }
+}

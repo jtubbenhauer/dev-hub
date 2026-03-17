@@ -1,0 +1,52 @@
+apps/dev-rig/cli/internal/fly/client_test.go
+  e2a003d7d5013b06 182-184
+apps/dev-rig/cli/internal/fly/client.go
+  451c218752901677 262-263,265-318
+  c928e1b21bb97284 264
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "14fbc8b1d858281b75a955b388731f7b1cb5d3e9",
+  "prompts": {
+    "451c218752901677": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_305359fceffee0q6DfUK8l3fUu-89a79c49-d881-4934-8bfb-b88356a4e661",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 57,
+      "total_deletions": 0,
+      "accepted_lines": 56,
+      "overriden_lines": 0
+    },
+    "c928e1b21bb97284": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_305359fceffee0q6DfUK8l3fUu-4de8a3c6-7f1d-40ce-bc10-e3132a2ade97",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "e2a003d7d5013b06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_305359fceffee0q6DfUK8l3fUu-ba610fc0-3fe7-4b85-9b69-dac4b7cbea86",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

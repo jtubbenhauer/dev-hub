@@ -1,0 +1,38 @@
+apps/dev-rig/cli/internal/provider/fly/provider.go
+  53ccb911ca28158f 1-142
+apps/dev-rig/cli/internal/provider/fly/provider_test.go
+  b82078019f687ba9 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "5154f02b6423353c35592c31db2704e18ea30ba8",
+  "prompts": {
+    "53ccb911ca28158f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_305382f39ffeZOlHY5LqOKsCD1-9d4f16d2-a058-4458-9b10-f93e858b0488",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 142,
+      "total_deletions": 0,
+      "accepted_lines": 142,
+      "overriden_lines": 0
+    },
+    "b82078019f687ba9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_305382f39ffeZOlHY5LqOKsCD1-87baa745-80fc-4277-816d-dbe1205a4423",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 64,
+      "total_deletions": 0,
+      "accepted_lines": 64,
+      "overriden_lines": 0
+    }
+  }
+}

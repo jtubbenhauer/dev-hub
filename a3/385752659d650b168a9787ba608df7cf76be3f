@@ -1,0 +1,43 @@
+lib/workspace-color-utils.ts
+  322bd4b518fd5404 1-57
+tests/lib/workspace-colors.test.ts
+  322bd4b518fd5404 1-136
+app/api/workspaces/route.ts
+  322bd4b518fd5404 10,142,154,202,218
+hooks/use-settings.ts
+  322bd4b518fd5404 45,408-417
+components/settings/workspace-settings.tsx
+  322bd4b518fd5404 9,23,33,39,71-77,166-180
+app/api/workspaces/worktrees/route.ts
+  322bd4b518fd5404 11,110,127,240,254
+app/workspaces/page.tsx
+  322bd4b518fd5404 27,37-42,115-140,152-168
+app/api/workspaces/clone/route.ts
+  322bd4b518fd5404 9,61,73
+lib/workspace-colors.ts
+  322bd4b518fd5404 1-27
+components/workspace/create-provider-workspace-dialog.tsx
+  322bd4b518fd5404 39,70
+components/dashboard/workspace-overview.tsx
+  322bd4b518fd5404 99-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "a3385752659d650b168a9787ba608df7cf76be3f",
+  "prompts": {
+    "322bd4b518fd5404": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_304b35564ffem3cK7o7v67HzOV",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 405,
+      "total_deletions": 82,
+      "accepted_lines": 328,
+      "overriden_lines": 0
+    }
+  }
+}

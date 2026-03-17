@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { MobileNav } from "@/components/layout/mobile-nav"
@@ -30,6 +30,7 @@ export function AuthenticatedLayout({
   const disconnectGlobalSSE = useChatStore((s) => s.disconnectGlobalSSE)
   const handleVisibilityRestored = useChatStore((s) => s.handleVisibilityRestored)
   const isKeyboardVisible = useKeyboardVisible()
+  const wasAuthenticatedRef = useRef(false)
 
   const { data, isFetching } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
@@ -76,7 +77,15 @@ export function AuthenticatedLayout({
   }, [handleVisibilityRestored])
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (status === "authenticated") {
+      wasAuthenticatedRef.current = true
+    }
+    // Only redirect on initial unauthenticated load. If the user was already
+    // authenticated, a transient refetch failure (common on mobile tab switches
+    // where the browser suspends network) should not bounce them to /login.
+    // The server-side middleware still guards all routes, so a truly expired
+    // session is caught on the next navigation or API call.
+    if (status === "unauthenticated" && !wasAuthenticatedRef.current) {
       router.push("/login")
     }
   }, [status, router])

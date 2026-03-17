@@ -368,6 +368,7 @@ export interface GitHubLabel {
 
 export interface GitHubPullRequest {
   number: number
+  node_id: string
   title: string
   body: string | null
   state: "open" | "closed"

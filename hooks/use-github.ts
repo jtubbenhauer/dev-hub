@@ -61,6 +61,36 @@ async function githubFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+// ─── GitHub GraphQL helper ───────────────────────────────────────────────────
+
+interface GraphQLResponse<T> {
+  data: T
+  errors?: { message: string }[]
+}
+
+async function githubGraphQL<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+  const res = await fetch("/api/github/graphql", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+  })
+  if (!res.ok) {
+    let message = `GitHub GraphQL error (${res.status})`
+    try {
+      const err = await res.json()
+      if (err.message) message = err.message
+    } catch {
+      // non-JSON body
+    }
+    throw new Error(message)
+  }
+  const json = (await res.json()) as GraphQLResponse<T>
+  if (json.errors?.length) {
+    throw new Error(json.errors[0].message)
+  }
+  return json.data
+}
+
 // The GitHub search/pulls API returns paginated results. For the review-requested list
 // we use the search API which is the most reliable cross-org approach.
 export function useGitHubPrsAwaitingReview() {
@@ -383,6 +413,122 @@ export function useGitHubMergePr() {
     },
     onError: (err: Error) => {
       toast.error(err.message)
+    },
+  })
+}
+
+// ─── PR file viewed state (GitHub GraphQL) ───────────────────────────────────
+
+const PR_VIEWED_FILES_QUERY = `
+  query PullRequestViewedFiles($owner: String!, $name: String!, $number: Int!, $after: String) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        files(first: 100, after: $after) {
+          nodes { path, viewerViewedState }
+          pageInfo { hasNextPage, endCursor }
+        }
+      }
+    }
+  }
+`
+
+const MARK_FILE_AS_VIEWED = `
+  mutation MarkFileAsViewed($input: MarkFileAsViewedInput!) {
+    markFileAsViewed(input: $input) { pullRequest { id } }
+  }
+`
+
+const UNMARK_FILE_AS_VIEWED = `
+  mutation UnmarkFileAsViewed($input: UnmarkFileAsViewedInput!) {
+    unmarkFileAsViewed(input: $input) { pullRequest { id } }
+  }
+`
+
+interface PrViewedFilesPage {
+  repository: {
+    pullRequest: {
+      files: {
+        nodes: { path: string; viewerViewedState: "VIEWED" | "UNVIEWED" | "DISMISSED" }[]
+        pageInfo: { hasNextPage: boolean; endCursor: string }
+      }
+    }
+  } | null
+}
+
+export function useGitHubPrViewedFiles(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null
+) {
+  return useQuery<string[]>({
+    queryKey: ["github", "pr-viewed-files", owner, repo, prNumber],
+    queryFn: async (): Promise<string[]> => {
+      const viewed: string[] = []
+      let after: string | null = null
+
+      for (;;) {
+        const page: PrViewedFilesPage = await githubGraphQL<PrViewedFilesPage>(
+          PR_VIEWED_FILES_QUERY,
+          { owner, name: repo, number: prNumber, after }
+        )
+
+        const files = page.repository?.pullRequest?.files
+        if (!files) break
+
+        for (const node of files.nodes) {
+          if (node.viewerViewedState === "VIEWED") viewed.push(node.path)
+        }
+
+        if (!files.pageInfo.hasNextPage) break
+        after = files.pageInfo.endCursor
+      }
+
+      return viewed
+    },
+    enabled: !!(owner && repo && prNumber),
+    staleTime: 30_000,
+  })
+}
+
+interface ToggleFileViewedInput {
+  pullRequestId: string
+  path: string
+  viewed: boolean
+}
+
+export function useGitHubToggleFileViewed(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null
+) {
+  const queryClient = useQueryClient()
+  const queryKey = ["github", "pr-viewed-files", owner, repo, prNumber]
+
+  return useMutation({
+    mutationFn: async (input: ToggleFileViewedInput) => {
+      const mutation = input.viewed ? MARK_FILE_AS_VIEWED : UNMARK_FILE_AS_VIEWED
+      return githubGraphQL(mutation, {
+        input: { pullRequestId: input.pullRequestId, path: input.path },
+      })
+    },
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<string[]>(queryKey)
+
+      queryClient.setQueryData<string[]>(queryKey, (old = []) =>
+        input.viewed
+          ? [...old, input.path]
+          : old.filter((p) => p !== input.path)
+      )
+
+      return { previous }
+    },
+    onError: (err: Error, _, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
+      toast.error(`Failed to update viewed state: ${err.message}`)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 }

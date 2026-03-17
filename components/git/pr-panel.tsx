@@ -57,6 +57,8 @@ import {
   useGitHubSubmitReview,
   useGitHubMergePr,
   useGitHubCurrentUser,
+  useGitHubPrViewedFiles,
+  useGitHubToggleFileViewed,
 } from "@/hooks/use-github"
 import type {
   GitHubPullRequest,
@@ -91,7 +93,6 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const [activeTab, setActiveTab] = useState<PrTab>("for-review")
   const [selectedPr, setSelectedPr] = useState<GitHubPullRequest | null>(null)
   const [selectedFilename, setSelectedFilename] = useState<string | null>(null)
-  const [reviewedFilenames, setReviewedFilenames] = useState<Set<string>>(new Set())
   const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false)
   const [isPrListOpen, setIsPrListOpen] = useState(false)
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false)
@@ -139,6 +140,10 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const { data: prComments = [] } = useGitHubPrComments(owner, repo, prNumber)
   const { data: prReviews = [] } = useGitHubPrReviews(owner, repo, prNumber)
   const { data: prChecks = [] } = useGitHubPrChecks(owner, repo, headSha)
+  const { data: viewedFilePaths = [] } = useGitHubPrViewedFiles(owner, repo, prNumber)
+  const toggleFileViewedMutation = useGitHubToggleFileViewed(owner, repo, prNumber)
+
+  const reviewedFilenames = useMemo(() => new Set(viewedFilePaths), [viewedFilePaths])
 
   const selectedFile = prFiles.find((f) => f.filename === selectedFilename) ?? null
 
@@ -173,7 +178,6 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const handleSelectPr = useCallback((pr: GitHubPullRequest) => {
     setSelectedPr(pr)
     setSelectedFilename(null)
-    setReviewedFilenames(new Set())
     setIsPrListOpen(false)
     setIsDescriptionOpen(false)
     try { localStorage.setItem("dev-hub:git-selected-pr", encodePrParam(pr)) } catch {}
@@ -182,7 +186,6 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const handleBackToList = useCallback(() => {
     setSelectedPr(null)
     setSelectedFilename(null)
-    setReviewedFilenames(new Set())
     setIsDescriptionOpen(false)
     try { localStorage.removeItem("dev-hub:git-selected-pr") } catch {}
   }, [])
@@ -192,17 +195,19 @@ export function PrPanel({ onClose }: PrPanelProps) {
     setIsMobileFileListOpen(false)
   }, [])
 
-  const handleToggleReviewed = useCallback((filename: string) => {
-    setReviewedFilenames((prev) => {
-      const next = new Set(prev)
-      if (next.has(filename)) {
-        next.delete(filename)
-      } else {
-        next.add(filename)
-      }
-      return next
-    })
-  }, [])
+  const handleToggleReviewed = useCallback(
+    (filename: string) => {
+      const nodeId = selectedPr?.node_id
+      if (!nodeId) return
+      const isCurrentlyViewed = reviewedFilenames.has(filename)
+      toggleFileViewedMutation.mutate({
+        pullRequestId: nodeId,
+        path: filename,
+        viewed: !isCurrentlyViewed,
+      })
+    },
+    [selectedPr?.node_id, reviewedFilenames, toggleFileViewedMutation]
+  )
 
   const handleAddComment = useCallback(
     async (body: string, line: number, startLine: number) => {

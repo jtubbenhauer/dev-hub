@@ -3,7 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { FileComment, NewFileComment } from "@/types"
-import { attachCommentToChat } from "@/lib/comment-chat-bridge"
+import { attachCommentToChat, detachCommentFromChat, updateCommentInChat } from "@/lib/comment-chat-bridge"
+import { useChatStore } from "@/stores/chat-store"
 
 async function fileCommentsGet<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -70,10 +71,11 @@ export function useFileComments(
 
 export function useCreateFileComment() {
   const queryClient = useQueryClient()
+  const activeSessionId = useChatStore((s) => s.activeSessionId)
 
   return useMutation<FileComment, Error, NewFileComment>({
     mutationFn: (input) => fileCommentsPost<FileComment>("/api/file-comments", input),
-    onSuccess: (comment) => {
+    onSuccess: (comment, variables) => {
       queryClient.invalidateQueries({ queryKey: ["file-comments"] })
       attachCommentToChat({
         id: comment.id,
@@ -81,6 +83,8 @@ export function useCreateFileComment() {
         startLine: comment.startLine,
         endLine: comment.endLine,
         body: comment.body,
+        workspaceId: variables.workspaceId,
+        sessionId: activeSessionId,
       })
       toast.success("Comment created")
     },
@@ -96,8 +100,9 @@ export function useUpdateFileComment() {
   return useMutation<FileComment, Error, { id: number; body: string }>({
     mutationFn: ({ id, body }) =>
       fileCommentsPut<FileComment>(`/api/file-comments/${id}`, { body }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["file-comments"] })
+      updateCommentInChat(variables.id, variables.body)
       toast.success("Comment updated")
     },
     onError: (err) => {
@@ -127,8 +132,9 @@ export function useDeleteFileComment() {
 
   return useMutation<void, Error, number>({
     mutationFn: (id) => fileCommentsDelete(`/api/file-comments/${id}`),
-    onSuccess: () => {
+    onSuccess: (_data, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["file-comments"] })
+      detachCommentFromChat(deletedId)
       toast.success("Comment deleted")
     },
     onError: (err) => {

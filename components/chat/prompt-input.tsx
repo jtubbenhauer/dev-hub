@@ -7,21 +7,22 @@ import { FilePicker } from "@/components/chat/file-picker"
 import { CommandPicker, type SlashCommand } from "@/components/chat/command-picker"
 import { cn } from "@/lib/utils"
 import type { Command } from "@/lib/opencode/types"
-import { getPendingCommentChips, clearPendingCommentChips } from "@/lib/comment-chat-bridge"
-
-type CommentChip = {
-  id: number
-  filePath: string
-  startLine: number
-  endLine: number
-  body: string
-}
+import { getPendingCommentChips, clearPendingCommentChips, getAllCachedComments, type CommentChip } from "@/lib/comment-chat-bridge"
+import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 export interface PromptInputHandle {
   focus: () => void
+  setValue: (text: string) => void
 }
 
-const sessionDrafts = new Map<string, string>()
+type SessionDraft = {
+  text: string
+  commentChips: CommentChip[]
+  files: string[]
+}
+
+const sessionDrafts = new Map<string, SessionDraft>()
 
 interface PromptInputProps {
   onSubmit: (text: string) => void
@@ -44,22 +45,37 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   commands,
   onCommandSelect,
 }, ref) {
-  const [value, setValue] = useState(() => (sessionId ? sessionDrafts.get(sessionId) ?? "" : ""))
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
-  const [selectedComments, setSelectedComments] = useState<CommentChip[]>([])
+  const queryClient = useQueryClient()
+  const [value, setValue] = useState(() => {
+    const draft = sessionId ? sessionDrafts.get(sessionId) : undefined
+    return draft?.text ?? ""
+  })
+  const [selectedFiles, setSelectedFiles] = useState<string[]>(() => {
+    const draft = sessionId ? sessionDrafts.get(sessionId) : undefined
+    return draft?.files ?? []
+  })
+  const [selectedComments, setSelectedComments] = useState<CommentChip[]>(() => {
+    const draft = sessionId ? sessionDrafts.get(sessionId) : undefined
+    return draft?.commentChips ?? []
+  })
   const [pickerQuery, setPickerQuery] = useState<string | null>(null)
   const [commandQuery, setCommandQuery] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const prevSessionIdRef = useRef(sessionId)
 
   if (prevSessionIdRef.current !== sessionId) {
-    if (prevSessionIdRef.current && value) {
-      sessionDrafts.set(prevSessionIdRef.current, value)
+    if (prevSessionIdRef.current) {
+      sessionDrafts.set(prevSessionIdRef.current, {
+        text: value,
+        commentChips: selectedComments,
+        files: selectedFiles,
+      })
     }
     prevSessionIdRef.current = sessionId
-    const restored = sessionId ? sessionDrafts.get(sessionId) ?? "" : ""
-    if (restored !== value) {
-      setValue(restored)
+    const draft = sessionId ? sessionDrafts.get(sessionId) : undefined
+    const restoredText = draft?.text ?? ""
+    if (restoredText !== value) {
+      setValue(restoredText)
       requestAnimationFrame(() => {
         const textarea = textareaRef.current
         if (!textarea) return
@@ -67,45 +83,77 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
         textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
       })
     }
+    setSelectedComments(draft?.commentChips ?? [])
+    setSelectedFiles(draft?.files ?? [])
   }
 
   useEffect(() => {
-    if (sessionId && value) {
-      sessionDrafts.set(sessionId, value)
-    } else if (sessionId) {
+    if (!sessionId) return
+    const hasContent = value || selectedComments.length > 0 || selectedFiles.length > 0
+    if (hasContent) {
+      sessionDrafts.set(sessionId, { text: value, commentChips: selectedComments, files: selectedFiles })
+    } else {
       sessionDrafts.delete(sessionId)
     }
-  }, [sessionId, value])
+  }, [sessionId, value, selectedComments, selectedFiles])
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
+    setValue: (text: string) => {
+      setValue(text)
+      requestAnimationFrame(() => {
+        const textarea = textareaRef.current
+        if (!textarea) return
+        textarea.style.height = "auto"
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+        textarea.focus()
+      })
+    },
   }), [])
 
   useEffect(() => {
-    const chips = getPendingCommentChips()
+    if (!workspaceId) return
+
+    const chips = getPendingCommentChips(workspaceId)
     if (chips.length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedComments(chips)
-      clearPendingCommentChips()
+      clearPendingCommentChips(workspaceId)
     }
 
     const handleAttach = () => {
-      const incoming = getPendingCommentChips()
+      if (!workspaceId) return
+      const incoming = getPendingCommentChips(workspaceId)
       if (incoming.length > 0) {
         setSelectedComments((prev) => {
           const existingIds = new Set(prev.map((c) => c.id))
           const newChips = incoming.filter((c) => !existingIds.has(c.id))
           return newChips.length > 0 ? [...prev, ...newChips] : prev
         })
-        clearPendingCommentChips()
+        clearPendingCommentChips(workspaceId)
       }
     }
 
+    const handleDetach = (e: Event) => {
+      const { commentId } = (e as CustomEvent).detail as { commentId: number }
+      setSelectedComments((prev) => prev.filter((c) => c.id !== commentId))
+    }
+
+    const handleUpdate = (e: Event) => {
+      const { commentId, body } = (e as CustomEvent).detail as { commentId: number; body: string }
+      setSelectedComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, body } : c))
+      )
+    }
+
     window.addEventListener("attach-comment-to-chat", handleAttach)
+    window.addEventListener("detach-comment-from-chat", handleDetach)
+    window.addEventListener("update-comment-in-chat", handleUpdate)
     return () => {
       window.removeEventListener("attach-comment-to-chat", handleAttach)
+      window.removeEventListener("detach-comment-from-chat", handleDetach)
+      window.removeEventListener("update-comment-in-chat", handleUpdate)
     }
-  }, [])
+  }, [workspaceId])
 
   const autoResize = useCallback(() => {
     const textarea = textareaRef.current
@@ -152,6 +200,20 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
       }
     }
 
+    if (selectedComments.length > 0 && workspaceId) {
+      const allComments = getAllCachedComments(queryClient, workspaceId)
+      if (allComments.length > 0) {
+        const commentMap = new Map(allComments.map((c) => [c.id, c]))
+        const stale = selectedComments.filter((c) => {
+          const live = commentMap.get(c.id)
+          return live?.resolved === true || !live
+        })
+        if (stale.length > 0) {
+          toast.warning(`${stale.length} attached comment(s) have been resolved or deleted since you added them`)
+        }
+      }
+    }
+
     const commentContext =
       selectedComments.length > 0
         ? `Comment references:\n${selectedComments
@@ -160,7 +222,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
                 c.startLine === c.endLine
                   ? `${c.filePath}:${c.startLine}`
                   : `${c.filePath}:${c.startLine}-${c.endLine}`
-              return `- ${lineRef} — "${c.body}"`
+              return `- [comment:${c.id}] ${lineRef} — "${c.body}"`
             })
             .join("\n")}\n\n`
         : ""
@@ -177,7 +239,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
-  }, [value, disabled, selectedFiles, selectedComments, onSubmit, availableCommands, onCommandSelect])
+  }, [value, disabled, selectedFiles, selectedComments, onSubmit, availableCommands, onCommandSelect, queryClient, workspaceId])
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {

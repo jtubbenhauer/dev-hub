@@ -22,7 +22,9 @@ const dispatchEventMock = vi.fn()
 vi.stubGlobal("window", { dispatchEvent: dispatchEventMock })
 
 beforeEach(() => {
-  Object.keys(store).forEach((k) => delete store[k])
+  Object.keys(store).forEach((k) => {
+    delete store[k]
+  })
   dispatchEventMock.mockClear()
 })
 
@@ -35,10 +37,12 @@ describe("comment-chat-bridge", () => {
         startLine: 10,
         endLine: 15,
         body: "This is a comment",
+        workspaceId: "ws-test",
+        sessionId: null,
       }
       attachCommentToChat(comment)
 
-      const stored = getPendingCommentChips()
+      const stored = getPendingCommentChips("ws-test")
       expect(stored).toHaveLength(1)
       expect(stored[0]).toEqual(comment)
     })
@@ -50,11 +54,13 @@ describe("comment-chat-bridge", () => {
         startLine: 10,
         endLine: 15,
         body: "This is a comment",
+        workspaceId: "ws-test",
+        sessionId: null,
       }
       attachCommentToChat(comment)
       attachCommentToChat(comment)
 
-      const stored = getPendingCommentChips()
+      const stored = getPendingCommentChips("ws-test")
       expect(stored).toHaveLength(1)
     })
 
@@ -65,6 +71,8 @@ describe("comment-chat-bridge", () => {
         startLine: 10,
         endLine: 15,
         body: "This is a comment",
+        workspaceId: "ws-test",
+        sessionId: null,
       }
       attachCommentToChat(comment)
 
@@ -76,7 +84,7 @@ describe("comment-chat-bridge", () => {
 
   describe("getPendingCommentChips", () => {
     it("returns empty array when localStorage is empty", () => {
-      const result = getPendingCommentChips()
+      const result = getPendingCommentChips("ws-test")
       expect(result).toEqual([])
     })
 
@@ -88,6 +96,8 @@ describe("comment-chat-bridge", () => {
           startLine: 10,
           endLine: 15,
           body: "Comment 1",
+          workspaceId: "ws-test",
+          sessionId: null,
         },
         {
           id: 2,
@@ -95,27 +105,29 @@ describe("comment-chat-bridge", () => {
           startLine: 20,
           endLine: 25,
           body: "Comment 2",
+          workspaceId: "ws-test",
+          sessionId: null,
         },
       ]
-      localStorage.setItem("devhub:pending-comment-chips", JSON.stringify(comments))
+      localStorage.setItem("devhub:pending-comment-chips:ws-test", JSON.stringify(comments))
 
-      const result = getPendingCommentChips()
+      const result = getPendingCommentChips("ws-test")
       expect(result).toEqual(comments)
     })
 
     it("returns empty array when JSON parsing fails", () => {
-      localStorage.setItem("devhub:pending-comment-chips", "invalid json")
-      const result = getPendingCommentChips()
+      localStorage.setItem("devhub:pending-comment-chips:ws-test", "invalid json")
+      const result = getPendingCommentChips("ws-test")
       expect(result).toEqual([])
     })
   })
 
   describe("clearPendingCommentChips", () => {
     it("removes the key from localStorage", () => {
-      localStorage.setItem("devhub:pending-comment-chips", JSON.stringify([{ id: 1 }]))
-      clearPendingCommentChips()
+      localStorage.setItem("devhub:pending-comment-chips:ws-test", JSON.stringify([{ id: 1 }]))
+      clearPendingCommentChips("ws-test")
 
-      const result = localStorage.getItem("devhub:pending-comment-chips")
+      const result = localStorage.getItem("devhub:pending-comment-chips:ws-test")
       expect(result).toBeNull()
     })
   })
@@ -129,6 +141,8 @@ describe("comment-chat-bridge", () => {
           startLine: 10,
           endLine: 15,
           body: "Comment 1",
+          workspaceId: "ws-test",
+          sessionId: null,
         },
         {
           id: 2,
@@ -136,13 +150,15 @@ describe("comment-chat-bridge", () => {
           startLine: 20,
           endLine: 25,
           body: "Comment 2",
+          workspaceId: "ws-test",
+          sessionId: null,
         },
       ]
-      localStorage.setItem("devhub:pending-comment-chips", JSON.stringify(comments))
+      localStorage.setItem("devhub:pending-comment-chips:ws-test", JSON.stringify(comments))
 
-      removePendingCommentChip(1)
+      removePendingCommentChip("ws-test", 1)
 
-      const result = getPendingCommentChips()
+      const result = getPendingCommentChips("ws-test")
       expect(result).toHaveLength(1)
       expect(result[0].id).toBe(2)
     })
@@ -154,12 +170,14 @@ describe("comment-chat-bridge", () => {
         startLine: 10,
         endLine: 15,
         body: "Comment",
+        workspaceId: "ws-test",
+        sessionId: null,
       }
-      localStorage.setItem("devhub:pending-comment-chips", JSON.stringify([comment]))
+      localStorage.setItem("devhub:pending-comment-chips:ws-test", JSON.stringify([comment]))
 
-      removePendingCommentChip(1)
+      removePendingCommentChip("ws-test", 1)
 
-      const result = localStorage.getItem("devhub:pending-comment-chips")
+      const result = localStorage.getItem("devhub:pending-comment-chips:ws-test")
       expect(result).toBeNull()
     })
   })

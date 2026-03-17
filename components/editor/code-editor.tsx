@@ -20,6 +20,7 @@ import { useFileComments, useCreateFileComment, useResolveFileComment, useDelete
 import { CommentThread } from "@/components/editor/comment-thread"
 import { CommentInput } from "@/components/editor/comment-input"
 import { attachCommentToChat } from "@/lib/comment-chat-bridge"
+import { useChatStore } from "@/stores/chat-store"
 
 Vim.noremap("jk", "<Esc>", "insert")
 
@@ -51,6 +52,7 @@ export function CodeEditor({
   const { tabSize } = useTabSizeSetting()
   const isMobile = useIsMobile()
 
+  const activeSessionId = useChatStore((s) => s.activeSessionId)
   const isCommentMode = !!(workspaceId && filePath)
   const { data: commentsData } = useFileComments(workspaceId ?? null, filePath)
   const { mutate: createComment } = useCreateFileComment()
@@ -262,6 +264,8 @@ export function CodeEditor({
                 startLine: comment.startLine,
                 endLine: comment.endLine,
                 body: comment.body,
+                workspaceId: workspaceId!,
+                sessionId: activeSessionId,
               })
               setActiveCommentLine(null)
             }}

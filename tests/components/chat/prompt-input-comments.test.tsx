@@ -1,13 +1,29 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, act, waitFor } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { render, screen, act, waitFor, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { PromptInput } from "@/components/chat/prompt-input"
 
 vi.mock("@/lib/comment-chat-bridge", () => ({
-  getPendingCommentChips: vi.fn(() => []),
-  clearPendingCommentChips: vi.fn(),
+  getPendingCommentChips: vi.fn((_workspaceId: string) => []),
+  clearPendingCommentChips: vi.fn((_workspaceId: string) => undefined),
   removePendingCommentChip: vi.fn(),
   attachCommentToChat: vi.fn(),
+  getAllCachedComments: vi.fn(() => []),
+}))
+
+vi.mock("@tanstack/react-query", async () => {
+  const actual = await vi.importActual("@tanstack/react-query")
+  return {
+    ...actual,
+    useQueryClient: () => ({
+      getQueryData: vi.fn(() => undefined),
+      getQueriesData: vi.fn(() => []),
+    }),
+  }
+})
+
+vi.mock("sonner", () => ({
+  toast: { warning: vi.fn(), success: vi.fn(), error: vi.fn() },
 }))
 
 vi.mock("@/components/chat/file-picker", () => ({
@@ -28,6 +44,8 @@ type CommentChip = {
   startLine: number
   endLine: number
   body: string
+  workspaceId: string
+  sessionId: string | null
 }
 
 const mockGetPending = getPendingCommentChips as ReturnType<typeof vi.fn>
@@ -50,6 +68,8 @@ const singleLineChip: CommentChip = {
   startLine: 42,
   endLine: 42,
   body: "Needs error handling",
+  workspaceId: "ws-1",
+  sessionId: "session-1",
 }
 
 const rangeChip: CommentChip = {
@@ -58,11 +78,19 @@ const rangeChip: CommentChip = {
   startLine: 10,
   endLine: 15,
   body: "Refactor this block",
+  workspaceId: "ws-1",
+  sessionId: "session-1",
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  mockGetPending.mockReturnValue([])
+  cleanup()
+  vi.resetAllMocks()
+  mockGetPending.mockImplementation((_workspaceId: string) => [])
+  mockClearPending.mockImplementation((_workspaceId: string) => undefined)
+})
+
+afterEach(() => {
+  cleanup()
 })
 
 describe("PromptInput — comment context chips", () => {
@@ -90,7 +118,7 @@ describe("PromptInput — comment context chips", () => {
     it("shows no comment chips when localStorage is empty on mount", () => {
       mockGetPending.mockReturnValue([])
 
-      render(<PromptInput {...baseProps} />)
+      render(<PromptInput {...baseProps} sessionId="fresh-session" />)
 
       expect(screen.queryByText(/auth\.ts/)).not.toBeInTheDocument()
     })
@@ -235,6 +263,7 @@ describe("PromptInput — comment context chips", () => {
       expect(submitted).toContain("Comment references:")
       expect(submitted).toContain("src/auth.ts:42")
       expect(submitted).toContain("Needs error handling")
+      expect(submitted).toContain("[comment:1]")
       expect(submitted).toContain("fix this")
     })
 
@@ -272,6 +301,7 @@ describe("PromptInput — comment context chips", () => {
 
       const submitted = onSubmit.mock.calls[0][0] as string
       expect(submitted).toContain("utils/helpers.ts:10-15")
+      expect(submitted).toContain("[comment:2]")
     })
 
     it("places comment context before user message text", async () => {

@@ -40,6 +40,7 @@ import { useFileComments, useCreateFileComment, useResolveFileComment, useDelete
 import { CommentThread } from "@/components/editor/comment-thread"
 import { CommentInput } from "@/components/editor/comment-input"
 import { attachCommentToChat } from "@/lib/comment-chat-bridge"
+import { useChatStore } from "@/stores/chat-store"
 import type { ReviewFile } from "@/types"
 
 // Register ]c / [c vim bindings for chunk navigation — runs once at module load
@@ -142,6 +143,7 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
   const [commentInput, setCommentInput] = useState<{ startLine: number; endLine: number } | null>(null)
   const [activeCommentLine, setActiveCommentLine] = useState<number | null>(null)
 
+  const activeSessionId = useChatStore((s) => s.activeSessionId)
   const { data: fileCommentsData } = useFileComments(workspaceId, fileContent.path)
   const createCommentMutation = useCreateFileComment()
   const resolveCommentMutation = useResolveFileComment()
@@ -406,8 +408,12 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
   }, [updateCommentMutation])
 
   const handleAttachToChat = useCallback((comment: { id: number; filePath: string; startLine: number; endLine: number; body: string }) => {
-    attachCommentToChat(comment)
-  }, [])
+    attachCommentToChat({
+      ...comment,
+      workspaceId,
+      sessionId: activeSessionId,
+    })
+  }, [workspaceId, activeSessionId])
 
   const activeComments = useMemo(() => {
     if (activeCommentLine === null || !fileCommentsData) return []

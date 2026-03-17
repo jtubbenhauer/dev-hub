@@ -9,6 +9,7 @@ import { useFileComments, useCreateFileComment, useResolveFileComment, useDelete
 import { CommentThread } from "@/components/editor/comment-thread"
 import { CommentInput } from "@/components/editor/comment-input"
 import { attachCommentToChat } from "@/lib/comment-chat-bridge"
+import { useChatStore } from "@/stores/chat-store"
 import type { FileComment } from "@/types"
 
 interface DiffViewerProps {
@@ -36,6 +37,7 @@ interface ActiveCommentLine {
 }
 
 export function DiffViewer({ diff, fileName, isLoading, workspaceId }: DiffViewerProps) {
+  const activeSessionId = useChatStore((s) => s.activeSessionId)
   const [hoveredLine, setHoveredLine] = useState<HoveredLine | null>(null)
   const [commentInputLine, setCommentInputLine] = useState<CommentInputLine | null>(null)
   const [activeCommentLine, setActiveCommentLine] = useState<ActiveCommentLine | null>(null)
@@ -123,6 +125,8 @@ export function DiffViewer({ diff, fileName, isLoading, workspaceId }: DiffViewe
       startLine: comment.startLine,
       endLine: comment.endLine,
       body: comment.body,
+      workspaceId: workspaceId ?? comment.workspaceId,
+      sessionId: activeSessionId,
     })
   }
 

@@ -5,7 +5,7 @@ import dynamic from "next/dynamic"
 import type { editor } from "monaco-editor"
 import { useEditorStore } from "@/stores/editor-store"
 import { useTheme } from "@/components/providers/theme-provider"
-import { registerMonacoThemes, getMonacoThemeName } from "@/lib/editor/monaco-themes"
+import { registerMonacoThemes, getMonacoThemeName, MONACO_FONT_FAMILY } from "@/lib/editor/monaco-themes"
 import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useFileComments, useCreateFileComment, useResolveFileComment, useDeleteFileComment, useUpdateFileComment } from "@/hooks/use-file-comments"
@@ -240,7 +240,9 @@ export function MonacoEditor({
         onMount={handleEditorDidMount}
         options={{
           fontSize: effectiveFontSize,
-          fontFamily: "'IBM Plex Mono', monospace",
+          lineHeight: Math.round(effectiveFontSize * 1.5),
+          fontFamily: MONACO_FONT_FAMILY,
+          fontLigatures: false,
           tabSize,
           minimap: { enabled: !isMobile },
           scrollBeyondLastLine: false,

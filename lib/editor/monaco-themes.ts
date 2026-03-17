@@ -2,6 +2,8 @@ import type { editor } from "monaco-editor"
 
 type MonacoThemeData = editor.IStandaloneThemeData
 
+export const MONACO_FONT_FAMILY = "Menlo, Monaco, 'Courier New', monospace"
+
 // ---------------------------------------------------------------------------
 // Catppuccin Mocha
 // ---------------------------------------------------------------------------
@@ -58,6 +60,13 @@ const catppuccinMocha: MonacoThemeData = {
     "scrollbarSlider.background": "#585b7044",
     "scrollbarSlider.hoverBackground": "#585b7066",
     "scrollbarSlider.activeBackground": "#585b7088",
+    "diffEditor.insertedLineBackground": "#a6e3a120",
+    "diffEditor.removedLineBackground": "#f38ba820",
+    "diffEditor.insertedTextBackground": "#a6e3a130",
+    "diffEditor.removedTextBackground": "#f38ba830",
+    "diffEditorGutter.insertedLineBackground": "#a6e3a130",
+    "diffEditorGutter.removedLineBackground": "#f38ba830",
+    "diffEditor.diagonalFill": "#45475a33",
   },
 }
 
@@ -117,6 +126,13 @@ const catppuccinMacchiato: MonacoThemeData = {
     "scrollbarSlider.background": "#5b607844",
     "scrollbarSlider.hoverBackground": "#5b607866",
     "scrollbarSlider.activeBackground": "#5b607888",
+    "diffEditor.insertedLineBackground": "#a6da9520",
+    "diffEditor.removedLineBackground": "#ed879620",
+    "diffEditor.insertedTextBackground": "#a6da9530",
+    "diffEditor.removedTextBackground": "#ed879630",
+    "diffEditorGutter.insertedLineBackground": "#a6da9530",
+    "diffEditorGutter.removedLineBackground": "#ed879630",
+    "diffEditor.diagonalFill": "#494d6433",
   },
 }
 
@@ -176,6 +192,13 @@ const catppuccinFrappe: MonacoThemeData = {
     "scrollbarSlider.background": "#62688044",
     "scrollbarSlider.hoverBackground": "#62688066",
     "scrollbarSlider.activeBackground": "#62688088",
+    "diffEditor.insertedLineBackground": "#a6d18920",
+    "diffEditor.removedLineBackground": "#e7828420",
+    "diffEditor.insertedTextBackground": "#a6d18930",
+    "diffEditor.removedTextBackground": "#e7828430",
+    "diffEditorGutter.insertedLineBackground": "#a6d18930",
+    "diffEditorGutter.removedLineBackground": "#e7828430",
+    "diffEditor.diagonalFill": "#51576d33",
   },
 }
 
@@ -235,6 +258,13 @@ const catppuccinLatte: MonacoThemeData = {
     "scrollbarSlider.background": "#acb0be44",
     "scrollbarSlider.hoverBackground": "#acb0be66",
     "scrollbarSlider.activeBackground": "#acb0be88",
+    "diffEditor.insertedLineBackground": "#40a02b18",
+    "diffEditor.removedLineBackground": "#d20f3918",
+    "diffEditor.insertedTextBackground": "#40a02b28",
+    "diffEditor.removedTextBackground": "#d20f3928",
+    "diffEditorGutter.insertedLineBackground": "#40a02b28",
+    "diffEditorGutter.removedLineBackground": "#d20f3928",
+    "diffEditor.diagonalFill": "#bcc0cc33",
   },
 }
 
@@ -294,6 +324,13 @@ const draculaTheme: MonacoThemeData = {
     "scrollbarSlider.background": "#44475a44",
     "scrollbarSlider.hoverBackground": "#44475a66",
     "scrollbarSlider.activeBackground": "#44475a88",
+    "diffEditor.insertedLineBackground": "#50fa7b20",
+    "diffEditor.removedLineBackground": "#ff555520",
+    "diffEditor.insertedTextBackground": "#50fa7b30",
+    "diffEditor.removedTextBackground": "#ff555530",
+    "diffEditorGutter.insertedLineBackground": "#50fa7b30",
+    "diffEditorGutter.removedLineBackground": "#ff555530",
+    "diffEditor.diagonalFill": "#44475a33",
   },
 }
 
@@ -337,6 +374,9 @@ const githubDark: MonacoThemeData = {
     "editorLineNumber.foreground": "#8b949e",
     "editorLineNumber.activeForeground": "#e6edf3",
     "editorGutter.background": "#0d1117",
+    "editorGutter.addedBackground": "#238636",
+    "editorGutter.modifiedBackground": "#1f6feb",
+    "editorGutter.deletedBackground": "#da3633",
     "editorBracketMatch.background": "#264f7844",
     "editorBracketMatch.border": "#388bfd",
     "editorIndentGuide.background": "#21262d",
@@ -353,6 +393,13 @@ const githubDark: MonacoThemeData = {
     "scrollbarSlider.background": "#8b949e22",
     "scrollbarSlider.hoverBackground": "#8b949e44",
     "scrollbarSlider.activeBackground": "#8b949e66",
+    "diffEditor.insertedLineBackground": "#23863633",
+    "diffEditor.removedLineBackground": "#da363333",
+    "diffEditor.insertedTextBackground": "#2386364d",
+    "diffEditor.removedTextBackground": "#da36334d",
+    "diffEditorGutter.insertedLineBackground": "#2386364d",
+    "diffEditorGutter.removedLineBackground": "#da36334d",
+    "diffEditor.diagonalFill": "#30363d55",
   },
 }
 
@@ -396,6 +443,13 @@ const defaultDark: MonacoThemeData = {
     "scrollbarSlider.background": "#4a4a4a44",
     "scrollbarSlider.hoverBackground": "#4a4a4a66",
     "scrollbarSlider.activeBackground": "#4a4a4a88",
+    "diffEditor.insertedLineBackground": "#2ea04330",
+    "diffEditor.removedLineBackground": "#f8514930",
+    "diffEditor.insertedTextBackground": "#2ea0434d",
+    "diffEditor.removedTextBackground": "#f851494d",
+    "diffEditorGutter.insertedLineBackground": "#2ea0434d",
+    "diffEditorGutter.removedLineBackground": "#f851494d",
+    "diffEditor.diagonalFill": "#4a4a4a33",
   },
 }
 
@@ -439,6 +493,13 @@ const defaultLight: MonacoThemeData = {
     "scrollbarSlider.background": "#8b949e22",
     "scrollbarSlider.hoverBackground": "#8b949e44",
     "scrollbarSlider.activeBackground": "#8b949e66",
+    "diffEditor.insertedLineBackground": "#2ea04318",
+    "diffEditor.removedLineBackground": "#cf222e18",
+    "diffEditor.insertedTextBackground": "#2ea04328",
+    "diffEditor.removedTextBackground": "#cf222e28",
+    "diffEditorGutter.insertedLineBackground": "#2ea04328",
+    "diffEditorGutter.removedLineBackground": "#cf222e28",
+    "diffEditor.diagonalFill": "#acb0be33",
   },
 }
 

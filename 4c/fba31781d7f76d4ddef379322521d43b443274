@@ -1,0 +1,52 @@
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-commbank-smart-health-settings/practice-commbank-smart-health-settings.component.html
+  6e93e88c51daa85b 17-21
+apps/principle-functions/src/environments/environment.ts
+  6e93e88c51daa85b 152-154,156-157,159,161
+apps/principle-functions/src/environments/environment.prod.ts
+  6e93e88c51daa85b 153-160,162
+apps/principle-functions/src/app/http/commbank-smart-health/commbank-smart-health-api.ts
+  6e93e88c51daa85b 62,110-111,114,117,120-122,161-197
+apps/principle-functions/src/environments/ienvironment.ts
+  6e93e88c51daa85b 109-110,150-155
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-commbank-smart-health-settings/practice-commbank-smart-health-settings.component.ts
+  6e93e88c51daa85b 93,105,116,125-127
+apps/principle-functions/src/app/lib/commbank-smart-health/commbank-smart-health-http-client.ts
+  6e93e88c51daa85b 25,49-67,79-80,87-91,93-94,96-98,116,118
+libs/principle-core/interfaces/src/lib/practice/practice.ts
+  6e93e88c51daa85b 270
+apps/principle-functions/src/environments/environment.staging.ts
+  6e93e88c51daa85b 152-154,156-157,159,161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "4cfba31781d7f76d4ddef379322521d43b443274",
+  "prompts": {
+    "3a0349011a6a07c4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_32b61ed2cffeaf413sVYMEXru2",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 319,
+      "overriden_lines": 0
+    },
+    "6e93e88c51daa85b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30ad64151ffe67wVmrZB3MrKsf",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 150,
+      "total_deletions": 80,
+      "accepted_lines": 123,
+      "overriden_lines": 5
+    }
+  }
+}

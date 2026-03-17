@@ -1,0 +1,174 @@
+apps/tinker/src/app/scripts/practice-migrations/remove-duplicate-steps.ts
+  b0ba4767eb8a6775 107
+libs/ng-auth/src/lib/auth-process.service.ts
+  54a8ad42035ddfc5 328,330
+libs/principle-db-connector/src/lib/dataconnect/index.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/destination/entities/sterilisation-equipment.ts
+  8f302a08f99aee83 162
+libs/principle-core/src/lib/models/organisation/organisation-cache/index.ts
+  54a8ad42035ddfc5 1
+libs/shared/src/lib/firebase/firestore/cache/index.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/source/connection/connection.node.ts
+  8343435946faca6f 169,171
+libs/practice-migrations/src/lib/source/source-entity-record.ts
+  8343435946faca6f 222
+libs/practice-migrations/src/lib/destination/destination-entity/index.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/translation-map/index.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/translation-map/translation-map.browser.ts
+  7b93377a73cec077 172,174-176
+libs/practice-migrations/src/lib/oasis/source/entities/patient-periodontal-charts.spec.ts
+  ddcffb72fc87727f 1
+libs/practice-migrations/src/lib/d4w/destination/entities/sterilisation-records.ts
+  b0ba4767eb8a6775 310
+libs/practice-migrations/src/lib/mappings/staffer-to-practitioner-to-xlsx.spec.ts
+  ddcffb72fc87727f 4
+libs/practice-migrations/src/lib/source/source-entity/index.ts
+  54a8ad42035ddfc5 1
+libs/shared/src/lib/recoverable-error.ts
+  54a8ad42035ddfc5 35
+apps/principle-functions/src/app/storage/practice-migration-backup-file-upload.ts
+  54a8ad42035ddfc5 141
+libs/shared/src/lib/firebase/firestore/adaptor/index.ts
+  54a8ad42035ddfc5 1
+libs/principle-db-connector/.eslintrc.json
+  54a8ad42035ddfc5 3
+libs/practice-migrations/src/lib/destination/base-destination-entity.ts
+  b0ba4767eb8a6775 135
+libs/ng-auth/src/lib/email-confirmation/email-confirmation.component.ts
+  54a8ad42035ddfc5 84
+libs/ng-auth/src/lib/ng-auth.module.ts
+  54a8ad42035ddfc5 90-91
+apps/tinker/src/app/scripts/remap-migrated-treatment-surfaces.ts
+  b0ba4767eb8a6775 106,108
+libs/practice-migrations/src/lib/destination/destination-entity/destination-entity.node.ts
+  54a8ad42035ddfc5 154,261,272
+  ddcffb72fc87727f 152
+  8f302a08f99aee83 210,247
+  7b93377a73cec077 276
+libs/practice-migrations/src/lib/destination/entities/patient-files.ts
+  8f302a08f99aee83 20
+libs/practice-migrations/src/lib/source/connection/index.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/practice-works/destination/entities/patient-invoices.ts
+  8343435946faca6f 388
+libs/practice-migrations/src/lib/mappings/appointment-book-to-practitioner-xlsx.ts
+  ddcffb72fc87727f 1-2
+libs/accounting/src/lib/dinero/index.ts
+  54a8ad42035ddfc5 1
+libs/shared/src/lib/firebase/data-connect/index.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/destination/destination-entity-record/destination-entity-record.node.ts
+  b0ba4767eb8a6775 103,120,140
+libs/practice-migrations/src/lib/destination/destination-entity/destination-entity.browser.ts
+  8343435946faca6f 182
+libs/shared/src/lib/firebase/firestore/transactions/index.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/translation-map/translation-map.node.ts
+  8343435946faca6f 138,154
+libs/practice-migrations/src/lib/source/source-entity/source-entity.browser.ts
+  8343435946faca6f 151,165,175,181
+  8f302a08f99aee83 128,201
+libs/ng-auth/src/lib/ngx-auth-firebaseui-login/ngx-auth-firebaseui-login.component.ts
+  54a8ad42035ddfc5 79
+libs/practice-migrations/src/lib/destination/destination-entity-record/index.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/destination/entities/sterilisation-machine.ts
+  8f302a08f99aee83 136
+libs/practice-migrations/src/lib/source/source-entity/source-entity.node.ts
+  8343435946faca6f 236,273,294,328,358
+libs/firebase-functions/src/lib/base-pub-sub-function.spec.ts
+  54a8ad42035ddfc5 1,18
+libs/practice-migrations/src/lib/storage/index.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/destination/destination-entity-record/destination-entity-record.browser.ts
+  b0ba4767eb8a6775 70,91,106,123,143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "76a14f0456c13c9c44e67c98b01b488d289fb2d8",
+  "prompts": {
+    "54a8ad42035ddfc5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305e277d3ffezvZxIdXXzrF0Lm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 65,
+      "total_deletions": 67,
+      "accepted_lines": 29,
+      "overriden_lines": 0
+    },
+    "7b93377a73cec077": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30513a5cbffe8snRtTQhgTcQbu",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 8,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "8343435946faca6f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30513d797ffeGdtHT5W9uPrtfg",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 17,
+      "total_deletions": 2,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    },
+    "8f302a08f99aee83": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30513bd09ffecoN0bH24VZ8WpW",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 6,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    },
+    "b0ba4767eb8a6775": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_3051a21f6ffeLA4GsV3MFkR33r",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 1,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    },
+    "ddcffb72fc87727f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305136365ffeAFN4hSPPsBs42J",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 20,
+      "total_deletions": 24,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,78 @@
+libs/practice-migrations/src/index.ts
+  7b3c7fb32781363f 9
+tools/scripts/dataconnect-deploy.ts
+  11e738efca74e55d 35
+libs/practice-migrations/src/lib/d4w/export-sql.spec.ts
+  7b3c7fb32781363f 1-72,75,77-112,114-115
+apps/principle-functions/src/app/http/migration-upload/get-upload-session.ts
+  7b3c7fb32781363f 67,69-78,81
+apps/principle-functions/src/app/http/migration-upload/complete-upload.ts
+  7b3c7fb32781363f 67-84,87
+libs/practice-migrations/src/lib/d4w/export-sql.ts
+  7b3c7fb32781363f 1-64
+apps/migration-toolkit/src/lib/d4w-dbisql.spec.ts
+  7b3c7fb32781363f 1-247
+libs/ng-practice-migrations/src/lib/components/migration-actions/d4w/database-export-sql/database-export-sql.component.ts
+  7b3c7fb32781363f 15-18,22,39,44,47,55-59
+apps/migration-toolkit/src/exporters/d4w-exporter.ts
+  7b3c7fb32781363f 2-9,15-43
+apps/migration-toolkit/src/lib/firebase.ts
+  7b3c7fb32781363f 79,97
+apps/migration-toolkit/src/media/sidexis/sidexis-types.spec.ts
+  7b3c7fb32781363f 25-26,29-30,53-54
+apps/migration-toolkit/src/media/sidexis/sidexis-export.spec.ts
+  7b3c7fb32781363f 153-154,165-166,312
+libs/ng-practice-migrations/src/lib/components/migration-actions/general/generate-upload-code/generate-upload-code.component.html
+  11e738efca74e55d 29-30,33-40,42,51,53-55,57-59,61-65,67-70,112-115
+libs/practice-migrations/src/lib/source/required-csv-files.ts
+  7b3c7fb32781363f 5,7,18-19,21-29
+apps/migration-toolkit/src/upload-runner.ts
+  7b3c7fb32781363f 13,81,83-84,95-96,176,178-180,182-212,214-246,341-342,357
+apps/migration-toolkit/src/lib/d4w-dbisql.ts
+  7b3c7fb32781363f 1-32,34-76
+apps/principle-functions/src/app/http/migration-upload/validate-upload-code.ts
+  7b3c7fb32781363f 88
+tools/scripts/firebase-deploy.ts
+  11e738efca74e55d 30
+tools/scripts/lib/cli.ts
+  11e738efca74e55d 89-94,96,102,113-114,117
+libs/ng-practice-migrations/src/lib/components/migration-actions/general/generate-upload-code/generate-upload-code.component.ts
+  11e738efca74e55d 9,40,51,65,71,92-93,95,108-110,147-149,162-164
+tools/scripts/firebase-emulator.ts
+  11e738efca74e55d 148
+libs/practice-migrations/interfaces/src/lib/migration-toolkit.ts
+  7b3c7fb32781363f 54,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "b8d9ffe21dff49c69cfbd5dcf92de6df3f96605b",
+  "prompts": {
+    "11e738efca74e55d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_31b89d633ffe75och6ZTYYuEGC",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 103,
+      "total_deletions": 73,
+      "accepted_lines": 66,
+      "overriden_lines": 0
+    },
+    "7b3c7fb32781363f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_32523966bffe94S9MrwxH6GOCv",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 888,
+      "total_deletions": 121,
+      "accepted_lines": 868,
+      "overriden_lines": 16
+    }
+  }
+}

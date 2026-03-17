@@ -1,0 +1,25 @@
+apps/exact-extract/exact/schema.go
+  cf46db94eb43b80d 5-6
+apps/exact-extract/exact/cmd_export_csv.go
+  cf46db94eb43b80d 22,39,65-72,81-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "7fade7d75f76f6f021111f7ca674071779cd545b",
+  "prompts": {
+    "cf46db94eb43b80d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305b71ee0ffeLYqAqDncZHXl3x",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 5,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}

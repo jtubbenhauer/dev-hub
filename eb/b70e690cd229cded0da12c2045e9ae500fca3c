@@ -1,0 +1,25 @@
+apps/migration-toolkit/src/converters/exact-converter.ts
+  d093f592b2db4edd 2,18-20,30,68-90
+apps/principle-functions/src/app/lib/compute/conversion-vm.ts
+  d093f592b2db4edd 22-23,117,120,122-142,186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "ebb70e690cd229cded0da12c2045e9ae500fca3c",
+  "prompts": {
+    "d093f592b2db4edd": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305c8720bffe5P4l4wRbG1ENaS",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 57,
+      "total_deletions": 3,
+      "accepted_lines": 57,
+      "overriden_lines": 0
+    }
+  }
+}

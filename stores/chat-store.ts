@@ -283,6 +283,20 @@ function findWorkspaceForSession(
   return null
 }
 
+// Snapshot of a session's data for undo restoration
+export interface SessionSnapshot {
+  sessionId: string
+  workspaceId: string
+  session: Session
+  messages: MessageWithParts[]
+  optimisticMessageId: string | undefined
+  sessionStatus: SessionStatus | undefined
+  todos: Todo[] | undefined
+  sessionAgent: string | undefined
+  lastViewedAt: number | undefined
+  wasActive: boolean
+}
+
 interface ChatState {
   workspaceStates: Record<string, WorkspaceState>
   commands: Command[]
@@ -306,10 +320,12 @@ interface ChatState {
   fetchSessions: (workspaceId: string) => Promise<void>
   createSession: (workspaceId: string) => Promise<Session | null>
   deleteSession: (sessionId: string, workspaceId: string) => Promise<void>
+  removeSessionLocal: (sessionId: string, workspaceId: string) => SessionSnapshot | null
+  restoreSessionLocal: (snapshot: SessionSnapshot) => void
   fetchMessages: (sessionId: string, workspaceId: string) => Promise<void>
   fetchCommands: (workspaceId: string) => Promise<void>
   summarizeSession: (sessionId: string, workspaceId: string) => Promise<void>
-  revertSession: (sessionId: string, workspaceId: string, messageID: string) => Promise<void>
+  revertSession: (sessionId: string, workspaceId: string, messageID: string) => Promise<string | null>
 
   // Messaging
   sendMessage: (
@@ -610,9 +626,17 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const { [sessionId]: _t, ...remainingTodos } = ws.todos
         const { [sessionId]: _a, ...remainingSessionAgents } = ws.sessionAgents
         const { [sessionId]: _lv, ...remainingLastViewedAt } = ws.lastViewedAt
+
+        let nextActiveSessionId = state.activeSessionId
+        if (state.activeSessionId === sessionId) {
+          const nextSession = Object.values(remainingSessions)
+            .filter((s) => !s.parentID)
+            .sort((a, b) => b.time.updated - a.time.updated)[0]
+          nextActiveSessionId = nextSession?.id ?? null
+        }
+
         return {
-          activeSessionId:
-            state.activeSessionId === sessionId ? null : state.activeSessionId,
+          activeSessionId: nextActiveSessionId,
           messageAccessOrder: state.messageAccessOrder.filter(
             (e) => e.sessionId !== sessionId
           ),
@@ -634,6 +658,96 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     } catch {
       // Silently fail
     }
+  },
+
+  removeSessionLocal: (sessionId, workspaceId) => {
+    const state = get()
+    const ws = state.workspaceStates[workspaceId]
+    if (!ws || !(sessionId in ws.sessions)) return null
+
+    const snapshot: SessionSnapshot = {
+      sessionId,
+      workspaceId,
+      session: ws.sessions[sessionId],
+      messages: ws.messages[sessionId] ?? [],
+      optimisticMessageId: ws.optimisticMessageIds[sessionId],
+      sessionStatus: ws.sessionStatuses[sessionId],
+      todos: ws.todos[sessionId],
+      sessionAgent: ws.sessionAgents[sessionId],
+      lastViewedAt: ws.lastViewedAt[sessionId],
+      wasActive: state.activeSessionId === sessionId,
+    }
+
+    const { [sessionId]: _s, ...remainingSessions } = ws.sessions
+    const { [sessionId]: _m, ...remainingMessages } = ws.messages
+    const { [sessionId]: _o, ...remainingOptimistic } = ws.optimisticMessageIds
+    const { [sessionId]: _st, ...remainingStatuses } = ws.sessionStatuses
+    const { [sessionId]: _t, ...remainingTodos } = ws.todos
+    const { [sessionId]: _a, ...remainingSessionAgents } = ws.sessionAgents
+    const { [sessionId]: _lv, ...remainingLastViewedAt } = ws.lastViewedAt
+
+    let nextActiveSessionId = state.activeSessionId
+    if (state.activeSessionId === sessionId) {
+      const nextSession = Object.values(remainingSessions)
+        .filter((s) => !s.parentID)
+        .sort((a, b) => b.time.updated - a.time.updated)[0]
+      nextActiveSessionId = nextSession?.id ?? null
+    }
+
+    set({
+      activeSessionId: nextActiveSessionId,
+      messageAccessOrder: state.messageAccessOrder.filter(
+        (e) => e.sessionId !== sessionId
+      ),
+      workspaceStates: {
+        ...state.workspaceStates,
+        [workspaceId]: {
+          ...ws,
+          sessions: remainingSessions,
+          messages: remainingMessages,
+          optimisticMessageIds: remainingOptimistic,
+          sessionStatuses: remainingStatuses,
+          todos: remainingTodos,
+          sessionAgents: remainingSessionAgents,
+          lastViewedAt: remainingLastViewedAt,
+        },
+      },
+    })
+
+    return snapshot
+  },
+
+  restoreSessionLocal: (snapshot) => {
+    set((state) => {
+      const ws = state.workspaceStates[snapshot.workspaceId] ?? emptyWorkspaceState()
+      const restored: Partial<WorkspaceState> = {
+        sessions: { ...ws.sessions, [snapshot.sessionId]: snapshot.session },
+        messages: { ...ws.messages, [snapshot.sessionId]: snapshot.messages },
+      }
+      if (snapshot.optimisticMessageId !== undefined) {
+        restored.optimisticMessageIds = { ...ws.optimisticMessageIds, [snapshot.sessionId]: snapshot.optimisticMessageId }
+      }
+      if (snapshot.sessionStatus !== undefined) {
+        restored.sessionStatuses = { ...ws.sessionStatuses, [snapshot.sessionId]: snapshot.sessionStatus }
+      }
+      if (snapshot.todos !== undefined) {
+        restored.todos = { ...ws.todos, [snapshot.sessionId]: snapshot.todos }
+      }
+      if (snapshot.sessionAgent !== undefined) {
+        restored.sessionAgents = { ...ws.sessionAgents, [snapshot.sessionId]: snapshot.sessionAgent }
+      }
+      if (snapshot.lastViewedAt !== undefined) {
+        restored.lastViewedAt = { ...ws.lastViewedAt, [snapshot.sessionId]: snapshot.lastViewedAt }
+      }
+
+      return {
+        activeSessionId: snapshot.wasActive ? snapshot.sessionId : state.activeSessionId,
+        workspaceStates: {
+          ...state.workspaceStates,
+          [snapshot.workspaceId]: { ...ws, ...restored },
+        },
+      }
+    })
   },
 
   fetchMessages: async (sessionId, workspaceId) => {
@@ -698,6 +812,28 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   revertSession: async (sessionId, workspaceId, messageID) => {
+    const ws = get().workspaceStates[workspaceId]
+    const msgs = ws?.messages[sessionId] ?? []
+    const idx = msgs.findIndex((m) => m.info.id === messageID)
+
+    let revertedText: string | null = null
+    if (idx >= 0) {
+      const target = msgs[idx]
+      revertedText = target.parts
+        .filter((p) => p.type === "text" && "text" in p)
+        .map((p) => (p as { text: string }).text)
+        .join("")
+
+      set((state) =>
+        updateWorkspace(state, workspaceId, (w) => ({
+          messages: {
+            ...w.messages,
+            [sessionId]: (w.messages[sessionId] ?? []).slice(0, idx),
+          },
+        }))
+      )
+    }
+
     try {
       await fetch(buildProxyUrl(`session/${sessionId}/revert`, workspaceId), {
         method: "POST",
@@ -705,8 +841,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         body: JSON.stringify({ messageID }),
       })
     } catch {
-      // Best effort
+      if (idx >= 0) {
+        set((state) =>
+          updateWorkspace(state, workspaceId, () => ({
+            messages: { ...ws!.messages },
+          }))
+        )
+      }
     }
+
+    return revertedText
   },
 
   sendMessage: async (sessionId, text, workspaceId, model, agent, variant) => {
@@ -1293,9 +1437,17 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           const { [info.id]: _t, ...remainingTodos } = ws.todos
           const { [info.id]: _a, ...remainingSessionAgents } = ws.sessionAgents
           const { [info.id]: _lv, ...remainingLastViewedAt } = ws.lastViewedAt
+
+          let nextActiveSessionId = state.activeSessionId
+          if (state.activeSessionId === info.id) {
+            const nextSession = Object.values(remainingSessions)
+              .filter((s) => !s.parentID)
+              .sort((a, b) => b.time.updated - a.time.updated)[0]
+            nextActiveSessionId = nextSession?.id ?? null
+          }
+
           return {
-            activeSessionId:
-              state.activeSessionId === info.id ? null : state.activeSessionId,
+            activeSessionId: nextActiveSessionId,
             messageAccessOrder: state.messageAccessOrder.filter(
               (e) => e.sessionId !== info.id
             ),

@@ -2187,3 +2187,206 @@ describe("isMessagesLoaded selector logic", () => {
     expect(isMessagesLoaded(state)).toBe(true)
   })
 })
+
+// ---------------------------------------------------------------------------
+// removeSessionLocal / restoreSessionLocal (soft-delete with undo)
+// ---------------------------------------------------------------------------
+
+describe("removeSessionLocal and restoreSessionLocal", () => {
+  beforeEach(resetStore)
+
+  const fullWorkspaceState = () => ({
+    sessions: {
+      "sess-a": makeSession("sess-a", { updated: 2000 }),
+      "sess-b": makeSession("sess-b", { updated: 1000 }),
+    },
+    messages: {
+      "sess-a": [{ info: makeUserMessage("msg-1", "sess-a"), parts: [] }],
+      "sess-b": [],
+    },
+    optimisticMessageIds: {} as Record<string, string>,
+    sessionStatuses: { "sess-a": { type: "busy" as const } },
+    permissions: [] as ReturnType<typeof makePermission>[],
+    questions: [] as ReturnType<typeof makeQuestion>[],
+    todos: {} as Record<string, never[]>,
+    sessionAgents: { "sess-a": "code" },
+    lastViewedAt: { "sess-a": 1500, "sess-b": 900 },
+  })
+
+  it("removes session from local state and returns a snapshot", () => {
+    useChatStore.setState({
+      workspaceStates: { "ws-a": fullWorkspaceState() },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    const snapshot = useChatStore.getState().removeSessionLocal("sess-a", "ws-a")
+
+    expect(snapshot).not.toBeNull()
+    expect(snapshot!.sessionId).toBe("sess-a")
+    expect(snapshot!.wasActive).toBe(true)
+    expect(snapshot!.session.id).toBe("sess-a")
+    expect(snapshot!.messages).toHaveLength(1)
+    expect(snapshot!.sessionAgent).toBe("code")
+    expect(snapshot!.lastViewedAt).toBe(1500)
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"]
+    expect(ws.sessions["sess-a"]).toBeUndefined()
+    expect(ws.sessions["sess-b"]).toBeDefined()
+    expect(ws.messages["sess-a"]).toBeUndefined()
+    expect(ws.sessionAgents["sess-a"]).toBeUndefined()
+    expect(useChatStore.getState().activeSessionId).toBe("sess-b")
+  })
+
+  it("auto-selects null when no remaining sessions exist", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          ...fullWorkspaceState(),
+          sessions: { "sess-a": makeSession("sess-a", { updated: 2000 }) },
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    useChatStore.getState().removeSessionLocal("sess-a", "ws-a")
+    expect(useChatStore.getState().activeSessionId).toBeNull()
+  })
+
+  it("returns null when session does not exist", () => {
+    useChatStore.setState({
+      workspaceStates: { "ws-a": fullWorkspaceState() },
+    })
+
+    const snapshot = useChatStore.getState().removeSessionLocal("sess-nonexistent", "ws-a")
+    expect(snapshot).toBeNull()
+  })
+
+  it("returns null when workspace does not exist", () => {
+    const snapshot = useChatStore.getState().removeSessionLocal("sess-a", "ws-missing")
+    expect(snapshot).toBeNull()
+  })
+
+  it("does not clear activeSessionId when removing a non-active session", () => {
+    useChatStore.setState({
+      workspaceStates: { "ws-a": fullWorkspaceState() },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    useChatStore.getState().removeSessionLocal("sess-b", "ws-a")
+
+    expect(useChatStore.getState().activeSessionId).toBe("sess-a")
+  })
+
+  it("restoreSessionLocal fully restores a removed session", () => {
+    useChatStore.setState({
+      workspaceStates: { "ws-a": fullWorkspaceState() },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    const snapshot = useChatStore.getState().removeSessionLocal("sess-a", "ws-a")!
+    useChatStore.getState().restoreSessionLocal(snapshot)
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"]
+    expect(ws.sessions["sess-a"]).toBeDefined()
+    expect(ws.sessions["sess-a"].id).toBe("sess-a")
+    expect(ws.messages["sess-a"]).toHaveLength(1)
+    expect(ws.sessionAgents["sess-a"]).toBe("code")
+    expect(ws.lastViewedAt["sess-a"]).toBe(1500)
+    expect(useChatStore.getState().activeSessionId).toBe("sess-a")
+  })
+
+  it("restoreSessionLocal does not override activeSessionId if the snapshot was not active", () => {
+    useChatStore.setState({
+      workspaceStates: { "ws-a": fullWorkspaceState() },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    const snapshot = useChatStore.getState().removeSessionLocal("sess-b", "ws-a")!
+    expect(snapshot.wasActive).toBe(false)
+
+    useChatStore.getState().restoreSessionLocal(snapshot)
+
+    expect(useChatStore.getState().activeSessionId).toBe("sess-a")
+    expect(useChatStore.getState().workspaceStates["ws-a"].sessions["sess-b"]).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// revertSession — optimistic removal + text extraction
+// ---------------------------------------------------------------------------
+
+describe("revertSession", () => {
+  beforeEach(resetStore)
+
+  function seedMessages() {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          optimisticMessageIds: {} as Record<string, string>,
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          lastViewedAt: {},
+          messages: {
+            "sess-a": [
+              { info: makeUserMessage("msg-1", "sess-a"), parts: [{ id: "p1", sessionID: "sess-a", messageID: "msg-1", type: "text" as const, text: "first question" }] },
+              { info: makeAssistantMessage("msg-2", "sess-a"), parts: [{ id: "p2", sessionID: "sess-a", messageID: "msg-2", type: "text" as const, text: "first answer" }] },
+              { info: makeUserMessage("msg-3", "sess-a"), parts: [{ id: "p3", sessionID: "sess-a", messageID: "msg-3", type: "text" as const, text: "second question" }] },
+              { info: makeAssistantMessage("msg-4", "sess-a"), parts: [{ id: "p4", sessionID: "sess-a", messageID: "msg-4", type: "text" as const, text: "second answer" }] },
+            ],
+          },
+        },
+      },
+    })
+  }
+
+  it("optimistically removes the target message and all subsequent messages", async () => {
+    seedMessages()
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+
+    await useChatStore.getState().revertSession("sess-a", "ws-a", "msg-3")
+
+    const msgs = useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"]
+    expect(msgs).toHaveLength(2)
+    expect(msgs[0].info.id).toBe("msg-1")
+    expect(msgs[1].info.id).toBe("msg-2")
+  })
+
+  it("returns the text content of the reverted message", async () => {
+    seedMessages()
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+
+    const text = await useChatStore.getState().revertSession("sess-a", "ws-a", "msg-3")
+
+    expect(text).toBe("second question")
+  })
+
+  it("restores messages on fetch failure", async () => {
+    seedMessages()
+    global.fetch = vi.fn().mockRejectedValue(new Error("Network error"))
+
+    await useChatStore.getState().revertSession("sess-a", "ws-a", "msg-3")
+
+    const msgs = useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"]
+    expect(msgs).toHaveLength(4)
+  })
+
+  it("returns null when message ID is not found", async () => {
+    seedMessages()
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+
+    const text = await useChatStore.getState().revertSession("sess-a", "ws-a", "nonexistent")
+
+    expect(text).toBeNull()
+  })
+})

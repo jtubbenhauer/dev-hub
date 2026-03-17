@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo } from "react"
-import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch, Brain } from "lucide-react"
+import { useCallback, useMemo, useRef, useState } from "react"
+import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch, Brain, ArrowUpDown, Group, GripVertical, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -44,6 +44,12 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
   workspaces?: { id: string; name: string; backend: string }[]
   activeWorkspaceId?: string | null
   onCreateSessionInWorkspace?: (workspaceId: string) => void
+  groupByWorkspace?: boolean
+  onToggleGroupByWorkspace?: () => void
+  workspaceOrder?: string[]
+  onWorkspaceOrderChange?: (order: string[]) => void
+  expandedWorkspaces?: Record<string, boolean>
+  onToggleWorkspaceExpanded?: (workspaceId: string) => void
 }
 
 type SessionListProps = WorkspaceSessionListProps | UnifiedSessionListProps
@@ -60,6 +66,80 @@ export function SessionList(props: SessionListProps) {
     return props.sessions
   }, [props.mode, props.sessions])
 
+  const isGrouped = props.mode === "unified" && !!props.groupByWorkspace
+  const workspaceOrder = props.mode === "unified" ? props.workspaceOrder : undefined
+
+  const allWorkspaceIds = props.mode === "unified" ? props.workspaces?.map((ws) => ws.id) : undefined
+
+  const groupedSessions = useMemo(() => {
+    if (!isGrouped) return null
+    const groups = new Map<string, SessionWithWorkspace[]>()
+    if (allWorkspaceIds) {
+      for (const id of allWorkspaceIds) {
+        groups.set(id, [])
+      }
+    }
+    for (const session of sortedSessions as SessionWithWorkspace[]) {
+      const existing = groups.get(session.workspaceId)
+      if (existing) {
+        existing.push(session)
+      } else {
+        groups.set(session.workspaceId, [session])
+      }
+    }
+    const entries = [...groups.entries()]
+    if (workspaceOrder && workspaceOrder.length > 0) {
+      const orderIndex = new Map(workspaceOrder.map((id, i) => [id, i]))
+      entries.sort((a, b) => {
+        const ai = orderIndex.get(a[0]) ?? Infinity
+        const bi = orderIndex.get(b[0]) ?? Infinity
+        if (ai !== Infinity || bi !== Infinity) return ai - bi
+        const aTime = a[1][0]?.time.updated ?? 0
+        const bTime = b[1][0]?.time.updated ?? 0
+        return bTime - aTime
+      })
+    } else {
+      entries.sort(([, a], [, b]) => {
+        const aTime = a[0]?.time.updated ?? 0
+        const bTime = b[0]?.time.updated ?? 0
+        return bTime - aTime
+      })
+    }
+    return entries
+  }, [isGrouped, sortedSessions, workspaceOrder, allWorkspaceIds])
+
+  const [draggedWorkspaceId, setDraggedWorkspaceId] = useState<string | null>(null)
+  const [dragOverWorkspaceId, setDragOverWorkspaceId] = useState<string | null>(null)
+
+  const handleDragOver = useCallback((e: React.DragEvent, targetId: string) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    setDragOverWorkspaceId(targetId)
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (
+      draggedWorkspaceId &&
+      dragOverWorkspaceId &&
+      draggedWorkspaceId !== dragOverWorkspaceId &&
+      groupedSessions &&
+      props.mode === "unified" &&
+      props.onWorkspaceOrderChange
+    ) {
+      const currentOrder = groupedSessions.map(([id]) => id)
+      const fromIndex = currentOrder.indexOf(draggedWorkspaceId)
+      const toIndex = currentOrder.indexOf(dragOverWorkspaceId)
+      if (fromIndex >= 0 && toIndex >= 0) {
+        const next = [...currentOrder]
+        next.splice(fromIndex, 1)
+        next.splice(toIndex, 0, draggedWorkspaceId)
+        props.onWorkspaceOrderChange(next)
+      }
+    }
+    setDraggedWorkspaceId(null)
+    setDragOverWorkspaceId(null)
+  }, [draggedWorkspaceId, dragOverWorkspaceId, groupedSessions, props])
+
   const handleSelect = (session: Session | SessionWithWorkspace) => {
     if (props.mode === "unified") {
       props.onSelectSession(session.id, (session as SessionWithWorkspace).workspaceId)
@@ -75,6 +155,20 @@ export function SessionList(props: SessionListProps) {
           {props.mode === "unified" ? "All sessions" : "Sessions"}
         </span>
         <div className="flex items-center gap-1">
+          {props.mode === "unified" && props.onToggleGroupByWorkspace && (
+            <Button
+              size="icon-xs"
+              variant={props.groupByWorkspace ? "secondary" : "ghost"}
+              onClick={props.onToggleGroupByWorkspace}
+              title={props.groupByWorkspace ? "Sort by recent" : "Group by workspace"}
+            >
+              {props.groupByWorkspace ? (
+                <Group className="size-3.5" />
+              ) : (
+                <ArrowUpDown className="size-3.5" />
+              )}
+            </Button>
+          )}
           {props.onToggleMode && (
             <Button
               size="icon-xs"
@@ -124,8 +218,8 @@ export function SessionList(props: SessionListProps) {
         </div>
       </div>
 
-      <ScrollArea className="min-h-0 min-w-0 flex-1">
-        {sortedSessions.length === 0 ? (
+      <ScrollArea className="min-h-0 min-w-0 flex-1 [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block">
+        {sortedSessions.length === 0 && (!groupedSessions || groupedSessions.length === 0) ? (
           <div className="flex flex-col items-center gap-2 p-4 text-center">
             <MessageSquare className="size-8 text-muted-foreground/50" />
             <p className="text-xs text-muted-foreground">No sessions yet</p>
@@ -135,36 +229,80 @@ export function SessionList(props: SessionListProps) {
             </Button>
           </div>
         ) : (
-          <div className="p-1">
-            {sortedSessions.map((session) => (
-              <SessionItem
-                key={session.id}
-                session={session}
-                isActive={session.id === activeSessionId}
-                status={sessionStatuses[session.id] ?? null}
-                isUnread={!!(
-                  session.id !== activeSessionId &&
-                  lastViewedAt[session.id] != null &&
-                  session.time.updated > lastViewedAt[session.id]
-                )}
-                workspaceBranch={
-                  props.mode === "unified"
-                    ? props.workspaceBranches[(session as SessionWithWorkspace).workspaceId] ??
-                      props.workspaceNames[(session as SessionWithWorkspace).workspaceId]
-                    : undefined
-                }
-                workspaceColor={
-                  props.mode === "unified"
-                    ? props.workspaceColors?.[(session as SessionWithWorkspace).workspaceId]
-                    : props.mode === "workspace"
-                      ? props.workspaceColor
+          <div className="overflow-hidden p-1">
+            {groupedSessions ? (
+              groupedSessions.map(([workspaceId, wsSessions]) => (
+                <WorkspaceGroup
+                  key={workspaceId}
+                  workspaceId={workspaceId}
+                  workspaceName={
+                    props.mode === "unified"
+                      ? props.workspaceNames[workspaceId] ?? workspaceId
+                      : workspaceId
+                  }
+                  workspaceColor={
+                    props.mode === "unified"
+                      ? props.workspaceColors?.[workspaceId]
                       : undefined
-                }
-                onSelect={() => handleSelect(session)}
-                onDelete={() => onDeleteSession(session.id)}
-              />
-            ))}
-            {props.mode === "unified" && props.hasMore && props.onLoadMore && (
+                  }
+                  sessions={wsSessions}
+                  activeSessionId={activeSessionId}
+                  sessionStatuses={sessionStatuses}
+                  lastViewedAt={lastViewedAt}
+                  isExpanded={
+                    props.mode === "unified"
+                      ? props.expandedWorkspaces?.[workspaceId] ?? false
+                      : false
+                  }
+                  onToggleExpanded={
+                    props.mode === "unified"
+                      ? () => props.onToggleWorkspaceExpanded?.(workspaceId)
+                      : undefined
+                  }
+                  onSelectSession={(session: Session | SessionWithWorkspace) => handleSelect(session)}
+                  onDeleteSession={onDeleteSession}
+                  onCreateSession={
+                    props.mode === "unified" && props.onCreateSessionInWorkspace
+                      ? () => props.onCreateSessionInWorkspace!(workspaceId)
+                      : undefined
+                  }
+                  onDragStart={() => setDraggedWorkspaceId(workspaceId)}
+                  onDragOver={(e: React.DragEvent) => handleDragOver(e, workspaceId)}
+                  onDragEnd={handleDragEnd}
+                  isDragTarget={dragOverWorkspaceId === workspaceId && draggedWorkspaceId !== workspaceId}
+                />
+              ))
+            ) : (
+              sortedSessions.map((session) => (
+                <SessionItem
+                  key={session.id}
+                  session={session}
+                  isActive={session.id === activeSessionId}
+                  status={sessionStatuses[session.id] ?? null}
+                  isUnread={!!(
+                    session.id !== activeSessionId &&
+                    lastViewedAt[session.id] != null &&
+                    session.time.updated > lastViewedAt[session.id]
+                  )}
+                  workspaceBranch={
+                    props.mode === "unified"
+                      ? props.workspaceBranches[(session as SessionWithWorkspace).workspaceId] ??
+                        props.workspaceNames[(session as SessionWithWorkspace).workspaceId]
+                      : undefined
+                  }
+                  workspaceColor={
+                    props.mode === "unified"
+                      ? props.workspaceColors?.[(session as SessionWithWorkspace).workspaceId]
+                      : props.mode === "workspace"
+                        ? props.workspaceColor
+                        : undefined
+                  }
+                  onSelect={() => handleSelect(session)}
+                  onDelete={() => onDeleteSession(session.id)}
+                />
+              ))
+            )}
+            {props.mode === "unified" && !isGrouped && props.hasMore && props.onLoadMore && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -177,6 +315,134 @@ export function SessionList(props: SessionListProps) {
           </div>
         )}
       </ScrollArea>
+    </div>
+  )
+}
+
+const COLLAPSED_SESSION_LIMIT = 3
+
+interface WorkspaceGroupProps {
+  workspaceId: string
+  workspaceName: string
+  workspaceColor?: string
+  sessions: SessionWithWorkspace[]
+  activeSessionId: string | null
+  sessionStatuses: Record<string, SessionStatus>
+  lastViewedAt: Record<string, number>
+  isExpanded: boolean
+  onToggleExpanded?: () => void
+  onSelectSession: (session: SessionWithWorkspace) => void
+  onDeleteSession: (sessionId: string) => void
+  onCreateSession?: () => void
+  onDragStart: () => void
+  onDragOver: (e: React.DragEvent) => void
+  onDragEnd: () => void
+  isDragTarget: boolean
+}
+
+function WorkspaceGroup({
+  workspaceId,
+  workspaceName,
+  workspaceColor,
+  sessions,
+  activeSessionId,
+  sessionStatuses,
+  lastViewedAt,
+  isExpanded,
+  onToggleExpanded,
+  onSelectSession,
+  onDeleteSession,
+  onCreateSession,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  isDragTarget,
+}: WorkspaceGroupProps) {
+  const visibleSessions = isExpanded ? sessions : sessions.slice(0, COLLAPSED_SESSION_LIMIT)
+  const hiddenCount = sessions.length - COLLAPSED_SESSION_LIMIT
+  const canExpand = sessions.length > COLLAPSED_SESSION_LIMIT
+
+  return (
+    <div
+      className={cn(
+        "min-w-0 overflow-hidden transition-colors",
+        isDragTarget && "bg-accent/50 rounded-md"
+      )}
+      onDragOver={onDragOver}
+      onDrop={(e) => { e.preventDefault(); onDragEnd() }}
+    >
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = "move"
+          onDragStart()
+        }}
+        onDragEnd={onDragEnd}
+        className="group/header flex min-w-0 cursor-grab items-center gap-1 px-1 pb-0.5 pt-2 first:pt-1 active:cursor-grabbing"
+      >
+        <GripVertical className="size-3 shrink-0 text-muted-foreground/0 transition-colors group-hover/header:text-muted-foreground/50" />
+        <FolderGit2
+          className="size-3 shrink-0"
+          style={workspaceColor ? { color: workspaceColor } : undefined}
+        />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
+          {workspaceName}
+        </span>
+        {onCreateSession && (
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            className="size-4 shrink-0 opacity-0 transition-opacity group-hover/header:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation()
+              onCreateSession()
+            }}
+            title={`New chat in ${workspaceName}`}
+          >
+            <Plus className="size-3" />
+          </Button>
+        )}
+        <span className="shrink-0 pr-1 text-[10px] tabular-nums text-muted-foreground/60">
+          {sessions.length}
+        </span>
+      </div>
+
+      {visibleSessions.map((session) => (
+        <SessionItem
+          key={session.id}
+          session={session}
+          isActive={session.id === activeSessionId}
+          status={sessionStatuses[session.id] ?? null}
+          isUnread={!!(
+            session.id !== activeSessionId &&
+            lastViewedAt[session.id] != null &&
+            session.time.updated > lastViewedAt[session.id]
+          )}
+          workspaceColor={workspaceColor}
+          onSelect={() => onSelectSession(session)}
+          onDelete={() => onDeleteSession(session.id)}
+        />
+      ))}
+
+      {canExpand && (
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          className="flex w-full items-center justify-center gap-1 rounded-sm py-0.5 text-[10px] text-muted-foreground/60 transition-colors hover:bg-muted hover:text-muted-foreground"
+        >
+          {isExpanded ? (
+            <>
+              <ChevronRight className="size-2.5 -rotate-90" />
+              Show less
+            </>
+          ) : (
+            <>
+              <ChevronRight className="size-2.5 rotate-90" />
+              {hiddenCount} more
+            </>
+          )}
+        </button>
+      )}
     </div>
   )
 }
@@ -220,7 +486,7 @@ function SessionItem({
         }
       }}
       className={cn(
-        "group flex min-w-0 w-full cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-left text-sm",
+        "group flex min-w-0 w-full cursor-pointer items-start gap-2 overflow-hidden rounded-md px-2 py-2 text-left text-sm",
         "hover:bg-muted transition-colors",
         isActive && "bg-muted"
       )}
@@ -228,7 +494,8 @@ function SessionItem({
       <div className="relative mt-0.5 shrink-0">
         {isBusy ? (
           <Brain
-            className="size-3.5 text-amber-500 animate-pulse"
+            className="size-3.5 animate-pulse"
+            style={workspaceColor ? { color: workspaceColor } : { color: "var(--color-amber-500)" }}
           />
         ) : (
           <MessageSquare

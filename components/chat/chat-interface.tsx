@@ -25,9 +25,10 @@ import { useChatStore } from "@/stores/chat-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useQueries } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, Brain, Check, ChevronDown, ChevronRight, Coins, GripVertical, LayoutList, ListTodo, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, Wrench, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Brain, Check, ChevronDown, ChevronRight, Clock, Coins, GripVertical, LayoutList, ListTodo, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, Wrench, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Component, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { Virtuoso } from "react-virtuoso";
 
@@ -89,6 +90,26 @@ export function ChatInterface() {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("dev-hub:chat-unified-mode") === "true";
   });
+  const [groupByWorkspace, setGroupByWorkspace] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("dev-hub:chat-group-by-workspace") === "true";
+  });
+  const [workspaceOrder, setWorkspaceOrder] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      return JSON.parse(localStorage.getItem("dev-hub:chat-workspace-order") ?? "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      return JSON.parse(localStorage.getItem("dev-hub:chat-expanded-workspaces") ?? "{}");
+    } catch {
+      return {};
+    }
+  });
   const [questionViewMode, setQuestionViewMode] = useState<"list" | "tabs">(() => {
     if (typeof window === "undefined") return "list";
     const stored = localStorage.getItem("dev-hub:chat-question-view");
@@ -117,9 +138,13 @@ export function ChatInterface() {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("dev-hub:chat-show-tokens") !== "false";
   });
+  const [showTimestamps, setShowTimestamps] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("dev-hub:chat-show-timestamps") === "true";
+  });
   const chatDisplaySettings = useMemo(
-    () => ({ showThinking, showToolCalls, showTokens }),
-    [showThinking, showToolCalls, showTokens],
+    () => ({ showThinking, showToolCalls, showTokens, showTimestamps }),
+    [showThinking, showToolCalls, showTokens, showTimestamps],
   );
   const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -240,6 +265,8 @@ export function ChatInterface() {
     fetchSessions,
     createSession,
     deleteSession,
+    removeSessionLocal,
+    restoreSessionLocal,
     fetchMessages,
     fetchCommands,
     summarizeSession,
@@ -291,8 +318,9 @@ export function ChatInterface() {
     ? sessions[activeSessionId]?.directory
     : undefined
   const [unifiedLimit, setUnifiedLimit] = useState(20)
+  const effectiveUnifiedLimit = groupByWorkspace ? Number.MAX_SAFE_INTEGER : unifiedLimit
   const unifiedSessions = useChatStore((state) =>
-    state.getRecentSessionsAcrossWorkspaces(unifiedLimit)
+    state.getRecentSessionsAcrossWorkspaces(effectiveUnifiedLimit)
   )
   const totalUnifiedCount = useChatStore((state) => {
     let count = 0
@@ -346,12 +374,8 @@ export function ChatInterface() {
 
   useEffect(() => {
     if (!isUnifiedMode) return;
-    const { workspaceStates } = useChatStore.getState();
     for (const ws of allWorkspaces) {
-      const state = workspaceStates[ws.id];
-      if (!state || Object.keys(state.sessions).length === 0) {
-        fetchSessions(ws.id);
-      }
+      fetchSessions(ws.id);
     }
   }, [isUnifiedMode, allWorkspaces, fetchSessions]);
 
@@ -540,6 +564,17 @@ export function ChatInterface() {
     abortSession(activeSessionId, activeWorkspaceId);
   }, [activeSessionId, activeWorkspaceId, abortSession]);
 
+  const handleRevert = useCallback(
+    async (messageId: string) => {
+      if (!activeSessionId || !activeWorkspaceId) return;
+      const text = await revertSession(activeSessionId, activeWorkspaceId, messageId);
+      if (text) {
+        promptInputRef.current?.setValue(text);
+      }
+    },
+    [activeSessionId, activeWorkspaceId, revertSession],
+  );
+
   const handleCreateSession = useCallback(() => {
     if (!activeWorkspaceId) return;
     createSession(activeWorkspaceId);
@@ -554,12 +589,51 @@ export function ChatInterface() {
     [setActiveWorkspaceId, createSession],
   );
 
+  const pendingDeletions = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    const ref = pendingDeletions.current;
+    return () => {
+      for (const timer of ref.values()) clearTimeout(timer);
+      ref.clear();
+    };
+  }, []);
+
   const handleDeleteSession = useCallback(
     (sessionId: string) => {
       if (!activeWorkspaceId) return;
-      deleteSession(sessionId, activeWorkspaceId);
+
+      const existing = pendingDeletions.current.get(sessionId);
+      if (existing) clearTimeout(existing);
+
+      const snapshot = removeSessionLocal(sessionId, activeWorkspaceId);
+      if (!snapshot) return;
+
+      const workspaceId = activeWorkspaceId;
+
+      const timer = setTimeout(() => {
+        pendingDeletions.current.delete(sessionId);
+        deleteSession(sessionId, workspaceId);
+      }, 5000);
+
+      pendingDeletions.current.set(sessionId, timer);
+
+      toast.success("Chat deleted", {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const pending = pendingDeletions.current.get(sessionId);
+            if (pending) {
+              clearTimeout(pending);
+              pendingDeletions.current.delete(sessionId);
+            }
+            restoreSessionLocal(snapshot);
+          },
+        },
+      });
     },
-    [activeWorkspaceId, deleteSession],
+    [activeWorkspaceId, deleteSession, removeSessionLocal, restoreSessionLocal],
   );
 
   const handleSelectSession = useCallback(
@@ -598,17 +672,34 @@ export function ChatInterface() {
       const next = !prev;
       localStorage.setItem("dev-hub:chat-unified-mode", String(next));
       if (next) {
-        const { workspaceStates } = useChatStore.getState();
         for (const ws of allWorkspaces) {
-          const state = workspaceStates[ws.id];
-          if (!state || Object.keys(state.sessions).length === 0) {
-            fetchSessions(ws.id);
-          }
+          fetchSessions(ws.id);
         }
       }
       return next;
     });
   }, [allWorkspaces, fetchSessions]);
+
+  const handleToggleGroupByWorkspace = useCallback(() => {
+    setGroupByWorkspace((prev) => {
+      const next = !prev;
+      localStorage.setItem("dev-hub:chat-group-by-workspace", String(next));
+      return next;
+    });
+  }, []);
+
+  const handleWorkspaceOrderChange = useCallback((order: string[]) => {
+    setWorkspaceOrder(order);
+    localStorage.setItem("dev-hub:chat-workspace-order", JSON.stringify(order));
+  }, []);
+
+  const handleToggleWorkspaceExpanded = useCallback((workspaceId: string) => {
+    setExpandedWorkspaces((prev) => {
+      const next = { ...prev, [workspaceId]: !prev[workspaceId] };
+      localStorage.setItem("dev-hub:chat-expanded-workspaces", JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   // Use refs so command closures stay stable but always call latest handlers
   const handleCreateSessionRef = useRef(handleCreateSession);
@@ -629,6 +720,8 @@ export function ChatInterface() {
   setShowToolCallsRef.current = setShowToolCalls;
   const setShowTokensRef = useRef(setShowTokens);
   setShowTokensRef.current = setShowTokens;
+  const setShowTimestampsRef = useRef(setShowTimestamps);
+  setShowTimestampsRef.current = setShowTimestamps;
 
   const toggleThinking = useCallback(() => {
     setShowThinkingRef.current((prev) => {
@@ -650,6 +743,14 @@ export function ChatInterface() {
     setShowTokensRef.current((prev) => {
       const next = !prev;
       localStorage.setItem("dev-hub:chat-show-tokens", String(next));
+      return next;
+    });
+  }, []);
+
+  const toggleTimestamps = useCallback(() => {
+    setShowTimestampsRef.current((prev) => {
+      const next = !prev;
+      localStorage.setItem("dev-hub:chat-show-timestamps", String(next));
       return next;
     });
   }, []);
@@ -702,8 +803,15 @@ export function ChatInterface() {
         icon: Coins,
         onSelect: toggleTokens,
       },
+      {
+        id: "chat:toggle-timestamps",
+        label: showTimestamps ? "Hide Timestamps" : "Show Timestamps",
+        group: "Chat",
+        icon: Clock,
+        onSelect: toggleTimestamps,
+      },
     ],
-    [toggleThinking, toggleToolCalls, toggleTokens, showThinking, showToolCalls, showTokens, isPlanPanelOpen, isTaskPanelOpen],
+    [toggleThinking, toggleToolCalls, toggleTokens, toggleTimestamps, showThinking, showToolCalls, showTokens, showTimestamps, isPlanPanelOpen, isTaskPanelOpen],
   );
 
   useCommand(chatCommands);
@@ -788,6 +896,14 @@ export function ChatInterface() {
       },
       {
         action: {
+          id: "chat:toggle-timestamps",
+          label: "Toggle timestamps",
+          page: "chat" as const,
+        },
+        handler: toggleTimestamps,
+      },
+      {
+        action: {
           id: "chat:focus-prompt",
           label: "Focus prompt input",
           page: "chat" as const,
@@ -795,7 +911,7 @@ export function ChatInterface() {
         handler: () => promptInputRef.current?.focus(),
       },
     ],
-    [toggleThinking, toggleToolCalls, toggleTokens],
+    [toggleThinking, toggleToolCalls, toggleTokens, toggleTimestamps],
   );
 
   useLeaderAction(chatLeaderActions);
@@ -887,6 +1003,12 @@ export function ChatInterface() {
               onDeleteSession={handleDeleteSession}
               isUnifiedMode={isUnifiedMode}
               onToggleMode={handleToggleUnifiedMode}
+              groupByWorkspace={groupByWorkspace}
+              onToggleGroupByWorkspace={handleToggleGroupByWorkspace}
+              workspaceOrder={workspaceOrder}
+              onWorkspaceOrderChange={handleWorkspaceOrderChange}
+              expandedWorkspaces={expandedWorkspaces}
+              onToggleWorkspaceExpanded={handleToggleWorkspaceExpanded}
             />
           ) : (
             <SessionList
@@ -933,6 +1055,12 @@ export function ChatInterface() {
                 onDeleteSession={handleDeleteSession}
                 isUnifiedMode={isUnifiedMode}
                 onToggleMode={handleToggleUnifiedMode}
+                groupByWorkspace={groupByWorkspace}
+                onToggleGroupByWorkspace={handleToggleGroupByWorkspace}
+                workspaceOrder={workspaceOrder}
+                onWorkspaceOrderChange={handleWorkspaceOrderChange}
+                expandedWorkspaces={expandedWorkspaces}
+                onToggleWorkspaceExpanded={handleToggleWorkspaceExpanded}
               />
             ) : (
               <SessionList
@@ -1066,7 +1194,18 @@ export function ChatInterface() {
                   itemContent={(index, msg) => {
                     const prev = index > 0 ? activeMessages[index - 1] : null
                     const showAvatar = !prev || prev.info.role !== msg.info.role
-                    return <ChatMessage key={msg.info.id} message={msg} showAvatar={showAvatar} />
+                    const canRevert =
+                      streamingStatus !== "streaming" &&
+                      msg.info.role === "user" &&
+                      index > 0
+                    return (
+                      <ChatMessage
+                        key={msg.info.id}
+                        message={msg}
+                        showAvatar={showAvatar}
+                        onRevert={canRevert ? handleRevert : undefined}
+                      />
+                    )
                   }}
                   followOutput={handleFollowOutput}
                   atBottomStateChange={handleAtBottomStateChange}

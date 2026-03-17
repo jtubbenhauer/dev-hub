@@ -1,0 +1,25 @@
+app/files/page.tsx
+  ab3f7ab768663111 3,35-42
+components/chat/sub-agent-dialog.tsx
+  ab3f7ab768663111 227
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "1cabfcd402340d8294bdff1ae2d7b3e144c6b892",
+  "prompts": {
+    "ab3f7ab768663111": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_304bd5925ffef8RtvZuY2VExRS",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 2,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}

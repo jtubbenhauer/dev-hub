@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { useEditorStore } from "@/stores/editor-store"
@@ -25,6 +25,7 @@ const GIT_STATUS_COLORS: Record<FileGitStatus, string> = {
   renamed: "text-blue-500",
   conflicted: "text-red-600",
   added: "text-green-400",
+  committed: "text-cyan-500",
 }
 
 interface FileTreeNodeProps {
@@ -140,10 +141,18 @@ function filterTree(
 }
 
 export function FileTree() {
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState("")
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   const openFile = useEditorStore((s) => s.openFile)
+  const toggleExpandedPath = useEditorStore((s) => s.toggleExpandedPath)
+  const expandPathToFile = useEditorStore((s) => s.expandPathToFile)
+  const workspaceFileStates = useEditorStore((s) => s.workspaceFileStates)
+
+  const expandedPaths = useMemo(() => {
+    if (!activeWorkspaceId) return new Set<string>()
+    const ws = workspaceFileStates[activeWorkspaceId]
+    return new Set(ws?.expandedPaths ?? [])
+  }, [activeWorkspaceId, workspaceFileStates])
 
   const { data: rootEntries, isLoading } = useQuery<FileTreeEntry[]>({
     queryKey: ["file-tree", activeWorkspaceId, "root"],
@@ -174,26 +183,54 @@ export function FileTree() {
 
   const onToggleExpand = useCallback(
     async (dirPath: string) => {
-      setExpandedPaths((prev) => {
-        const next = new Set(prev)
-        if (next.has(dirPath)) {
-          next.delete(dirPath)
-        } else {
-          next.add(dirPath)
-        }
-        return next
-      })
+      if (activeWorkspaceId) {
+        toggleExpandedPath(activeWorkspaceId, dirPath)
+      }
 
       if (!lazyEntries.has(dirPath)) {
         const children = await fetchChildren(dirPath)
         setLazyEntries((prev) => new Map(prev).set(dirPath, children))
       }
     },
-    [fetchChildren, lazyEntries]
+    [activeWorkspaceId, toggleExpandedPath, fetchChildren, lazyEntries]
   )
+
+  const fetchingRef = useRef(new Set<string>())
+
+  useEffect(() => {
+    if (!activeWorkspaceId) return
+    const missing: string[] = []
+    for (const p of expandedPaths) {
+      if (!lazyEntries.has(p) && !fetchingRef.current.has(p)) {
+        missing.push(p)
+      }
+    }
+    if (missing.length === 0) return
+
+    for (const p of missing) fetchingRef.current.add(p)
+
+    Promise.all(
+      missing.map((dirPath) =>
+        fetchChildren(dirPath).then((children) => [dirPath, children] as const)
+      )
+    ).then((results) => {
+      setLazyEntries((prev) => {
+        const next = new Map(prev)
+        for (const [dirPath, children] of results) {
+          next.set(dirPath, children)
+          fetchingRef.current.delete(dirPath)
+        }
+        return next
+      })
+    })
+  }, [activeWorkspaceId, expandedPaths, lazyEntries, fetchChildren])
 
   const onFileClick = useCallback(
     async (entry: FileTreeEntry) => {
+      if (activeWorkspaceId) {
+        expandPathToFile(activeWorkspaceId, entry.path)
+      }
+
       const response = await fetch(
         `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(entry.path)}`
       )
@@ -213,7 +250,7 @@ export function FileTree() {
         originalContent: data.content,
       })
     },
-    [activeWorkspaceId, openFile]
+    [activeWorkspaceId, openFile, expandPathToFile]
   )
 
   // Merge lazy-loaded children into root entries

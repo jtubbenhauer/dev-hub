@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   MessageSquare,
+  FileCode2,
   GitMerge,
   GitBranch,
   Terminal,
@@ -20,6 +21,7 @@ import { useCommandPalette } from "@/components/providers/command-palette-provid
 const navItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/files", label: "Files", icon: FileCode2 },
   { href: "/git", label: "Git", icon: GitMerge },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/workspaces", label: "Repos", icon: GitBranch },
@@ -58,6 +60,10 @@ export function AppSidebar() {
       {
         action: { id: "nav:chat", label: "Go to Chat", page: "global" as const },
         handler: () => routerRef.current.push("/chat"),
+      },
+      {
+        action: { id: "nav:files", label: "Go to Files", page: "global" as const },
+        handler: () => routerRef.current.push("/files"),
       },
       {
         action: { id: "nav:git", label: "Go to Git", page: "global" as const },

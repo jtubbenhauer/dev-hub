@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   MessageSquare,
+  FileCode2,
   GitMerge,
   GitBranch,
   Settings,
@@ -16,6 +17,7 @@ import { useKeyboardVisible } from "@/hooks/use-keyboard-visible"
 const mobileNavItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
   { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/files", label: "Files", icon: FileCode2 },
   { href: "/git", label: "Git", icon: GitMerge },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/workspaces", label: "Repos", icon: GitBranch },

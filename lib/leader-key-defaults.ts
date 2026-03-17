@@ -20,6 +20,9 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "chat:toggle-plan", label: "Toggle plan panel", page: "chat" },
   { id: "chat:focus-prompt", label: "Focus prompt input", page: "chat" },
 
+  // Files page
+  { id: "files:save", label: "Save file", page: "files" },
+
   // Git page
   { id: "git:toggle-reviewed", label: "Toggle file reviewed", page: "git" },
   { id: "git:reviewed-next", label: "Mark reviewed & next file", page: "git" },
@@ -49,6 +52,9 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "nav:settings": "g s",
   "global:command-palette": ",",
   "global:switch-workspace": "w",
+
+  // Files page
+  "files:save": "S",
 
   // Chat page
   "chat:switch-model": "m",

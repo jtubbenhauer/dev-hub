@@ -42,10 +42,11 @@ import { DiffViewToggle } from "@/components/editor/diff-view-toggle"
 import { useEditorStore } from "@/stores/editor-store"
 import { getCM6Theme } from "@/lib/editor/catppuccin-theme"
 import { useTheme } from "@/components/providers/theme-provider"
-import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
+import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting, useEditorTypeSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
 import { cn } from "@/lib/utils"
+import { MonacoPrDiffEditor } from "@/components/git/monaco-pr-diff-editor"
 import type { GitHubPrFileContent, GitHubReviewComment } from "@/types"
 
 // Register ]c / [c for chunk navigation (runs once at module load)
@@ -257,7 +258,19 @@ interface PrDiffEditorProps {
 }
 
 export const PrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
-  function PrDiffEditor(
+  function PrDiffEditor(props, ref) {
+    const { editorType } = useEditorTypeSetting()
+
+    if (editorType === "monaco") {
+      return <MonacoPrDiffEditor ref={ref} {...props} />
+    }
+
+    return <CMPrDiffEditor ref={ref} {...props} />
+  }
+)
+
+const CMPrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
+  function CMPrDiffEditor(
     {
       fileContent,
       comments,

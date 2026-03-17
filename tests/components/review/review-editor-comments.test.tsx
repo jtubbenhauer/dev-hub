@@ -14,6 +14,7 @@ vi.mock("@/hooks/use-settings", () => ({
   useFontSizeSetting: () => ({ fontSize: 14, setFontSize: vi.fn() }),
   useMobileFontSizeSetting: () => ({ mobileFontSize: 12, setMobileFontSize: vi.fn() }),
   useTabSizeSetting: () => ({ tabSize: 2, setTabSize: vi.fn() }),
+  useEditorTypeSetting: () => ({ editorType: "codemirror", isLoading: false }),
 }))
 
 vi.mock("@/hooks/use-mobile", () => ({
@@ -45,6 +46,10 @@ vi.mock("@/components/editor/vim-toggle", () => ({
 
 vi.mock("@/components/editor/diff-view-toggle", () => ({
   DiffViewToggle: () => null,
+}))
+
+vi.mock("@/components/review/monaco-review-editor", () => ({
+  MonacoReviewEditor: () => null,
 }))
 
 let capturedCommentCallbacks: {

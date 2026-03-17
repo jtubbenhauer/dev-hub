@@ -31,7 +31,7 @@ import { DiffViewToggle } from "@/components/editor/diff-view-toggle"
 import { useEditorStore } from "@/stores/editor-store"
 import { getCM6Theme } from "@/lib/editor/catppuccin-theme"
 import { useTheme } from "@/components/providers/theme-provider"
-import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
+import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting, useEditorTypeSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getLanguageExtension } from "@/lib/editor/language"
 import { toast } from "sonner"
@@ -41,6 +41,7 @@ import { CommentThread } from "@/components/editor/comment-thread"
 import { CommentInput } from "@/components/editor/comment-input"
 import { attachCommentToChat } from "@/lib/comment-chat-bridge"
 import { useChatStore } from "@/stores/chat-store"
+import { MonacoReviewEditor } from "@/components/review/monaco-review-editor"
 import type { ReviewFile } from "@/types"
 
 // Register ]c / [c vim bindings for chunk navigation — runs once at module load
@@ -117,7 +118,17 @@ interface ReviewEditorProps {
   onOpenFileList?: () => void
 }
 
-export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(function ReviewEditor({
+export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(function ReviewEditor(props, ref) {
+  const { editorType } = useEditorTypeSetting()
+
+  if (editorType === "monaco") {
+    return <MonacoReviewEditor ref={ref} {...props} />
+  }
+
+  return <CMReviewEditor ref={ref} {...props} />
+})
+
+const CMReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(function CMReviewEditor({
   fileContent,
   file,
   workspaceId,

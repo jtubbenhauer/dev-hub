@@ -1,0 +1,53 @@
+.github/workflows/pull_request.yaml
+  69c949011e898118 26,59,103,109-110,118-119,127-128,136-137,145-146,168,212,263,302,310,314,387,430
+apps/principle-e2e/src/integration/lib/fee-schedules/fee-schedule-page-tests.ts
+  bb6cad04437a2833 22
+libs/ng-principle/pages/src/lib/settings/fee-schedule/fee-schedule-edit/fee-schedule-edit.component.html
+  7e5481f57472d154 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "fa7a0a2633d20f4f08d46b1d78d5ba9b27ae31cc",
+  "prompts": {
+    "69c949011e898118": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-4a3b20e3-c3ca-4977-9c3c-aca14e167b47",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    },
+    "7e5481f57472d154": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-a744ed58-61a1-41f3-8f4a-c70de90e1f21",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "bb6cad04437a2833": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-0fe707fb-0429-4adf-953a-66faa2531cf3",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -427,9 +427,9 @@ export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(fu
   const fileName = fileContent.path.split("/").pop() ?? fileContent.path
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
       {/* Editor header */}
-      <div className="flex shrink-0 items-center gap-1.5 border-b bg-muted/30 px-2 py-1.5 md:gap-2 md:px-3">
+      <div className="flex shrink-0 items-center gap-1.5 overflow-hidden border-b bg-muted/30 px-2 py-1.5 md:gap-2 md:px-3">
         {/* File list toggle - mobile only */}
         {onOpenFileList && (
           <Button

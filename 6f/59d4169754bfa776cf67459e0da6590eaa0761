@@ -1,0 +1,47 @@
+apps/tinker/src/app/scripts/remap-migrated-treatment-surfaces.ts
+  54a8ad42035ddfc5 26-27
+libs/practice-migrations/src/lib/source/connection/connection.node.ts
+  54a8ad42035ddfc5 21-22
+libs/practice-migrations/src/lib/destination/destination-entity/destination-entity.browser.ts
+  54a8ad42035ddfc5 28-29
+libs/practice-migrations/src/lib/source/source-entity-record.ts
+  54a8ad42035ddfc5 34-35
+libs/practice-migrations/src/lib/exact/destination/entities/lib/exact-invoice-builder.spec.ts
+  54a8ad42035ddfc5 307-351
+libs/practice-migrations/src/lib/source/source-entity/source-entity.browser.ts
+  54a8ad42035ddfc5 38-39
+libs/practice-migrations/src/lib/destination/destination-entity/destination-entity.node.ts
+  54a8ad42035ddfc5 38-39
+libs/practice-migrations/src/lib/translation-map/translation-map.node.ts
+  54a8ad42035ddfc5 27-28
+libs/practice-migrations/src/lib/exact/destination/entities/lib/exact-invoice-builder.ts
+  54a8ad42035ddfc5 282-292
+libs/practice-migrations/src/lib/destination/destination-entity-record/destination-entity-record.node.ts
+  54a8ad42035ddfc5 34-35
+libs/practice-migrations/src/lib/source/source-entity/source-entity.node.ts
+  54a8ad42035ddfc5 39-40
+apps/tinker/src/app/scripts/practice-migrations/remove-duplicate-steps.ts
+  54a8ad42035ddfc5 26-27
+libs/practice-migrations/src/lib/destination/destination-entity-record/destination-entity-record.browser.ts
+  54a8ad42035ddfc5 37-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "6f59d4169754bfa776cf67459e0da6590eaa0761",
+  "prompts": {
+    "54a8ad42035ddfc5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305e277d3ffezvZxIdXXzrF0Lm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 78,
+      "total_deletions": 53,
+      "accepted_lines": 78,
+      "overriden_lines": 0
+    }
+  }
+}

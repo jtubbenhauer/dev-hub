@@ -41,7 +41,12 @@ export const SETTINGS_KEYS = {
   SOUND_PERMISSIONS_ID: "sound-permissions-id",
   SOUND_ERRORS_ENABLED: "sound-errors-enabled",
   SOUND_ERRORS_ID: "sound-errors-id",
+  EDITOR_TYPE: "editor-type",
 } as const
+
+export type EditorType = "codemirror" | "monaco"
+export const EDITOR_TYPE_OPTIONS: EditorType[] = ["codemirror", "monaco"]
+export const DEFAULT_EDITOR_TYPE: EditorType = "codemirror"
 
 export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
 export type FontSize = (typeof FONT_SIZE_OPTIONS)[number]
@@ -388,4 +393,14 @@ export function useSoundSettings(): {
     errorsSoundId,
     isLoading,
   }
+}
+
+export function useEditorTypeSetting(): {
+  editorType: EditorType
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.EDITOR_TYPE]
+  const isValid = typeof raw === "string" && EDITOR_TYPE_OPTIONS.includes(raw as EditorType)
+  return { editorType: isValid ? (raw as EditorType) : DEFAULT_EDITOR_TYPE, isLoading }
 }

@@ -23,6 +23,7 @@ import {
   useFontSizeSetting,
   useMobileFontSizeSetting,
   useTabSizeSetting,
+  useEditorTypeSetting,
   useShellRcPathSetting,
   useSettingsMutation,
   useSoundSettings,
@@ -30,12 +31,14 @@ import {
   FONT_SIZE_OPTIONS,
   MOBILE_FONT_SIZE_OPTIONS,
   TAB_SIZE_OPTIONS,
+  EDITOR_TYPE_OPTIONS,
   DEFAULT_FONT_SIZE,
   DEFAULT_MOBILE_FONT_SIZE,
   DEFAULT_TAB_SIZE,
+  DEFAULT_EDITOR_TYPE,
   APP_THEMES,
 } from "@/hooks/use-settings"
-import type { FontSize, MobileFontSize, TabSize, AppTheme } from "@/hooks/use-settings"
+import type { FontSize, MobileFontSize, TabSize, EditorType, AppTheme } from "@/hooks/use-settings"
 import { useTheme } from "@/components/providers/theme-provider"
 import { SOUND_OPTIONS, soundSrc, playSound } from "@/lib/sounds"
 
@@ -109,16 +112,25 @@ function EditorSettingsCard() {
   const { fontSize, isLoading: isLoadingFont } = useFontSizeSetting()
   const { mobileFontSize, isLoading: isLoadingMobileFont } = useMobileFontSizeSetting()
   const { tabSize, isLoading: isLoadingTab } = useTabSizeSetting()
+  const { editorType, isLoading: isLoadingEditorType } = useEditorTypeSetting()
   const setVimMode = useEditorStore((s) => s.setVimMode)
   const mutation = useSettingsMutation()
 
-  const isLoading = isLoadingVim || isLoadingFont || isLoadingMobileFont || isLoadingTab
+  const isLoading = isLoadingVim || isLoadingFont || isLoadingMobileFont || isLoadingTab || isLoadingEditorType
 
   useEffect(() => {
     if (!isLoadingVim) {
       setVimMode(isVimMode)
     }
   }, [isVimMode, isLoadingVim, setVimMode])
+
+  const handleEditorTypeChange = (value: string) => {
+    const next = value as EditorType
+    mutation.mutate(
+      { key: SETTINGS_KEYS.EDITOR_TYPE, value: next },
+      { onSuccess: () => toast.success(`Editor set to ${next === "monaco" ? "Monaco (VS Code)" : "CodeMirror"}`) }
+    )
+  }
 
   const handleVimToggle = (checked: boolean) => {
     setVimMode(checked)
@@ -171,6 +183,32 @@ function EditorSettingsCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="editor-type">Editor engine</Label>
+            <p className="text-xs text-muted-foreground">
+              CodeMirror (Vim-friendly) or Monaco (VS Code engine)
+            </p>
+          </div>
+          <Select
+            value={editorType}
+            onValueChange={handleEditorTypeChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="editor-type" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {EDITOR_TYPE_OPTIONS.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type === "codemirror" ? "CodeMirror" : "Monaco (VS Code)"}
+                  {type === DEFAULT_EDITOR_TYPE ? " (default)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="vim-mode">Vim mode</Label>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { X, Save, FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { CodeEditor } from "@/components/editor/code-editor"
+import { EditorSwitcher } from "@/components/editor/editor-switcher"
 import {
   Select,
   SelectContent,
@@ -288,7 +288,7 @@ export function PlanPanel({
             </p>
           </div>
         ) : (
-          <CodeEditor
+          <EditorSwitcher
             content={content}
             language="markdown"
             onChange={setContent}

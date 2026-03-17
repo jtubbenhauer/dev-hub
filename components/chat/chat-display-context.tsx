@@ -6,12 +6,14 @@ export interface ChatDisplaySettings {
   showThinking: boolean
   showToolCalls: boolean
   showTokens: boolean
+  showTimestamps: boolean
 }
 
 const defaultSettings: ChatDisplaySettings = {
   showThinking: true,
   showToolCalls: true,
   showTokens: true,
+  showTimestamps: false,
 }
 
 export const ChatDisplayContext = createContext<ChatDisplaySettings>(defaultSettings)

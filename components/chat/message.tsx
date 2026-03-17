@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useMemo, useState, useRef, useEffect } from "react"
+import { memo, useMemo, useState, useRef, useEffect, useCallback } from "react"
 import {
   User,
   Bot,
@@ -8,12 +8,19 @@ import {
   ChevronDown,
   ChevronRight,
   Brain,
+  Undo2,
+  Copy,
+  Check,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { useChatDisplay } from "@/components/chat/chat-display-context"
 import { MarkdownContent } from "@/components/chat/markdown-content"
 import { MessageToolUse } from "@/components/chat/message-tool-use"
+import { parseCommentRefs } from "@/lib/comment-chat-bridge"
+import { CommentRefBadge } from "@/components/chat/comment-ref-badge"
+import { useWorkspaceStore } from "@/stores/workspace-store"
 import type { MessageWithParts } from "@/lib/opencode/types"
 import type {
   ToolPart,
@@ -59,6 +66,7 @@ function useThrottledValue<T>(value: T, delayMs: number): T {
 interface ChatMessageProps {
   message: MessageWithParts
   showAvatar?: boolean
+  onRevert?: (messageId: string) => void
 }
 
 export function isMessageVisible(
@@ -90,12 +98,32 @@ function isSystemReminder(messageParts: readonly { type: string }[]): boolean {
   return false
 }
 
+function UserMessageBubble({ textContent, workspaceId }: { textContent: string; workspaceId: string | null }) {
+  const { refs, cleanedText } = parseCommentRefs(textContent)
+
+  return (
+    <>
+      {refs.length > 0 && (
+        <div className="flex flex-wrap justify-end gap-1 pb-1">
+          {refs.map((r) => (
+            <CommentRefBadge key={r.id} commentRef={r} workspaceId={workspaceId} />
+          ))}
+        </div>
+      )}
+      <div className="rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-primary-foreground">
+        <p className="whitespace-pre-wrap text-sm">{cleanedText || textContent}</p>
+      </div>
+    </>
+  )
+}
+
 export const ChatMessage = memo(
-  function ChatMessage({ message, showAvatar = true }: ChatMessageProps) {
+  function ChatMessage({ message, showAvatar = true, onRevert }: ChatMessageProps) {
     const { info, parts } = message
-  const { showThinking, showToolCalls, showTokens } = useChatDisplay()
+  const { showThinking, showToolCalls, showTokens, showTimestamps } = useChatDisplay()
   const isUser = info.role === "user"
   const isAssistant = info.role === "assistant"
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
 
   const { textContent, inlineThinkingParts } = useMemo(() => {
     const raw = parts
@@ -121,7 +149,7 @@ export const ChatMessage = memo(
     }
 
     const cleaned = raw.replace(/<thinking>[\s\S]*?<\/thinking>\s*/g, "").trim()
-    return { textContent: cleaned, inlineThinkingParts: extracted }
+    return { textContent: stripSoleCodeFence(cleaned), inlineThinkingParts: extracted }
   }, [parts, info.id, info.sessionID, info.time.created])
 
   const toolParts = useMemo(
@@ -171,9 +199,26 @@ export const ChatMessage = memo(
           )}
         >
         {isUser ? (
-          <div className="rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-primary-foreground">
-            <p className="whitespace-pre-wrap text-sm">{textContent}</p>
-          </div>
+          <>
+            <div className="flex items-end gap-1">
+              {onRevert && (
+                <button
+                  type="button"
+                  onClick={() => onRevert(info.id)}
+                  className="mb-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/0 transition-colors hover:bg-muted hover:text-muted-foreground group-hover:text-muted-foreground/60"
+                  title="Revert to before this message"
+                >
+                  <Undo2 className="size-3.5" />
+                </button>
+              )}
+              <UserMessageBubble textContent={textContent} workspaceId={activeWorkspaceId} />
+            </div>
+            {showTimestamps && (
+              <span className="text-[10px] text-muted-foreground/60">
+                {formatMessageTime(info.time.created)}
+              </span>
+            )}
+          </>
         ) : (
           <div className="min-w-0 w-full space-y-3 overflow-hidden">
             {showThinking && reasoningParts.map((part) => (
@@ -185,8 +230,11 @@ export const ChatMessage = memo(
             ))}
 
             {throttledTextContent && (
-              <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
-                <MarkdownContent content={throttledTextContent} />
+              <div className="group/markdown relative">
+                <CopyMarkdownButton content={textContent} />
+                <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
+                  <MarkdownContent content={throttledTextContent} />
+                </div>
               </div>
             )}
 
@@ -199,15 +247,24 @@ export const ChatMessage = memo(
               </div>
             )}
 
-            {showTokens && isAssistant && "tokens" in info && (
+            {(showTokens || showTimestamps) && isAssistant && (
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs font-normal">
-                  {info.tokens.input + info.tokens.output} tokens
-                </Badge>
-                {info.cost > 0 && (
-                  <Badge variant="outline" className="text-xs font-normal">
-                    ${info.cost.toFixed(4)}
-                  </Badge>
+                {showTokens && "tokens" in info && (
+                  <>
+                    <Badge variant="outline" className="text-xs font-normal">
+                      {info.tokens.input + info.tokens.output} tokens
+                    </Badge>
+                    {info.cost > 0 && (
+                      <Badge variant="outline" className="text-xs font-normal">
+                        ${info.cost.toFixed(4)}
+                      </Badge>
+                    )}
+                  </>
+                )}
+                {showTimestamps && (
+                  <span className="text-[10px] text-muted-foreground/60">
+                    {formatMessageTime(info.time.created)}
+                  </span>
                 )}
               </div>
             )}
@@ -230,7 +287,8 @@ export const ChatMessage = memo(
 (prev, next) =>
   prev.message.parts === next.message.parts &&
   prev.message.info === next.message.info &&
-  prev.showAvatar === next.showAvatar
+  prev.showAvatar === next.showAvatar &&
+  prev.onRevert === next.onRevert
 )
 
 const ReasoningBlock = memo(function ReasoningBlock({ part }: { part: ReasoningPart }) {
@@ -287,6 +345,33 @@ const ReasoningBlock = memo(function ReasoningBlock({ part }: { part: ReasoningP
 (prev, next) => prev.part.id === next.part.id && prev.part.text === next.part.text && prev.part.time === next.part.time
 )
 
+function CopyMarkdownButton({ content }: { content: string }) {
+  const [isCopied, setIsCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(content).then(() => {
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
+    })
+  }, [content])
+
+  return (
+    <Button
+      size="icon-xs"
+      variant="ghost"
+      onClick={handleCopy}
+      title="Copy markdown"
+      className="absolute right-0 top-0 z-10 opacity-0 transition-opacity group-hover/markdown:opacity-100"
+    >
+      {isCopied ? (
+        <Check className="size-3" />
+      ) : (
+        <Copy className="size-3" />
+      )}
+    </Button>
+  )
+}
+
 function CompactionDivider() {
   return (
     <div className="flex items-center gap-2 py-1">
@@ -301,6 +386,44 @@ function CompactionDivider() {
 
 
 
+// Unwrap bare ``` fences that wrap the bulk of a response (not actual code)
+export function stripSoleCodeFence(text: string): string {
+  const trimmed = text.trim()
+  if (!trimmed.endsWith("```")) return text
+
+  const fenceOpen = trimmed.indexOf("```")
+  if (fenceOpen === -1) return text
+
+  const openLineEnd = trimmed.indexOf("\n", fenceOpen)
+  if (openLineEnd === -1) return text
+
+  const openingLine = trimmed.slice(fenceOpen, openLineEnd).trim()
+  if (openingLine !== "```") return text
+
+  const fenceClose = trimmed.lastIndexOf("```")
+  if (fenceClose <= fenceOpen) return text
+
+  const inner = trimmed.slice(openLineEnd + 1, fenceClose).trimEnd()
+  if (inner.includes("```")) return text
+
+  if (looksLikeCode(inner)) return text
+
+  const prefix = trimmed.slice(0, fenceOpen).trim()
+  return prefix ? `${prefix}\n\n${inner}` : inner
+}
+
+function looksLikeCode(text: string): boolean {
+  const codeSignals = [
+    /[{};]\s*$/m,
+    /^\s*(import|export|const|let|var|function|class|def|return|if|for|while)\b/m,
+    /^\s*(public|private|protected|static)\s/m,
+    /=>/m,
+    /\w+\.\w+\(.*\)\s*;?\s*$/m,
+  ]
+  const matches = codeSignals.filter((re) => re.test(text)).length
+  return matches >= 2
+}
+
 function getErrorMessage(error: unknown): string {
   if (!error || typeof error !== "object") return "Unknown error"
   const typed = error as { data?: { message?: string }; name?: string }
@@ -314,4 +437,16 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = Math.round(seconds % 60)
   return `${minutes}m ${remainingSeconds}s`
+}
+
+function formatMessageTime(timestamp: number): string {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  if (isToday) return time
+  return `${date.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`
 }

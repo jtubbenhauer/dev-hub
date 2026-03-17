@@ -1,0 +1,66 @@
+apps/dev-rig/cli/internal/provider/fly/provider.go
+  ee04beefce3e5afb 86-91,93-97,99-115,117-119
+apps/dev-rig/cli/internal/provider/fly/provider_test.go
+  0d57e6ad9c9b3d8e 182-203
+  c7038d3b3cf2532c 66-181
+  0c9a496b428843ca 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "468f0f74777b09dcb0dd30db42b9602defc291c0",
+  "prompts": {
+    "0c9a496b428843ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_30531ffb9ffeZ0tdRThZntgSjz-d5d24b3b-7f85-4736-a228-c6ba3358264e",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "0d57e6ad9c9b3d8e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_30531ffb9ffeZ0tdRThZntgSjz-4176c67f-09c9-4b5f-871e-d4a622e67e87",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 0,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    },
+    "c7038d3b3cf2532c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_30531ffb9ffeZ0tdRThZntgSjz-5a3fdb9c-e3f7-4781-a33b-00ed28333911",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 116,
+      "total_deletions": 0,
+      "accepted_lines": 116,
+      "overriden_lines": 0
+    },
+    "ee04beefce3e5afb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_30531ffb9ffeZ0tdRThZntgSjz-3f800682-4fee-42b0-b9da-4e63f2c62cbb",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 32,
+      "total_deletions": 3,
+      "accepted_lines": 32,
+      "overriden_lines": 0
+    }
+  }
+}

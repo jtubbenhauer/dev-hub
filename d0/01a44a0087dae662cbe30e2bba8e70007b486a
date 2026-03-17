@@ -1,0 +1,38 @@
+vitest.config.ts
+  25b33ee562d80931 9
+AGENTS.md
+  25b33ee562d80931 148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "d001a44a0087dae662cbe30e2bba8e70007b486a",
+  "prompts": {
+    "25b33ee562d80931": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_304eee63dffenUeh5g8QCPMDVB",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 50,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "7c5ab68d170d76c9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30aa65a92ffe7gT9T2Pqja49yN",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 33,
+      "total_deletions": 32,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

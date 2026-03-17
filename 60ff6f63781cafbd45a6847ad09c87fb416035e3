@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "60ff6f63781cafbd45a6847ad09c87fb416035e3",
+  "prompts": {
+    "417488ebc8883243": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_30cc0ff9dffeM685qpFDUehfOa",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 134,
+      "overriden_lines": 0
+    }
+  }
+}

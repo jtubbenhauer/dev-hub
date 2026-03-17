@@ -352,6 +352,15 @@ export function ChatInterface() {
   const lastViewedAt = isUnifiedMode ? unifiedLastViewed : activeWsLastViewedAt;
   const activeTodos = useChatStore(getActiveTodos);
 
+  const isSessionsLoading = useChatStore((s) => {
+    if (isUnifiedMode) {
+      return allWorkspaces.some((ws) => !s.workspaceStates[ws.id]?.sessionsLoaded)
+    }
+    const wsId = s.activeWorkspaceId
+    if (!wsId) return false
+    return !s.workspaceStates[wsId]?.sessionsLoaded
+  });
+
   const activePermissions = useMemo(
     () => allPermissions.filter((p) => p.sessionID === activeSessionId),
     [allPermissions, activeSessionId],
@@ -998,6 +1007,7 @@ export function ChatInterface() {
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
               lastViewedAt={lastViewedAt}
+              isLoading={isSessionsLoading}
               onSelectSession={handleSelectUnifiedSession}
               onCreateSession={handleMobileCreateSession}
               onDeleteSession={handleDeleteSession}
@@ -1018,6 +1028,7 @@ export function ChatInterface() {
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
               lastViewedAt={lastViewedAt}
+              isLoading={isSessionsLoading}
               onSelectSession={handleMobileSelectSession}
               onCreateSession={handleMobileCreateSession}
               onDeleteSession={handleDeleteSession}
@@ -1050,6 +1061,7 @@ export function ChatInterface() {
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
               lastViewedAt={lastViewedAt}
+                isLoading={isSessionsLoading}
                 onSelectSession={handleSelectUnifiedSession}
                 onCreateSession={handleCreateSession}
                 onDeleteSession={handleDeleteSession}
@@ -1070,6 +1082,7 @@ export function ChatInterface() {
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
               lastViewedAt={lastViewedAt}
+                isLoading={isSessionsLoading}
                 onSelectSession={handleSelectSession}
                 onCreateSession={handleCreateSession}
                 onDeleteSession={handleDeleteSession}

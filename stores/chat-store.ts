@@ -34,6 +34,7 @@ export type WorkspaceActivity = "idle" | "active" | "waiting"
 // Per-workspace state bucket
 export interface WorkspaceState {
   sessions: Record<string, Session>
+  sessionsLoaded: boolean
   messages: Record<string, MessageWithParts[]>
   optimisticMessageIds: Record<string, string>
   sessionStatuses: Record<string, SessionStatus>
@@ -47,6 +48,7 @@ export interface WorkspaceState {
 function emptyWorkspaceState(): WorkspaceState {
   return {
     sessions: {},
+    sessionsLoaded: false,
     messages: {},
     optimisticMessageIds: {},
     sessionStatuses: {},
@@ -523,6 +525,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const response = await fetch(buildProxyUrl("session", workspaceId))
       if (!response.ok) {
         console.warn(`[chat] fetchSessions failed: ${response.status}`)
+        set((state) => updateWorkspace(state, workspaceId, () => ({ sessionsLoaded: true })))
         return
       }
 
@@ -532,7 +535,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         sessionsMap[session.id] = session
       }
       set((state) => {
-        const wsUpdate = updateWorkspace(state, workspaceId, () => ({ sessions: sessionsMap }))
+        const wsUpdate = updateWorkspace(state, workspaceId, () => ({ sessions: sessionsMap, sessionsLoaded: true }))
         // Prune orphaned sub-records for sessions that no longer exist
         const ws = wsUpdate.workspaceStates?.[workspaceId]
         if (!ws) return wsUpdate
@@ -571,6 +574,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
     } catch (error) {
       console.warn("[chat] fetchSessions error:", error)
+      set((state) => updateWorkspace(state, workspaceId, () => ({ sessionsLoaded: true })))
     }
   },
 

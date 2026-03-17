@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import { useCommand } from "@/hooks/use-command"
 import { useLeaderAction } from "@/hooks/use-leader-action"
 import { useCommandPalette } from "@/components/providers/command-palette-provider"
+import { useFilePicker } from "@/components/file-picker/file-picker"
 
 const navItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
@@ -32,6 +33,7 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { open: openCommandPalette } = useCommandPalette()
+  const { open: openFilePicker } = useFilePicker()
 
   const navCommands = useMemo(
     () =>
@@ -54,6 +56,8 @@ export function AppSidebar() {
   routerRef.current = router
   const openCommandPaletteRef = useRef(openCommandPalette)
   openCommandPaletteRef.current = openCommandPalette
+  const openFilePickerRef = useRef(openFilePicker)
+  openFilePickerRef.current = openFilePicker
 
   const globalLeaderActions = useMemo(
     () => [
@@ -88,6 +92,10 @@ export function AppSidebar() {
       {
         action: { id: "global:command-palette", label: "Open command palette", page: "global" as const },
         handler: () => openCommandPaletteRef.current(),
+      },
+      {
+        action: { id: "global:file-picker", label: "Open file picker", page: "global" as const },
+        handler: () => openFilePickerRef.current(),
       },
     ],
     []

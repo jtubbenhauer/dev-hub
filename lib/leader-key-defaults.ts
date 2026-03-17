@@ -11,6 +11,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "nav:repos", label: "Go to Repos", page: "global" },
   { id: "nav:settings", label: "Go to Settings", page: "global" },
   { id: "global:command-palette", label: "Open command palette", page: "global" },
+  { id: "global:file-picker", label: "Open file picker", page: "global" },
   { id: "global:switch-workspace", label: "Open workspace switcher", page: "global" },
 
   // Chat page
@@ -53,6 +54,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "nav:repos": "g r",
   "nav:settings": "g s",
   "global:command-palette": ",",
+  "global:file-picker": "f",
   "global:switch-workspace": "w",
 
   // Files page

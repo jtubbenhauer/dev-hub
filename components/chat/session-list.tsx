@@ -5,6 +5,7 @@ import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranc
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,7 @@ interface BaseSessionListProps {
   activeSessionId: string | null
   sessionStatuses: Record<string, SessionStatus>
   lastViewedAt: Record<string, number>
+  isLoading?: boolean
   onCreateSession: () => void
   onDeleteSession: (sessionId: string) => void
   isUnifiedMode?: boolean
@@ -219,7 +221,9 @@ export function SessionList(props: SessionListProps) {
       </div>
 
       <ScrollArea className="min-h-0 min-w-0 flex-1 [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block">
-        {sortedSessions.length === 0 && (!groupedSessions || groupedSessions.length === 0) ? (
+        {props.isLoading ? (
+          <SessionListSkeleton />
+        ) : sortedSessions.length === 0 && (!groupedSessions || groupedSessions.length === 0) ? (
           <div className="flex flex-col items-center gap-2 p-4 text-center">
             <MessageSquare className="size-8 text-muted-foreground/50" />
             <p className="text-xs text-muted-foreground">No sessions yet</p>
@@ -556,6 +560,22 @@ function SessionItem({
       >
         <Trash2 className="size-3 text-muted-foreground" />
       </Button>
+    </div>
+  )
+}
+
+function SessionListSkeleton() {
+  return (
+    <div className="space-y-1 p-1">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex items-start gap-2 px-2 py-2">
+          <Skeleton className="mt-0.5 size-3.5 shrink-0 rounded" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Skeleton className="h-3.5 rounded" style={{ width: `${60 + (i % 3) * 15}%` }} />
+            <Skeleton className="h-3 w-12 rounded" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

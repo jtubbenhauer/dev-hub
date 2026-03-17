@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState, useEffect, useMemo, useCallback } from "react"
+import { memo, useState, useMemo } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -8,14 +8,15 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Brain,
   MessageSquareText,
+  ExternalLink,
 } from "lucide-react"
 import AnsiToHtml from "ansi-to-html"
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/chat-store"
 import { MarkdownContent } from "@/components/chat/markdown-content"
-import type { ToolPart, MessageWithParts } from "@/lib/opencode/types"
+import { SubAgentDialog } from "@/components/chat/sub-agent-dialog"
+import type { ToolPart } from "@/lib/opencode/types"
 
 const MAX_OUTPUT_LINES = 10
 const AGENT_TOOL_NAMES = new Set(["agent", "task"])
@@ -145,10 +146,7 @@ function StandardToolCall({ part, nested }: { part: ToolPart; nested?: boolean }
 function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
   const { state } = part
   const isActiveStatus = state.status === "running" || state.status === "pending"
-  const [userToggled, setUserToggled] = useState(false)
-  const [manualExpanded, setManualExpanded] = useState(false)
-  const isExpanded = userToggled ? manualExpanded : true
-  const [showSubThinking, setShowSubThinking] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   const statusIcon = getStatusIcon(state.status)
   const statusColor = getStatusColor(state.status)
@@ -157,108 +155,8 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
       ? formatDuration(state.time.end - state.time.start)
       : null
 
-  const childSessionId = part.callID
+  const childSessionId = ("metadata" in part.state && (part.state.metadata as Record<string, unknown>)?.sessionId as string | undefined) ?? null
   const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId)
-  const [childMessages, setChildMessages] = useState<MessageWithParts[]>([])
-
-  useEffect(() => {
-    if (!childSessionId || !activeWorkspaceId) return
-
-    const controller = new AbortController()
-    const params = new URLSearchParams({ workspaceId: activeWorkspaceId })
-    const url = `/api/opencode/session/${childSessionId}/message?${params}`
-
-    fetch(url, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) return
-        return res.json() as Promise<MessageWithParts[]>
-      })
-      .then((data) => {
-        if (data) setChildMessages(data)
-      })
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === "AbortError") return
-        console.warn("[AgentToolCall] failed to fetch child messages:", err)
-      })
-
-    return () => controller.abort()
-  }, [childSessionId, activeWorkspaceId])
-
-  useEffect(() => {
-    if (!childSessionId || !activeWorkspaceId) return
-    if (state.status !== "completed" && state.status !== "error") return
-
-    const controller = new AbortController()
-    const params = new URLSearchParams({ workspaceId: activeWorkspaceId })
-    const url = `/api/opencode/session/${childSessionId}/message?${params}`
-
-    fetch(url, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) return
-        return res.json() as Promise<MessageWithParts[]>
-      })
-      .then((data) => {
-        if (data) setChildMessages(data)
-      })
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === "AbortError") return
-        console.warn("[AgentToolCall] failed to re-fetch child messages on completion:", err)
-      })
-
-    return () => controller.abort()
-  }, [state.status, childSessionId, activeWorkspaceId])
-
-  const childToolParts = useMemo(() => {
-    const toolParts: ToolPart[] = []
-    for (const msg of childMessages) {
-      for (const p of msg.parts) {
-        if (p.type === "tool") {
-          toolParts.push(p)
-        }
-      }
-    }
-    return toolParts
-  }, [childMessages])
-
-  const childTextContent = useMemo(() => {
-    const texts: string[] = []
-    for (const msg of childMessages) {
-      if (msg.info.role === "assistant") {
-        for (const p of msg.parts) {
-          if (p.type === "text" && "text" in p && !("ignored" in p && p.ignored)) {
-            texts.push((p as { text: string }).text)
-          }
-        }
-      }
-    }
-    return texts.join("\n\n").trim()
-  }, [childMessages])
-
-  const childReasoningContent = useMemo(() => {
-    const reasonings: string[] = []
-    for (const msg of childMessages) {
-      if (msg.info.role === "assistant") {
-        for (const p of msg.parts) {
-          if (p.type === "reasoning" && "text" in p) {
-            reasonings.push((p as { text: string }).text)
-          }
-        }
-      }
-    }
-    return reasonings.join("\n\n").trim()
-  }, [childMessages])
-
-  const handleToggle = useCallback(() => {
-    if (userToggled) {
-      setManualExpanded((prev) => !prev)
-    } else {
-      setUserToggled(true)
-      setManualExpanded(false)
-    }
-  }, [userToggled])
-
-  const hasSubText = childTextContent.length > 0
-  const hasSubThinking = childReasoningContent.length > 0
 
   const description = typeof state.input?.description === "string"
     ? state.input.description
@@ -273,17 +171,13 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
     )}>
       <button
         type="button"
-        onClick={handleToggle}
+        onClick={() => setDialogOpen(true)}
         className={cn(
           "flex min-w-0 items-center gap-1.5 text-left text-xs hover:bg-muted/30 rounded px-1 py-0.5 transition-colors",
           nested ? "inline-flex" : "w-full"
         )}
       >
-        {isExpanded ? (
-          <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" />
-        ) : (
-          <ChevronRight className="size-3 shrink-0 text-muted-foreground/60" />
-        )}
+        <ExternalLink className="size-3 shrink-0 text-muted-foreground/60" />
 
         <span className={cn("shrink-0", statusColor)}>{statusIcon}</span>
 
@@ -295,65 +189,32 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
           {description}
         </span>
 
+        {isActiveStatus && (
+          <Loader2 className="size-3 shrink-0 animate-spin text-muted-foreground/50" />
+        )}
+
         {duration && (
           <span className="ml-auto shrink-0 text-muted-foreground/50 tabular-nums">
             {duration}
           </span>
         )}
+
+        {state.status === "error" && (
+          <span className="ml-auto shrink-0 text-xs text-destructive">
+            Error
+          </span>
+        )}
       </button>
 
-      {isExpanded && (
-        <div className="mt-0.5 space-y-1.5 pl-2">
-          {childToolParts.map((childPart) => (
-            <MessageToolUse key={childPart.id} part={childPart} nested />
-          ))}
-
-          {isActiveStatus && childToolParts.length === 0 && (
-            <div className="flex items-center gap-1.5 py-1 pl-1 text-xs text-muted-foreground/60 italic">
-              <Loader2 className="size-3 animate-spin" />
-              Working…
-            </div>
-          )}
-
-          {hasSubThinking && (
-            <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                onClick={() => setShowSubThinking((prev) => !prev)}
-                className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors w-fit"
-              >
-                <Brain className="size-3" />
-                {showSubThinking ? "Hide thinking" : "Show thinking"}
-              </button>
-              <div
-                className={cn(
-                  "grid transition-[grid-template-rows] duration-300 ease-in-out",
-                  showSubThinking ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                )}
-              >
-                <div className="overflow-hidden">
-                  <div className="rounded bg-amber-500/5 border border-amber-500/20 px-2 py-1.5 text-xs text-muted-foreground whitespace-pre-wrap max-h-60 overflow-y-auto mt-1">
-                    {childReasoningContent}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {hasSubText && (
-            <div className="rounded-md bg-muted/30 px-3 py-2 max-h-60 overflow-y-auto">
-              <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
-                <MarkdownContent content={childTextContent} />
-              </div>
-            </div>
-          )}
-
-          {state.status === "error" && (
-            <p className="truncate text-destructive px-1 text-xs">
-              Error: {typeof state.error === "string" ? state.error.replaceAll("\n", " ") : JSON.stringify(state.error)}
-            </p>
-          )}
-        </div>
+      {childSessionId && activeWorkspaceId && (
+        <SubAgentDialog
+          childSessionId={childSessionId}
+          workspaceId={activeWorkspaceId}
+          description={typeof description === "string" ? description : "Sub-agent"}
+          isActive={isActiveStatus}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+        />
       )}
     </div>
   )

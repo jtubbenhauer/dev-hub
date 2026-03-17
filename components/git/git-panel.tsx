@@ -341,6 +341,11 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   const comparableBranchesRef = useRef(comparableBranches)
   comparableBranchesRef.current = comparableBranches
 
+  if (viewMode === "branch" && compareBaseRef === null && comparableBranches.length > 0) {
+    const defaultBranch = comparableBranches.find((b) => b.name === "main" || b.name === "master")
+    if (defaultBranch) setCompareBaseRef(defaultBranch.name)
+  }
+
   const hasMultipleBranches = comparableBranches.length > 0
 
   // Cycle through sort modes

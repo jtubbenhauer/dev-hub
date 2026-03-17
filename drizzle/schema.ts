@@ -115,3 +115,22 @@ export const reviewFiles = sqliteTable("review_files", {
   diffHash: text("diff_hash"),
   reviewedAt: integer("reviewed_at", { mode: "timestamp" }),
 })
+
+export const fileComments = sqliteTable("file_comments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  filePath: text("file_path").notNull(),
+  startLine: integer("start_line").notNull(),
+  endLine: integer("end_line").notNull(),
+  body: text("body").notNull(),
+  contentSnapshot: text("content_snapshot"),
+  resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+})

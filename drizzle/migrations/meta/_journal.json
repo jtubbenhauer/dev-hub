@@ -57,6 +57,13 @@
       "when": 1773455697235,
       "tag": "0007_wakeful_mathemanic",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1773630255877,
+      "tag": "0008_opposite_mimic",
+      "breakpoints": true
     }
   ]
 }

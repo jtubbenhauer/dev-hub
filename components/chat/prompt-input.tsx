@@ -1,12 +1,21 @@
 "use client"
 
 import { useState, useRef, useCallback, forwardRef, useImperativeHandle, useEffect } from "react"
-import { Send, Square, X } from "lucide-react"
+import { Send, Square, X, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FilePicker } from "@/components/chat/file-picker"
 import { CommandPicker, type SlashCommand } from "@/components/chat/command-picker"
 import { cn } from "@/lib/utils"
 import type { Command } from "@/lib/opencode/types"
+import { getPendingCommentChips, clearPendingCommentChips } from "@/lib/comment-chat-bridge"
+
+type CommentChip = {
+  id: number
+  filePath: string
+  startLine: number
+  endLine: number
+  body: string
+}
 
 export interface PromptInputHandle {
   focus: () => void
@@ -37,6 +46,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
 }, ref) {
   const [value, setValue] = useState(() => (sessionId ? sessionDrafts.get(sessionId) ?? "" : ""))
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])
+  const [selectedComments, setSelectedComments] = useState<CommentChip[]>([])
   const [pickerQuery, setPickerQuery] = useState<string | null>(null)
   const [commandQuery, setCommandQuery] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -70,6 +80,32 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
   }), [])
+
+  useEffect(() => {
+    const chips = getPendingCommentChips()
+    if (chips.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedComments(chips)
+      clearPendingCommentChips()
+    }
+
+    const handleAttach = () => {
+      const incoming = getPendingCommentChips()
+      if (incoming.length > 0) {
+        setSelectedComments((prev) => {
+          const existingIds = new Set(prev.map((c) => c.id))
+          const newChips = incoming.filter((c) => !existingIds.has(c.id))
+          return newChips.length > 0 ? [...prev, ...newChips] : prev
+        })
+        clearPendingCommentChips()
+      }
+    }
+
+    window.addEventListener("attach-comment-to-chat", handleAttach)
+    return () => {
+      window.removeEventListener("attach-comment-to-chat", handleAttach)
+    }
+  }, [])
 
   const autoResize = useCallback(() => {
     const textarea = textareaRef.current
@@ -106,6 +142,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
         onCommandSelect(match, args)
         setValue("")
         setSelectedFiles([])
+        setSelectedComments([])
         setPickerQuery(null)
         setCommandQuery(null)
         if (textareaRef.current) {
@@ -115,19 +152,32 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
       }
     }
 
+    const commentContext =
+      selectedComments.length > 0
+        ? `Comment references:\n${selectedComments
+            .map((c) => {
+              const lineRef =
+                c.startLine === c.endLine
+                  ? `${c.filePath}:${c.startLine}`
+                  : `${c.filePath}:${c.startLine}-${c.endLine}`
+              return `- ${lineRef} — "${c.body}"`
+            })
+            .join("\n")}\n\n`
+        : ""
     const fileContext =
       selectedFiles.length > 0
         ? `Context files: ${selectedFiles.join(", ")}\n\n`
         : ""
-    onSubmit(fileContext + trimmed)
+    onSubmit(commentContext + fileContext + trimmed)
     setValue("")
     setSelectedFiles([])
+    setSelectedComments([])
     setPickerQuery(null)
     setCommandQuery(null)
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
-  }, [value, disabled, selectedFiles, onSubmit, availableCommands, onCommandSelect])
+  }, [value, disabled, selectedFiles, selectedComments, onSubmit, availableCommands, onCommandSelect])
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -225,6 +275,10 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
     setSelectedFiles((prev) => prev.filter((p) => p !== path))
   }, [])
 
+  const handleRemoveComment = useCallback((id: number) => {
+    setSelectedComments((prev) => prev.filter((c) => c.id !== id))
+  }, [])
+
   const handleCommandSelect = useCallback((cmd: SlashCommand) => {
     setValue(`/${cmd.name} `)
     setCommandQuery(null)
@@ -257,6 +311,35 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
                 {fileName}
                 <button
                   onClick={() => handleRemoveFile(path)}
+                  className="ml-0.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Comment context chips */}
+      {selectedComments.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {selectedComments.map((comment) => {
+            const fileName = comment.filePath.split("/").pop() ?? comment.filePath
+            const lineLabel =
+              comment.startLine === comment.endLine
+                ? `${fileName}:${comment.startLine}`
+                : `${fileName}:${comment.startLine}-${comment.endLine}`
+            return (
+              <span
+                key={comment.id}
+                className="flex items-center gap-1 rounded-md border bg-primary/10 px-2 py-0.5 text-xs"
+              >
+                <MessageSquare className="size-3 text-primary" />
+                {lineLabel}
+                <button
+                  onClick={() => handleRemoveComment(comment.id)}
+                  aria-label={`Remove comment ${fileName}:${comment.startLine}`}
                   className="ml-0.5 text-muted-foreground hover:text-foreground"
                 >
                   <X className="size-3" />

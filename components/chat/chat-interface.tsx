@@ -25,7 +25,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useQueries } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, Brain, Check, Coins, GripVertical, LayoutList, ListTodo, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, Wrench, X } from "lucide-react";
+import { AlertCircle, ArrowDown, Brain, Check, ChevronDown, ChevronRight, Coins, GripVertical, LayoutList, ListTodo, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, Wrench, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Component, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
@@ -94,6 +94,7 @@ export function ChatInterface() {
     const stored = localStorage.getItem("dev-hub:chat-question-view");
     return stored === "tabs" ? "tabs" : "list";
   });
+  const [isQuestionsMinimized, setIsQuestionsMinimized] = useState(false);
 
   const {
     width: sessionListWidth,
@@ -205,6 +206,19 @@ export function ChatInterface() {
   }, [allWorkspaces]);
 
   const { primaryAgents } = useAgents(activeWorkspaceId);
+  const orderedAgents = useMemo(() => {
+    const utilityNames = new Set(["compaction", "title", "summary"])
+    const regular: typeof primaryAgents = []
+    const utility: typeof primaryAgents = []
+    for (const agent of primaryAgents) {
+      if (utilityNames.has(agent.name.toLowerCase())) {
+        utility.push(agent)
+      } else {
+        regular.push(agent)
+      }
+    }
+    return [...regular, ...utility]
+  }, [primaryAgents])
   const { bindings: agentModelBindings } = useModelAgentBindings();
 
   useEffect(() => {
@@ -787,8 +801,8 @@ export function ChatInterface() {
   useLeaderAction(chatLeaderActions);
 
   // Tab / Shift+Tab cycles through agents
-  const primaryAgentsRef = useRef(primaryAgents);
-  primaryAgentsRef.current = primaryAgents;
+  const primaryAgentsRef = useRef(orderedAgents);
+  primaryAgentsRef.current = orderedAgents;
   const selectedAgentRef = useRef(selectedAgent);
   selectedAgentRef.current = selectedAgent;
   const setSelectedAgentRef = useRef(setSelectedAgent);
@@ -1111,68 +1125,90 @@ export function ChatInterface() {
 
         {/* Question requests */}
         {activeQuestions.length > 0 && (
-          <div className="shrink-0 border-t bg-indigo-500/10 px-4 py-2 space-y-2">
-            <div className="flex justify-end">
-              <div className="flex rounded-md border border-indigo-500/30 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuestionViewMode("list");
-                    localStorage.setItem("dev-hub:chat-question-view", "list");
+          <div className={cn("shrink-0 border-t bg-indigo-500/10 px-4 py-2", !isQuestionsMinimized && "space-y-2")}>
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsQuestionsMinimized((prev) => !prev)}
+                className="flex items-center gap-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-indigo-100 transition-colors"
+              >
+                {isQuestionsMinimized ? (
+                  <ChevronRight className="size-3.5" />
+                ) : (
+                  <ChevronDown className="size-3.5" />
+                )}
+                <MessageCircleQuestion className="size-3.5" />
+                {activeQuestions.length} {activeQuestions.length === 1 ? "question" : "questions"} pending
+              </button>
+              {!isQuestionsMinimized && (
+                <div className="flex rounded-md border border-indigo-500/30 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuestionViewMode("list");
+                      localStorage.setItem("dev-hub:chat-question-view", "list");
+                    }}
+                    className={cn(
+                      "px-1.5 py-1 transition-colors",
+                      questionViewMode === "list"
+                        ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )}
+                    title="List view"
+                  >
+                    <LayoutList className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuestionViewMode("tabs");
+                      localStorage.setItem("dev-hub:chat-question-view", "tabs");
+                    }}
+                    className={cn(
+                      "px-1.5 py-1 transition-colors",
+                      questionViewMode === "tabs"
+                        ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )}
+                    title="Tab view"
+                  >
+                    <PanelTop className="size-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className={cn(
+              "grid transition-[grid-template-rows] duration-200 ease-in-out",
+              isQuestionsMinimized ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
+            )}>
+              <div className="overflow-hidden">
+                <QuestionErrorBoundary
+                  key={activeQuestions.map((q) => q.id).join(",")}
+                  onDismissAll={() => {
+                    if (!activeWorkspaceId) return;
+                    activeQuestions.forEach((q) =>
+                      rejectQuestion(q.id, activeWorkspaceId),
+                    );
                   }}
-                  className={cn(
-                    "px-1.5 py-1 transition-colors",
-                    questionViewMode === "list"
-                      ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  )}
-                  title="List view"
                 >
-                  <LayoutList className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuestionViewMode("tabs");
-                    localStorage.setItem("dev-hub:chat-question-view", "tabs");
-                  }}
-                  className={cn(
-                    "px-1.5 py-1 transition-colors",
-                    questionViewMode === "tabs"
-                      ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  )}
-                  title="Tab view"
-                >
-                  <PanelTop className="size-3.5" />
-                </button>
+                  {activeQuestions.map((question) => (
+                    <QuestionBanner
+                      key={question.id}
+                      request={question}
+                      viewMode={questionViewMode}
+                      onReply={(answers) => {
+                        if (!activeWorkspaceId) return;
+                        replyToQuestion(question.id, answers, activeWorkspaceId);
+                      }}
+                      onReject={() => {
+                        if (!activeWorkspaceId) return;
+                        rejectQuestion(question.id, activeWorkspaceId);
+                      }}
+                    />
+                  ))}
+                </QuestionErrorBoundary>
               </div>
             </div>
-            <QuestionErrorBoundary
-              key={activeQuestions.map((q) => q.id).join(",")}
-              onDismissAll={() => {
-                if (!activeWorkspaceId) return;
-                activeQuestions.forEach((q) =>
-                  rejectQuestion(q.id, activeWorkspaceId),
-                );
-              }}
-            >
-              {activeQuestions.map((question) => (
-                <QuestionBanner
-                  key={question.id}
-                  request={question}
-                  viewMode={questionViewMode}
-                  onReply={(answers) => {
-                    if (!activeWorkspaceId) return;
-                    replyToQuestion(question.id, answers, activeWorkspaceId);
-                  }}
-                  onReject={() => {
-                    if (!activeWorkspaceId) return;
-                    rejectQuestion(question.id, activeWorkspaceId);
-                  }}
-                />
-              ))}
-            </QuestionErrorBoundary>
           </div>
         )}
 
@@ -1305,7 +1341,8 @@ const VirtuosoFooter = memo(function VirtuosoFooter() {
   return <StreamingIndicator messages={messages} sessionStatus={sessionStatus} />
 })
 
-const EMPTY_COMPONENTS = {} as const
+const VirtuosoSpacer = () => <div className="h-4" />
+const EMPTY_COMPONENTS = { Footer: VirtuosoSpacer } as const
 const STREAMING_COMPONENTS = { Footer: VirtuosoFooter } as const
 
 function EmptyChat({ onSend }: { onSend: (text: string) => void }) {

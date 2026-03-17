@@ -3,6 +3,7 @@
 import { memo, useState, useCallback } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkBreaks from "remark-breaks"
 import rehypeHighlight from "rehype-highlight"
 import { Copy, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button"
 export const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkBreaks]}
       rehypePlugins={[rehypeHighlight]}
       components={{
         pre({ children, ...props }) {

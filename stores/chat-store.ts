@@ -135,8 +135,7 @@ function flushPendingPartUpdates(
 
       const ws = nextWorkspaceStates[wsId]
       if (!ws) continue
-      const sessionMessages = ws.messages[sessionId]
-      if (!sessionMessages) continue
+      const sessionMessages = ws.messages[sessionId] ?? []
 
       let updatedSession = sessionMessages
       for (const [messageId, byPart] of byMessage) {
@@ -1272,6 +1271,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) =>
           updateWorkspace(state, sourceWorkspaceId, (ws) => ({
             sessions: { ...ws.sessions, [info.id]: info },
+            // Pre-initialize messages for child sessions so part updates aren't
+            // dropped before fetchMessages completes.
+            ...(eventType === "session.created" && !(info.id in ws.messages)
+              ? { messages: { ...ws.messages, [info.id]: [] } }
+              : {}),
           }))
         )
         break

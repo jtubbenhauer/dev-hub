@@ -101,6 +101,20 @@ function readDirectoryTree(
   return result
 }
 
+async function findDefaultBranch(
+  git: ReturnType<typeof simpleGit>
+): Promise<string | null> {
+  for (const candidate of ["main", "master"]) {
+    try {
+      await git.raw(["rev-parse", "--verify", candidate])
+      return candidate
+    } catch {
+      // branch doesn't exist
+    }
+  }
+  return null
+}
+
 async function getFileStatuses(
   workspacePath: string
 ): Promise<Record<string, FileGitStatus>> {
@@ -136,6 +150,32 @@ async function getFileStatuses(
     for (const file of status.created) {
       if (!(file in statuses)) {
         statuses[file] = "added"
+      }
+    }
+
+    const defaultBranch = await findDefaultBranch(git)
+    if (defaultBranch) {
+      const currentBranch = status.current
+      if (currentBranch && currentBranch !== defaultBranch) {
+        try {
+          const mergeBase = (
+            await git.raw(["merge-base", "HEAD", defaultBranch])
+          ).trim()
+          const diffOutput = await git.raw([
+            "diff",
+            "--name-only",
+            mergeBase,
+            "HEAD",
+          ])
+          for (const line of diffOutput.trim().split("\n")) {
+            const file = line.trim()
+            if (file && !(file in statuses)) {
+              statuses[file] = "committed"
+            }
+          }
+        } catch {
+          // merge-base or diff failed
+        }
       }
     }
   } catch {

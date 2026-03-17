@@ -17,6 +17,7 @@ export type FileGitStatus =
   | "renamed"
   | "conflicted"
   | "added"
+  | "committed"
 
 // Git types
 

@@ -16,15 +16,23 @@ function applyGitStatuses(
       entry.gitStatus = status
     }
 
-    // Bubble up status to parent directories
-    if (entry.type === "directory" && entry.children) {
-      applyGitStatuses(entry.children, statuses)
+    if (entry.type === "directory") {
+      if (entry.children) {
+        applyGitStatuses(entry.children, statuses)
 
-      // Mark directory as modified if any child has a git status
-      if (!entry.gitStatus) {
-        const hasChangedChild = entry.children.some((c) => c.gitStatus)
-        if (hasChangedChild) {
-          entry.gitStatus = "modified"
+        if (!entry.gitStatus) {
+          const hasChangedChild = entry.children.some((c) => c.gitStatus)
+          if (hasChangedChild) {
+            entry.gitStatus = "modified"
+          }
+        }
+      } else if (!entry.gitStatus) {
+        const prefix = entry.path + "/"
+        for (const key of statuses.keys()) {
+          if (key.startsWith(prefix)) {
+            entry.gitStatus = "modified"
+            break
+          }
         }
       }
     }

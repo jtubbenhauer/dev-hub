@@ -1,6 +1,20 @@
 import simpleGit from "simple-git"
 import type { FileGitStatus } from "@/types"
 
+async function findDefaultBranch(
+  git: ReturnType<typeof simpleGit>
+): Promise<string | null> {
+  for (const candidate of ["main", "master"]) {
+    try {
+      await git.raw(["rev-parse", "--verify", candidate])
+      return candidate
+    } catch {
+      // branch doesn't exist
+    }
+  }
+  return null
+}
+
 export async function getFileStatuses(
   workspacePath: string
 ): Promise<Map<string, FileGitStatus>> {
@@ -36,6 +50,32 @@ export async function getFileStatuses(
     for (const file of status.created) {
       if (!statuses.has(file)) {
         statuses.set(file, "added")
+      }
+    }
+
+    const defaultBranch = await findDefaultBranch(git)
+    if (defaultBranch) {
+      const currentBranch = status.current
+      if (currentBranch && currentBranch !== defaultBranch) {
+        try {
+          const mergeBase = (
+            await git.raw(["merge-base", "HEAD", defaultBranch])
+          ).trim()
+          const diffOutput = await git.raw([
+            "diff",
+            "--name-only",
+            mergeBase,
+            "HEAD",
+          ])
+          for (const line of diffOutput.trim().split("\n")) {
+            const file = line.trim()
+            if (file && !statuses.has(file)) {
+              statuses.set(file, "committed")
+            }
+          }
+        } catch {
+          // merge-base or diff failed (e.g. no common ancestor)
+        }
       }
     }
   } catch {

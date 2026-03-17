@@ -1,0 +1,51 @@
+apps/principle-partners/src/environments/ienvironment.ts
+  54a8ad42035ddfc5 32
+apps/principle-partners/src/app/auth/auth-page/auth-page.component.scss
+  54a8ad42035ddfc5 1
+apps/principle-referrals/src/environments/environment.ts
+  54a8ad42035ddfc5 34
+jest-environment-jsdom.js
+  54a8ad42035ddfc5 19,22-28
+apps/principle-partners/src/environments/environment.prod.ts
+  54a8ad42035ddfc5 30
+apps/principle-referrals/src/app/app.component.ts
+  54a8ad42035ddfc5 1,3-4,63-64,85,89
+apps/principle-partners/src/app/app.component.ts
+  54a8ad42035ddfc5 5,8-9,113-114,169,173
+apps/principle-referrals/src/environments/environment.staging.ts
+  54a8ad42035ddfc5 31
+apps/principle-referrals/src/environments/environment.emulator.ts
+  54a8ad42035ddfc5 36
+apps/principle-referrals/src/app/app.config.ts
+  54a8ad42035ddfc5 10-11,14-19,36,90,165-171
+apps/principle-partners/src/environments/environment.ts
+  54a8ad42035ddfc5 34
+libs/practice-migrations/interfaces/project.json
+  54a8ad42035ddfc5 6
+apps/principle-partners/src/app/app.module.ts
+  54a8ad42035ddfc5 8-9,12-17,37,100,193-199
+apps/principle-referrals/src/environments/environment.prod.ts
+  54a8ad42035ddfc5 33
+apps/principle-partners/src/environments/environment.staging.ts
+  54a8ad42035ddfc5 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "01991c20b79a5d503ba8bd05444d97cb762c6eb3",
+  "prompts": {
+    "54a8ad42035ddfc5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305e277d3ffezvZxIdXXzrF0Lm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 207,
+      "total_deletions": 118,
+      "accepted_lines": 144,
+      "overriden_lines": 0
+    }
+  }
+}

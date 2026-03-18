@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useRef, useState } from "react"
-import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch, Brain, ArrowUpDown, Group, GripVertical, ChevronDown, ChevronRight, Pin, PinOff } from "lucide-react"
+import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch, Brain, ArrowUpDown, Group, GripVertical, ChevronDown, ChevronRight, Pin, PinOff, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -55,6 +55,7 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
   onWorkspaceOrderChange?: (order: string[]) => void
   expandedWorkspaces?: Record<string, boolean>
   onToggleWorkspaceExpanded?: (workspaceId: string) => void
+  onWakeWorkspace?: (workspaceId: string) => void
 }
 
 type SessionListProps = WorkspaceSessionListProps | UnifiedSessionListProps
@@ -293,6 +294,7 @@ export function SessionList(props: SessionListProps) {
                   onDragOver={(e: React.DragEvent) => handleDragOver(e, workspaceId)}
                   onDragEnd={handleDragEnd}
                   isDragTarget={dragOverWorkspaceId === workspaceId && draggedWorkspaceId !== workspaceId}
+                  onWakeWorkspace={props.mode === "unified" ? props.onWakeWorkspace : undefined}
                 />
               ))
             ) : (
@@ -376,6 +378,7 @@ interface WorkspaceGroupProps {
   onDragOver: (e: React.DragEvent) => void
   onDragEnd: () => void
   isDragTarget: boolean
+  onWakeWorkspace?: (workspaceId: string) => void
 }
 
 function WorkspaceGroup({
@@ -398,6 +401,7 @@ function WorkspaceGroup({
   onDragOver,
   onDragEnd,
   isDragTarget,
+  onWakeWorkspace,
 }: WorkspaceGroupProps) {
   const visibleSessions = isExpanded ? sessions : sessions.slice(0, COLLAPSED_SESSION_LIMIT)
   const hiddenCount = sessions.length - COLLAPSED_SESSION_LIMIT
@@ -472,30 +476,41 @@ function WorkspaceGroup({
         </span>
       </div>
 
-      {visibleSessions.map((session) => (
-        <SessionItem
-          key={session.id}
-          session={session}
-          isActive={session.id === activeSessionId}
-          isPinned={pinnedSessionIds?.has(session.id) ?? false}
-          status={sessionStatuses[session.id] ?? null}
-          isUnread={!!(
-            session.id !== activeSessionId &&
-            lastViewedAt[session.id] != null &&
-            session.time.updated > lastViewedAt[session.id]
-          )}
-          workspaceColor={workspaceColor}
-          onSelect={() => onSelectSession(session)}
-          onDelete={() => onDeleteSession(session.id, workspaceId)}
-          onTogglePin={onPinSession && onUnpinSession ? () => {
-            if (pinnedSessionIds?.has(session.id)) {
-              onUnpinSession(session.id, workspaceId)
-            } else {
-              onPinSession(session.id, workspaceId)
-            }
-          } : undefined}
-        />
-      ))}
+      {sessions.length === 0 && onWakeWorkspace ? (
+        <button
+          type="button"
+          onClick={() => onWakeWorkspace(workspaceId)}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-xs text-muted-foreground/60 transition-colors hover:bg-muted hover:text-muted-foreground"
+        >
+          <Clock className="size-3" />
+          No sessions cached — click to connect
+        </button>
+      ) : (
+        visibleSessions.map((session) => (
+          <SessionItem
+            key={session.id}
+            session={session}
+            isActive={session.id === activeSessionId}
+            isPinned={pinnedSessionIds?.has(session.id) ?? false}
+            status={sessionStatuses[session.id] ?? null}
+            isUnread={!!(
+              session.id !== activeSessionId &&
+              lastViewedAt[session.id] != null &&
+              session.time.updated > lastViewedAt[session.id]
+            )}
+            workspaceColor={workspaceColor}
+            onSelect={() => onSelectSession(session)}
+            onDelete={() => onDeleteSession(session.id, workspaceId)}
+            onTogglePin={onPinSession && onUnpinSession ? () => {
+              if (pinnedSessionIds?.has(session.id)) {
+                onUnpinSession(session.id, workspaceId)
+              } else {
+                onPinSession(session.id, workspaceId)
+              }
+            } : undefined}
+          />
+        ))
+      )}
 
       {canExpand && (
         <button
@@ -550,6 +565,7 @@ function SessionItem({
   }, [session.time.updated])
 
   const isBusy = status !== null && status.type === "busy"
+  const isCached = "fromCache" in session && (session as Record<string, unknown>).fromCache === true
 
   return (
     <div
@@ -566,11 +582,17 @@ function SessionItem({
       className={cn(
         "group flex min-w-0 w-full cursor-pointer items-start gap-2 overflow-hidden rounded-md px-2 py-2 text-left text-sm",
         "hover:bg-muted transition-colors",
-        isActive && "bg-muted"
+        isActive && "bg-muted",
+        isCached && "opacity-60"
       )}
     >
       <div className="relative mt-0.5 shrink-0">
-        {isBusy ? (
+        {isCached ? (
+          <Clock
+            className="size-3.5 text-muted-foreground"
+            style={workspaceColor ? { color: workspaceColor } : undefined}
+          />
+        ) : isBusy ? (
           <Brain
             className="size-3.5 animate-pulse"
             style={workspaceColor ? { color: workspaceColor } : { color: "var(--color-amber-500)" }}

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useCommand } from "@/hooks/use-command";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -303,6 +304,7 @@ export function ChatInterface() {
     pinSession,
     unpinSession,
     getPinnedSessionIds,
+    fetchCachedSessions,
   } = useChatStore();
 
   // Restore per-session agent when the active session changes.
@@ -423,10 +425,16 @@ export function ChatInterface() {
   useEffect(() => {
     if (!isUnifiedMode) return;
     for (const ws of allWorkspaces) {
-      fetchSessions(ws.id);
-      fetchPinnedSessions(ws.id);
+      if (shouldSSEConnect(ws, activeWorkspaceId)) {
+        // Awake workspace — fetch live sessions
+        fetchSessions(ws.id);
+        fetchPinnedSessions(ws.id);
+      } else {
+        // Sleeping workspace — use cached sessions from DB
+        fetchCachedSessions(ws.id);
+      }
     }
-  }, [isUnifiedMode, allWorkspaces, fetchSessions, fetchPinnedSessions]);
+  }, [isUnifiedMode, allWorkspaces, activeWorkspaceId, fetchSessions, fetchPinnedSessions, fetchCachedSessions]);
 
   // Fetch messages when active session changes
   useEffect(() => {
@@ -711,12 +719,22 @@ export function ChatInterface() {
 
   const handleSelectUnifiedSession = useCallback(
     (sessionId: string, workspaceId: string) => {
+      const ws = allWorkspaces.find((w) => w.id === workspaceId);
+      const isSleeping = ws && !shouldSSEConnect(ws, activeWorkspaceId);
+
       useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
       setActiveWorkspaceId(workspaceId);
       setActiveSession(sessionId);
       setIsMobileSessionsOpen(false);
+
+      if (isSleeping) {
+        toast("Waking workspace…", {
+          description: "This may take a few seconds",
+        });
+        fetchSessions(workspaceId);
+      }
     },
-    [setActiveWorkspaceId, setActiveSession],
+    [allWorkspaces, activeWorkspaceId, setActiveWorkspaceId, setActiveSession, fetchSessions],
   );
 
   const handleToggleUnifiedMode = useCallback(() => {
@@ -725,12 +743,16 @@ export function ChatInterface() {
       localStorage.setItem("dev-hub:chat-unified-mode", String(next));
       if (next) {
         for (const ws of allWorkspaces) {
-          fetchSessions(ws.id);
+          if (shouldSSEConnect(ws, activeWorkspaceId)) {
+            fetchSessions(ws.id);
+          } else {
+            fetchCachedSessions(ws.id);
+          }
         }
       }
       return next;
     });
-  }, [allWorkspaces, fetchSessions]);
+  }, [allWorkspaces, activeWorkspaceId, fetchSessions, fetchCachedSessions]);
 
   const handleToggleGroupByWorkspace = useCallback(() => {
     setGroupByWorkspace((prev) => {
@@ -739,6 +761,18 @@ export function ChatInterface() {
       return next;
     });
   }, []);
+
+  const handleWakeWorkspace = useCallback(
+    (workspaceId: string) => {
+      useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
+      setActiveWorkspaceId(workspaceId);
+      toast("Waking workspace…", {
+        description: "This may take a few seconds",
+      });
+      fetchSessions(workspaceId);
+    },
+    [setActiveWorkspaceId, fetchSessions],
+  );
 
   const handleWorkspaceOrderChange = useCallback((order: string[]) => {
     setWorkspaceOrder(order);
@@ -1231,6 +1265,7 @@ export function ChatInterface() {
               onWorkspaceOrderChange={handleWorkspaceOrderChange}
               expandedWorkspaces={expandedWorkspaces}
               onToggleWorkspaceExpanded={handleToggleWorkspaceExpanded}
+              onWakeWorkspace={handleWakeWorkspace}
             />
           ) : (
             <SessionList
@@ -1297,6 +1332,7 @@ export function ChatInterface() {
                 onWorkspaceOrderChange={handleWorkspaceOrderChange}
                 expandedWorkspaces={expandedWorkspaces}
                 onToggleWorkspaceExpanded={handleToggleWorkspaceExpanded}
+                onWakeWorkspace={handleWakeWorkspace}
               />
             ) : (
               <SessionList
@@ -1339,7 +1375,7 @@ export function ChatInterface() {
       >
         {messagesPanel.Indicator}
         {/* Chat toolbar */}
-        <div className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center gap-2 border-b bg-background px-4 py-2">
+        <div className="sticky top-0 z-30 flex shrink-0 items-center gap-1.5 border-b bg-background px-3 py-2 sm:gap-2 sm:px-4 md:flex-wrap">
           {/* Mobile: open session sheet */}
           <Button
             size="icon-xs"
@@ -1367,7 +1403,7 @@ export function ChatInterface() {
             </svg>
           </Button>
 
-          <div className="flex-1" />
+          <div className="sm:flex-1" />
 
           <Button
             size="icon-sm"

@@ -94,14 +94,19 @@ pnpm agent:start      # Start agent sidecar
 
 1. Edit `drizzle/schema.ts`
 2. Run `pnpm db:generate` to create a migration SQL file
-3. Run `pnpm db:push` to apply to your local DB
-4. The `instrumentation.ts` file auto-runs migrations on Next.js server startup, so deployed instances stay in sync
+3. Restart the dev server — `instrumentation.ts` auto-runs `migrate()` on startup and applies it
+
+**Do NOT use `db:push` to apply incremental schema changes.** Once a DB exists with a migration journal, `migrate()` owns it. Using `db:push` mid-stream creates a mismatch: the column/table exists but the journal doesn't know about it, which breaks auto-migration for other developers.
+
+`db:push` is **only** for initial DB creation (fresh DB, no journal). After that, always use `db:generate` + let auto-migration handle it.
 
 ### Auto-Migration Gotchas
 
 - `instrumentation.ts` uses `NEXT_RUNTIME === "nodejs"` guard — required because Next.js bundles this file for Edge Runtime too, and better-sqlite3/`node:path`/`process.cwd()` are Node-only
 - All Node.js imports inside `register()` must be dynamic (`await import(...)`)
-- DBs created via `db:push` have tables but an empty `__drizzle_migrations` journal — the instrumentation seeds the journal before calling `migrate()` to prevent re-running DDL
+- Fresh DBs created via `db:push` have tables but no `__drizzle_migrations` journal — the instrumentation seeds the journal on first run so `migrate()` doesn't re-run already-applied DDL
+- Once the journal exists, the seed function does nothing — `migrate()` handles all new migrations from that point on
+- **Never modify `seedJournalForPushCreatedDb` to insert hashes for unapplied migrations** — this silently prevents `migrate()` from running them
 
 ## Import Conventions
 
@@ -197,4 +202,4 @@ API routes live in `app/api/` and follow Next.js App Router conventions:
 2. **better-sqlite3:** Node-only native module. Cannot be imported in client components or Edge Runtime.
 3. **DB path:** Configured via `DB_PATH` env var, defaults to `./dev-hub.db`.
 4. **Worktree types:** `WorkspaceRow` is inferred from the schema (`typeof workspaces.$inferSelect`), so adding columns to the schema auto-propagates to all typed references.
-5. **Fresh DB:** If starting from scratch, `pnpm db:push` creates all tables. The auto-migration in `instrumentation.ts` handles journal seeding.
+5. **Fresh DB:** If starting from scratch, `pnpm db:push` creates all tables. The auto-migration in `instrumentation.ts` handles journal seeding. After that, never use `db:push` again — use `db:generate` + restart.

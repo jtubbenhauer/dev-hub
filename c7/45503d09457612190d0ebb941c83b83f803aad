@@ -1,0 +1,23 @@
+libs/e2e/src/lib/cypressWebpackPreprocessor.ts
+  c0743689a6250d2b 88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "c745503d09457612190d0ebb941c83b83f803aad",
+  "prompts": {
+    "c0743689a6250d2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-8ec04fe1-d67d-4ea0-b7a5-8fd3bd61a9dd",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

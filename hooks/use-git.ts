@@ -477,7 +477,7 @@ export function useUpdateWorktreeSymlinks() {
 
 // Agent health
 
-export type AgentHealthStatus = "healthy" | "unreachable" | "unknown"
+export type AgentHealthStatus = "healthy" | "unreachable" | "unknown" | "suspended"
 
 interface AgentHealthResponse {
   status: "ok" | "unreachable"

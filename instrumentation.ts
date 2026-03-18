@@ -8,6 +8,9 @@ export async function register() {
     const migrationsFolder = path.join(process.cwd(), "drizzle/migrations")
     seedJournalForPushCreatedDb(db, migrationsFolder, readMigrationFiles)
     migrate(db, { migrationsFolder })
+
+    const { startPtyServer } = await import("@/lib/terminal/pty-server")
+    startPtyServer()
   }
 }
 

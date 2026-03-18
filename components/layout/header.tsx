@@ -5,6 +5,7 @@ import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher"
 import { GitStatusBar } from "@/components/layout/git-status-bar"
 import { SystemIndicator } from "@/components/layout/system-indicator"
 import { CommandDrawer } from "@/components/command-runner/command-drawer"
+import { TerminalDrawer } from "@/components/terminal/terminal-drawer"
 import { ProviderCreationIndicator } from "@/components/workspace/provider-creation-indicator"
 import { useCommandPalette } from "@/components/providers/command-palette-provider"
 import { Button } from "@/components/ui/button"
@@ -73,6 +74,7 @@ export function Header() {
         </div>
       </header>
       <CommandDrawer />
+      <TerminalDrawer />
     </>
   )
 }

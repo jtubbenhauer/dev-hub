@@ -25,6 +25,7 @@ const navItems = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/files", label: "Files", icon: FileCode2 },
   { href: "/git", label: "Git", icon: GitMerge },
+  { href: "/terminal", label: "Term", icon: Terminal },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/settings", label: "Settings", icon: Settings },

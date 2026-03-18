@@ -1,0 +1,41 @@
+libs/principle-api/src/lib/paths/v1-availability.yml
+  61262754dad05d22 8-9,11-12
+apps/principle-functions/src/app/http/patient-portal/actions/online-booking/get-booking-suggestions.ts
+  61262754dad05d22 79-80,155-156,241-251,260,264,268,274,280-281
+  9cb3dafa402a9537 108,110,117-124,177-178,184,186-187,190,520,522-524,545,550-552
+libs/principle-api/src/lib/paths/v1-patients-{patientId}-appointments-{appointmentId}-availability.yml
+  61262754dad05d22 10-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "9a5b0405c20501f39c92d17dc58a919ed36f523b",
+  "prompts": {
+    "61262754dad05d22": {
+      "agent_id": {
+        "tool": "github-copilot",
+        "id": "4ab01d6f-4bbb-4686-99e0-dc7cf16c2e03",
+        "model": "copilot/claude-opus-4.6"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 75,
+      "total_deletions": 80,
+      "accepted_lines": 31,
+      "overriden_lines": 1
+    },
+    "9cb3dafa402a9537": {
+      "agent_id": {
+        "tool": "github-copilot",
+        "id": "63756ae1-78cc-4f98-afb8-ea73836bbfde",
+        "model": "copilot/claude-opus-4.6"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 44,
+      "total_deletions": 79,
+      "accepted_lines": 25,
+      "overriden_lines": 0
+    }
+  }
+}

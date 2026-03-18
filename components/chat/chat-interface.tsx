@@ -1375,13 +1375,13 @@ export function ChatInterface() {
       >
         {messagesPanel.Indicator}
         {/* Chat toolbar */}
-        <div className="sticky top-0 z-30 flex shrink-0 items-center gap-1.5 border-b bg-background px-3 py-2 sm:gap-2 sm:px-4 md:flex-wrap">
+        <div className="sticky top-0 z-30 flex shrink-0 items-center gap-1.5 border-b bg-background px-3 py-2 md:gap-2 md:px-4">
           {/* Mobile: open session sheet */}
           <Button
             size="icon-xs"
             variant="ghost"
             onClick={() => setIsMobileSessionsOpen(true)}
-            className="md:hidden"
+            className="mr-1 md:hidden"
           >
             <MessageSquare className="size-4" />
           </Button>
@@ -1403,7 +1403,7 @@ export function ChatInterface() {
             </svg>
           </Button>
 
-          <div className="sm:flex-1" />
+          <div className="md:flex-1" />
 
           <Button
             size="icon-sm"

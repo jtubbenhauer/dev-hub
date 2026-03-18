@@ -48,7 +48,7 @@ export function VariantSelector({
           size="sm"
           role="combobox"
           aria-expanded={isOpen}
-          className="max-w-[120px] gap-1.5 text-xs"
+          className="min-w-0 shrink max-w-[120px] gap-1.5 overflow-hidden text-xs"
         >
           <Sparkles className="size-3 shrink-0" />
           <span className="truncate capitalize">

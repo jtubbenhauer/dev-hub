@@ -1,17 +1,12 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { TerminalPanel } from "./terminal-panel"
 import { useTerminalStore } from "@/stores/terminal-store"
 import { useWorkspaceStore } from "@/stores/workspace-store"
-import { Loader2, AlertCircle, TerminalSquare } from "lucide-react"
+import { useTerminalScrollbackSetting } from "@/hooks/use-settings"
+import { cn } from "@/lib/utils"
+import { Loader2, AlertCircle, TerminalSquare, X } from "lucide-react"
 
 interface TerminalConfig {
   wsUrl: string
@@ -25,11 +20,13 @@ export function TerminalDrawer() {
   const toggle = useTerminalStore((s) => s.toggle)
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
+  const { scrollback } = useTerminalScrollbackSetting()
 
   const [config, setConfig] = useState<TerminalConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null)
+  const hasEverOpened = useRef(false)
 
   const resolve = useCallback((workspaceId: string) => {
     setIsLoading(true)
@@ -57,6 +54,7 @@ export function TerminalDrawer() {
 
   useEffect(() => {
     if (!isOpen || !activeWorkspaceId) return
+    hasEverOpened.current = true
     if (activeWorkspaceId === resolvedWorkspaceId && config) return
 
     resolve(activeWorkspaceId)
@@ -74,31 +72,54 @@ export function TerminalDrawer() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggle])
 
+  if (!hasEverOpened.current && !isOpen) return null
+
   return (
-    <Sheet open={isOpen} onOpenChange={setOpen}>
-      <SheetContent side="bottom" className="h-[60vh] max-h-[600px]" showCloseButton={false}>
-        <SheetHeader className="pb-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <SheetTitle className="text-sm flex items-center gap-1.5">
-                <TerminalSquare className="size-3.5" />
-                Terminal
-              </SheetTitle>
-              {activeWorkspace && (
-                <span className="text-xs text-muted-foreground">
-                  {activeWorkspace.name}
-                  {activeWorkspace.backend === "remote" && (
-                    <span className="text-blue-500 ml-1">(remote)</span>
-                  )}
-                </span>
-              )}
+    <>
+      {isOpen && (
+        // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- backdrop overlay requires div for full-screen coverage
+        <button
+          type="button"
+          tabIndex={-1}
+          className="fixed inset-0 z-50 bg-black/50 animate-in fade-in-0 cursor-default appearance-none border-none p-0"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      <div
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-50 flex flex-col border-t bg-background shadow-lg transition-transform duration-300 ease-in-out",
+          "h-[60vh] max-h-[600px]",
+          isOpen ? "translate-y-0" : "translate-y-full",
+        )}
+      >
+        <div className="flex items-center justify-between p-4 pb-0">
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-semibold flex items-center gap-1.5">
+              <TerminalSquare className="size-3.5" />
+              Terminal
             </div>
-            <SheetDescription className="sr-only">
-              Interactive terminal session
-            </SheetDescription>
-            <span className="text-xs text-muted-foreground font-mono">Ctrl+`</span>
+            {activeWorkspace && (
+              <span className="text-xs text-muted-foreground">
+                {activeWorkspace.name}
+                {activeWorkspace.backend === "remote" && (
+                  <span className="text-blue-500 ml-1">(remote)</span>
+                )}
+              </span>
+            )}
           </div>
-        </SheetHeader>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-mono">Ctrl+`</span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-sm p-1 opacity-70 hover:opacity-100 transition-opacity"
+            >
+              <X className="size-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          </div>
+        </div>
 
         <div className="flex flex-1 flex-col overflow-hidden px-4 pb-4">
           {!activeWorkspaceId && (
@@ -129,13 +150,15 @@ export function TerminalDrawer() {
               <TerminalPanel
                 key={resolvedWorkspaceId}
                 wsUrl={config.wsUrl}
+                workspaceId={activeWorkspaceId}
                 cwd={config.cwd}
                 shellCommand={config.shellCommand}
+                scrollback={scrollback}
               />
             </div>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </>
   )
 }

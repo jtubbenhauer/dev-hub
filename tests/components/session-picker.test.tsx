@@ -71,6 +71,7 @@ function seedStores(sessions: ReturnType<typeof makeSession>[], workspaceId = "w
         opencodeUrl: null,
         agentUrl: null,
         providerMeta: null,
+        shellCommand: null,
         worktreeSymlinks: null,
         linkedTaskId: null,
         linkedTaskMeta: null,

@@ -52,11 +52,15 @@ function buildTheme(): ITheme {
 
 interface TerminalPanelProps {
   wsUrl: string
+  workspaceId: string
   cwd: string
   shellCommand: string | null
+  scrollback?: number
 }
 
-export function TerminalPanel({ wsUrl, cwd, shellCommand }: TerminalPanelProps) {
+const DEFAULT_SCROLLBACK = 5000
+
+export function TerminalPanel({ wsUrl, workspaceId, cwd, shellCommand, scrollback = DEFAULT_SCROLLBACK }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -71,6 +75,7 @@ export function TerminalPanel({ wsUrl, cwd, shellCommand }: TerminalPanelProps) 
       fontFamily: "var(--font-geist-mono), monospace",
       fontSize: 14,
       lineHeight: 1.2,
+      scrollback,
       theme: buildTheme(),
     })
 
@@ -87,7 +92,13 @@ export function TerminalPanel({ wsUrl, cwd, shellCommand }: TerminalPanelProps) 
 
     const cols = term.cols
     const rows = term.rows
-    const params = new URLSearchParams({ cols: String(cols), rows: String(rows), cwd })
+    const params = new URLSearchParams({
+      workspaceId,
+      cols: String(cols),
+      rows: String(rows),
+      cwd,
+      scrollback: String(scrollback),
+    })
     if (shellCommand) params.set("shellCommand", shellCommand)
 
     const ws = new WebSocket(`${wsUrl}?${params.toString()}`)
@@ -137,7 +148,7 @@ export function TerminalPanel({ wsUrl, cwd, shellCommand }: TerminalPanelProps) 
         ws.send(JSON.stringify({ type: "resize", cols, rows }))
       }
     })
-  }, [wsUrl, cwd, shellCommand])
+  }, [wsUrl, workspaceId, cwd, shellCommand, scrollback])
 
   useEffect(() => {
     connect()

@@ -90,6 +90,7 @@ function TerminalPageContent() {
       <div className="flex-1 min-h-0">
         <TerminalPanel
           wsUrl={config.wsUrl}
+          workspaceId={workspaceId!}
           cwd={config.cwd}
           shellCommand={config.shellCommand}
         />

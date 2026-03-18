@@ -44,6 +44,7 @@ export const SETTINGS_KEYS = {
   EDITOR_TYPE: "editor-type",
   AUTO_COLOR_WORKSPACES: "auto-color-workspaces",
   PANEL_NAVIGATION: "panel-navigation",
+  TERMINAL_SCROLLBACK: "terminal-scrollback",
 } as const
 
 export type EditorType = "codemirror" | "monaco"
@@ -415,6 +416,19 @@ export function useAutoColorSetting(): {
   const raw = data?.[SETTINGS_KEYS.AUTO_COLOR_WORKSPACES]
   // Default: true (auto-color is on by default)
   return { isAutoColorEnabled: raw !== false, isLoading }
+}
+
+export const DEFAULT_TERMINAL_SCROLLBACK = 5000
+export const TERMINAL_SCROLLBACK_OPTIONS = [1000, 2000, 5000, 10000, 25000, 50000] as const
+
+export function useTerminalScrollbackSetting(): {
+  scrollback: number
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.TERMINAL_SCROLLBACK]
+  const isValid = typeof raw === "number" && raw > 0
+  return { scrollback: isValid ? raw : DEFAULT_TERMINAL_SCROLLBACK, isLoading }
 }
 
 export function usePanelNavigationSetting(): {

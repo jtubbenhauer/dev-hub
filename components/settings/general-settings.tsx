@@ -25,6 +25,7 @@ import {
   useTabSizeSetting,
   useEditorTypeSetting,
   useShellRcPathSetting,
+  useTerminalScrollbackSetting,
   useSettingsMutation,
   useSoundSettings,
   SETTINGS_KEYS,
@@ -32,10 +33,12 @@ import {
   MOBILE_FONT_SIZE_OPTIONS,
   TAB_SIZE_OPTIONS,
   EDITOR_TYPE_OPTIONS,
+  TERMINAL_SCROLLBACK_OPTIONS,
   DEFAULT_FONT_SIZE,
   DEFAULT_MOBILE_FONT_SIZE,
   DEFAULT_TAB_SIZE,
   DEFAULT_EDITOR_TYPE,
+  DEFAULT_TERMINAL_SCROLLBACK,
   APP_THEMES,
 } from "@/hooks/use-settings"
 import type { FontSize, MobileFontSize, TabSize, EditorType, AppTheme } from "@/hooks/use-settings"
@@ -47,6 +50,7 @@ export function GeneralSettings() {
     <div className="space-y-6">
       <AppearanceSettingsCard />
       <EditorSettingsCard />
+      <TerminalSettingsCard />
       <CommandSettingsCard />
       <SoundSettingsCard />
     </div>
@@ -293,6 +297,66 @@ function EditorSettingsCard() {
               {TAB_SIZE_OPTIONS.map((size) => (
                 <SelectItem key={size} value={String(size)}>
                   {size} spaces{size === DEFAULT_TAB_SIZE ? " (default)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function TerminalSettingsCard() {
+  const { scrollback, isLoading } = useTerminalScrollbackSetting()
+  const mutation = useSettingsMutation()
+
+  const handleScrollbackChange = (value: string) => {
+    const next = Number(value)
+    mutation.mutate(
+      { key: SETTINGS_KEYS.TERMINAL_SCROLLBACK, value: next },
+      { onSuccess: () => toast.success(`Terminal scrollback set to ${next.toLocaleString()} lines`) }
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Terminal</CardTitle>
+        <CardDescription>
+          Configure the embedded terminal.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="terminal-scrollback">Scrollback lines</Label>
+            <p className="text-xs text-muted-foreground">
+              Number of lines to keep in the terminal buffer
+            </p>
+          </div>
+          <Select
+            value={String(scrollback)}
+            onValueChange={handleScrollbackChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="terminal-scrollback" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TERMINAL_SCROLLBACK_OPTIONS.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size.toLocaleString()} lines{size === DEFAULT_TERMINAL_SCROLLBACK ? " (default)" : ""}
                 </SelectItem>
               ))}
             </SelectContent>

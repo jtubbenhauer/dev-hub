@@ -43,6 +43,7 @@ export const SETTINGS_KEYS = {
   SOUND_ERRORS_ID: "sound-errors-id",
   EDITOR_TYPE: "editor-type",
   AUTO_COLOR_WORKSPACES: "auto-color-workspaces",
+  PANEL_NAVIGATION: "panel-navigation",
 } as const
 
 export type EditorType = "codemirror" | "monaco"
@@ -414,4 +415,13 @@ export function useAutoColorSetting(): {
   const raw = data?.[SETTINGS_KEYS.AUTO_COLOR_WORKSPACES]
   // Default: true (auto-color is on by default)
   return { isAutoColorEnabled: raw !== false, isLoading }
+}
+
+export function usePanelNavigationSetting(): {
+  isPanelNavigationEnabled: boolean
+  isLoading: boolean
+} {
+  const { data, isLoading } = useSettings()
+  const raw = data?.[SETTINGS_KEYS.PANEL_NAVIGATION]
+  return { isPanelNavigationEnabled: raw === true, isLoading }
 }

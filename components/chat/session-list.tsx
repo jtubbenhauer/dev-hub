@@ -506,6 +506,7 @@ function SessionItem({
     <div
       role="button"
       tabIndex={0}
+      data-session-id={session.id}
       onClick={onSelect}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {

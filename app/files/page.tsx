@@ -12,6 +12,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useLeaderAction } from "@/hooks/use-leader-action"
+import { usePanelZone } from "@/hooks/use-panel-zone"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
@@ -23,7 +24,6 @@ import {
   FolderOpen,
   FileCode2,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useState } from "react"
 
@@ -219,6 +219,21 @@ function FilesContent() {
   )
   useLeaderAction(filesLeaderActions)
 
+  // Panel zone registration
+  const fileTreeFocusRef = useRef<HTMLDivElement>(null)
+  const editorPanelFocusRef = useRef<HTMLDivElement>(null)
+
+  const treePanel = usePanelZone("files-tree", {
+    neighbors: { right: "files-editor" },
+    focusRef: fileTreeFocusRef,
+    isVisible: isFileTreeOpen && !isMobile,
+  })
+
+  const editorPanel = usePanelZone("files-editor", {
+    neighbors: { left: "files-tree" },
+    focusRef: editorPanelFocusRef,
+  })
+
   const handleChange = useCallback(
     (content: string) => {
       if (activeFilePath) {
@@ -263,9 +278,15 @@ function FilesContent() {
         {/* Desktop file tree panel */}
         {!isMobile && isFileTreeOpen && (
           <div
-            className="flex min-h-0 shrink-0 flex-col border-r"
+            ref={(el) => {
+              treePanel.containerRef.current = el
+              fileTreeFocusRef.current = el
+            }}
+            tabIndex={-1}
+            className="relative flex min-h-0 shrink-0 flex-col border-r"
             style={{ width: panelWidth }}
           >
+            {treePanel.Indicator}
             <div className="flex shrink-0 items-center justify-between border-b px-2 py-1">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                 Explorer
@@ -294,7 +315,15 @@ function FilesContent() {
         )}
 
         {/* Editor panel (right) */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div
+          ref={(el) => {
+            editorPanel.containerRef.current = el
+            editorPanelFocusRef.current = el
+          }}
+          tabIndex={-1}
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+        >
+          {editorPanel.Indicator}
           {/* Editor header bar */}
           <div className="flex shrink-0 items-center gap-1.5 border-b bg-muted/30 px-2 py-1.5">
             {/* Toggle file tree button */}

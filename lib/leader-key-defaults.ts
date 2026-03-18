@@ -12,7 +12,16 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "nav:settings", label: "Go to Settings", page: "global" },
   { id: "global:command-palette", label: "Open command palette", page: "global" },
   { id: "global:file-picker", label: "Open file picker", page: "global" },
+  { id: "global:session-picker", label: "Open session picker", page: "global" },
   { id: "global:switch-workspace", label: "Open workspace switcher", page: "global" },
+
+  // Panel navigation (only active when panel-navigation setting is on)
+  { id: "panel:focus-left", label: "Focus panel left", page: "global" },
+  { id: "panel:focus-down", label: "Focus panel below", page: "global" },
+  { id: "panel:focus-up", label: "Focus panel above", page: "global" },
+  { id: "panel:focus-right", label: "Focus panel right", page: "global" },
+  { id: "panel:focus-input", label: "Focus input", page: "global" },
+  { id: "panel:search", label: "Search in panel", page: "global" },
 
   // Chat page
   { id: "chat:switch-model", label: "Switch model", page: "chat" },
@@ -55,7 +64,16 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "nav:settings": "g s",
   "global:command-palette": ",",
   "global:file-picker": "f",
+  "global:session-picker": "e",
   "global:switch-workspace": "w",
+
+  // Panel navigation
+  "panel:focus-left": "h",
+  "panel:focus-down": "j",
+  "panel:focus-up": "k",
+  "panel:focus-right": "l",
+  "panel:focus-input": "i",
+  "panel:search": "/",
 
   // Files page
   "files:save": "S",

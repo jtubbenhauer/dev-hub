@@ -12,6 +12,7 @@ import { useClickUpSearch, useClickUpViewTasks } from "@/hooks/use-clickup"
 import { useClickUpSettings } from "@/hooks/use-settings"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { usePanelZone } from "@/hooks/use-panel-zone"
 import type { ClickUpTask, ClickUpPinnedView } from "@/types"
 
 const MIN_SIDEBAR_WIDTH = 180
@@ -61,6 +62,10 @@ export function TasksPage() {
   const [selectedTask, setSelectedTask] = useState<ClickUpTask | null>(null)
   const [viewPage, _setViewPage] = useState(0)
   const restoredTaskRef = useRef(false)
+
+  const sidebarFocusRef = useRef<HTMLDivElement>(null)
+  const taskListFocusRef = useRef<HTMLDivElement>(null)
+  const detailFocusRef = useRef<HTMLDivElement>(null)
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
@@ -172,6 +177,23 @@ export function TasksPage() {
     try { localStorage.removeItem("dev-hub:tasks-selected-task-id") } catch {}
   }
 
+  const sidebarPanel = usePanelZone("tasks-sidebar", {
+    neighbors: { right: "tasks-list" },
+    focusRef: sidebarFocusRef,
+    isVisible: !isMobile,
+  })
+
+  const taskListPanel = usePanelZone("tasks-list", {
+    neighbors: { left: "tasks-sidebar", right: "tasks-detail" },
+    focusRef: taskListFocusRef,
+  })
+
+  const detailPanel = usePanelZone("tasks-detail", {
+    neighbors: { left: "tasks-list" },
+    focusRef: detailFocusRef,
+    isVisible: !isMobile && selectedTask !== null,
+  })
+
   if (!isLoadingSettings && !isConfigured) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
@@ -217,7 +239,16 @@ export function TasksPage() {
       {/* Desktop: inline sidebar */}
       {!isMobile && (
         <>
-          <div style={{ width: sidebarWidth }} className="shrink-0">
+          <div
+            ref={(el) => {
+              sidebarPanel.containerRef.current = el
+              sidebarFocusRef.current = el
+            }}
+            tabIndex={-1}
+            style={{ width: sidebarWidth }}
+            className="relative shrink-0"
+          >
+            {sidebarPanel.Indicator}
             {sidebarContent}
           </div>
           <div
@@ -229,7 +260,15 @@ export function TasksPage() {
         </>
       )}
 
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+      <div
+        ref={(el) => {
+          taskListPanel.containerRef.current = el
+          taskListFocusRef.current = el
+        }}
+        tabIndex={-1}
+        className="relative flex flex-1 flex-col min-w-0 overflow-hidden"
+      >
+        {taskListPanel.Indicator}
         {/* Mobile toolbar */}
         {isMobile && (
           <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
@@ -297,11 +336,22 @@ export function TasksPage() {
               >
                 <GripVertical className="size-3.5 text-muted-foreground/30" />
               </div>
-              <TaskDetailPanel
-                task={selectedTask}
-                onClose={handleCloseTask}
+              <div
+                ref={(el) => {
+                  detailPanel.containerRef.current = el
+                  detailFocusRef.current = el
+                }}
+                tabIndex={-1}
                 style={{ width: detailWidth }}
-              />
+                className="relative min-w-0 shrink-0"
+              >
+                {detailPanel.Indicator}
+                <TaskDetailPanel
+                  task={selectedTask}
+                  onClose={handleCloseTask}
+                  className="border-l-0"
+                />
+              </div>
             </>
           )}
         </div>

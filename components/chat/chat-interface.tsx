@@ -18,10 +18,14 @@ import { cn } from "@/lib/utils";
 import { useCommand } from "@/hooks/use-command";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { usePanelZone } from "@/hooks/use-panel-zone";
+import type { StandardActions } from "@/stores/panel-navigation-store";
+import { usePanelNavigationStore } from "@/stores/panel-navigation-store";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
-import { useModelAgentBindings } from "@/hooks/use-settings";
+import { useModelAgentBindings, usePanelNavigationSetting } from "@/hooks/use-settings";
 import type { Command, MessageWithParts, PermissionRequest, QuestionAnswer, QuestionInfo, QuestionRequest, SessionStatus } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
+import type { SessionWithWorkspace } from "@/stores/chat-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useQueries } from "@tanstack/react-query";
@@ -166,6 +170,9 @@ export function ChatInterface() {
   const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const promptInputRef = useRef<PromptInputHandle>(null);
+  const sessionListFocusRef = useRef<HTMLDivElement>(null);
+  const messagesPanelFocusRef = useRef<HTMLDivElement>(null);
+  const taskPanelFocusRef = useRef<HTMLDivElement>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const activeWorkspaceId = useWorkspaceStore(
@@ -764,6 +771,117 @@ export function ChatInterface() {
     });
   }, []);
 
+  // Panel navigation setting — must be before chatLeaderActions which conditionally excludes chat:focus-prompt
+  const { isPanelNavigationEnabled } = usePanelNavigationSetting();
+
+  // Session list j/k navigation: build flat list of visible session IDs in render order
+  const COLLAPSED_SESSION_LIMIT = 3
+  const visibleSessionIds = useMemo<string[]>(() => {
+    if (isUnifiedMode && groupByWorkspace) {
+      // Replicate groupedSessions logic from SessionList
+      const allWsIds = workspaceOptions.map((ws) => ws.id)
+      const groups = new Map<string, SessionWithWorkspace[]>()
+      for (const id of allWsIds) groups.set(id, [])
+      for (const session of unifiedSessions) {
+        const existing = groups.get(session.workspaceId)
+        if (existing) {
+          existing.push(session)
+        } else {
+          groups.set(session.workspaceId, [session])
+        }
+      }
+      const entries = [...groups.entries()]
+      if (workspaceOrder.length > 0) {
+        const orderIndex = new Map(workspaceOrder.map((id, i) => [id, i]))
+        entries.sort((a, b) => {
+          const ai = orderIndex.get(a[0]) ?? Infinity
+          const bi = orderIndex.get(b[0]) ?? Infinity
+          if (ai !== Infinity || bi !== Infinity) return ai - bi
+          const aTime = a[1][0]?.time.updated ?? 0
+          const bTime = b[1][0]?.time.updated ?? 0
+          return bTime - aTime
+        })
+      } else {
+        entries.sort(([, a], [, b]) => {
+          const aTime = a[0]?.time.updated ?? 0
+          const bTime = b[0]?.time.updated ?? 0
+          return bTime - aTime
+        })
+      }
+      const ids: string[] = []
+      for (const [wsId, wsSessions] of entries) {
+        const isExpanded = expandedWorkspaces[wsId] ?? false
+        const visible = isExpanded ? wsSessions : wsSessions.slice(0, COLLAPSED_SESSION_LIMIT)
+        for (const s of visible) ids.push(s.id)
+      }
+      return ids
+    }
+    if (isUnifiedMode) {
+      return unifiedSessions.map((s) => s.id)
+    }
+    // Workspace mode
+    return Object.values(sessions)
+      .filter((s) => !s.parentID)
+      .sort((a, b) => b.time.updated - a.time.updated)
+      .map((s) => s.id)
+  }, [isUnifiedMode, groupByWorkspace, sessions, unifiedSessions, workspaceOptions, workspaceOrder, expandedWorkspaces])
+
+  const visibleSessionIdsRef = useRef(visibleSessionIds)
+  visibleSessionIdsRef.current = visibleSessionIds
+  const activeSessionIdForNavRef = useRef(activeSessionId)
+  activeSessionIdForNavRef.current = activeSessionId
+
+  const selectSessionByIdRef = useRef((sessionId: string) => {
+    if (isUnifiedMode) {
+      const session = unifiedSessions.find((s) => s.id === sessionId)
+      if (session) handleSelectUnifiedSession(sessionId, session.workspaceId)
+    } else {
+      handleSelectSession(sessionId)
+    }
+  })
+  selectSessionByIdRef.current = (sessionId: string) => {
+    if (isUnifiedMode) {
+      const session = unifiedSessions.find((s) => s.id === sessionId)
+      if (session) handleSelectUnifiedSession(sessionId, session.workspaceId)
+    } else {
+      handleSelectSession(sessionId)
+    }
+  }
+
+  const sessionsPanelActions = useMemo<StandardActions>(
+    () => ({
+      "navigate-next": () => {
+        const ids = visibleSessionIdsRef.current
+        const currentIndex = ids.indexOf(activeSessionIdForNavRef.current ?? "")
+        const nextIndex = Math.min(currentIndex + 1, ids.length - 1)
+        const nextId = ids[nextIndex]
+        if (nextId) {
+          selectSessionByIdRef.current(nextId)
+          sessionListFocusRef.current
+            ?.querySelector(`[data-session-id="${nextId}"]`)
+            ?.scrollIntoView({ block: "nearest" })
+        }
+      },
+      "navigate-prev": () => {
+        const ids = visibleSessionIdsRef.current
+        const currentIndex = ids.indexOf(activeSessionIdForNavRef.current ?? "")
+        const prevIndex = Math.max(currentIndex - 1, 0)
+        const prevId = ids[prevIndex]
+        if (prevId) {
+          selectSessionByIdRef.current(prevId)
+          sessionListFocusRef.current
+            ?.querySelector(`[data-session-id="${prevId}"]`)
+            ?.scrollIntoView({ block: "nearest" })
+        }
+      },
+      "select-item": () => {
+        usePanelNavigationStore.getState().focusPanel("chat-messages")
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   const chatCommands = useMemo(
     () => [
       {
@@ -826,104 +944,141 @@ export function ChatInterface() {
   useCommand(chatCommands);
 
   const chatLeaderActions = useMemo(
-    () => [
-      {
-        action: {
-          id: "chat:switch-model",
-          label: "Switch model",
-          page: "chat" as const,
+    () => {
+      const actions = [
+        {
+          action: {
+            id: "chat:switch-model",
+            label: "Switch model",
+            page: "chat" as const,
+          },
+          handler: () => setIsModelSelectorOpenRef.current(true),
         },
-        handler: () => setIsModelSelectorOpenRef.current(true),
-      },
-      {
-        action: {
-          id: "chat:switch-agent",
-          label: "Switch agent",
-          page: "chat" as const,
+        {
+          action: {
+            id: "chat:switch-agent",
+            label: "Switch agent",
+            page: "chat" as const,
+          },
+          handler: () => setIsAgentSelectorOpenRef.current(true),
         },
-        handler: () => setIsAgentSelectorOpenRef.current(true),
-      },
-      {
-        action: {
-          id: "chat:new-session",
-          label: "New session",
-          page: "chat" as const,
+        {
+          action: {
+            id: "chat:new-session",
+            label: "New session",
+            page: "chat" as const,
+          },
+          handler: () => handleCreateSessionRef.current(),
         },
-        handler: () => handleCreateSessionRef.current(),
-      },
-      {
-        action: {
-          id: "chat:toggle-sessions",
-          label: "Toggle session list",
-          page: "chat" as const,
+        {
+          action: {
+            id: "chat:toggle-sessions",
+            label: "Toggle session list",
+            page: "chat" as const,
+          },
+          handler: () => setIsSessionListOpenRef.current((prev) => !prev),
         },
-        handler: () => setIsSessionListOpenRef.current((prev) => !prev),
-      },
-      {
-        action: {
-          id: "chat:toggle-plan",
-          label: "Toggle plan panel",
-          page: "chat" as const,
+        {
+          action: {
+            id: "chat:toggle-plan",
+            label: "Toggle plan panel",
+            page: "chat" as const,
+          },
+          handler: () => setIsPlanPanelOpenRef.current((prev) => !prev),
         },
-        handler: () => setIsPlanPanelOpenRef.current((prev) => !prev),
-      },
-      {
-        action: {
-          id: "chat:toggle-tasks",
-          label: "Toggle task progress",
-          page: "chat" as const,
+        {
+          action: {
+            id: "chat:toggle-tasks",
+            label: "Toggle task progress",
+            page: "chat" as const,
+          },
+          handler: () => setIsTaskPanelOpenRef.current((prev) => {
+            const next = !prev;
+            localStorage.setItem("dev-hub:chat-task-panel", String(next));
+            return next;
+          }),
         },
-        handler: () => setIsTaskPanelOpenRef.current((prev) => {
-          const next = !prev;
-          localStorage.setItem("dev-hub:chat-task-panel", String(next));
-          return next;
-        }),
-      },
-      {
-        action: {
-          id: "chat:toggle-thinking",
-          label: "Toggle thinking",
-          page: "chat" as const,
+        {
+          action: {
+            id: "chat:toggle-thinking",
+            label: "Toggle thinking",
+            page: "chat" as const,
+          },
+          handler: toggleThinking,
         },
-        handler: toggleThinking,
-      },
-      {
-        action: {
-          id: "chat:toggle-tool-calls",
-          label: "Toggle tool calls",
-          page: "chat" as const,
+        {
+          action: {
+            id: "chat:toggle-tool-calls",
+            label: "Toggle tool calls",
+            page: "chat" as const,
+          },
+          handler: toggleToolCalls,
         },
-        handler: toggleToolCalls,
-      },
-      {
-        action: {
-          id: "chat:toggle-tokens",
-          label: "Toggle token usage",
-          page: "chat" as const,
+        {
+          action: {
+            id: "chat:toggle-tokens",
+            label: "Toggle token usage",
+            page: "chat" as const,
+          },
+          handler: toggleTokens,
         },
-        handler: toggleTokens,
-      },
-      {
-        action: {
-          id: "chat:toggle-timestamps",
-          label: "Toggle timestamps",
-          page: "chat" as const,
+        {
+          action: {
+            id: "chat:toggle-timestamps",
+            label: "Toggle timestamps",
+            page: "chat" as const,
+          },
+          handler: toggleTimestamps,
         },
-        handler: toggleTimestamps,
-      },
-      {
-        action: {
-          id: "chat:focus-prompt",
-          label: "Focus prompt input",
-          page: "chat" as const,
-        },
-        handler: () => promptInputRef.current?.focus(),
-      },
-    ],
-    [toggleThinking, toggleToolCalls, toggleTokens, toggleTimestamps],
+      ];
+
+      // When panel nav is ON, panel:focus-input (bound to "i") replaces chat:focus-prompt
+      if (!isPanelNavigationEnabled) {
+        actions.push({
+          action: {
+            id: "chat:focus-prompt",
+            label: "Focus prompt input",
+            page: "chat" as const,
+          },
+          handler: () => promptInputRef.current?.focus(),
+        });
+      }
+
+      return actions;
+    },
+    [toggleThinking, toggleToolCalls, toggleTokens, toggleTimestamps, isPanelNavigationEnabled],
   );
 
   useLeaderAction(chatLeaderActions);
+
+  // Panel zone registration
+
+  const messagesPanelActions = useMemo<StandardActions>(
+    () => ({
+      "focus-input": () => promptInputRef.current?.focus(),
+    }),
+    [],
+  );
+
+  const sessionsPanel = usePanelZone("chat-sessions", {
+    neighbors: { right: "chat-messages" },
+    focusRef: sessionListFocusRef,
+    isVisible: isSessionListOpen && !isMobile,
+    actions: sessionsPanelActions,
+  });
+
+  const messagesPanel = usePanelZone("chat-messages", {
+    neighbors: { left: "chat-sessions", right: "chat-tasks" },
+    focusRef: messagesPanelFocusRef,
+    actions: messagesPanelActions,
+    onFocus: () => promptInputRef.current?.focus(),
+  });
+
+  const tasksPanel = usePanelZone("chat-tasks", {
+    neighbors: { left: "chat-messages" },
+    focusRef: taskPanelFocusRef,
+    isVisible: isTaskPanelOpen && activeTodos.length > 0 && !isMobile,
+  });
 
   // Tab / Shift+Tab cycles through agents
   const primaryAgentsRef = useRef(orderedAgents);
@@ -1043,9 +1198,15 @@ export function ChatInterface() {
       {isSessionListOpen && (
         <>
           <div
-            className="hidden shrink-0 overflow-hidden md:block"
+            ref={(el) => {
+              sessionsPanel.containerRef.current = el;
+              sessionListFocusRef.current = el;
+            }}
+            tabIndex={-1}
+            className="hidden shrink-0 overflow-hidden md:block relative"
             style={{ width: sessionListWidth }}
           >
+            {sessionsPanel.Indicator}
             {isUnifiedMode ? (
               <SessionList
                 mode="unified"
@@ -1102,7 +1263,15 @@ export function ChatInterface() {
 
       {/* Main chat area */}
       <ChatDisplayContext.Provider value={chatDisplaySettings}>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div
+        ref={(el) => {
+          messagesPanel.containerRef.current = el;
+          messagesPanelFocusRef.current = el;
+        }}
+        tabIndex={-1}
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      >
+        {messagesPanel.Indicator}
         {/* Chat toolbar */}
         <div className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center gap-2 border-b bg-background px-4 py-2">
           {/* Mobile: open session sheet */}
@@ -1403,9 +1572,15 @@ export function ChatInterface() {
             <GripVertical className="size-3.5 text-muted-foreground/30" />
           </div>
           <div
-            className="hidden shrink-0 overflow-y-auto border-l md:block"
+            ref={(el) => {
+              tasksPanel.containerRef.current = el;
+              taskPanelFocusRef.current = el;
+            }}
+            tabIndex={-1}
+            className="hidden shrink-0 overflow-y-auto border-l md:block relative"
             style={{ width: taskPanelWidth }}
           >
+            {tasksPanel.Indicator}
             <div className="flex items-center justify-between border-b px-3 py-2">
               <span className="text-xs font-medium text-muted-foreground">Task Progress</span>
               <Button

@@ -1,0 +1,330 @@
+components/chat/session-list.tsx
+  c8d51b11d644821d 568
+  0c8c747918ee6b07 58
+  e431c1074e6ad854 4
+  c606dae5cf2b395e 479-488,512
+  aa309937d6af3c45 585-586,590-595
+  310acfccdb811673 297
+components/chat/chat-interface.tsx
+  9afe3fbd935f4b72 1378
+  58a32441f9f4d26c 1268
+  73f8c6459ee8b1cf 722-724,729-735,737
+  358505cbee657be2 428-429,431-435,437
+  0994151a7ccbda35 746-750,755
+  fe14a65fa6dfa710 18
+  9b87fe1fec908bf3 765-776
+  ee8b3a9b3ad4602a 307
+  a5cdffe90da6f1cb 1335
+  c980f0966916fe50 1406
+components/layout/workspace-switcher.tsx
+  c1742cc42979d321 135-142
+  477d7327144f6c9c 176-179,193-218
+  4a560bb054e288a5 3
+  5f14458d24391781 159-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "25036993e6035ff8459db15eddd5428eb7d9bb94",
+  "prompts": {
+    "0994151a7ccbda35": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-7187fe35-f194-4da8-9bb9-350893c3ce37",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 2,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    },
+    "0c8c747918ee6b07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-f6bf7c62-e1ef-49c0-84bd-0eb58e3e15cd",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "310acfccdb811673": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-a6a11384-0e06-4fa9-b44a-cc846a716329",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "358505cbee657be2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-0f8cc15a-2cbf-4c90-8750-0d10fed0653d",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 3,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    },
+    "388c3986270b603b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_307838736ffepey5fYn2lE6mLp-2f93cd6a-d527-433a-b87c-99a2ca6e6dfd",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 345,
+      "overriden_lines": 0
+    },
+    "477d7327144f6c9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce22370ffePoQKmr8PLlBF8z-d4c21d4e-0956-4d4c-b2cb-d867277bc038",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 30,
+      "total_deletions": 0,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    },
+    "4a560bb054e288a5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce22370ffePoQKmr8PLlBF8z-7a940ad3-4380-4aea-9b9e-2340bbd60278",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "58a32441f9f4d26c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-d15008a0-457f-4fc8-803e-21d2df3f1fec",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "5f14458d24391781": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce22370ffePoQKmr8PLlBF8z-f3d7db8b-1a54-48d2-a1c2-5802fd1562c9",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 1,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    },
+    "67840f1a4fc71811": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fd1904f8ffehQs7hp8lIAgiZZ-b1220640-2a1d-4d17-9a7b-590ed80a0f51",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "73f8c6459ee8b1cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-76dee943-e2c0-47fa-8a64-43738c47ce18",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 1,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "9afe3fbd935f4b72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fd1904f8ffehQs7hp8lIAgiZZ-a69c9e14-cb98-4487-8eb3-fc7214d005e1",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "9b87fe1fec908bf3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-43ef01ec-1427-4126-b863-f4e9c4dfc989",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 0,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    },
+    "a5cdffe90da6f1cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-7544547c-e63a-455a-8064-249cba50c3b3",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "aa309937d6af3c45": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-ebaa6851-eb87-4541-9a87-7843be81099b",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 2,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    },
+    "c1742cc42979d321": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce22370ffePoQKmr8PLlBF8z-7a0159f7-4c00-4dbf-942f-e9c7bc8f3922",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 0,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    },
+    "c606dae5cf2b395e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-b5222eee-2c46-4e07-93a8-52b70fe6a2ca",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 35,
+      "total_deletions": 24,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "c8d51b11d644821d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-45bb17dd-01f6-40ea-9cd6-ba36bdaed027",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "c980f0966916fe50": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fd1904f8ffehQs7hp8lIAgiZZ-a41f3e33-9c4f-4730-944f-e9ea101235e6",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "d1feacc0ed03cdac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fd1904f8ffehQs7hp8lIAgiZZ-211b3289-1c8d-4390-9c7f-3ca364ff7b04",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "e431c1074e6ad854": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-c752a8b8-9829-4b9b-bce9-081b77f6e02c",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "ee8b3a9b3ad4602a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-2c1e9960-348d-47e7-9f08-998dace86c87",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "fe14a65fa6dfa710": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2fce26ec1ffeTuMTphZ1GZqY17-466b49bf-4bbf-4e7f-a99d-7b6f4959b545",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

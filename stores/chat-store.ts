@@ -400,6 +400,7 @@ interface ChatState {
   setSessionAgent: (sessionId: string, workspaceId: string, agent: string) => void
   getSessionAgent: (sessionId: string) => string | null
 
+  fetchCachedSessions: (workspaceId: string) => Promise<void>
   fetchPinnedSessions: (workspaceId: string) => Promise<void>
   pinSession: (sessionId: string, workspaceId: string) => Promise<void>
   unpinSession: (sessionId: string, workspaceId: string) => Promise<void>
@@ -574,6 +575,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           },
         }
       })
+
+      fetch("/api/sessions/cache", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId, sessions: data }),
+      }).catch(() => {})
 
       // Auto-select the most recently updated session if none is selected for this workspace
       const { activeWorkspaceId, activeSessionId } = get()
@@ -1946,6 +1953,24 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const wsId = activeWorkspaceId ?? findWorkspaceForSession(workspaceStates, sessionId)
     if (!wsId) return null
     return workspaceStates[wsId]?.sessionAgents[sessionId] ?? null
+  },
+
+  fetchCachedSessions: async (workspaceId) => {
+    try {
+      const response = await fetch(`/api/sessions/cache?workspaceId=${workspaceId}`)
+      if (!response.ok) return
+      const data = await response.json()
+      if (!Array.isArray(data) || data.length === 0) return
+      const sessionsMap: Record<string, Session> = {}
+      for (const session of data) {
+        sessionsMap[session.id] = session
+      }
+      set((state) => {
+        const ws = state.workspaceStates[workspaceId]
+        if (ws && Object.keys(ws.sessions).length > 0) return state
+        return updateWorkspace(state, workspaceId, () => ({ sessions: sessionsMap, sessionsLoaded: true }))
+      })
+    } catch {}
   },
 
   fetchPinnedSessions: async (workspaceId) => {

@@ -42,6 +42,7 @@ function seedStores(sessions: ReturnType<typeof makeSession>[], workspaceId = "w
       [workspaceId]: {
         sessions: sessionsMap,
         sessionsLoaded: true,
+        pinnedSessionIds: new Set(),
         messages: {},
         optimisticMessageIds: {},
         sessionStatuses: {},

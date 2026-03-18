@@ -43,6 +43,7 @@ export interface WorkspaceState {
   todos: Record<string, Todo[]>
   sessionAgents: Record<string, string>
   lastViewedAt: Record<string, number>
+  pinnedSessionIds: Set<string>
 }
 
 function emptyWorkspaceState(): WorkspaceState {
@@ -57,6 +58,7 @@ function emptyWorkspaceState(): WorkspaceState {
     todos: {},
     sessionAgents: {},
     lastViewedAt: {},
+    pinnedSessionIds: new Set(),
   }
 }
 
@@ -70,6 +72,7 @@ const EMPTY_TODOS: Todo[] = []
 const EMPTY_SESSION_STATUSES: Record<string, SessionStatus> = {}
 const EMPTY_LAST_VIEWED: Record<string, number> = {}
 const EMPTY_UNIFIED_SESSIONS: SessionWithWorkspace[] = []
+const EMPTY_PINNED: Set<string> = new Set()
 
 // Memoization cache for getRecentSessionsAcrossWorkspaces.
 // We compare each workspace's `sessions` record by reference to detect changes.
@@ -84,6 +87,9 @@ let _unifiedStatusesCacheRefs = new Map<string, Record<string, SessionStatus>>()
 // Memoization cache for getUnifiedLastViewedAt.
 let _unifiedLastViewedCache: Record<string, number> = EMPTY_LAST_VIEWED
 let _unifiedLastViewedCacheRefs = new Map<string, Record<string, number>>()
+
+let _unifiedPinnedCache: Set<string> = EMPTY_PINNED
+let _unifiedPinnedCacheRefs = new Map<string, Set<string>>()
 
 // RAF-batched buffer for message.part.updated events.
 // Keyed: sessionId → messageId → partId → Part
@@ -389,8 +395,16 @@ interface ChatState {
   getRecentSessionsAcrossWorkspaces: (limit: number) => SessionWithWorkspace[]
   getUnifiedSessionStatuses: () => Record<string, SessionStatus>
   getUnifiedLastViewedAt: () => Record<string, number>
+  getUnifiedPinnedSessionIds: () => Set<string>
+  getActivePinnedSessionIds: () => Set<string>
   setSessionAgent: (sessionId: string, workspaceId: string, agent: string) => void
   getSessionAgent: (sessionId: string) => string | null
+
+  fetchPinnedSessions: (workspaceId: string) => Promise<void>
+  pinSession: (sessionId: string, workspaceId: string) => Promise<void>
+  unpinSession: (sessionId: string, workspaceId: string) => Promise<void>
+  isSessionPinned: (sessionId: string, workspaceId: string) => boolean
+  getPinnedSessionIds: (workspaceId: string) => Set<string>
 }
 
 function buildProxyUrl(
@@ -1847,6 +1861,38 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     return _unifiedLastViewedCache
   },
 
+  getUnifiedPinnedSessionIds: () => {
+    const { workspaceStates } = get()
+    const entries = Object.entries(workspaceStates)
+
+    if (entries.length === 0) return EMPTY_PINNED
+
+    if (
+      entries.length === _unifiedPinnedCacheRefs.size &&
+      entries.every(([id, ws]) => _unifiedPinnedCacheRefs.get(id) === ws.pinnedSessionIds)
+    ) {
+      return _unifiedPinnedCache
+    }
+
+    const merged = new Set<string>()
+    const newRefs = new Map<string, Set<string>>()
+    for (const [wsId, ws] of entries) {
+      newRefs.set(wsId, ws.pinnedSessionIds)
+      for (const id of ws.pinnedSessionIds) merged.add(id)
+    }
+
+    _unifiedPinnedCache = merged.size > 0 ? merged : EMPTY_PINNED
+    _unifiedPinnedCacheRefs = newRefs
+    return _unifiedPinnedCache
+  },
+
+  getActivePinnedSessionIds: () => {
+    const { activeWorkspaceId, workspaceStates } = get()
+    if (!activeWorkspaceId) return EMPTY_PINNED
+    const pins = workspaceStates[activeWorkspaceId]?.pinnedSessionIds
+    return pins && pins.size > 0 ? pins : EMPTY_PINNED
+  },
+
   setSessionAgent: (sessionId, workspaceId, agent) => {
     set((state) =>
       updateWorkspace(state, workspaceId, (ws) => ({
@@ -1860,5 +1906,75 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const wsId = activeWorkspaceId ?? findWorkspaceForSession(workspaceStates, sessionId)
     if (!wsId) return null
     return workspaceStates[wsId]?.sessionAgents[sessionId] ?? null
+  },
+
+  fetchPinnedSessions: async (workspaceId) => {
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/pinned-sessions`)
+      if (!response.ok) return
+      const sessionIds: string[] = await response.json()
+      set((state) =>
+        updateWorkspace(state, workspaceId, () => ({
+          pinnedSessionIds: new Set(sessionIds),
+        }))
+      )
+    } catch {
+      // Best effort
+    }
+  },
+
+  pinSession: async (sessionId, workspaceId) => {
+    set((state) =>
+      updateWorkspace(state, workspaceId, (ws) => ({
+        pinnedSessionIds: new Set([...ws.pinnedSessionIds, sessionId]),
+      }))
+    )
+    try {
+      await fetch(`/api/workspaces/${workspaceId}/pinned-sessions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      })
+    } catch {
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => {
+          const next = new Set(ws.pinnedSessionIds)
+          next.delete(sessionId)
+          return { pinnedSessionIds: next }
+        })
+      )
+    }
+  },
+
+  unpinSession: async (sessionId, workspaceId) => {
+    const previousPinned = get().workspaceStates[workspaceId]?.pinnedSessionIds
+    set((state) =>
+      updateWorkspace(state, workspaceId, (ws) => {
+        const next = new Set(ws.pinnedSessionIds)
+        next.delete(sessionId)
+        return { pinnedSessionIds: next }
+      })
+    )
+    try {
+      await fetch(`/api/workspaces/${workspaceId}/pinned-sessions?sessionId=${sessionId}`, {
+        method: "DELETE",
+      })
+    } catch {
+      if (previousPinned) {
+        set((state) =>
+          updateWorkspace(state, workspaceId, () => ({
+            pinnedSessionIds: previousPinned,
+          }))
+        )
+      }
+    }
+  },
+
+  isSessionPinned: (sessionId, workspaceId) => {
+    return get().workspaceStates[workspaceId]?.pinnedSessionIds.has(sessionId) ?? false
+  },
+
+  getPinnedSessionIds: (workspaceId) => {
+    return get().workspaceStates[workspaceId]?.pinnedSessionIds ?? EMPTY_PINNED
   },
 }))

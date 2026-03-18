@@ -295,8 +295,14 @@ export function ChatInterface() {
     getActiveTodos,
     getUnifiedSessionStatuses,
     getUnifiedLastViewedAt,
+    getUnifiedPinnedSessionIds,
+    getActivePinnedSessionIds,
     setSessionAgent,
     getSessionAgent,
+    fetchPinnedSessions,
+    pinSession,
+    unpinSession,
+    getPinnedSessionIds,
   } = useChatStore();
 
   // Restore per-session agent when the active session changes.
@@ -358,6 +364,9 @@ export function ChatInterface() {
   const sessionStatuses = isUnifiedMode ? unifiedStatuses : activeWsSessionStatuses;
   const lastViewedAt = isUnifiedMode ? unifiedLastViewed : activeWsLastViewedAt;
   const activeTodos = useChatStore(getActiveTodos);
+  const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
+  const activePinnedIds = useChatStore(getActivePinnedSessionIds);
+  const pinnedSessionIds = isUnifiedMode ? unifiedPinnedIds : activePinnedIds;
 
   const isSessionsLoading = useChatStore((s) => {
     if (isUnifiedMode) {
@@ -386,14 +395,16 @@ export function ChatInterface() {
     if (!activeWorkspaceId) return;
     fetchSessions(activeWorkspaceId);
     fetchCommands(activeWorkspaceId);
-  }, [activeWorkspaceId, fetchSessions, fetchCommands]);
+    fetchPinnedSessions(activeWorkspaceId);
+  }, [activeWorkspaceId, fetchSessions, fetchCommands, fetchPinnedSessions]);
 
   useEffect(() => {
     if (!isUnifiedMode) return;
     for (const ws of allWorkspaces) {
       fetchSessions(ws.id);
+      fetchPinnedSessions(ws.id);
     }
-  }, [isUnifiedMode, allWorkspaces, fetchSessions]);
+  }, [isUnifiedMode, allWorkspaces, fetchSessions, fetchPinnedSessions]);
 
   // Fetch messages when active session changes
   useEffect(() => {
@@ -616,16 +627,15 @@ export function ChatInterface() {
   }, []);
 
   const handleDeleteSession = useCallback(
-    (sessionId: string) => {
-      if (!activeWorkspaceId) return;
+    (sessionId: string, sessionWorkspaceId?: string) => {
+      const workspaceId = sessionWorkspaceId ?? activeWorkspaceId;
+      if (!workspaceId) return;
 
       const existing = pendingDeletions.current.get(sessionId);
       if (existing) clearTimeout(existing);
 
-      const snapshot = removeSessionLocal(sessionId, activeWorkspaceId);
+      const snapshot = removeSessionLocal(sessionId, workspaceId);
       if (!snapshot) return;
-
-      const workspaceId = activeWorkspaceId;
 
       const timer = setTimeout(() => {
         pendingDeletions.current.delete(sessionId);
@@ -716,6 +726,24 @@ export function ChatInterface() {
       return next;
     });
   }, []);
+
+  const handlePinSession = useCallback(
+    (sessionId: string, workspaceId?: string) => {
+      const wsId = workspaceId ?? activeWorkspaceId;
+      if (!wsId) return;
+      pinSession(sessionId, wsId);
+    },
+    [activeWorkspaceId, pinSession],
+  );
+
+  const handleUnpinSession = useCallback(
+    (sessionId: string, workspaceId?: string) => {
+      const wsId = workspaceId ?? activeWorkspaceId;
+      if (!wsId) return;
+      unpinSession(sessionId, wsId);
+    },
+    [activeWorkspaceId, unpinSession],
+  );
 
   // Use refs so command closures stay stable but always call latest handlers
   const handleCreateSessionRef = useRef(handleCreateSession);
@@ -1163,9 +1191,12 @@ export function ChatInterface() {
               sessionStatuses={sessionStatuses}
               lastViewedAt={lastViewedAt}
               isLoading={isSessionsLoading}
+              pinnedSessionIds={pinnedSessionIds}
               onSelectSession={handleSelectUnifiedSession}
               onCreateSession={handleMobileCreateSession}
               onDeleteSession={handleDeleteSession}
+              onPinSession={handlePinSession}
+              onUnpinSession={handleUnpinSession}
               isUnifiedMode={isUnifiedMode}
               onToggleMode={handleToggleUnifiedMode}
               groupByWorkspace={groupByWorkspace}
@@ -1183,10 +1214,13 @@ export function ChatInterface() {
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
               lastViewedAt={lastViewedAt}
+              pinnedSessionIds={pinnedSessionIds}
               isLoading={isSessionsLoading}
               onSelectSession={handleMobileSelectSession}
               onCreateSession={handleMobileCreateSession}
               onDeleteSession={handleDeleteSession}
+              onPinSession={handlePinSession}
+              onUnpinSession={handleUnpinSession}
               isUnifiedMode={isUnifiedMode}
               onToggleMode={handleToggleUnifiedMode}
             />
@@ -1223,9 +1257,12 @@ export function ChatInterface() {
                 sessionStatuses={sessionStatuses}
               lastViewedAt={lastViewedAt}
                 isLoading={isSessionsLoading}
+                pinnedSessionIds={pinnedSessionIds}
                 onSelectSession={handleSelectUnifiedSession}
                 onCreateSession={handleCreateSession}
                 onDeleteSession={handleDeleteSession}
+                onPinSession={handlePinSession}
+                onUnpinSession={handleUnpinSession}
                 isUnifiedMode={isUnifiedMode}
                 onToggleMode={handleToggleUnifiedMode}
                 groupByWorkspace={groupByWorkspace}
@@ -1242,11 +1279,14 @@ export function ChatInterface() {
                 workspaceColor={activeWorkspaceColor}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
-              lastViewedAt={lastViewedAt}
+                lastViewedAt={lastViewedAt}
+                pinnedSessionIds={pinnedSessionIds}
                 isLoading={isSessionsLoading}
                 onSelectSession={handleSelectSession}
                 onCreateSession={handleCreateSession}
                 onDeleteSession={handleDeleteSession}
+                onPinSession={handlePinSession}
+                onUnpinSession={handleUnpinSession}
                 isUnifiedMode={isUnifiedMode}
                 onToggleMode={handleToggleUnifiedMode}
               />

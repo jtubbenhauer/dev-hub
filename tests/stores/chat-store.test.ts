@@ -311,6 +311,7 @@ describe("workspace switching", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -360,6 +361,7 @@ describe("getStreamingStatus selector", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -384,6 +386,7 @@ describe("getStreamingStatus selector", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -406,6 +409,7 @@ describe("getStreamingStatus selector", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -429,6 +433,7 @@ describe("getStreamingStatus selector", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -452,6 +457,7 @@ describe("getStreamingStatus selector", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -474,6 +480,7 @@ describe("getStreamingStatus selector", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -496,6 +503,7 @@ describe("getStreamingStatus selector", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -519,6 +527,7 @@ describe("getStreamingStatus selector", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -607,6 +616,7 @@ describe("SSE event handling — session lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -637,6 +647,7 @@ describe("SSE event handling — session lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -667,6 +678,7 @@ describe("SSE event handling — session lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -712,6 +724,7 @@ describe("cross-workspace SSE routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
         "ws-b": {
@@ -724,6 +737,7 @@ describe("cross-workspace SSE routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -757,6 +771,7 @@ describe("cross-workspace SSE routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -790,6 +805,7 @@ describe("cross-workspace SSE routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
         "ws-b": {
@@ -802,6 +818,7 @@ describe("cross-workspace SSE routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -835,6 +852,7 @@ describe("cross-workspace SSE routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -864,6 +882,7 @@ describe("cross-workspace SSE routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -893,6 +912,7 @@ describe("cross-workspace SSE routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -916,6 +936,7 @@ describe("cross-workspace SSE routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1031,6 +1052,7 @@ describe("message routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1072,6 +1094,7 @@ describe("message routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1116,6 +1139,7 @@ describe("message routing", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1170,6 +1194,7 @@ describe("permission lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1196,6 +1221,7 @@ describe("permission lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1219,6 +1245,7 @@ describe("permission lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1251,6 +1278,7 @@ describe("question lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1280,6 +1308,7 @@ describe("question lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1319,6 +1348,7 @@ describe("question lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1348,6 +1378,7 @@ describe("question lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1377,6 +1408,7 @@ describe("question lifecycle", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1494,6 +1526,7 @@ describe("SSE connection management", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1539,6 +1572,7 @@ describe("SSE connection management", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1581,6 +1615,7 @@ describe("SSE connection management", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1643,6 +1678,7 @@ describe("streaming poll", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1688,6 +1724,7 @@ describe("refreshActiveSessionStatus", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1720,6 +1757,7 @@ describe("refreshActiveSessionStatus", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1806,6 +1844,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
         "ws-b": {
@@ -1818,6 +1857,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1844,6 +1884,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1870,6 +1911,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1892,6 +1934,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -1962,6 +2005,7 @@ describe("createSession — message initialization", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -2015,6 +2059,7 @@ describe("fetchMessages — error handling", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -2041,6 +2086,7 @@ describe("fetchMessages — error handling", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -2069,6 +2115,7 @@ describe("fetchMessages — error handling", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -2098,6 +2145,7 @@ describe("fetchMessages — error handling", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -2164,6 +2212,7 @@ describe("isMessagesLoaded selector logic", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -2186,6 +2235,7 @@ describe("isMessagesLoaded selector logic", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -2208,6 +2258,7 @@ describe("isMessagesLoaded selector logic", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
         },
       },
@@ -2262,6 +2313,7 @@ describe("removeSessionLocal and restoreSessionLocal", () => {
     todos: {} as Record<string, never[]>,
     sessionAgents: { "sess-a": "code" },
     lastViewedAt: { "sess-a": 1500, "sess-b": 900 },
+    pinnedSessionIds: new Set<string>(),
     sessionsLoaded: true,
   })
 
@@ -2389,6 +2441,7 @@ describe("revertSession", () => {
           todos: {},
           sessionAgents: {},
           lastViewedAt: {},
+          pinnedSessionIds: new Set(),
           sessionsLoaded: true,
           messages: {
             "sess-a": [
@@ -2441,5 +2494,137 @@ describe("revertSession", () => {
     const text = await useChatStore.getState().revertSession("sess-a", "ws-a", "nonexistent")
 
     expect(text).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Pinned sessions
+// ---------------------------------------------------------------------------
+
+describe("pinned sessions", () => {
+  beforeEach(resetStore)
+
+  it("fetchPinnedSessions populates pinnedSessionIds for a workspace", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ["sess-1", "sess-2"],
+    })
+
+    await useChatStore.getState().fetchPinnedSessions("ws-a")
+
+    const pinned = useChatStore.getState().workspaceStates["ws-a"].pinnedSessionIds
+    expect(pinned.has("sess-1")).toBe(true)
+    expect(pinned.has("sess-2")).toBe(true)
+    expect(pinned.size).toBe(2)
+  })
+
+  it("pinSession optimistically adds to pinnedSessionIds", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ pinned: true }),
+    })
+
+    await useChatStore.getState().pinSession("sess-1", "ws-a")
+
+    const pinned = useChatStore.getState().workspaceStates["ws-a"].pinnedSessionIds
+    expect(pinned.has("sess-1")).toBe(true)
+  })
+
+  it("unpinSession optimistically removes from pinnedSessionIds", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ unpinned: true }),
+    })
+
+    await useChatStore.getState().pinSession("sess-1", "ws-a")
+    expect(useChatStore.getState().workspaceStates["ws-a"].pinnedSessionIds.has("sess-1")).toBe(true)
+
+    await useChatStore.getState().unpinSession("sess-1", "ws-a")
+    expect(useChatStore.getState().workspaceStates["ws-a"].pinnedSessionIds.has("sess-1")).toBe(false)
+  })
+
+  it("pinSession rolls back on fetch failure", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error("network error"))
+
+    await useChatStore.getState().pinSession("sess-1", "ws-a")
+
+    const pinned = useChatStore.getState().workspaceStates["ws-a"].pinnedSessionIds
+    expect(pinned.has("sess-1")).toBe(false)
+  })
+
+  it("unpinSession rolls back on fetch failure", async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ pinned: true }) })
+      .mockRejectedValueOnce(new Error("network error"))
+
+    await useChatStore.getState().pinSession("sess-1", "ws-a")
+    expect(useChatStore.getState().workspaceStates["ws-a"].pinnedSessionIds.has("sess-1")).toBe(true)
+
+    await useChatStore.getState().unpinSession("sess-1", "ws-a")
+    expect(useChatStore.getState().workspaceStates["ws-a"].pinnedSessionIds.has("sess-1")).toBe(true)
+  })
+
+  it("isSessionPinned returns correct state", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ pinned: true }),
+    })
+
+    expect(useChatStore.getState().isSessionPinned("sess-1", "ws-a")).toBe(false)
+
+    await useChatStore.getState().pinSession("sess-1", "ws-a")
+
+    expect(useChatStore.getState().isSessionPinned("sess-1", "ws-a")).toBe(true)
+  })
+
+  it("pinned sessions are scoped per workspace", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ pinned: true }),
+    })
+
+    await useChatStore.getState().pinSession("sess-1", "ws-a")
+    await useChatStore.getState().pinSession("sess-2", "ws-b")
+
+    expect(useChatStore.getState().isSessionPinned("sess-1", "ws-a")).toBe(true)
+    expect(useChatStore.getState().isSessionPinned("sess-2", "ws-a")).toBe(false)
+    expect(useChatStore.getState().isSessionPinned("sess-2", "ws-b")).toBe(true)
+    expect(useChatStore.getState().isSessionPinned("sess-1", "ws-b")).toBe(false)
+  })
+
+  it("getPinnedSessionIds returns empty set for unknown workspace", () => {
+    expect(useChatStore.getState().getPinnedSessionIds("unknown").size).toBe(0)
+  })
+
+  it("getActivePinnedSessionIds reflects pinned state for active workspace", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ pinned: true }),
+    })
+
+    useChatStore.setState({ activeWorkspaceId: "ws-a" })
+
+    const before = useChatStore.getState().getActivePinnedSessionIds()
+    expect(before.size).toBe(0)
+
+    await useChatStore.getState().pinSession("sess-1", "ws-a")
+
+    const after = useChatStore.getState().getActivePinnedSessionIds()
+    expect(after.has("sess-1")).toBe(true)
+    expect(after).not.toBe(before)
+  })
+
+  it("getUnifiedPinnedSessionIds merges across workspaces", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ pinned: true }),
+    })
+
+    await useChatStore.getState().pinSession("sess-1", "ws-a")
+    await useChatStore.getState().pinSession("sess-2", "ws-b")
+
+    const unified = useChatStore.getState().getUnifiedPinnedSessionIds()
+    expect(unified.has("sess-1")).toBe(true)
+    expect(unified.has("sess-2")).toBe(true)
   })
 })

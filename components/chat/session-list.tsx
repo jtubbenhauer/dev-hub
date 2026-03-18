@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useRef, useState } from "react"
-import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch, Brain, ArrowUpDown, Group, GripVertical, ChevronDown, ChevronRight } from "lucide-react"
+import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch, Brain, ArrowUpDown, Group, GripVertical, ChevronDown, ChevronRight, Pin, PinOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -20,9 +20,12 @@ interface BaseSessionListProps {
   activeSessionId: string | null
   sessionStatuses: Record<string, SessionStatus>
   lastViewedAt: Record<string, number>
+  pinnedSessionIds?: Set<string>
   isLoading?: boolean
   onCreateSession: () => void
-  onDeleteSession: (sessionId: string) => void
+  onDeleteSession: (sessionId: string, workspaceId?: string) => void
+  onPinSession?: (sessionId: string, workspaceId?: string) => void
+  onUnpinSession?: (sessionId: string, workspaceId?: string) => void
   isUnifiedMode?: boolean
   onToggleMode?: () => void
 }
@@ -57,16 +60,29 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
 type SessionListProps = WorkspaceSessionListProps | UnifiedSessionListProps
 
 export function SessionList(props: SessionListProps) {
-  const { activeSessionId, sessionStatuses, lastViewedAt, onCreateSession, onDeleteSession } = props
+  const { activeSessionId, sessionStatuses, lastViewedAt, pinnedSessionIds, onCreateSession, onDeleteSession, onPinSession, onUnpinSession } = props
 
   const sortedSessions = useMemo(() => {
     if (props.mode === "workspace") {
       return Object.values(props.sessions)
         .filter((s) => !s.parentID)
-        .sort((a, b) => b.time.updated - a.time.updated)
+        .sort((a, b) => {
+          const aPinned = pinnedSessionIds?.has(a.id) ?? false
+          const bPinned = pinnedSessionIds?.has(b.id) ?? false
+          if (aPinned !== bPinned) return aPinned ? -1 : 1
+          return b.time.updated - a.time.updated
+        })
+    }
+    if (pinnedSessionIds && pinnedSessionIds.size > 0) {
+      return [...props.sessions].sort((a, b) => {
+        const aPinned = pinnedSessionIds.has(a.id)
+        const bPinned = pinnedSessionIds.has(b.id)
+        if (aPinned !== bPinned) return aPinned ? -1 : 1
+        return b.time.updated - a.time.updated
+      })
     }
     return props.sessions
-  }, [props.mode, props.sessions])
+  }, [props.mode, props.sessions, pinnedSessionIds])
 
   const isGrouped = props.mode === "unified" && !!props.groupByWorkspace
   const workspaceOrder = props.mode === "unified" ? props.workspaceOrder : undefined
@@ -263,8 +279,11 @@ export function SessionList(props: SessionListProps) {
                       ? () => props.onToggleWorkspaceExpanded?.(workspaceId)
                       : undefined
                   }
+                  pinnedSessionIds={pinnedSessionIds}
                   onSelectSession={(session: Session | SessionWithWorkspace) => handleSelect(session)}
                   onDeleteSession={onDeleteSession}
+                  onPinSession={onPinSession}
+                  onUnpinSession={onUnpinSession}
                   onCreateSession={
                     props.mode === "unified" && props.onCreateSessionInWorkspace
                       ? () => props.onCreateSessionInWorkspace!(workspaceId)
@@ -282,6 +301,7 @@ export function SessionList(props: SessionListProps) {
                   key={session.id}
                   session={session}
                   isActive={session.id === activeSessionId}
+                  isPinned={pinnedSessionIds?.has(session.id) ?? false}
                   status={sessionStatuses[session.id] ?? null}
                   isUnread={!!(
                     session.id !== activeSessionId &&
@@ -302,7 +322,18 @@ export function SessionList(props: SessionListProps) {
                         : undefined
                   }
                   onSelect={() => handleSelect(session)}
-                  onDelete={() => onDeleteSession(session.id)}
+                  onDelete={() => onDeleteSession(
+                    session.id,
+                    props.mode === "unified" ? (session as SessionWithWorkspace).workspaceId : undefined
+                  )}
+                  onTogglePin={onPinSession && onUnpinSession ? () => {
+                    const wsId = props.mode === "unified" ? (session as SessionWithWorkspace).workspaceId : undefined
+                    if (pinnedSessionIds?.has(session.id)) {
+                      onUnpinSession(session.id, wsId)
+                    } else {
+                      onPinSession(session.id, wsId)
+                    }
+                  } : undefined}
                 />
               ))
             )}
@@ -333,10 +364,13 @@ interface WorkspaceGroupProps {
   activeSessionId: string | null
   sessionStatuses: Record<string, SessionStatus>
   lastViewedAt: Record<string, number>
+  pinnedSessionIds?: Set<string>
   isExpanded: boolean
   onToggleExpanded?: () => void
   onSelectSession: (session: SessionWithWorkspace) => void
-  onDeleteSession: (sessionId: string) => void
+  onDeleteSession: (sessionId: string, workspaceId?: string) => void
+  onPinSession?: (sessionId: string, workspaceId?: string) => void
+  onUnpinSession?: (sessionId: string, workspaceId?: string) => void
   onCreateSession?: () => void
   onDragStart: () => void
   onDragOver: (e: React.DragEvent) => void
@@ -352,10 +386,13 @@ function WorkspaceGroup({
   activeSessionId,
   sessionStatuses,
   lastViewedAt,
+  pinnedSessionIds,
   isExpanded,
   onToggleExpanded,
   onSelectSession,
   onDeleteSession,
+  onPinSession,
+  onUnpinSession,
   onCreateSession,
   onDragStart,
   onDragOver,
@@ -440,6 +477,7 @@ function WorkspaceGroup({
           key={session.id}
           session={session}
           isActive={session.id === activeSessionId}
+          isPinned={pinnedSessionIds?.has(session.id) ?? false}
           status={sessionStatuses[session.id] ?? null}
           isUnread={!!(
             session.id !== activeSessionId &&
@@ -448,7 +486,14 @@ function WorkspaceGroup({
           )}
           workspaceColor={workspaceColor}
           onSelect={() => onSelectSession(session)}
-          onDelete={() => onDeleteSession(session.id)}
+          onDelete={() => onDeleteSession(session.id, workspaceId)}
+          onTogglePin={onPinSession && onUnpinSession ? () => {
+            if (pinnedSessionIds?.has(session.id)) {
+              onUnpinSession(session.id, workspaceId)
+            } else {
+              onPinSession(session.id, workspaceId)
+            }
+          } : undefined}
         />
       ))}
 
@@ -478,23 +523,27 @@ function WorkspaceGroup({
 interface SessionItemProps {
   session: Session
   isActive: boolean
+  isPinned: boolean
   status: SessionStatus | null
   isUnread: boolean
   workspaceBranch?: string
   workspaceColor?: string
   onSelect: () => void
   onDelete: () => void
+  onTogglePin?: () => void
 }
 
 function SessionItem({
   session,
   isActive,
+  isPinned,
   status,
   isUnread,
   workspaceBranch,
   workspaceColor,
   onSelect,
   onDelete,
+  onTogglePin,
 }: SessionItemProps) {
   const formattedTime = useMemo(() => {
     return formatRelativeTime(session.time.updated)
@@ -526,6 +575,11 @@ function SessionItem({
             className="size-3.5 animate-pulse"
             style={workspaceColor ? { color: workspaceColor } : { color: "var(--color-amber-500)" }}
           />
+        ) : isPinned ? (
+          <Pin
+            className="size-3.5 rotate-45"
+            style={workspaceColor ? { color: workspaceColor } : undefined}
+          />
         ) : (
           <MessageSquare
             className={cn("size-3.5", !workspaceColor && "text-muted-foreground")}
@@ -550,17 +604,40 @@ function SessionItem({
           )}
         </div>
       </div>
-      <Button
-        size="icon-xs"
-        variant="ghost"
-        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={(event) => {
-          event.stopPropagation()
-          onDelete()
-        }}
-      >
-        <Trash2 className="size-3 text-muted-foreground" />
-      </Button>
+      <div className="flex shrink-0 items-center gap-0.5">
+        {onTogglePin && (
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            className={cn(
+              "shrink-0 transition-opacity",
+              isPinned ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-100"
+            )}
+            onClick={(event) => {
+              event.stopPropagation()
+              onTogglePin()
+            }}
+            title={isPinned ? "Unpin" : "Pin"}
+          >
+            {isPinned ? (
+              <PinOff className="size-3 text-muted-foreground" />
+            ) : (
+              <Pin className="size-3 text-muted-foreground" />
+            )}
+          </Button>
+        )}
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete()
+          }}
+        >
+          <Trash2 className="size-3 text-muted-foreground" />
+        </Button>
+      </div>
     </div>
   )
 }

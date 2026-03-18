@@ -332,7 +332,7 @@ interface ChatState {
   restoreSessionLocal: (snapshot: SessionSnapshot) => void
   fetchMessages: (sessionId: string, workspaceId: string) => Promise<void>
   fetchCommands: (workspaceId: string) => Promise<void>
-  summarizeSession: (sessionId: string, workspaceId: string) => Promise<void>
+  summarizeSession: (sessionId: string, workspaceId: string, model?: { providerID: string; modelID: string }) => Promise<void>
   revertSession: (sessionId: string, workspaceId: string, messageID: string) => Promise<string | null>
 
   // Messaging
@@ -817,15 +817,26 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
-  summarizeSession: async (sessionId, workspaceId) => {
+  summarizeSession: async (sessionId, workspaceId, model) => {
     try {
-      await fetch(buildProxyUrl(`session/${sessionId}/summarize`, workspaceId), {
+      const response = await fetch(buildProxyUrl(`session/${sessionId}/summarize`, workspaceId), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify(model ? { providerID: model.providerID, modelID: model.modelID } : {}),
       })
-    } catch {
-      // Best effort
+      if (!response.ok) {
+        let message = "Failed to compact session"
+        try {
+          const body = await response.json()
+          const extracted = extractErrorString(body)
+          if (extracted) message = extracted
+        } catch {
+          // Response wasn't JSON — use default message
+        }
+        set({ streamingError: message })
+      }
+    } catch (error) {
+      set({ streamingError: extractErrorString(error) })
     }
   },
 
@@ -1537,7 +1548,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       case "session.compacted": {
         const sessionID = properties.sessionID as string
-        get().fetchMessages(sessionID, sourceWorkspaceId)
+        const wsId = findWorkspaceForSession(get().workspaceStates, sessionID) ?? sourceWorkspaceId
+        get().fetchMessages(sessionID, wsId)
         break
       }
 

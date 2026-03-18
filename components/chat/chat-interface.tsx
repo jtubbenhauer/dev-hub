@@ -556,9 +556,12 @@ export function ChatInterface() {
 
       if (command.source === "builtin") {
         switch (command.name) {
-          case "compact":
-            summarizeSession(sessionId, activeWorkspaceId);
+          case "compact": {
+            const compactionAgent = primaryAgents.find((a) => a.name.toLowerCase() === "compaction")
+            const compactModel = compactionAgent?.model ?? selectedModel ?? undefined
+            summarizeSession(sessionId, activeWorkspaceId, compactModel);
             break;
+          }
           case "undo": {
             const lastAssistant = [...activeMessages]
               .reverse()
@@ -589,6 +592,7 @@ export function ChatInterface() {
       activeWorkspaceId,
       activeSessionId,
       activeMessages,
+      primaryAgents,
       createSession,
       summarizeSession,
       revertSession,

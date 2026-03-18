@@ -36,6 +36,7 @@ export const workspaces = sqliteTable("workspaces", {
   opencodeUrl: text("opencode_url"),
   agentUrl: text("agent_url"),
   providerMeta: text("provider_meta", { mode: "json" }),
+  shellCommand: text("shell_command"),
   worktreeSymlinks: text("worktree_symlinks", { mode: "json" }).$type<string[]>(),
   linkedTaskId: text("linked_task_id"),
   linkedTaskMeta: text("linked_task_meta", { mode: "json" }),
@@ -115,6 +116,18 @@ export const reviewFiles = sqliteTable("review_files", {
   diffHash: text("diff_hash"),
   reviewedAt: integer("reviewed_at", { mode: "timestamp" }),
 })
+
+export const pinnedSessions = sqliteTable("pinned_sessions", {
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  sessionId: text("session_id").notNull(),
+  pinnedAt: integer("pinned_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+}, (table) => [
+  primaryKey({ columns: [table.workspaceId, table.sessionId] }),
+])
 
 export const fileComments = sqliteTable("file_comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),

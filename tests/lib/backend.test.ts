@@ -17,6 +17,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     opencodeUrl: null,
     agentUrl: null,
     providerMeta: null,
+    shellCommand: null,
     worktreeSymlinks: null,
     linkedTaskId: null,
     linkedTaskMeta: null,

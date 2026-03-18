@@ -17,6 +17,7 @@ function makeWorkspace(id: string, name?: string): Workspace {
     opencodeUrl: null,
     agentUrl: null,
     providerMeta: null,
+    shellCommand: null,
     worktreeSymlinks: null,
     linkedTaskId: null,
     linkedTaskMeta: null,

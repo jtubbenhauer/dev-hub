@@ -39,6 +39,7 @@ export interface Workspace {
   opencodeUrl: string | null
   agentUrl: string | null
   providerMeta: Record<string, unknown> | null
+  shellCommand: string | null
   worktreeSymlinks: string[] | null
   linkedTaskId: string | null
   linkedTaskMeta: LinkedTaskMeta | null
@@ -499,6 +500,7 @@ export interface WorkspaceProvider {
     create: string
     destroy: string
     status: string
+    shell?: string
   }
 }
 

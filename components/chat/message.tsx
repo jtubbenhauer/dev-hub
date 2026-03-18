@@ -11,6 +11,7 @@ import {
   Undo2,
   Copy,
   Check,
+  Minimize2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -81,7 +82,7 @@ export function isMessageVisible(
   const hasText = parts.some((p) => p.type === "text" && !("ignored" in p && p.ignored) && "text" in p && (p as { text: string }).text)
   const hasThinking = options.showThinking && parts.some((p) => p.type === "reasoning")
   const hasTools = options.showToolCalls && parts.some((p) => p.type === "tool")
-  const hasCompaction = parts.some((p) => p.type === "compaction")
+  const hasCompaction = parts.some((p) => p.type === "compaction") || ("summary" in info && info.summary === true)
   const hasError = "error" in info && Boolean(info.error)
   return hasText || hasThinking || hasTools || hasCompaction || hasError
 }
@@ -123,6 +124,10 @@ export const ChatMessage = memo(
   const { showThinking, showToolCalls, showTokens, showTimestamps } = useChatDisplay()
   const isUser = info.role === "user"
   const isAssistant = info.role === "assistant"
+  // Compaction summary messages have summary=true and/or agent="compaction" on the message info.
+  // CompactionPart may live on a different message (the pre-compaction marker), so we detect
+  // compaction from the message metadata, not the parts array.
+  const isCompaction = isAssistant && ("summary" in info && info.summary === true)
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
 
   const { textContent, inlineThinkingParts } = useMemo(() => {
@@ -165,10 +170,16 @@ export const ChatMessage = memo(
     [parts, inlineThinkingParts]
   )
 
-  const compactionParts = useMemo(
-    () => parts.filter((p) => p.type === "compaction"),
-    [parts]
-  )
+  const compactionTextContent = useMemo(() => {
+    if (!isCompaction) return ""
+    // Compaction summaries may have text parts marked ignored — extract from ALL text parts
+    return parts
+      .filter((p): p is TextPart => p.type === "text")
+      .map((p) => p.text)
+      .join("")
+      .replace(/<thinking>[\s\S]*?<\/thinking>\s*/g, "")
+      .trim()
+  }, [parts, isCompaction])
 
   // Throttle markdown re-parses during streaming (~200ms intervals)
   const throttledTextContent = useThrottledValue(textContent, THROTTLE_MS)
@@ -229,16 +240,33 @@ export const ChatMessage = memo(
               <MessageToolUse key={part.id} part={part} />
             ))}
 
-            {throttledTextContent && (
+            {isCompaction && compactionTextContent ? (
+              <div className="rounded-lg border border-dashed bg-muted/20">
+                <div className="flex items-center gap-2 px-3 py-2 text-sm">
+                  <Minimize2 className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="flex-1 text-xs font-medium text-muted-foreground">
+                    Context compacted
+                  </span>
+                </div>
+                <div className="border-t px-3 py-2">
+                  <div className="group/markdown relative">
+                    <CopyMarkdownButton content={compactionTextContent} />
+                    <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
+                      <MarkdownContent content={compactionTextContent} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : isCompaction ? (
+              <CompactionDivider />
+            ) : throttledTextContent ? (
               <div className="group/markdown relative">
                 <CopyMarkdownButton content={textContent} />
                 <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
                   <MarkdownContent content={throttledTextContent} />
                 </div>
               </div>
-            )}
-
-            {compactionParts.length > 0 && <CompactionDivider />}
+            ) : null}
 
             {hasError && (
               <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">

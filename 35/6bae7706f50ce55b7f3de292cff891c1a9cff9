@@ -1,0 +1,23 @@
+libs/principle-db-connector/src/lib/dataconnect/dataconnect.browser.ts
+  54a8ad42035ddfc5 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "356bae7706f50ce55b7f3de292cff891c1a9cff9",
+  "prompts": {
+    "54a8ad42035ddfc5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305e277d3ffezvZxIdXXzrF0Lm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,23 @@
+apps/dev-rig/cli/main.go
+  8199dcae83799a5c 3,5-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "566272ae6e83a4262bf08ed256b498ad200ccc70",
+  "prompts": {
+    "8199dcae83799a5c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_3054cae82ffeP97oAugzbwvuh7-1c4b8540-c2a7-4aa5-abb3-f67480f6ff07",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

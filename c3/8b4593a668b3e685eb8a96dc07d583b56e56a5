@@ -1,0 +1,23 @@
+libs/ng-interactions/src/lib/email/email.component.html
+  8f9164efa2bddf0e 111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "c38b4593a668b3e685eb8a96dc07d583b56e56a5",
+  "prompts": {
+    "8f9164efa2bddf0e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_300b00186ffedEfCeKn6bAHk3s",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

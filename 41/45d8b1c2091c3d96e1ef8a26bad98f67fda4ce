@@ -1,0 +1,41 @@
+libs/practice-migrations/src/index.ts
+  54a8ad42035ddfc5 18,25
+apps/tinker/src/app/scripts/practice-migrations/remove-duplicate-steps.ts
+  54a8ad42035ddfc5 3
+apps/tinker/src/app/scripts/practice-migrations/remove-duplicate-invoices.ts
+  54a8ad42035ddfc5 3
+libs/scss-principle/project.json
+  54a8ad42035ddfc5 8
+libs/scss-level-up/project.json
+  54a8ad42035ddfc5 8
+libs/practice-migrations/src/lib/translation-map/translation-map.browser.ts
+  54a8ad42035ddfc5 172-173,175-180
+apps/tinker/src/app/scripts/practice-migrations/remove-duplicate-appointments.ts
+  54a8ad42035ddfc5 3
+apps/tinker/src/app/scripts/remap-migrated-treatment-surfaces.ts
+  54a8ad42035ddfc5 24
+libs/scss-shared/project.json
+  54a8ad42035ddfc5 8
+libs/practice-migrations/src/lib/translation-map/translation-map.node.ts
+  54a8ad42035ddfc5 199-200,202-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "4145d8b1c2091c3d96e1ef8a26bad98f67fda4ce",
+  "prompts": {
+    "54a8ad42035ddfc5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305e277d3ffezvZxIdXXzrF0Lm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 57,
+      "total_deletions": 47,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    }
+  }
+}

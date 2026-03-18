@@ -1,0 +1,23 @@
+libs/ng-clinical-charting/src/lib/components/ai-notes/ai-notes-button/ai-notes-button.component.spec.ts
+  b646208db8807a1b 14,93-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "07578dd55c4ac276aeba0119795ca37842db8011",
+  "prompts": {
+    "b646208db8807a1b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_320608551ffelGiwnh10w1M7L3",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 1,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

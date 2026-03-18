@@ -1,0 +1,23 @@
+apps/tinker/src/app/scripts/cliniview-image-migration.ts
+  591c5b583688b417 1,3,5-8,15,17-18,21-27,29-33,40-44,46-47,49,51-52,54,57-58,60-63,65-66,68-71,74-78,82-203,205-210,212-218,221,223-341,343-344,346-347,349-361,363-368
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "9ef57c7bae44e31e86ec1ee901bf5e44842e7746",
+  "prompts": {
+    "591c5b583688b417": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_330804fe6ffegT2KV7u0rsF7n8",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 486,
+      "total_deletions": 65,
+      "accepted_lines": 427,
+      "overriden_lines": 9
+    }
+  }
+}

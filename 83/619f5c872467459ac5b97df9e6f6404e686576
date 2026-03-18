@@ -1,0 +1,51 @@
+infra/dev-rig/docs/laptop-setup-guide.md
+  7990505fedea2155 303
+infra/dev-rig/docs/cli-architecture.md
+  615005a967610e13 1253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "83619f5c872467459ac5b97df9e6f6404e686576",
+  "prompts": {
+    "615005a967610e13": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_33f923bbbffettnEHihmwR54Yj-1368f7c4-7248-490a-a3c2-72d2a5e579a8",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "7990505fedea2155": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_33f923bbbffettnEHihmwR54Yj-0293b310-4e40-41b4-9d8d-14ced0b43b6d",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "a4d1ea02cc21c421": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_33f932d7dffe3s3lyWGG20uEXD-7d919919-6408-47ab-afbc-ee9f9430fa5f",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 461,
+      "overriden_lines": 0
+    }
+  }
+}

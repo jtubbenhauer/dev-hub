@@ -1,0 +1,23 @@
+libs/principle-db-connector/src/lib/dataconnect/dist/esm/index.esm.d.ts
+  54a8ad42035ddfc5 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "9f1b200c668ed7aeafcc702f372f96de3be6553d",
+  "prompts": {
+    "54a8ad42035ddfc5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305e277d3ffezvZxIdXXzrF0Lm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,47 @@
+libs/practice-migrations/src/lib/d4w/destination/mappings/patient-statuses-to-xlsx.spec.ts
+  54a8ad42035ddfc5 1
+libs/practice-migrations/src/lib/exact/destination/entities/lib/exact-invoice-builder.spec.ts
+  54a8ad42035ddfc5 76,278-282,295,329,346,376
+libs/practice-migrations/src/lib/d4w/destination/entities/patient-clinical-chart.spec.ts
+  54a8ad42035ddfc5 68
+libs/practice-migrations/src/lib/d4w/destination/entities/patient-deposits.spec.ts
+  54a8ad42035ddfc5 67
+apps/principle-functions/src/app/http/automations/cloud-task-reschedule.offline.spec.ts
+  54a8ad42035ddfc5 26-27,43-44,49-50,90
+libs/practice-migrations/src/lib/d4w/destination/entities/patient-interactions.spec.ts
+  54a8ad42035ddfc5 68
+apps/principle-partners/src/app/app.component.ts
+  54a8ad42035ddfc5 66
+libs/practice-migrations/src/lib/d4w/destination/entities/patients.spec.ts
+  54a8ad42035ddfc5 65
+libs/practice-migrations/src/lib/d4w/destination/entities/patient-treatment-plans.spec.ts
+  54a8ad42035ddfc5 98,102,110,123,140,153,162,270,272,291
+libs/practice-migrations/src/lib/d4w/destination/entities/patient-appointments.spec.ts
+  54a8ad42035ddfc5 65
+libs/practice-migrations/src/lib/core-practice/destination/entities/patient-clinical-charts.spec.ts
+  54a8ad42035ddfc5 5
+libs/practice-migrations/src/lib/mappings/item-code-mapping-helpers.spec.ts
+  54a8ad42035ddfc5 15,24,41,58-60,77,95,111,118
+libs/practice-migrations/src/lib/core-practice/destination/mappings/media-categories-to-xlsx.spec.ts
+  54a8ad42035ddfc5 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "cc178467c54a1642b493d58840e017598ef4fc81",
+  "prompts": {
+    "54a8ad42035ddfc5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305e277d3ffezvZxIdXXzrF0Lm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 75,
+      "total_deletions": 147,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  }
+}

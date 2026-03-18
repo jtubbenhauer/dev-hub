@@ -1,0 +1,37 @@
+apps/backend-principle-bridge/src/app/integrations/sirona/lib/resolve-sql-host.spec.ts
+  c263bda3b4d838d0 1-35
+apps/backend-principle-bridge/src/app/integrations/sirona/lib/detect-sidexis-version.ts
+  c263bda3b4d838d0 1-9
+apps/backend-principle-bridge/src/app/integrations/sirona/lib/detect-sidexis-version.spec.ts
+  c263bda3b4d838d0 1-41
+apps/backend-principle-bridge/src/app/integrations/sirona/lib/sidexis-schema.ts
+  c263bda3b4d838d0 1-35
+apps/backend-principle-bridge/src/app/integrations/sirona/sidexis-db.ts
+  c263bda3b4d838d0 1-33,35-39,42-128,130-166
+apps/backend-principle-bridge/src/app/integrations/sirona/sidexis.ts
+  c263bda3b4d838d0 11,15,27,53-55,150,232-233,236-237,260-261,263,282-284,604-605,624,636-711
+apps/backend-principle-bridge/src/app/integrations/sirona/lib/resolve-sql-host.ts
+  c263bda3b4d838d0 1-6,8-11,14
+apps/backend-principle-bridge/src/app/integrations/sirona/sidexis-db.spec.ts
+  c263bda3b4d838d0 1-418
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "07e399270fcea774e2b11595e2db1aecc225ea55",
+  "prompts": {
+    "c263bda3b4d838d0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_33fe7bf99ffek9XX49MlXW1HUh",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 1150,
+      "total_deletions": 403,
+      "accepted_lines": 909,
+      "overriden_lines": 2
+    }
+  }
+}

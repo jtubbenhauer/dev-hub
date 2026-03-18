@@ -1,0 +1,29 @@
+apps/exact-extract/exact/cmd_export_csv.go
+  cf46db94eb43b80d 73-77,89-91,110-112,115,118,120-124,127,159-162,183-185
+apps/exact-extract/main.go
+  cf46db94eb43b80d 19-20
+apps/exact-extract/exact/parser.go
+  cf46db94eb43b80d 278-279
+apps/exact-extract/exact/btrieve.go
+  cf46db94eb43b80d 118-121,143,146,160,162
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "b160b7f1347fdbcfccc0546a1151d0c8d97dd5d2",
+  "prompts": {
+    "cf46db94eb43b80d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305b71ee0ffeLYqAqDncZHXl3x",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 42,
+      "total_deletions": 27,
+      "accepted_lines": 42,
+      "overriden_lines": 0
+    }
+  }
+}

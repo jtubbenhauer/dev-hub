@@ -1,0 +1,101 @@
+libs/ng-payments/src/lib/transactions/transaction-providers/transaction-extended-data-renderers.ts
+  3a0349011a6a07c4 4,15,67-74
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/commbank-smart-health.service.ts
+  3a0349011a6a07c4 1-121
+apps/principle-functions/src/app/lib/commbank-smart-health/commbank-smart-health-http-client.ts
+  3a0349011a6a07c4 1-347
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/select-commbank-smart-health-terminal/select-commbank-smart-health-terminal.component.ts
+  3a0349011a6a07c4 1-64
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/commbank-smart-health-extended-data/commbank-smart-health-extended-data.component.html
+  3a0349011a6a07c4 1-95
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/commbank-smart-health-claim-transaction-provider.service.ts
+  3a0349011a6a07c4 1-223
+libs/ng-payments/src/lib/transactions/transaction-providers/transaction-provider-options/transaction-provider-options.ts
+  3a0349011a6a07c4 12,93
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-commbank-smart-health-settings/practice-commbank-smart-health-settings.component.html
+  3a0349011a6a07c4 1-106
+libs/principle-core/interfaces/src/lib/transaction/commbank-smart-health/commbank-smart-health.spec.ts
+  3a0349011a6a07c4 1-281
+libs/principle-core/features/src/lib/commbank-smart-health.ts
+  3a0349011a6a07c4 1-9
+apps/principle-functions/src/environments/environment.ts
+  3a0349011a6a07c4 151-152,154
+libs/principle-core/interfaces/src/lib/transaction/transaction.ts
+  3a0349011a6a07c4 108-110,125,138
+libs/principle-core/features/src/index.ts
+  3a0349011a6a07c4 5
+apps/principle-functions/src/app/http/commbank-smart-health/commbank-smart-health-api.ts
+  3a0349011a6a07c4 1-201
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/select-commbank-smart-health-terminal/select-commbank-smart-health-terminal.component.scss
+  3a0349011a6a07c4 1-3
+apps/principle-functions/src/app/http/index.ts
+  3a0349011a6a07c4 7
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/commbank-smart-health-payment-transaction-provider.service.ts
+  3a0349011a6a07c4 1-205
+libs/ng-payments/src/lib/transactions/transaction-providers/transaction-providers.module.ts
+  3a0349011a6a07c4 46-51,67,88-91
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/select-commbank-smart-health-terminal/select-commbank-smart-health-terminal.service.ts
+  3a0349011a6a07c4 1-76
+libs/ng-payments/src/lib/transactions/transaction-providers/transaction-provider-options/commbank-smart-health-transaction-provider-options.ts
+  3a0349011a6a07c4 1-25
+libs/ng-payments/src/lib/transactions/transaction-providers/transaction-action-factory.service.ts
+  3a0349011a6a07c4 60-63,91-92,165-170,190-193
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/select-commbank-smart-health-terminal/select-commbank-smart-health-terminal.component.html
+  3a0349011a6a07c4 1-22
+libs/ng-principle/pages/src/lib/settings/practices/practices.module.ts
+  3a0349011a6a07c4 47,65
+libs/principle-core/src/index.ts
+  3a0349011a6a07c4 186
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/commbank-smart-health-extended-data/commbank-smart-health-extended-data.component.ts
+  3a0349011a6a07c4 1-125
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/actions/cancel-commbank-smart-health-claim-transaction.ts
+  3a0349011a6a07c4 1-68
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-commbank-smart-health-settings/practice-commbank-smart-health-settings.component.ts
+  3a0349011a6a07c4 1-229
+libs/principle-core/features/src/lib/features.ts
+  3a0349011a6a07c4 7,28
+libs/principle-core/src/lib/models/integrations/commbank-smart-health.ts
+  3a0349011a6a07c4 1-160
+libs/principle-core/interfaces/src/lib/practice/practice.ts
+  3a0349011a6a07c4 52,219,260-273
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/actions/refund-commbank-smart-health-payment-transaction.ts
+  3a0349011a6a07c4 1-65
+apps/principle-functions/src/environments/environment.prod.ts
+  3a0349011a6a07c4 152-155
+apps/principle-functions/src/app/http/commbank-smart-health/index.ts
+  3a0349011a6a07c4 1
+apps/principle-functions/src/environments/environment.staging.ts
+  3a0349011a6a07c4 151-154
+libs/principle-core/interfaces/src/index.ts
+  3a0349011a6a07c4 245
+libs/principle-core/src/lib/models/practice/practice.ts
+  3a0349011a6a07c4 12,537-557
+libs/principle-core/interfaces/src/lib/transaction/commbank-smart-health/commbank-smart-health.ts
+  3a0349011a6a07c4 1-395
+libs/ng-payments/src/lib/transactions/transaction-providers/commbank-smart-health/commbank-smart-health-claim-estimate-provider.service.ts
+  3a0349011a6a07c4 1-180
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-integrations.component.html
+  3a0349011a6a07c4 36-48
+apps/principle-functions/src/environments/ienvironment.ts
+  3a0349011a6a07c4 108-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "7a2a140e5a39df1199a8f96053ddbb185fc1c36f",
+  "prompts": {
+    "3a0349011a6a07c4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_32b61ed2cffeaf413sVYMEXru2",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 3709,
+      "total_deletions": 271,
+      "accepted_lines": 3439,
+      "overriden_lines": 0
+    }
+  }
+}

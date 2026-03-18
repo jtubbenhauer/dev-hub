@@ -1,0 +1,27 @@
+libs/principle-core/src/lib/scripts/practice-migration-organisation-importer.ts
+  54a8ad42035ddfc5 9-11,16-18
+libs/practice-migrations/src/lib/practice-works/destination/entities/lib/practice-works-invoice-builder.ts
+  54a8ad42035ddfc5 58
+libs/principle-core/src/lib/scripts/practice-migration-organisation-exporter.ts
+  54a8ad42035ddfc5 43-45,50-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "2fb406b21899ac2cccdef3dfabf648d9ed0d84a6",
+  "prompts": {
+    "54a8ad42035ddfc5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305e277d3ffezvZxIdXXzrF0Lm",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 23,
+      "total_deletions": 27,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}

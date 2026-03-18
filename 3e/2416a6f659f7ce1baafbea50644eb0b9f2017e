@@ -1,0 +1,50 @@
+libs/ng-practice-migrations/src/lib/components/migration-actions/general/generate-upload-code/generate-upload-code.component.html
+  ac93ccf7744d26d6 31-34,45-47,49,118
+libs/practice-migrations/src/lib/imaging/sidexis/destination/entities/sidexis-images.ts
+  d34488a1f4d92077 22-23,37,40,61,169-175,341-403
+apps/migration-toolkit/src/media/sidexis/sidexis-runner.ts
+  d34488a1f4d92077 7,41,49,53,62
+libs/ng-practice-migrations/src/lib/components/migration-actions/general/generate-upload-code/generate-upload-code.component.ts
+  ac93ccf7744d26d6 8,86,88-94,97
+apps/principle-functions/src/app/http/migration-upload/generate-upload-code.ts
+  ac93ccf7744d26d6 52-53,101-163,279-280
+apps/principle-functions/src/app/http/migration-upload/download-script.ts
+  d34488a1f4d92077 270,281
+apps/migration-toolkit/src/media/media-command.ts
+  d34488a1f4d92077 76
+libs/practice-migrations/src/lib/imaging/sidexis/destination/entities/sidexis-images.spec.ts
+  d34488a1f4d92077 1-263
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "3e2416a6f659f7ce1baafbea50644eb0b9f2017e",
+  "prompts": {
+    "ac93ccf7744d26d6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_325c44d71ffew5UOgWK1BSHohP",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 93,
+      "total_deletions": 15,
+      "accepted_lines": 88,
+      "overriden_lines": 0
+    },
+    "d34488a1f4d92077": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_32f164958ffeRQ4Z2NShgluaYl",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 373,
+      "total_deletions": 435,
+      "accepted_lines": 347,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,51 @@
+apps/dev-rig/docker/opencode/entrypoint.sh
+  2cf57916e2e6c58b 73
+  eb2c7bc2da2ca65a 42-45,69-72,91-93,95-96,99-103,105,107
+  40a97a5c53f057c7 74-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "a66b55454da12f221787e680873f275f9afd77a1",
+  "prompts": {
+    "2cf57916e2e6c58b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_301bb7603ffeBQvODbMfOgMZzt-14090d79-62a6-482f-9caa-69d3d19a41c7",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "40a97a5c53f057c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_301bb7603ffeBQvODbMfOgMZzt-08bbd798-e977-48b2-8e6d-dc83286eebb1",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 17,
+      "overriden_lines": 0
+    },
+    "eb2c7bc2da2ca65a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_301bb7603ffeBQvODbMfOgMZzt-b529d402-9682-4a19-8972-993fbcbb3187",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 20,
+      "overriden_lines": 0
+    }
+  }
+}

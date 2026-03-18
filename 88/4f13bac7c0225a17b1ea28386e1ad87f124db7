@@ -1,0 +1,23 @@
+libs/ng-clinical-charting/src/lib/components/treatment-steps-editor/treatment-steps-editor.service.spec.ts
+  387ab18ba10e127b 6,163-165,183-185,191-194,232-234,241-242,306-308,323-325,333-335,372-374,378-381
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "884f13bac7c0225a17b1ea28386e1ad87f124db7",
+  "prompts": {
+    "387ab18ba10e127b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_301f43e62ffe1BdNmhORCkRpGu",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 37,
+      "total_deletions": 3,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    }
+  }
+}

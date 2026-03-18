@@ -1,0 +1,79 @@
+apps/principle-e2e/src/integration/appointment-lifecycle/reschedule-cancel-history.spec.ts
+  37ccff32ff401e2c 34
+apps/principle-e2e/src/integration/manage-patient-account/lib/payment-e2e.ts
+  99368a6bb055aca1 107-114
+apps/principle-e2e/src/integration/patient-treatment-plans/lib/treatment-plan-e2e.ts
+  38b80c5b74e206d2 1-2,5-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "c824763adf8c0b21157a1f29217950210d3db9e5",
+  "prompts": {
+    "37ccff32ff401e2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-b435fbac-4a7b-46db-ab29-6056117ee0eb",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "38b80c5b74e206d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-0a653b87-b78c-4423-b6dc-d6c0ab34fb69",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 6,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "99368a6bb055aca1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_304a68379ffeHQRMxO7Y3i7gQf",
+        "model": "anthropic/claude-opus-4-6"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 0,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    },
+    "c0743689a6250d2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-8ec04fe1-d67d-4ea0-b7a5-8fd3bd61a9dd",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "c284d4de547c86c8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-c8481db6-8acd-4213-9438-c877d807c858",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 0,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1440,12 +1440,17 @@ describe("SSE connection management", () => {
     expect(useChatStore.getState().globalEventSource).not.toBeNull()
   })
 
-  it("connectGlobalSSE closes any existing globalEventSource before creating a new one", () => {
+  it("connectGlobalSSE closes old EventSource after new one opens (overlap strategy)", () => {
     useChatStore.getState().connectGlobalSSE(["ws-a"])
     const first = useChatStore.getState().globalEventSource!
     const closeSpy = vi.spyOn(first, "close")
 
     useChatStore.getState().connectGlobalSSE(["ws-a", "ws-b"])
+
+    expect(closeSpy).not.toHaveBeenCalled()
+
+    const second = useChatStore.getState().globalEventSource!
+    second.onopen?.(new Event("open"))
 
     expect(closeSpy).toHaveBeenCalled()
   })

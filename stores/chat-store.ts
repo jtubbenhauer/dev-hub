@@ -1166,16 +1166,40 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       return
     }
 
-    if (existing) {
-      existing.close()
+    if (workspaceIds.length === 0) {
+      if (existing) existing.close()
+      set({ globalEventSource: null, sseWorkspaceIds: [] })
+      return
     }
 
-    if (workspaceIds.length === 0) return
+    const pendingTimer = get().sseReconnectTimer
+    if (pendingTimer !== null) {
+      clearTimeout(pendingTimer)
+      set({ sseReconnectTimer: null })
+    }
+
+    // Overlap: both EventSources run concurrently (~100-500ms) until new one opens.
+    // Safe because handleEvent is idempotent — duplicate events are harmless.
+    const oldEventSource = existing
 
     const url = `/api/opencode/events?workspaceIds=${workspaceIds.join(",")}`
-    const eventSource = new EventSource(url)
+    const newEventSource = new EventSource(url)
 
-    eventSource.onopen = () => {
+    const safetyTimeout = oldEventSource
+      ? setTimeout(() => {
+          if (oldEventSource.readyState !== EventSource.CLOSED) {
+            console.warn("[chat] SSE overlap safety timeout — closing old connection")
+            oldEventSource.close()
+          }
+        }, 5000)
+      : null
+
+    newEventSource.onopen = () => {
+      if (oldEventSource && oldEventSource.readyState !== EventSource.CLOSED) {
+        oldEventSource.close()
+      }
+      if (safetyTimeout) clearTimeout(safetyTimeout)
+
       console.log(`[chat] Global SSE connected for ${workspaceIds.length} workspace(s)`)
       set({ sseReconnectAttempts: 0 })
 
@@ -1228,7 +1252,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
     }
 
-    eventSource.onmessage = (evt) => {
+    newEventSource.onmessage = (evt) => {
       try {
         const { workspaceId, event } = JSON.parse(evt.data) as {
           workspaceId: string
@@ -1240,8 +1264,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
     }
 
-    eventSource.onerror = () => {
-      eventSource.close()
+    newEventSource.onerror = () => {
+      newEventSource.close()
+      if (oldEventSource && oldEventSource.readyState !== EventSource.CLOSED) {
+        oldEventSource.close()
+      }
+      if (safetyTimeout) clearTimeout(safetyTimeout)
 
       const attempts = get().sseReconnectAttempts
       const MAX_RECONNECT_ATTEMPTS = 20
@@ -1264,7 +1292,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       set({ sseReconnectTimer: timer })
     }
 
-    set({ globalEventSource: eventSource, sseWorkspaceIds: workspaceIds })
+    set({ globalEventSource: newEventSource, sseWorkspaceIds: workspaceIds })
   },
 
   disconnectGlobalSSE: () => {

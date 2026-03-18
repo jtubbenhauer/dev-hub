@@ -17,6 +17,7 @@ import { FolderGit2, Globe, GitBranch } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Workspace } from "@/types"
 import type { AgentHealthStatus } from "@/hooks/use-git"
+import { getWorkspaceBehaviour } from "@/lib/workspaces/behaviour"
 
 function useAllWorkspaceActivities(workspaceIds: string[]): Record<string, WorkspaceActivity> {
   return useChatStore(
@@ -40,21 +41,45 @@ function useAllWorkspaceActivities(workspaceIds: string[]): Record<string, Works
   )
 }
 
-function useRemoteWorkspaceHealthStatuses(workspaces: Workspace[]): Record<string, AgentHealthStatus> {
+function useRemoteWorkspaceHealthStatuses(
+  workspaces: Workspace[],
+  activeWorkspaceId: string | null,
+): Record<string, AgentHealthStatus> {
   const remoteWorkspaces = workspaces.filter((w) => w.backend === "remote")
   const results = useQueries({
-    queries: remoteWorkspaces.map((w) => ({
-      queryKey: ["agent-health", w.id],
-      queryFn: async (): Promise<AgentHealthStatus> => {
-        const res = await fetch(`/api/workspaces/${w.id}/health`)
-        if (!res.ok) return "unreachable"
-        const data = (await res.json()) as { status?: string }
-        return data.status === "ok" ? "healthy" : "unreachable"
-      },
-      refetchInterval: 30_000,
-      staleTime: 25_000,
-      retry: false,
-    })),
+    queries: remoteWorkspaces.map((w) => {
+      const behaviour = getWorkspaceBehaviour(w)
+      const isActive = w.id === activeWorkspaceId
+      const interval = isActive
+        ? behaviour.activeHealthIntervalMs
+        : behaviour.inactiveHealthIntervalMs
+
+      // Inactive workspace that supports auto-suspend with no polling — report suspended
+      if (!isActive && behaviour.supportsAutoSuspend && interval === 0) {
+        return {
+          queryKey: ["agent-health", w.id],
+          queryFn: async (): Promise<AgentHealthStatus> => "suspended",
+          refetchInterval: false as const,
+          staleTime: 25_000,
+          retry: false,
+          enabled: false,
+        }
+      }
+
+      return {
+        queryKey: ["agent-health", w.id],
+        queryFn: async (): Promise<AgentHealthStatus> => {
+          const res = await fetch(`/api/workspaces/${w.id}/health`)
+          if (!res.ok) return "unreachable"
+          const data = (await res.json()) as { status?: string }
+          return data.status === "ok" ? "healthy" : "unreachable"
+        },
+        refetchInterval: interval || false,
+        staleTime: 25_000,
+        retry: false,
+        enabled: interval > 0 || isActive,
+      }
+    }),
   })
 
   const statuses: Record<string, AgentHealthStatus> = {}
@@ -64,19 +89,29 @@ function useRemoteWorkspaceHealthStatuses(workspaces: Workspace[]): Record<strin
   return statuses
 }
 
-function useWorkspaceBranches(workspaces: Workspace[]): Record<string, string> {
+function useWorkspaceBranches(
+  workspaces: Workspace[],
+  activeWorkspaceId: string | null,
+): Record<string, string> {
   const results = useQueries({
-    queries: workspaces.map((w) => ({
-      queryKey: ["git-status", w.id],
-      queryFn: async () => {
-        const params = new URLSearchParams({ action: "status" })
-        const res = await fetch(`/api/workspaces/${w.id}/git?${params}`)
-        if (!res.ok) return null
-        return res.json() as Promise<{ branch: string }>
-      },
-      staleTime: 30_000,
-      retry: false,
-    })),
+    queries: workspaces.map((w) => {
+      const isInactiveRemote = w.backend === "remote" && w.id !== activeWorkspaceId
+      const shouldDisable =
+        isInactiveRemote && !getWorkspaceBehaviour(w).branchPollWhenInactive
+
+      return {
+        queryKey: ["git-status", w.id],
+        queryFn: async () => {
+          const params = new URLSearchParams({ action: "status" })
+          const res = await fetch(`/api/workspaces/${w.id}/git?${params}`)
+          if (!res.ok) return null
+          return res.json() as Promise<{ branch: string }>
+        },
+        staleTime: 30_000,
+        retry: false,
+        enabled: !shouldDisable,
+      }
+    }),
   })
 
   const branches: Record<string, string> = {}
@@ -93,8 +128,8 @@ export function WorkspaceSwitcher() {
 
   const workspaceIds = workspaces.map((w) => w.id)
   const activities = useAllWorkspaceActivities(workspaceIds)
-  const healthStatuses = useRemoteWorkspaceHealthStatuses(workspaces)
-  const branches = useWorkspaceBranches(workspaces)
+  const healthStatuses = useRemoteWorkspaceHealthStatuses(workspaces, activeWorkspaceId)
+  const branches = useWorkspaceBranches(workspaces, activeWorkspaceId)
 
   if (isLoadingWorkspaces) {
     return <Skeleton className="h-9 w-36 sm:w-48" />

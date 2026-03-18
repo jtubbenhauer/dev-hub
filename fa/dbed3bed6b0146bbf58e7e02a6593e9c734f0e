@@ -1,0 +1,25 @@
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-verifone-settings/pair-verifone-terminal-dialog/pair-verifone-terminal-dialog.component.ts
+  70b84b11babaad00 5,35,46,50,77-78
+libs/ng-principle/pages/src/lib/settings/practices/practice-integrations/practice-verifone-settings/pair-verifone-terminal-dialog/pair-verifone-terminal-dialog.component.html
+  70b84b11babaad00 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "fadbed3bed6b0146bbf58e7e02a6593e9c734f0e",
+  "prompts": {
+    "70b84b11babaad00": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305da5656ffe7rT0DlVXsy60Fd",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 12,
+      "accepted_lines": 147,
+      "overriden_lines": 0
+    }
+  }
+}

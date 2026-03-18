@@ -1,0 +1,31 @@
+libs/ng-payments/src/lib/transactions/transaction-providers/verifone/verifone-card-purchase-transaction-provider.service.ts
+  70b84b11babaad00 420
+libs/principle-core/src/lib/models/integrations/verifone.ts
+  70b84b11babaad00 1,154
+libs/ng-payments/src/lib/transactions/transaction-providers/verifone/actions/void-verifone-transaction.ts
+  70b84b11babaad00 42,48,50
+libs/ng-payments/src/lib/transactions/transaction-providers/verifone/actions/print-receipt-verifone-transaction.ts
+  70b84b11babaad00 33,35,37
+libs/ng-payments/src/lib/transactions/transaction-providers/verifone/actions/approve-verifone-transaction.ts
+  70b84b11babaad00 40,46,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "74b0561cf3948cd25b3182c9239e2f76d750c96a",
+  "prompts": {
+    "70b84b11babaad00": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_305da5656ffe7rT0DlVXsy60Fd",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 26,
+      "total_deletions": 16,
+      "accepted_lines": 152,
+      "overriden_lines": 0
+    }
+  }
+}

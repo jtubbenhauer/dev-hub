@@ -1,0 +1,62 @@
+apps/ng-patient-scheduling-portal-e2e/src/e2e/components/booking-confirmation/booking-confirmation.component.cy.ts
+  646cac3a7dc29862 24,27,32,35-36,41,44-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "991910963535e0985d90e0871ddeeb0442d1054c",
+  "prompts": {
+    "646cac3a7dc29862": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-55cc2040-2902-4496-9462-a6bd69872cf4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    },
+    "69c949011e898118": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-4a3b20e3-c3ca-4977-9c3c-aca14e167b47",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    },
+    "7e5481f57472d154": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-a744ed58-61a1-41f3-8f4a-c70de90e1f21",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "bb6cad04437a2833": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_304a68379ffeHQRMxO7Y3i7gQf-0fe707fb-0429-4adf-953a-66faa2531cf3",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

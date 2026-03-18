@@ -52,6 +52,7 @@ import {
   Settings2,
   Pencil,
   CheckSquare,
+  TerminalSquare,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils"
@@ -278,6 +279,17 @@ export function WorkspaceCard({
             >
               <FolderOpen className="size-3" />
               Git
+            </Link>
+            <Link
+              href={`/terminal?workspace=${workspace.id}`}
+              onClick={(event) => {
+                event.stopPropagation()
+                setActiveWorkspaceId(workspace.id)
+              }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <TerminalSquare className="size-3" />
+              Terminal
             </Link>
           </div>
           <div className="flex items-center gap-1">

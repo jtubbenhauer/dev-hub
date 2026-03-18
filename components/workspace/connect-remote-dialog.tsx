@@ -23,6 +23,7 @@ export function ConnectRemoteDialog() {
   const [agentUrl, setAgentUrl] = useState("")
   const [opencodeUrl, setOpencodeUrl] = useState("")
   const [name, setName] = useState("")
+  const [shellCommand, setShellCommand] = useState("")
   const [healthStatus, setHealthStatus] = useState<HealthStatus>("idle")
 
   const isValidAgentUrl = useMemo(() => {
@@ -70,6 +71,7 @@ export function ConnectRemoteDialog() {
       agentUrl: string
       opencodeUrl: string
       name?: string
+      shellCommand?: string
     }) => {
       const res = await fetch("/api/workspaces", {
         method: "POST",
@@ -79,6 +81,7 @@ export function ConnectRemoteDialog() {
           agentUrl: data.agentUrl,
           opencodeUrl: data.opencodeUrl,
           name: data.name || undefined,
+          shellCommand: data.shellCommand || undefined,
         }),
       })
       if (!res.ok) {
@@ -104,6 +107,7 @@ export function ConnectRemoteDialog() {
       agentUrl,
       opencodeUrl,
       name: name || undefined,
+      shellCommand: shellCommand || undefined,
     })
   }
 
@@ -111,6 +115,7 @@ export function ConnectRemoteDialog() {
     setAgentUrl("")
     setOpencodeUrl("")
     setName("")
+    setShellCommand("")
     setHealthStatus("idle")
   }
 
@@ -207,6 +212,22 @@ export function ConnectRemoteDialog() {
                 if (e.key === "Enter" && canSubmit) handleConnect()
               }}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="shell-command" className="text-xs text-muted-foreground">
+              Shell command (optional)
+            </Label>
+            <Input
+              id="shell-command"
+              value={shellCommand}
+              onChange={(e) => setShellCommand(e.target.value)}
+              placeholder="docker exec -it container_name sh"
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Command to open a terminal session into this workspace.
+            </p>
           </div>
 
           {isValidAgentUrl && isValidOpencodeUrl && (

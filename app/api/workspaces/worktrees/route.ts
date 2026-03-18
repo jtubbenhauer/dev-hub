@@ -184,6 +184,7 @@ export async function POST(request: NextRequest) {
     opencodeUrl: null,
     agentUrl: null,
     providerMeta: null,
+    shellCommand: null,
     color: null,
     worktreeSymlinks: null,
     linkedTaskId: null,

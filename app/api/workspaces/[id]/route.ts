@@ -48,7 +48,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   const { id } = await params
   const body = await request.json()
-  const { name, quickCommands, agentUrl, opencodeUrl, provider, providerMeta, color } = body
+  const { name, quickCommands, agentUrl, opencodeUrl, provider, providerMeta, shellCommand, color } = body
 
   const updateData: Record<string, unknown> = {}
   if (name !== undefined) updateData.name = name
@@ -57,6 +57,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (opencodeUrl !== undefined) updateData.opencodeUrl = opencodeUrl
   if (provider !== undefined) updateData.provider = provider
   if (providerMeta !== undefined) updateData.providerMeta = providerMeta
+  if (shellCommand !== undefined) updateData.shellCommand = shellCommand
   if (color !== undefined) updateData.color = color
 
   if (Object.keys(updateData).length === 0) {

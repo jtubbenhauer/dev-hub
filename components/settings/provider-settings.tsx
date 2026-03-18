@@ -22,6 +22,7 @@ interface ProviderFormState {
   createCommand: string
   destroyCommand: string
   statusCommand: string
+  shellCommand: string
 }
 
 const EMPTY_FORM: ProviderFormState = {
@@ -30,6 +31,7 @@ const EMPTY_FORM: ProviderFormState = {
   createCommand: "{binary} create --repo {repo} --branch {branch}",
   destroyCommand: "{binary} destroy --id {id}",
   statusCommand: "{binary} status --id {id}",
+  shellCommand: "",
 }
 
 export function ProviderSettings() {
@@ -55,6 +57,7 @@ export function ProviderSettings() {
       createCommand: provider.commands.create,
       destroyCommand: provider.commands.destroy,
       statusCommand: provider.commands.status,
+      shellCommand: provider.commands.shell ?? "",
     })
     setTestStatus("idle")
     setDialogOpen(true)
@@ -84,6 +87,7 @@ export function ProviderSettings() {
       return
     }
 
+    const shellCmd = form.shellCommand.trim() || undefined
     const newProvider: WorkspaceProvider = {
       id: editingProviderId ?? crypto.randomUUID(),
       name: trimmedName,
@@ -92,6 +96,7 @@ export function ProviderSettings() {
         create: form.createCommand.trim() || EMPTY_FORM.createCommand,
         destroy: form.destroyCommand.trim() || EMPTY_FORM.destroyCommand,
         status: form.statusCommand.trim() || EMPTY_FORM.statusCommand,
+        ...(shellCmd ? { shell: shellCmd } : {}),
       },
     }
 
@@ -321,6 +326,22 @@ export function ProviderSettings() {
                   placeholder="{binary} status --id {id}"
                   className="font-mono text-xs h-8"
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="cmd-shell" className="text-xs">
+                  Shell (optional)
+                </Label>
+                <Input
+                  id="cmd-shell"
+                  value={form.shellCommand}
+                  onChange={(e) => updateField("shellCommand", e.target.value)}
+                  placeholder="{binary} exec --id {id} sh"
+                  className="font-mono text-xs h-8"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Command to open a terminal session. Leave blank to disable terminal access.
+                </p>
               </div>
             </div>
 

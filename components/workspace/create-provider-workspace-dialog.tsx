@@ -35,7 +35,7 @@ import {
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Terminal, Loader2, ChevronsUpDown, Check, Plus, GitBranch, Minus } from "lucide-react"
 import { toast } from "sonner"
-import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils"
+import { cn, WORKSPACE_PRESET_COLORS, sanitizeBranchName } from "@/lib/utils"
 import { pickNextColor } from "@/lib/workspace-color-utils"
 import { useWorkspaceProviders } from "@/hooks/use-settings"
 import { useProviderCreationStore } from "@/stores/provider-creation-store"
@@ -156,7 +156,7 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
       providerId,
       providerName: selectedProvider.name,
       repo: repo.trim(),
-      branch: branch.trim() || undefined,
+      branch: sanitizeBranchName(branch, "all") || undefined,
       name: name.trim() || undefined,
       context: context.trim() || undefined,
       color: selectedColor ?? undefined,
@@ -371,7 +371,7 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                       <CommandInput
                         placeholder="Search or type a new branch..."
                         value={branchSearch}
-                        onValueChange={setBranchSearch}
+                        onValueChange={(v) => setBranchSearch(sanitizeBranchName(v))}
                       />
                       <CommandList>
                         {filteredBranches.length > 0 && (

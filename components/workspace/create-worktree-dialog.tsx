@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react"
 import { useCreateWorktree, useGitBranches, useWorktreeSymlinks } from "@/hooks/use-git"
+import { sanitizeBranchName } from "@/lib/utils"
 import type { Workspace, GitBranch as GitBranchType } from "@/types"
 
 const SYMLINK_SUGGESTIONS = [".npmrc", ".env", ".env.local", ".opencode/plans"]
@@ -107,7 +108,7 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
     createWorktree.mutate(
       {
         parentWorkspaceId: selectedRepo.id,
-        branch: branchName,
+        branch: sanitizeBranchName(branchName, "all"),
         newBranch: isNewBranch,
         startPoint: startPoint || undefined,
         name: customName || undefined,
@@ -322,7 +323,8 @@ function WorktreeConfigForm({
           <Input
             id="branch-name"
             value={branchName}
-            onChange={(e) => setBranchName(e.target.value)}
+            onChange={(e) => setBranchName(sanitizeBranchName(e.target.value))}
+            onBlur={() => setBranchName(sanitizeBranchName(branchName, "all"))}
             placeholder="feature/my-feature"
             className="font-mono text-sm"
           />

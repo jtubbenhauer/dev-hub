@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { GitFork, FolderGit2, Loader2, Plus, Link, X } from "lucide-react"
 import { useCreateWorktree, useWorktreeSymlinks } from "@/hooks/use-git"
+import { sanitizeBranchName } from "@/lib/utils"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { usePendingChatStore } from "@/stores/pending-chat-store"
 import type { ClickUpTask, Workspace, LinkedTaskMeta } from "@/types"
@@ -48,13 +49,7 @@ function formatPlanPrompt(task: ClickUpTask): string {
 }
 
 function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60)
+  return sanitizeBranchName(text).slice(0, 60)
 }
 
 export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDialogProps) {
@@ -119,7 +114,7 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
     createWorktree.mutate(
       {
         parentWorkspaceId: selectedRepo.id,
-        branch: branchName,
+        branch: sanitizeBranchName(branchName, "all"),
         newBranch: true,
         name: customName || undefined,
         symlinkPaths: symlinkPaths.length > 0 ? symlinkPaths : undefined,
@@ -249,7 +244,8 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
             <Input
               id="task-branch-name"
               value={branchName}
-              onChange={(e) => setBranchName(e.target.value)}
+              onChange={(e) => setBranchName(sanitizeBranchName(e.target.value))}
+              onBlur={() => setBranchName((v) => sanitizeBranchName(v, "all"))}
               placeholder={defaultBranch}
               className="font-mono text-sm"
             />

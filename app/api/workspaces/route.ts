@@ -196,6 +196,8 @@ async function createRemoteWorkspace(
     ? body.providerMeta
     : null
 
+  const shellCommand = typeof body.shellCommand === "string" ? body.shellCommand : null
+
   // For remote workspaces, path is informational (the container's workspace path)
   const workspacePath = typeof body.path === "string" ? body.path : "/workspace"
   const workspaceName = name || "Remote Workspace"
@@ -215,6 +217,7 @@ async function createRemoteWorkspace(
     opencodeUrl,
     agentUrl,
     providerMeta,
+    shellCommand,
     color: autoColor,
     createdAt: new Date(),
     lastAccessedAt: new Date(),

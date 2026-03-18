@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm"
 import { spawn } from "node:child_process"
 import crypto from "node:crypto"
 import type { WorkspaceProvider, WorkspaceProviderCreateResult } from "@/types"
+import { DEFAULT_PROVIDER_BEHAVIOUR } from "@/types"
 
 function isWorkspaceProvider(value: unknown): value is WorkspaceProvider {
   if (!value || typeof value !== "object") return false
@@ -306,6 +307,7 @@ async function handlePostSpawn({ provider, derivedName, id, repo, branch, userId
       providerWorkspaceId: createResult.id,
       repo,
       branch,
+      behaviour: provider.behaviour ?? DEFAULT_PROVIDER_BEHAVIOUR,
       ...createResult.metadata,
     },
     color,

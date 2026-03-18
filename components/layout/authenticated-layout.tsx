@@ -16,6 +16,7 @@ import { useDefaultWorkspaceSetting } from "@/hooks/use-settings"
 import type { Workspace } from "@/types"
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible"
 import { cn } from "@/lib/utils"
+import { shouldSSEConnect } from "@/lib/workspaces/behaviour"
 
 export function AuthenticatedLayout({
   children,
@@ -57,7 +58,7 @@ export function AuthenticatedLayout({
         : data[0].id
       setActiveWorkspaceId(preferred)
     }
-    connectGlobalSSE(data.map((w) => w.id))
+    connectGlobalSSE(data.filter((w) => shouldSSEConnect(w, activeWorkspaceId)).map((w) => w.id))
   }, [data, activeWorkspaceId, defaultWorkspaceId, setWorkspaces, setActiveWorkspaceId, connectGlobalSSE])
 
   useEffect(() => {

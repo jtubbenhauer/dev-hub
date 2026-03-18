@@ -147,3 +147,15 @@ export const fileComments = sqliteTable("file_comments", {
     .notNull()
     .default(sql`(unixepoch())`),
 })
+
+export const cachedSessions = sqliteTable("cached_sessions", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  userId: text("user_id").notNull(),
+  title: text("title"),
+  parentId: text("parent_id"),
+  status: text("status"),
+  createdAt: integer("created_at"),
+  updatedAt: integer("updated_at"),
+  cachedAt: integer("cached_at").notNull(),
+})

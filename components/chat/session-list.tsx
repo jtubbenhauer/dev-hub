@@ -611,7 +611,7 @@ function SessionItem({
             variant="ghost"
             className={cn(
               "shrink-0 transition-opacity",
-              isPinned ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-100"
+              "opacity-0 group-hover:opacity-100"
             )}
             onClick={(event) => {
               event.stopPropagation()

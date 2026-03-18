@@ -377,13 +377,35 @@ export function ChatInterface() {
     return !s.workspaceStates[wsId]?.sessionsLoaded
   });
 
+  const childSessionIds = useMemo(() => {
+    if (!activeSessionId) return new Set<string>()
+    const childrenOf = new Map<string, string[]>()
+    for (const s of Object.values(sessions)) {
+      if (s.parentID) {
+        const siblings = childrenOf.get(s.parentID) ?? []
+        siblings.push(s.id)
+        childrenOf.set(s.parentID, siblings)
+      }
+    }
+    const descendants = new Set<string>()
+    const queue = [...(childrenOf.get(activeSessionId) ?? [])]
+    while (queue.length > 0) {
+      const id = queue.shift()!
+      if (!descendants.has(id)) {
+        descendants.add(id)
+        queue.push(...(childrenOf.get(id) ?? []))
+      }
+    }
+    return descendants
+  }, [sessions, activeSessionId])
+
   const activePermissions = useMemo(
-    () => allPermissions.filter((p) => p.sessionID === activeSessionId),
-    [allPermissions, activeSessionId],
+    () => allPermissions.filter((p) => p.sessionID === activeSessionId || childSessionIds.has(p.sessionID)),
+    [allPermissions, activeSessionId, childSessionIds],
   );
   const activeQuestions = useMemo(
-    () => allQuestions.filter((q) => q.sessionID === activeSessionId),
-    [allQuestions, activeSessionId],
+    () => allQuestions.filter((q) => q.sessionID === activeSessionId || childSessionIds.has(q.sessionID)),
+    [allQuestions, activeSessionId, childSessionIds],
   );
 
   // Sync workspace from global workspace store
@@ -1471,9 +1493,9 @@ export function ChatInterface() {
                 key={permission.id}
                 permission={permission}
                 onRespond={(response) => {
-                  if (!activeSessionId || !activeWorkspaceId) return;
+                  if (!activeWorkspaceId) return;
                   respondToPermission(
-                    activeSessionId,
+                    permission.sessionID,
                     permission.id,
                     response,
                     activeWorkspaceId,

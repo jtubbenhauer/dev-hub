@@ -1,0 +1,53 @@
+apps/principle-e2e/src/support/commands.ts
+  5d420ab0345bde13 23
+apps/principle-e2e/src/integration/schedule-an-appointment/lib/scheduling-e2e.ts
+  450a3ea92f1f666d 145,147-150
+apps/principle-e2e/src/integration/appointment-lifecycle/lib/appointment-lifecycle-e2e.ts
+  6b72fc988688412f 36-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "1ca00c4b57532777f5baef06b30b245b2b94fc54",
+  "prompts": {
+    "450a3ea92f1f666d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_30252ed9cffeAsM5EjyDFDvvK3-2e1c7b5f-1a53-4961-952a-688e9247464a",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "5d420ab0345bde13": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_30252ed9cffeAsM5EjyDFDvvK3-65ebd777-e019-4bf0-8a79-c5375b00e57b",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "6b72fc988688412f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_30252ed9cffeAsM5EjyDFDvvK3-cce782ea-753c-449e-a887-8e37ffa4b01a",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -14,6 +14,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "global:file-picker", label: "Open file picker", page: "global" },
   { id: "global:session-picker", label: "Open session picker", page: "global" },
   { id: "global:switch-workspace", label: "Open workspace switcher", page: "global" },
+  { id: "global:task-picker", label: "Open task picker", page: "global" },
 
   // Panel navigation (only active when panel-navigation setting is on)
   { id: "panel:focus-left", label: "Focus panel left", page: "global" },
@@ -66,6 +67,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "global:file-picker": "f",
   "global:session-picker": "e",
   "global:switch-workspace": "w",
+  "global:task-picker": "t",
 
   // Panel navigation
   "panel:focus-left": "h",

@@ -131,6 +131,21 @@ export function TasksPage() {
     restoredTaskRef.current = true
   }, [tasks, selectedTask])
 
+  useEffect(() => {
+    const handleSelectTaskEvent = (event: Event) => {
+      const customEvent = event as CustomEvent<{ taskId: string; task: ClickUpTask }>
+      setSelectedTask(customEvent.detail.task)
+      try {
+        localStorage.setItem("dev-hub:tasks-selected-task-id", customEvent.detail.taskId)
+      } catch {}
+    }
+
+    window.addEventListener("devhub:select-task", handleSelectTaskEvent)
+    return () => {
+      window.removeEventListener("devhub:select-task", handleSelectTaskEvent)
+    }
+  }, [])
+
   function handleSearchChange(query: string) {
     setSearchQuery(query)
     try { localStorage.setItem("dev-hub:tasks-search", query) } catch {}

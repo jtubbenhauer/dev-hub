@@ -192,6 +192,12 @@ export function TaskPickerDialog() {
   const handleSelectTask = useCallback(
     (task: ClickUpTask) => {
       localStorage.setItem("dev-hub:tasks-selected-task-id", task.id)
+      localStorage.setItem("dev-hub:tasks-pending-context", JSON.stringify({
+        listId: task.list.id,
+        listName: task.list.name,
+        folderId: task.folder.id,
+        spaceId: task.space.id,
+      }))
       window.dispatchEvent(
         new CustomEvent("devhub:select-task", { detail: { taskId: task.id, task } })
       )

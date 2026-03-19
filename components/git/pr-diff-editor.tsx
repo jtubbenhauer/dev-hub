@@ -541,7 +541,7 @@ const CMPrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
       )
     }
 
-    const fileName = fileContent.path.split("/").pop() ?? fileContent.path
+    const fileName = fileContent.path
     const activeCommentThreadComments =
       activeCommentLine !== null ? (commentsByLine.get(activeCommentLine) ?? []) : []
     const existingCommentLines = Array.from(commentsByLine.keys())

@@ -361,7 +361,7 @@ export const MonacoPrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorPro
       )
     }
 
-    const fileName = fileContent.path.split("/").pop() ?? fileContent.path
+    const fileName = fileContent.path
     const activeCommentThreadComments =
       activeCommentLine !== null
         ? (commentsByLine.get(activeCommentLine) ?? [])

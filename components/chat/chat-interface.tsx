@@ -10,6 +10,7 @@ import type { PromptInputHandle } from "@/components/chat/prompt-input";
 import { PromptInput } from "@/components/chat/prompt-input";
 import { SessionList } from "@/components/chat/session-list";
 import { TaskProgressPanel } from "@/components/chat/task-progress";
+import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { VariantSelector } from "@/components/chat/variant-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -263,8 +264,16 @@ export function ChatInterface() {
       const bound = agentModelBindings[selectedAgent];
       if (bound) setSelectedModel(bound);
     }
-    setSelectedVariant(agent?.variant ?? null);
-  }, [selectedAgent, primaryAgents, agentModelBindings]);
+    // Only set the agent's default variant if it's in the model's available variants.
+    // The agent config may advertise a variant name (e.g. "high") that doesn't exist
+    // as a key in the model's variants map, which would cause an API error.
+    const agentVariant = agent?.variant ?? null;
+    if (agentVariant && availableVariants.length > 0 && !availableVariants.includes(agentVariant)) {
+      setSelectedVariant(null);
+    } else {
+      setSelectedVariant(agentVariant);
+    }
+  }, [selectedAgent, primaryAgents, agentModelBindings, availableVariants]);
   const {
     activeSessionId,
     streamingError,
@@ -988,7 +997,7 @@ export function ChatInterface() {
       },
       {
         id: "chat:toggle-task-panel",
-        label: isTaskPanelOpen ? "Hide Task Progress" : "Show Task Progress",
+        label: isTaskPanelOpen ? "Hide Side Panel" : "Show Side Panel",
         group: "Chat",
         icon: ListTodo,
         onSelect: () => setIsTaskPanelOpenRef.current((prev) => {
@@ -1077,7 +1086,7 @@ export function ChatInterface() {
         {
           action: {
             id: "chat:toggle-tasks",
-            label: "Toggle task progress",
+            label: "Toggle side panel",
             page: "chat" as const,
           },
           handler: () => setIsTaskPanelOpenRef.current((prev) => {
@@ -1165,7 +1174,7 @@ export function ChatInterface() {
   const tasksPanel = usePanelZone("chat-tasks", {
     neighbors: { left: "chat-messages" },
     focusRef: taskPanelFocusRef,
-    isVisible: isTaskPanelOpen && activeTodos.length > 0 && !isMobile,
+    isVisible: isTaskPanelOpen && !isMobile,
   });
 
   // Tab / Shift+Tab cycles through agents
@@ -1665,7 +1674,7 @@ export function ChatInterface() {
       </div>
       </ChatDisplayContext.Provider>
 
-      {isTaskPanelOpen && activeTodos.length > 0 && (
+      {isTaskPanelOpen && (
         <>
           <div
             className="hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors md:flex"
@@ -1684,7 +1693,9 @@ export function ChatInterface() {
           >
             {tasksPanel.Indicator}
             <div className="flex items-center justify-between border-b px-3 py-2">
-              <span className="text-xs font-medium text-muted-foreground">Task Progress</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {activeTodos.length > 0 ? "Task Progress" : "Side Panel"}
+              </span>
               <Button
                 size="icon-xs"
                 variant="ghost"
@@ -1696,8 +1707,16 @@ export function ChatInterface() {
                 <X className="size-3" />
               </Button>
             </div>
-            <div className="p-3">
-              <TaskProgressPanel todos={activeTodos} />
+            {activeTodos.length > 0 && (
+              <div className="p-3">
+                <TaskProgressPanel todos={activeTodos} />
+              </div>
+            )}
+            <div className={activeTodos.length > 0 ? "border-t px-3 py-2" : "px-3 py-2"}>
+              <span className="text-xs font-medium text-muted-foreground">MCP Servers</span>
+            </div>
+            <div className="px-3 pb-3">
+              <McpStatusPanel />
             </div>
           </div>
         </>

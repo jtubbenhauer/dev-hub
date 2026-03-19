@@ -264,9 +264,7 @@ export function ChatInterface() {
       const bound = agentModelBindings[selectedAgent];
       if (bound) setSelectedModel(bound);
     }
-    // Only set the agent's default variant if it's in the model's available variants.
-    // The agent config may advertise a variant name (e.g. "high") that doesn't exist
-    // as a key in the model's variants map, which would cause an API error.
+    // Agent config can advertise a variant (e.g. "high") not in the model's variant map → API error
     const agentVariant = agent?.variant ?? null;
     if (agentVariant && availableVariants.length > 0 && !availableVariants.includes(agentVariant)) {
       setSelectedVariant(null);
@@ -274,6 +272,13 @@ export function ChatInterface() {
       setSelectedVariant(agentVariant);
     }
   }, [selectedAgent, primaryAgents, agentModelBindings, availableVariants]);
+
+  useEffect(() => {
+    if (selectedVariant && availableVariants.length > 0 && !availableVariants.includes(selectedVariant)) {
+      setSelectedVariant(null);
+    }
+  }, [availableVariants, selectedVariant]);
+
   const {
     activeSessionId,
     streamingError,

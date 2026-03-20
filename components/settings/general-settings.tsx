@@ -22,10 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { useEditorStore } from "@/stores/editor-store";
 import {
-  useVimModeSetting,
   useFontSizeSetting,
   useMobileFontSizeSetting,
   useTabSizeSetting,
@@ -137,30 +134,21 @@ function AppearanceSettingsCard() {
 }
 
 function EditorSettingsCard() {
-  const { isVimMode, isLoading: isLoadingVim } = useVimModeSetting();
   const { fontSize, isLoading: isLoadingFont } = useFontSizeSetting();
   const { mobileFontSize, isLoading: isLoadingMobileFont } =
     useMobileFontSizeSetting();
   const { tabSize, isLoading: isLoadingTab } = useTabSizeSetting();
   const { editorType, isLoading: isLoadingEditorType } = useEditorTypeSetting();
   const { nvimAppName, isLoading: isLoadingNvim } = useNvimAppNameSetting();
-  const setVimMode = useEditorStore((s) => s.setVimMode);
   const mutation = useSettingsMutation();
   const [customNvimAppName, setCustomNvimAppName] = useState("");
 
   const isLoading =
-    isLoadingVim ||
     isLoadingFont ||
     isLoadingMobileFont ||
     isLoadingTab ||
     isLoadingEditorType ||
     isLoadingNvim;
-
-  useEffect(() => {
-    if (!isLoadingVim) {
-      setVimMode(isVimMode);
-    }
-  }, [isVimMode, isLoadingVim, setVimMode]);
 
   useEffect(() => {
     if (
@@ -175,7 +163,7 @@ function EditorSettingsCard() {
   const editorTypeLabel = (type: EditorType): string => {
     if (type === "monaco") return "Monaco (VS Code)";
     if (type === "neovim") return "Neovim (terminal)";
-    return "CodeMirror";
+    return type;
   };
 
   const handleEditorTypeChange = (value: string) => {
@@ -185,17 +173,6 @@ function EditorSettingsCard() {
       {
         onSuccess: () =>
           toast.success(`Editor set to ${editorTypeLabel(next)}`),
-      },
-    );
-  };
-
-  const handleVimToggle = (checked: boolean) => {
-    setVimMode(checked);
-    mutation.mutate(
-      { key: SETTINGS_KEYS.VIM_MODE, value: checked },
-      {
-        onSuccess: () =>
-          toast.success(checked ? "Vim mode enabled" : "Vim mode disabled"),
       },
     );
   };
@@ -271,7 +248,7 @@ function EditorSettingsCard() {
           <div className="space-y-0.5">
             <Label htmlFor="editor-type">Editor engine</Label>
             <p className="text-xs text-muted-foreground">
-              CodeMirror, Monaco (VS Code), or Neovim (terminal PTY)
+              Monaco (VS Code) or Neovim (terminal PTY)
             </p>
           </div>
           <Select
@@ -351,21 +328,6 @@ function EditorSettingsCard() {
             )}
           </div>
         )}
-
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="vim-mode">Vim mode</Label>
-            <p className="text-xs text-muted-foreground">
-              Enable Vim keybindings in the code editor
-            </p>
-          </div>
-          <Switch
-            id="vim-mode"
-            checked={isVimMode}
-            onCheckedChange={handleVimToggle}
-            disabled={mutation.isPending}
-          />
-        </div>
 
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">

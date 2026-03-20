@@ -18,7 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+import { cn, isEditorElement } from "@/lib/utils"
 import { usePanelNavigationSetting } from "@/hooks/use-settings"
 import type { GitFileStatus } from "@/types"
 
@@ -119,7 +119,7 @@ export function FileStatusList({
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.closest(".cm-editor"))
+        (e.target instanceof HTMLElement && isEditorElement(e.target))
       ) {
         return
       }

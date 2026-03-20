@@ -24,7 +24,7 @@ This repo is fully vibe-coded. Multiple people (and agents) push directly to `ma
 - **Testing:** Vitest 4 + Testing Library (jsdom environment)
 - **Linting:** ESLint 9 flat config (no Prettier, no Biome)
 - **Package Manager:** pnpm (workspace monorepo)
-- **Editor Integration:** CodeMirror 6
+- **Editor Integration:** Monaco Editor, Neovim (via node-pty/xterm)
 
 ## Project Structure
 
@@ -43,7 +43,7 @@ components/             # React components
   git/                  # Git feature components (pr-panel, etc.)
   workspace/            # Workspace feature components
   dashboard/            # Dashboard components
-  editor/               # CodeMirror editor components
+  editor/               # Editor components (Monaco, Neovim, shared UI)
   ...
 hooks/                  # TanStack Query hooks (use-git.ts, use-github.ts, etc.)
 stores/                 # Zustand stores (chat-store.ts, workspace-store.ts, etc.)
@@ -203,4 +203,4 @@ API routes live in `app/api/` and follow Next.js App Router conventions:
 3. **DB path:** Configured via `DB_PATH` env var, defaults to `./dev-hub.db`.
 4. **Worktree types:** `WorkspaceRow` is inferred from the schema (`typeof workspaces.$inferSelect`), so adding columns to the schema auto-propagates to all typed references.
 5. **Fresh DB:** If starting from scratch, `pnpm db:push` creates all tables. The auto-migration in `instrumentation.ts` handles journal seeding. After that, never use `db:push` again — use `db:generate` + restart.
-6. **Dual editor engines:** The diff/code editor has two implementations — CodeMirror (`pr-diff-editor.tsx`, `diff-editor.tsx`) and Monaco (`monaco-pr-diff-editor.tsx`, `monaco-diff-editor.tsx`). A user setting (`editorType`) controls which one renders. Any change to editor UI (toolbar, headers, features) must be applied to **both** implementations.
+6. **Dual editor engines:** The diff/code editor supports Monaco and Neovim. A user setting (`editorType`) controls which one renders. Monaco is the default. Any change to editor UI (toolbar, headers, features) must be applied to both Monaco and Neovim implementations where applicable.

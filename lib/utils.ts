@@ -19,6 +19,11 @@ export function sanitizeBranchName(input: string, strip: "all" | "leading" = "le
   return result
 }
 
+export function isEditorElement(el: Element | null): boolean {
+  if (!el) return false
+  return el.closest(".monaco-editor, .monaco-diff-editor, .xterm") !== null
+}
+
 export const WORKSPACE_PRESET_COLORS = [
   "#ef4444", "#f97316", "#eab308", "#22c55e",
   "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",

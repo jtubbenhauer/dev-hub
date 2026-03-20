@@ -12,7 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { VimToggle } from "@/components/editor/vim-toggle"
 import type { PlanFile } from "@/app/api/files/plans/route"
 
 interface PlanPanelProps {
@@ -237,8 +236,6 @@ export function PlanPanel({
               title="Unsaved changes"
             />
           )}
-
-          <VimToggle />
 
           <Button
             size="icon-xs"

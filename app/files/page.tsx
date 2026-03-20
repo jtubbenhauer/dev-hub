@@ -7,7 +7,6 @@ import { FileTree } from "@/components/editor/file-tree"
 import { OpenEditors } from "@/components/editor/open-editors"
 import { FileTabs } from "@/components/editor/file-tabs"
 import { EditorSwitcher } from "@/components/editor/editor-switcher"
-import { VimToggle } from "@/components/editor/vim-toggle"
 import { useEditorStore } from "@/stores/editor-store"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
@@ -375,8 +374,6 @@ function FilesContent() {
                 <span className="hidden md:inline">Save</span>
               </Button>
             )}
-
-            <VimToggle />
           </div>
 
           {/* File tabs */}

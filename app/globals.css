@@ -456,17 +456,6 @@ pre code.hljs {
   content: none;
 }
 
-/* Kill strikethrough on <del> elements inside CodeMirror merge views.
-   Covers: InlineDeletion widgets, deletionWidget block lines, and any nested children.
-   High-specificity selectors needed because @fsegurai theme uses !important on del. */
-.cm-editor del,
-.cm-editor del *,
-.cm-editor .cm-deletedLine,
-.cm-editor .cm-deletedChunk del,
-.cm-editor .cm-deletedChunk .cm-deletedLine {
-  text-decoration: none !important;
-}
-
 /* Radix ScrollArea viewport injects an inner div with `display: table; min-width: 100%`.
    Table layout uses content intrinsic width as the minimum, preventing shrink below that
    width when the browser window narrows (the ~830px mobile overflow bug in chat).

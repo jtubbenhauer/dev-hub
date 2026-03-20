@@ -505,6 +505,7 @@ export const MonacoReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorPro
               lineHeight: Math.round(effectiveFontSize * 1.5),
               fontFamily: MONACO_FONT_FAMILY,
               fontLigatures: false,
+              wordWrap: "on",
               renderSideBySide: diffViewMode === "side-by-side",
               hideUnchangedRegions: { enabled: true },
               renderIndicators: true,

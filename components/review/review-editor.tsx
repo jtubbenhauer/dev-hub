@@ -277,6 +277,7 @@ const CMReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(functio
           },
         }),
         EditorState.tabSize.of(tabSize),
+        EditorView.lineWrapping,
         diffColorTheme,
       ]
 

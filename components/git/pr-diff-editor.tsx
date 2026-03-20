@@ -390,6 +390,7 @@ const CMPrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorProps>(
             },
           }),
           EditorState.tabSize.of(tabSize),
+          EditorView.lineWrapping,
           diffColourOverrides,
         ]
 

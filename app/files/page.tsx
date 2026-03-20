@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout"
 import { FileTree } from "@/components/editor/file-tree"
+import { OpenEditors } from "@/components/editor/open-editors"
 import { FileTabs } from "@/components/editor/file-tabs"
 import { EditorSwitcher } from "@/components/editor/editor-switcher"
 import { VimToggle } from "@/components/editor/vim-toggle"
@@ -269,6 +270,7 @@ function FilesContent() {
                 <SheetTitle className="text-sm">Files</SheetTitle>
               </SheetHeader>
               <div className="h-[calc(100%-41px)]">
+                <OpenEditors />
                 <FileTree />
               </div>
             </SheetContent>
@@ -300,6 +302,7 @@ function FilesContent() {
                 <PanelLeftClose className="h-3.5 w-3.5" />
               </Button>
             </div>
+            <OpenEditors />
             <FileTree />
           </div>
         )}

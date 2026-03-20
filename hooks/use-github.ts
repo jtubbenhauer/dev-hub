@@ -210,12 +210,9 @@ async function fetchFileContentAtRef(
       `repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${ref}`
     )
     if (data.encoding === "base64") {
-      // atob works in browser; in Node edge runtime use Buffer
-      try {
-        return atob(data.content.replace(/\n/g, ""))
-      } catch {
-        return Buffer.from(data.content.replace(/\n/g, ""), "base64").toString("utf-8")
-      }
+      const raw = data.content.replace(/\n/g, "")
+      const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
+      return new TextDecoder("utf-8").decode(bytes)
     }
     return data.content
   } catch (err) {

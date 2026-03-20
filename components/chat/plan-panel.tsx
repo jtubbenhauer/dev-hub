@@ -295,6 +295,7 @@ export function PlanPanel({
             onSave={handleSave}
             workspaceId={workspaceId}
             filePath={activePlanPath ?? undefined}
+            autoFocus
           />
         )}
       </div>

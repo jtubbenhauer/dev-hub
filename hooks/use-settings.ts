@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
-import { useMemo } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-import type { LeaderBindingsMap } from "@/types/leader-key"
-import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults"
-import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds"
-import type { WorkspaceProvider } from "@/types"
+import { useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import type { LeaderBindingsMap } from "@/types/leader-key";
+import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults";
+import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds";
+import type { WorkspaceProvider } from "@/types";
 
 interface SelectedModel {
-  providerID: string
-  modelID: string
+  providerID: string;
+  modelID: string;
 }
 
 // Settings key constants
@@ -42,65 +42,123 @@ export const SETTINGS_KEYS = {
   SOUND_ERRORS_ENABLED: "sound-errors-enabled",
   SOUND_ERRORS_ID: "sound-errors-id",
   EDITOR_TYPE: "editor-type",
+  NVIM_APPNAME: "nvim-appname",
   AUTO_COLOR_WORKSPACES: "auto-color-workspaces",
   PANEL_NAVIGATION: "panel-navigation",
   TERMINAL_SCROLLBACK: "terminal-scrollback",
-} as const
+  TERMINAL_FONT: "terminal-font",
+} as const;
 
-export type EditorType = "codemirror" | "monaco"
-export const EDITOR_TYPE_OPTIONS: EditorType[] = ["codemirror", "monaco"]
-export const DEFAULT_EDITOR_TYPE: EditorType = "codemirror"
+export type EditorType = "codemirror" | "monaco" | "neovim";
+export const EDITOR_TYPE_OPTIONS: EditorType[] = [
+  "codemirror",
+  "monaco",
+  "neovim",
+];
+export const DEFAULT_EDITOR_TYPE: EditorType = "codemirror";
 
-export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const
-export type FontSize = (typeof FONT_SIZE_OPTIONS)[number]
-export const DEFAULT_FONT_SIZE: FontSize = 13
+export type NvimAppName = "devhub" | "personal" | string;
+export const DEFAULT_NVIM_APPNAME: NvimAppName = "devhub";
 
-export type AppTheme = "system" | "default-dark" | "default-light" | "catppuccin-latte" | "catppuccin-frappe" | "catppuccin-macchiato" | "catppuccin-mocha" | "dracula" | "github-dark"
+export const FONT_SIZE_OPTIONS = [10, 12, 13, 14, 16] as const;
+export type FontSize = (typeof FONT_SIZE_OPTIONS)[number];
+export const DEFAULT_FONT_SIZE: FontSize = 13;
 
-export const APP_THEMES: Array<{ value: AppTheme; label: string; isDark: boolean; flavorClass: string | null }> = [
-  { value: "system",              label: "System",           isDark: true,  flavorClass: null },
-  { value: "default-dark",        label: "Default Dark",     isDark: true,  flavorClass: null },
-  { value: "default-light",       label: "Default Light",    isDark: false, flavorClass: null },
-  { value: "catppuccin-latte",    label: "Catppuccin Latte",    isDark: false, flavorClass: "catppuccin-latte" },
-  { value: "catppuccin-frappe",   label: "Catppuccin Frappé",   isDark: true,  flavorClass: "catppuccin-frappe" },
-  { value: "catppuccin-macchiato",label: "Catppuccin Macchiato",isDark: true,  flavorClass: "catppuccin-macchiato" },
-  { value: "catppuccin-mocha",    label: "Catppuccin Mocha",    isDark: true,  flavorClass: "catppuccin-mocha" },
-  { value: "dracula",             label: "Dracula",              isDark: true,  flavorClass: "dracula" },
-  { value: "github-dark",         label: "GitHub Dark",          isDark: true,  flavorClass: "github-dark" },
-]
+export type AppTheme =
+  | "system"
+  | "default-dark"
+  | "default-light"
+  | "catppuccin-latte"
+  | "catppuccin-frappe"
+  | "catppuccin-macchiato"
+  | "catppuccin-mocha"
+  | "dracula"
+  | "github-dark";
 
-export const MOBILE_FONT_SIZE_OPTIONS = [8, 9, 10, 12, 13, 14] as const
-export type MobileFontSize = (typeof MOBILE_FONT_SIZE_OPTIONS)[number]
-export const DEFAULT_MOBILE_FONT_SIZE: MobileFontSize = 10
+export const APP_THEMES: Array<{
+  value: AppTheme;
+  label: string;
+  isDark: boolean;
+  flavorClass: string | null;
+}> = [
+  { value: "system", label: "System", isDark: true, flavorClass: null },
+  {
+    value: "default-dark",
+    label: "Default Dark",
+    isDark: true,
+    flavorClass: null,
+  },
+  {
+    value: "default-light",
+    label: "Default Light",
+    isDark: false,
+    flavorClass: null,
+  },
+  {
+    value: "catppuccin-latte",
+    label: "Catppuccin Latte",
+    isDark: false,
+    flavorClass: "catppuccin-latte",
+  },
+  {
+    value: "catppuccin-frappe",
+    label: "Catppuccin Frappé",
+    isDark: true,
+    flavorClass: "catppuccin-frappe",
+  },
+  {
+    value: "catppuccin-macchiato",
+    label: "Catppuccin Macchiato",
+    isDark: true,
+    flavorClass: "catppuccin-macchiato",
+  },
+  {
+    value: "catppuccin-mocha",
+    label: "Catppuccin Mocha",
+    isDark: true,
+    flavorClass: "catppuccin-mocha",
+  },
+  { value: "dracula", label: "Dracula", isDark: true, flavorClass: "dracula" },
+  {
+    value: "github-dark",
+    label: "GitHub Dark",
+    isDark: true,
+    flavorClass: "github-dark",
+  },
+];
 
-export const TAB_SIZE_OPTIONS = [2, 4] as const
-export type TabSize = (typeof TAB_SIZE_OPTIONS)[number]
-export const DEFAULT_TAB_SIZE: TabSize = 2
+export const MOBILE_FONT_SIZE_OPTIONS = [8, 9, 10, 12, 13, 14] as const;
+export type MobileFontSize = (typeof MOBILE_FONT_SIZE_OPTIONS)[number];
+export const DEFAULT_MOBILE_FONT_SIZE: MobileFontSize = 10;
+
+export const TAB_SIZE_OPTIONS = [2, 4] as const;
+export type TabSize = (typeof TAB_SIZE_OPTIONS)[number];
+export const DEFAULT_TAB_SIZE: TabSize = 2;
 
 // "providerID::modelID" format
-export type ModelAllowlist = string[]
-export type ModelAgentBindings = Record<string, SelectedModel>
+export type ModelAllowlist = string[];
+export type ModelAgentBindings = Record<string, SelectedModel>;
 
-type SettingsMap = Record<string, unknown>
+type SettingsMap = Record<string, unknown>;
 
 async function fetchSettings(): Promise<SettingsMap> {
-  const res = await fetch("/api/settings")
+  const res = await fetch("/api/settings");
   if (!res.ok) {
-    let message = `Failed to fetch settings (${res.status})`
+    let message = `Failed to fetch settings (${res.status})`;
     try {
-      const err = await res.json()
-      if (err.error) message = err.error
+      const err = await res.json();
+      if (err.error) message = err.error;
     } catch {
       // Response body is not JSON (e.g. HTML error page or redirect)
     }
-    throw new Error(message)
+    throw new Error(message);
   }
-  const contentType = res.headers.get("content-type") ?? ""
+  const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
     // Server returned a non-JSON response (e.g. auth redirect to login page)
-    throw new Error("Session expired — please refresh the page")
+    throw new Error("Session expired — please refresh the page");
   }
-  return res.json()
+  return res.json();
 }
 
 async function putSetting(key: string, value: unknown): Promise<void> {
@@ -108,16 +166,16 @@ async function putSetting(key: string, value: unknown): Promise<void> {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ key, value }),
-  })
+  });
   if (!res.ok) {
-    let message = `Failed to save setting (${res.status})`
+    let message = `Failed to save setting (${res.status})`;
     try {
-      const err = await res.json()
-      if (err.error) message = err.error
+      const err = await res.json();
+      if (err.error) message = err.error;
     } catch {
       // Response body is not JSON (e.g. HTML error page or server crash)
     }
-    throw new Error(message)
+    throw new Error(message);
   }
 }
 
@@ -125,214 +183,235 @@ export function useSettings() {
   return useQuery<SettingsMap>({
     queryKey: ["settings"],
     queryFn: fetchSettings,
-  })
+  });
 }
 
 export function useSettingsMutation() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: unknown }) =>
       putSetting(key, value),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings"] })
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      toast.error(err.message);
     },
-  })
+  });
 }
 
 export function useModelAllowlist(): {
-  allowlist: ModelAllowlist
-  isLoading: boolean
+  allowlist: ModelAllowlist;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.MODEL_ALLOWLIST]
-  const allowlist = Array.isArray(raw) ? (raw as ModelAllowlist) : []
-  return { allowlist, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.MODEL_ALLOWLIST];
+  const allowlist = Array.isArray(raw) ? (raw as ModelAllowlist) : [];
+  return { allowlist, isLoading };
 }
 
 export function useModelAgentBindings(): {
-  bindings: ModelAgentBindings
-  isLoading: boolean
+  bindings: ModelAgentBindings;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.MODEL_AGENT_BINDINGS]
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.MODEL_AGENT_BINDINGS];
   const bindings = useMemo(
     () =>
       raw && typeof raw === "object" && !Array.isArray(raw)
         ? (raw as ModelAgentBindings)
         : {},
     [raw],
-  )
-  return { bindings, isLoading }
+  );
+  return { bindings, isLoading };
 }
 
 export function useVimModeSetting(): {
-  isVimMode: boolean
-  isLoading: boolean
+  isVimMode: boolean;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.VIM_MODE]
-  return { isVimMode: raw === true, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.VIM_MODE];
+  return { isVimMode: raw === true, isLoading };
 }
 
 export function useFontSizeSetting(): {
-  fontSize: FontSize
-  isLoading: boolean
+  fontSize: FontSize;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.FONT_SIZE]
-  const isValid = typeof raw === "number" && (FONT_SIZE_OPTIONS as readonly number[]).includes(raw)
-  return { fontSize: isValid ? (raw as FontSize) : DEFAULT_FONT_SIZE, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.FONT_SIZE];
+  const isValid =
+    typeof raw === "number" &&
+    (FONT_SIZE_OPTIONS as readonly number[]).includes(raw);
+  return {
+    fontSize: isValid ? (raw as FontSize) : DEFAULT_FONT_SIZE,
+    isLoading,
+  };
 }
 
 export function useMobileFontSizeSetting(): {
-  mobileFontSize: MobileFontSize
-  isLoading: boolean
+  mobileFontSize: MobileFontSize;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.MOBILE_FONT_SIZE]
-  const isValid = typeof raw === "number" && (MOBILE_FONT_SIZE_OPTIONS as readonly number[]).includes(raw)
-  return { mobileFontSize: isValid ? (raw as MobileFontSize) : DEFAULT_MOBILE_FONT_SIZE, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.MOBILE_FONT_SIZE];
+  const isValid =
+    typeof raw === "number" &&
+    (MOBILE_FONT_SIZE_OPTIONS as readonly number[]).includes(raw);
+  return {
+    mobileFontSize: isValid
+      ? (raw as MobileFontSize)
+      : DEFAULT_MOBILE_FONT_SIZE,
+    isLoading,
+  };
 }
 
 export function useTabSizeSetting(): {
-  tabSize: TabSize
-  isLoading: boolean
+  tabSize: TabSize;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.TAB_SIZE]
-  const isValid = typeof raw === "number" && (TAB_SIZE_OPTIONS as readonly number[]).includes(raw)
-  return { tabSize: isValid ? (raw as TabSize) : DEFAULT_TAB_SIZE, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.TAB_SIZE];
+  const isValid =
+    typeof raw === "number" &&
+    (TAB_SIZE_OPTIONS as readonly number[]).includes(raw);
+  return { tabSize: isValid ? (raw as TabSize) : DEFAULT_TAB_SIZE, isLoading };
 }
 
 export function useDefaultWorkspaceSetting(): {
-  defaultWorkspaceId: string | null
-  isLoading: boolean
+  defaultWorkspaceId: string | null;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.DEFAULT_WORKSPACE]
-  return { defaultWorkspaceId: typeof raw === "string" ? raw : null, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.DEFAULT_WORKSPACE];
+  return {
+    defaultWorkspaceId: typeof raw === "string" ? raw : null,
+    isLoading,
+  };
 }
 
 export function useWorktreeBaseDirSetting(): {
-  worktreeBaseDir: string
-  isLoading: boolean
+  worktreeBaseDir: string;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.WORKTREE_BASE_DIR]
-  return { worktreeBaseDir: typeof raw === "string" ? raw : "", isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.WORKTREE_BASE_DIR];
+  return { worktreeBaseDir: typeof raw === "string" ? raw : "", isLoading };
 }
 
 export function useCloneBaseDirSetting(): {
-  cloneBaseDir: string
-  isLoading: boolean
+  cloneBaseDir: string;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.CLONE_BASE_DIR]
-  return { cloneBaseDir: typeof raw === "string" ? raw : "~/dev/", isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.CLONE_BASE_DIR];
+  return { cloneBaseDir: typeof raw === "string" ? raw : "~/dev/", isLoading };
 }
 
 export function useShellRcPathSetting(): {
-  shellRcPath: string
-  isLoading: boolean
+  shellRcPath: string;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.SHELL_RC_PATH]
-  return { shellRcPath: typeof raw === "string" ? raw : "~/.zshrc", isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.SHELL_RC_PATH];
+  return { shellRcPath: typeof raw === "string" ? raw : "~/.zshrc", isLoading };
 }
 
 export function useClickUpSettings(): {
-  apiToken: string | null
-  teamId: string | null
-  userId: string | null
-  isConfigured: boolean
-  isLoading: boolean
+  apiToken: string | null;
+  teamId: string | null;
+  userId: string | null;
+  isConfigured: boolean;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const apiToken = typeof data?.[SETTINGS_KEYS.CLICKUP_API_TOKEN] === "string"
-    ? (data[SETTINGS_KEYS.CLICKUP_API_TOKEN] as string)
-    : null
-  const teamId = typeof data?.[SETTINGS_KEYS.CLICKUP_TEAM_ID] === "string"
-    ? (data[SETTINGS_KEYS.CLICKUP_TEAM_ID] as string)
-    : null
-  const userId = data?.[SETTINGS_KEYS.CLICKUP_USER_ID] != null
-    ? String(data[SETTINGS_KEYS.CLICKUP_USER_ID])
-    : null
+  const { data, isLoading } = useSettings();
+  const apiToken =
+    typeof data?.[SETTINGS_KEYS.CLICKUP_API_TOKEN] === "string"
+      ? (data[SETTINGS_KEYS.CLICKUP_API_TOKEN] as string)
+      : null;
+  const teamId =
+    typeof data?.[SETTINGS_KEYS.CLICKUP_TEAM_ID] === "string"
+      ? (data[SETTINGS_KEYS.CLICKUP_TEAM_ID] as string)
+      : null;
+  const userId =
+    data?.[SETTINGS_KEYS.CLICKUP_USER_ID] != null
+      ? String(data[SETTINGS_KEYS.CLICKUP_USER_ID])
+      : null;
   return {
     apiToken,
     teamId,
     userId,
     isConfigured: !!(apiToken && teamId),
     isLoading,
-  }
+  };
 }
 
 export function useLeaderKeyBindings(): {
-  bindings: LeaderBindingsMap
-  isLoading: boolean
+  bindings: LeaderBindingsMap;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.LEADER_KEY_BINDINGS]
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.LEADER_KEY_BINDINGS];
   const stored =
     raw && typeof raw === "object" && !Array.isArray(raw)
       ? (raw as LeaderBindingsMap)
-      : {}
+      : {};
   // Merge stored overrides on top of defaults (memoize to keep a stable reference)
   const bindings: LeaderBindingsMap = useMemo(
     () => ({ ...DEFAULT_LEADER_BINDINGS, ...stored }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(stored)]
-  )
-  return { bindings, isLoading }
+    [JSON.stringify(stored)],
+  );
+  return { bindings, isLoading };
 }
 
-export const DEFAULT_LEADER_TIMEOUT = 2
+export const DEFAULT_LEADER_TIMEOUT = 2;
 
 export function useLeaderTimeoutSetting(): {
   /** Seconds before auto-cancel, or null for "never hide" */
-  leaderTimeout: number | null
-  isLoading: boolean
+  leaderTimeout: number | null;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.LEADER_TIMEOUT]
-  if (raw === null) return { leaderTimeout: null, isLoading }
-  if (typeof raw === "number" && raw > 0) return { leaderTimeout: raw, isLoading }
-  return { leaderTimeout: DEFAULT_LEADER_TIMEOUT, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.LEADER_TIMEOUT];
+  if (raw === null) return { leaderTimeout: null, isLoading };
+  if (typeof raw === "number" && raw > 0)
+    return { leaderTimeout: raw, isLoading };
+  return { leaderTimeout: DEFAULT_LEADER_TIMEOUT, isLoading };
 }
 
 export function useLeaderWhichKeySetting(): {
-  isWhichKeyEnabled: boolean
-  isLoading: boolean
+  isWhichKeyEnabled: boolean;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.LEADER_WHICH_KEY]
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.LEADER_WHICH_KEY];
   // Default: true (which-key popup is on by default)
-  return { isWhichKeyEnabled: raw !== false, isLoading }
+  return { isWhichKeyEnabled: raw !== false, isLoading };
 }
 
 export function useGitHubSettings(): {
-  apiToken: string | null
-  isConfigured: boolean
-  isLoading: boolean
+  apiToken: string | null;
+  isConfigured: boolean;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
+  const { data, isLoading } = useSettings();
   const apiToken =
     typeof data?.[SETTINGS_KEYS.GITHUB_API_TOKEN] === "string"
       ? (data[SETTINGS_KEYS.GITHUB_API_TOKEN] as string)
-      : null
+      : null;
   return {
     apiToken,
     isConfigured: !!apiToken,
     isLoading,
-  }
+  };
 }
 
 function isWorkspaceProvider(value: unknown): value is WorkspaceProvider {
-  if (!value || typeof value !== "object") return false
-  const obj = value as Record<string, unknown>
+  if (!value || typeof value !== "object") return false;
+  const obj = value as Record<string, unknown>;
   return (
     typeof obj.id === "string" &&
     typeof obj.name === "string" &&
@@ -342,51 +421,53 @@ function isWorkspaceProvider(value: unknown): value is WorkspaceProvider {
     typeof (obj.commands as Record<string, unknown>).create === "string" &&
     typeof (obj.commands as Record<string, unknown>).destroy === "string" &&
     typeof (obj.commands as Record<string, unknown>).status === "string"
-  )
+  );
 }
 
 export function useWorkspaceProviders(): {
-  providers: WorkspaceProvider[]
-  isLoading: boolean
+  providers: WorkspaceProvider[];
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.WORKSPACE_PROVIDERS]
-  const providers = Array.isArray(raw) ? raw.filter(isWorkspaceProvider) : []
-  return { providers, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.WORKSPACE_PROVIDERS];
+  const providers = Array.isArray(raw) ? raw.filter(isWorkspaceProvider) : [];
+  return { providers, isLoading };
 }
 
 export function useThemeSetting(): { theme: AppTheme; isLoading: boolean } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.THEME]
-  const isValid = typeof raw === "string" && APP_THEMES.some(t => t.value === raw)
-  return { theme: isValid ? (raw as AppTheme) : "system", isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.THEME];
+  const isValid =
+    typeof raw === "string" && APP_THEMES.some((t) => t.value === raw);
+  return { theme: isValid ? (raw as AppTheme) : "system", isLoading };
 }
 
 export function useSoundSettings(): {
-  agentEnabled: boolean
-  agentSoundId: string
-  permissionsEnabled: boolean
-  permissionsSoundId: string
-  errorsEnabled: boolean
-  errorsSoundId: string
-  isLoading: boolean
+  agentEnabled: boolean;
+  agentSoundId: string;
+  permissionsEnabled: boolean;
+  permissionsSoundId: string;
+  errorsEnabled: boolean;
+  errorsSoundId: string;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const agentEnabled = data?.[SETTINGS_KEYS.SOUND_AGENT_ENABLED] === true
+  const { data, isLoading } = useSettings();
+  const agentEnabled = data?.[SETTINGS_KEYS.SOUND_AGENT_ENABLED] === true;
   const agentSoundId =
     typeof data?.[SETTINGS_KEYS.SOUND_AGENT_ID] === "string"
       ? (data[SETTINGS_KEYS.SOUND_AGENT_ID] as string)
-      : DEFAULT_SOUND_SETTINGS.agentSoundId
-  const permissionsEnabled = data?.[SETTINGS_KEYS.SOUND_PERMISSIONS_ENABLED] === true
+      : DEFAULT_SOUND_SETTINGS.agentSoundId;
+  const permissionsEnabled =
+    data?.[SETTINGS_KEYS.SOUND_PERMISSIONS_ENABLED] === true;
   const permissionsSoundId =
     typeof data?.[SETTINGS_KEYS.SOUND_PERMISSIONS_ID] === "string"
       ? (data[SETTINGS_KEYS.SOUND_PERMISSIONS_ID] as string)
-      : DEFAULT_SOUND_SETTINGS.permissionsSoundId
-  const errorsEnabled = data?.[SETTINGS_KEYS.SOUND_ERRORS_ENABLED] === true
+      : DEFAULT_SOUND_SETTINGS.permissionsSoundId;
+  const errorsEnabled = data?.[SETTINGS_KEYS.SOUND_ERRORS_ENABLED] === true;
   const errorsSoundId =
     typeof data?.[SETTINGS_KEYS.SOUND_ERRORS_ID] === "string"
       ? (data[SETTINGS_KEYS.SOUND_ERRORS_ID] as string)
-      : DEFAULT_SOUND_SETTINGS.errorsSoundId
+      : DEFAULT_SOUND_SETTINGS.errorsSoundId;
   return {
     agentEnabled,
     agentSoundId,
@@ -395,47 +476,107 @@ export function useSoundSettings(): {
     errorsEnabled,
     errorsSoundId,
     isLoading,
-  }
+  };
 }
 
 export function useEditorTypeSetting(): {
-  editorType: EditorType
-  isLoading: boolean
+  editorType: EditorType;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.EDITOR_TYPE]
-  const isValid = typeof raw === "string" && EDITOR_TYPE_OPTIONS.includes(raw as EditorType)
-  return { editorType: isValid ? (raw as EditorType) : DEFAULT_EDITOR_TYPE, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.EDITOR_TYPE];
+  const isValid =
+    typeof raw === "string" && EDITOR_TYPE_OPTIONS.includes(raw as EditorType);
+  return {
+    editorType: isValid ? (raw as EditorType) : DEFAULT_EDITOR_TYPE,
+    isLoading,
+  };
+}
+
+export function useNvimAppNameSetting(): {
+  nvimAppName: NvimAppName;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.NVIM_APPNAME];
+  return {
+    nvimAppName:
+      typeof raw === "string" && raw.length > 0 ? raw : DEFAULT_NVIM_APPNAME,
+    isLoading,
+  };
 }
 
 export function useAutoColorSetting(): {
-  isAutoColorEnabled: boolean
-  isLoading: boolean
+  isAutoColorEnabled: boolean;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.AUTO_COLOR_WORKSPACES]
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.AUTO_COLOR_WORKSPACES];
   // Default: true (auto-color is on by default)
-  return { isAutoColorEnabled: raw !== false, isLoading }
+  return { isAutoColorEnabled: raw !== false, isLoading };
 }
 
-export const DEFAULT_TERMINAL_SCROLLBACK = 5000
-export const TERMINAL_SCROLLBACK_OPTIONS = [1000, 2000, 5000, 10000, 25000, 50000] as const
+export const DEFAULT_TERMINAL_SCROLLBACK = 5000;
+export const TERMINAL_SCROLLBACK_OPTIONS = [
+  1000, 2000, 5000, 10000, 25000, 50000,
+] as const;
 
 export function useTerminalScrollbackSetting(): {
-  scrollback: number
-  isLoading: boolean
+  scrollback: number;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.TERMINAL_SCROLLBACK]
-  const isValid = typeof raw === "number" && raw > 0
-  return { scrollback: isValid ? raw : DEFAULT_TERMINAL_SCROLLBACK, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.TERMINAL_SCROLLBACK];
+  const isValid = typeof raw === "number" && raw > 0;
+  return { scrollback: isValid ? raw : DEFAULT_TERMINAL_SCROLLBACK, isLoading };
+}
+
+export type TerminalFont = "geist-mono" | "ibm-plex-mono-nerd";
+export const TERMINAL_FONT_OPTIONS: Array<{
+  value: TerminalFont;
+  label: string;
+  fontFamily: string;
+}> = [
+  {
+    value: "geist-mono",
+    label: "Geist Mono",
+    fontFamily: "var(--font-geist-mono), monospace",
+  },
+  {
+    value: "ibm-plex-mono-nerd",
+    label: "IBM Plex Mono Nerd Font",
+    fontFamily: "BlexMonoNerdFontMono, monospace",
+  },
+];
+export const DEFAULT_TERMINAL_FONT: TerminalFont = "geist-mono";
+
+export function terminalFontFamily(font: TerminalFont): string {
+  return (
+    TERMINAL_FONT_OPTIONS.find((o) => o.value === font)?.fontFamily ??
+    TERMINAL_FONT_OPTIONS[0].fontFamily
+  );
+}
+
+export function useTerminalFontSetting(): {
+  terminalFont: TerminalFont;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.TERMINAL_FONT];
+  const isValid =
+    typeof raw === "string" &&
+    TERMINAL_FONT_OPTIONS.some((o) => o.value === raw);
+  return {
+    terminalFont: isValid ? (raw as TerminalFont) : DEFAULT_TERMINAL_FONT,
+    isLoading,
+  };
 }
 
 export function usePanelNavigationSetting(): {
-  isPanelNavigationEnabled: boolean
-  isLoading: boolean
+  isPanelNavigationEnabled: boolean;
+  isLoading: boolean;
 } {
-  const { data, isLoading } = useSettings()
-  const raw = data?.[SETTINGS_KEYS.PANEL_NAVIGATION]
-  return { isPanelNavigationEnabled: raw === true, isLoading }
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.PANEL_NAVIGATION];
+  return { isPanelNavigationEnabled: raw === true, isLoading };
 }

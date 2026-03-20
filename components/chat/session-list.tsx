@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useRef, useState } from "react"
-import { Plus, Trash2, MessageSquare, Globe, Layers, FolderGit2, Check, GitBranch, Brain, ArrowUpDown, Group, GripVertical, ChevronDown, ChevronRight, Pin, PinOff, Clock } from "lucide-react"
+import { Plus, Trash2, MessageSquare, MessageCircleQuestion, Globe, Layers, FolderGit2, Check, GitBranch, Brain, ArrowUpDown, Group, GripVertical, ChevronDown, ChevronRight, Pin, PinOff, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +19,7 @@ import type { SessionWithWorkspace } from "@/stores/chat-store"
 interface BaseSessionListProps {
   activeSessionId: string | null
   sessionStatuses: Record<string, SessionStatus>
+  questionSessionIds?: Set<string>
   lastViewedAt: Record<string, number>
   pinnedSessionIds?: Set<string>
   isLoading?: boolean
@@ -56,12 +57,13 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
   expandedWorkspaces?: Record<string, boolean>
   onToggleWorkspaceExpanded?: (workspaceId: string) => void
   onWakeWorkspace?: (workspaceId: string) => void
+  sleepingWorkspaceIds?: Set<string>
 }
 
 type SessionListProps = WorkspaceSessionListProps | UnifiedSessionListProps
 
 export function SessionList(props: SessionListProps) {
-  const { activeSessionId, sessionStatuses, lastViewedAt, pinnedSessionIds, onCreateSession, onDeleteSession, onPinSession, onUnpinSession } = props
+  const { activeSessionId, sessionStatuses, questionSessionIds, lastViewedAt, pinnedSessionIds, onCreateSession, onDeleteSession, onPinSession, onUnpinSession } = props
 
   const sortedSessions = useMemo(() => {
     if (props.mode === "workspace") {
@@ -269,6 +271,7 @@ export function SessionList(props: SessionListProps) {
                   sessions={wsSessions}
                   activeSessionId={activeSessionId}
                   sessionStatuses={sessionStatuses}
+                  questionSessionIds={questionSessionIds}
                   lastViewedAt={lastViewedAt}
                   isExpanded={
                     props.mode === "unified"
@@ -294,7 +297,11 @@ export function SessionList(props: SessionListProps) {
                   onDragOver={(e: React.DragEvent) => handleDragOver(e, workspaceId)}
                   onDragEnd={handleDragEnd}
                   isDragTarget={dragOverWorkspaceId === workspaceId && draggedWorkspaceId !== workspaceId}
-                  onWakeWorkspace={props.mode === "unified" ? props.onWakeWorkspace : undefined}
+                  onWakeWorkspace={
+                    props.mode === "unified" && props.sleepingWorkspaceIds?.has(workspaceId)
+                      ? props.onWakeWorkspace
+                      : undefined
+                  }
                 />
               ))
             ) : (
@@ -304,6 +311,7 @@ export function SessionList(props: SessionListProps) {
                   session={session}
                   isActive={session.id === activeSessionId}
                   isPinned={pinnedSessionIds?.has(session.id) ?? false}
+                  hasQuestion={questionSessionIds?.has(session.id) ?? false}
                   status={sessionStatuses[session.id] ?? null}
                   isUnread={!!(
                     session.id !== activeSessionId &&
@@ -365,6 +373,7 @@ interface WorkspaceGroupProps {
   sessions: SessionWithWorkspace[]
   activeSessionId: string | null
   sessionStatuses: Record<string, SessionStatus>
+  questionSessionIds?: Set<string>
   lastViewedAt: Record<string, number>
   pinnedSessionIds?: Set<string>
   isExpanded: boolean
@@ -388,6 +397,7 @@ function WorkspaceGroup({
   sessions,
   activeSessionId,
   sessionStatuses,
+  questionSessionIds,
   lastViewedAt,
   pinnedSessionIds,
   isExpanded,
@@ -492,6 +502,7 @@ function WorkspaceGroup({
             session={session}
             isActive={session.id === activeSessionId}
             isPinned={pinnedSessionIds?.has(session.id) ?? false}
+            hasQuestion={questionSessionIds?.has(session.id) ?? false}
             status={sessionStatuses[session.id] ?? null}
             isUnread={!!(
               session.id !== activeSessionId &&
@@ -539,6 +550,7 @@ interface SessionItemProps {
   session: Session
   isActive: boolean
   isPinned: boolean
+  hasQuestion: boolean
   status: SessionStatus | null
   isUnread: boolean
   workspaceBranch?: string
@@ -552,6 +564,7 @@ function SessionItem({
   session,
   isActive,
   isPinned,
+  hasQuestion,
   status,
   isUnread,
   workspaceBranch,
@@ -591,6 +604,11 @@ function SessionItem({
           <Clock
             className="size-3.5 text-muted-foreground"
             style={workspaceColor ? { color: workspaceColor } : undefined}
+          />
+        ) : hasQuestion ? (
+          <MessageCircleQuestion
+            className="size-3.5 animate-pulse"
+            style={workspaceColor ? { color: workspaceColor } : { color: "var(--color-indigo-500)" }}
           />
         ) : isBusy ? (
           <Brain

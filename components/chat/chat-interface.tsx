@@ -239,6 +239,16 @@ export function ChatInterface() {
     }));
   }, [allWorkspaces]);
 
+  const sleepingWorkspaceIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const ws of allWorkspaces) {
+      if (!shouldSSEConnect(ws, activeWorkspaceId)) {
+        ids.add(ws.id);
+      }
+    }
+    return ids;
+  }, [allWorkspaces, activeWorkspaceId]);
+
   const { primaryAgents } = useAgents(activeWorkspaceId);
   const orderedAgents = useMemo(() => {
     const utilityNames = new Set(["compaction", "title", "summary"])
@@ -255,23 +265,43 @@ export function ChatInterface() {
   }, [primaryAgents])
   const { bindings: agentModelBindings } = useModelAgentBindings();
 
+  // Track the previous agent so we only force-set the model when the agent
+  // actually changes — not when other deps (primaryAgents, bindings) re-render.
+  // This lets the user manually override the model within a session.
+  const prevAgentRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!selectedAgent || primaryAgents.length === 0) return;
+
+    const agentChanged = prevAgentRef.current !== selectedAgent;
+    prevAgentRef.current = selectedAgent;
+
     const agent = primaryAgents.find((a) => a.name === selectedAgent);
-    if (agent?.model) {
-      setSelectedModel(agent.model);
-    } else {
-      const bound = agentModelBindings[selectedAgent];
-      if (bound) setSelectedModel(bound);
+
+    // When the session has a stored model override, skip auto-deriving model from agent.
+    // On agent change within a session, clearSessionModel is called first (see AgentSelector),
+    // so this guard only preserves overrides during session switches.
+    const hasStoredModel = activeSessionId ? !!getSessionModel(activeSessionId) : false;
+
+    if ((agentChanged || !selectedModel) && !hasStoredModel) {
+      if (agent?.model) {
+        setSelectedModel(agent.model);
+      } else {
+        const bound = agentModelBindings[selectedAgent];
+        if (bound) setSelectedModel(bound);
+      }
     }
+
     // Agent config can advertise a variant (e.g. "high") not in the model's variant map → API error
-    const agentVariant = agent?.variant ?? null;
-    if (agentVariant && availableVariants.length > 0 && !availableVariants.includes(agentVariant)) {
-      setSelectedVariant(null);
-    } else {
-      setSelectedVariant(agentVariant);
+    if (agentChanged) {
+      const agentVariant = agent?.variant ?? null;
+      if (agentVariant && availableVariants.length > 0 && !availableVariants.includes(agentVariant)) {
+        setSelectedVariant(null);
+      } else {
+        setSelectedVariant(agentVariant);
+      }
     }
-  }, [selectedAgent, primaryAgents, agentModelBindings, availableVariants]);
+  }, [selectedAgent, primaryAgents, agentModelBindings, availableVariants, selectedModel]);
 
   useEffect(() => {
     if (selectedVariant && availableVariants.length > 0 && !availableVariants.includes(selectedVariant)) {
@@ -309,11 +339,16 @@ export function ChatInterface() {
     getRecentSessionsAcrossWorkspaces,
     getActiveTodos,
     getUnifiedSessionStatuses,
+    getActiveQuestionSessionIds,
+    getUnifiedQuestionSessionIds,
     getUnifiedLastViewedAt,
     getUnifiedPinnedSessionIds,
     getActivePinnedSessionIds,
     setSessionAgent,
     getSessionAgent,
+    setSessionModel,
+    clearSessionModel,
+    getSessionModel,
     fetchPinnedSessions,
     pinSession,
     unpinSession,
@@ -325,14 +360,23 @@ export function ChatInterface() {
   // Falls back to "code" (or the first available agent) when the session has no stored agent.
   useEffect(() => {
     if (primaryAgents.length === 0) return;
-    const stored = activeSessionId ? getSessionAgent(activeSessionId) : null;
-    if (stored) {
-      setSelectedAgent(stored);
-    } else if (!selectedAgent) {
+
+    // Restore agent
+    const storedAgent = activeSessionId ? getSessionAgent(activeSessionId) : null;
+    if (storedAgent) {
+      setSelectedAgent(storedAgent);
+    } else {
       const defaultAgent =
         primaryAgents.find((a) => a.name === "code") ?? primaryAgents[0];
       setSelectedAgent(defaultAgent.name);
     }
+
+    // Restore model override (if session has one stored)
+    const storedModel = activeSessionId ? getSessionModel(activeSessionId) : null;
+    if (storedModel) {
+      setSelectedModel(storedModel);
+    }
+    // If no stored model, the agent-change useEffect will derive it from agent binding
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, primaryAgents]);
 
@@ -348,8 +392,13 @@ export function ChatInterface() {
     : undefined
   const [unifiedLimit, setUnifiedLimit] = useState(20)
   const effectiveUnifiedLimit = groupByWorkspace ? Number.MAX_SAFE_INTEGER : unifiedLimit
-  const unifiedSessions = useChatStore((state) =>
+  const allUnifiedSessions = useChatStore((state) =>
     state.getRecentSessionsAcrossWorkspaces(effectiveUnifiedLimit)
+  )
+  const workspaceIds = useMemo(() => new Set(allWorkspaces.map((w) => w.id)), [allWorkspaces])
+  const unifiedSessions = useMemo(
+    () => allUnifiedSessions.filter((s) => workspaceIds.has(s.workspaceId)),
+    [allUnifiedSessions, workspaceIds]
   )
   const totalUnifiedCount = useChatStore((state) => {
     let count = 0
@@ -383,6 +432,9 @@ export function ChatInterface() {
   const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
   const activePinnedIds = useChatStore(getActivePinnedSessionIds);
   const pinnedSessionIds = isUnifiedMode ? unifiedPinnedIds : activePinnedIds;
+  const activeQuestionSessionIds = useChatStore(getActiveQuestionSessionIds);
+  const unifiedQuestionSessionIds = useChatStore(getUnifiedQuestionSessionIds);
+  const questionSessionIds = isUnifiedMode ? unifiedQuestionSessionIds : activeQuestionSessionIds;
 
   const isSessionsLoading = useChatStore((s) => {
     if (isUnifiedMode) {
@@ -713,6 +765,7 @@ export function ChatInterface() {
   const handleSelectSession = useCallback(
     (sessionId: string) => {
       setActiveSession(sessionId);
+      requestAnimationFrame(() => promptInputRef.current?.focus());
     },
     [setActiveSession],
   );
@@ -721,6 +774,7 @@ export function ChatInterface() {
     (sessionId: string) => {
       setActiveSession(sessionId);
       setIsMobileSessionsOpen(false);
+      requestAnimationFrame(() => promptInputRef.current?.focus());
     },
     [setActiveSession],
   );
@@ -740,6 +794,7 @@ export function ChatInterface() {
       setActiveWorkspaceId(workspaceId);
       setActiveSession(sessionId);
       setIsMobileSessionsOpen(false);
+      requestAnimationFrame(() => promptInputRef.current?.focus());
 
       if (isSleeping) {
         toast("Waking workspace…", {
@@ -1196,6 +1251,15 @@ export function ChatInterface() {
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
 
+  const handleModelChange = useCallback((model: SelectedModel) => {
+    setSelectedModel(model);
+    const sid = activeSessionIdRef.current;
+    const wid = activeWorkspaceIdRef.current;
+    if (sid && wid) {
+      setSessionModel(sid, wid, model);
+    }
+  }, [setSessionModel]);
+
   useEffect(() => {
     const handleTabCycle = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
@@ -1263,6 +1327,7 @@ export function ChatInterface() {
               onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
+              questionSessionIds={questionSessionIds}
               lastViewedAt={lastViewedAt}
               isLoading={isSessionsLoading}
               pinnedSessionIds={pinnedSessionIds}
@@ -1280,6 +1345,7 @@ export function ChatInterface() {
               expandedWorkspaces={expandedWorkspaces}
               onToggleWorkspaceExpanded={handleToggleWorkspaceExpanded}
               onWakeWorkspace={handleWakeWorkspace}
+              sleepingWorkspaceIds={sleepingWorkspaceIds}
             />
           ) : (
             <SessionList
@@ -1288,6 +1354,7 @@ export function ChatInterface() {
               workspaceColor={activeWorkspaceColor}
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
+              questionSessionIds={questionSessionIds}
               lastViewedAt={lastViewedAt}
               pinnedSessionIds={pinnedSessionIds}
               isLoading={isSessionsLoading}
@@ -1330,6 +1397,7 @@ export function ChatInterface() {
                 onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
+              questionSessionIds={questionSessionIds}
               lastViewedAt={lastViewedAt}
                 isLoading={isSessionsLoading}
                 pinnedSessionIds={pinnedSessionIds}
@@ -1347,6 +1415,7 @@ export function ChatInterface() {
                 expandedWorkspaces={expandedWorkspaces}
                 onToggleWorkspaceExpanded={handleToggleWorkspaceExpanded}
                 onWakeWorkspace={handleWakeWorkspace}
+                sleepingWorkspaceIds={sleepingWorkspaceIds}
               />
             ) : (
               <SessionList
@@ -1355,6 +1424,7 @@ export function ChatInterface() {
                 workspaceColor={activeWorkspaceColor}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
+              questionSessionIds={questionSessionIds}
                 lastViewedAt={lastViewedAt}
                 pinnedSessionIds={pinnedSessionIds}
                 isLoading={isSessionsLoading}
@@ -1435,6 +1505,7 @@ export function ChatInterface() {
               setSelectedAgent(agent);
               if (activeSessionId && activeWorkspaceId) {
                 setSessionAgent(activeSessionId, activeWorkspaceId, agent);
+                clearSessionModel(activeSessionId, activeWorkspaceId);
               }
             }}
             open={isAgentSelectorOpen}
@@ -1444,7 +1515,7 @@ export function ChatInterface() {
           <ModelSelector
             workspaceId={activeWorkspaceId}
             selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
+            onModelChange={handleModelChange}
             onVariantsChange={setAvailableVariants}
             open={isModelSelectorOpen}
             onOpenChange={setIsModelSelectorOpen}

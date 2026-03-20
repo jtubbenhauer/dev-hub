@@ -50,6 +50,7 @@ function seedStores(sessions: ReturnType<typeof makeSession>[], workspaceId = "w
         questions: [],
         todos: {},
         sessionAgents: {},
+          sessionModels: {},
         lastViewedAt: {},
       },
     },

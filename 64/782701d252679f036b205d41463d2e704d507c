@@ -1,0 +1,49 @@
+hooks/use-settings.ts
+  11cc281cba6a130a 20,57
+components/editor/editor-switcher.tsx
+  11cc281cba6a130a 39
+components/git/pr-file-list.tsx
+  11cc281cba6a130a 93
+components/editor/monaco-editor.tsx
+  11cc281cba6a130a 259
+components/git/changed-file-list.tsx
+  11cc281cba6a130a 12,61
+components/git/file-status.tsx
+  11cc281cba6a130a 21,122
+components/review/review-editor.tsx
+  11cc281cba6a130a 3,5,58
+components/panel-navigation/panel-nav-commands.tsx
+  11cc281cba6a130a 16
+AGENTS.md
+  11cc281cba6a130a 27,46,206
+components/review/review-file-list.tsx
+  11cc281cba6a130a 80
+lib/utils.ts
+  11cc281cba6a130a 22-26
+components/settings/general-settings.tsx
+  11cc281cba6a130a 166
+components/git/pr-diff-editor.tsx
+  11cc281cba6a130a 3,39
+components/git/git-panel.tsx
+  11cc281cba6a130a 46,412
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "64782701d252679f036b205d41463d2e704d507c",
+  "prompts": {
+    "11cc281cba6a130a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2f64eeca4ffellT6TQktK69CIB",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 105,
+      "total_deletions": 1973,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    }
+  }
+}

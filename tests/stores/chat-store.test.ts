@@ -310,6 +310,7 @@ describe("workspace switching", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -360,6 +361,7 @@ describe("getStreamingStatus selector", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -385,6 +387,7 @@ describe("getStreamingStatus selector", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -408,6 +411,7 @@ describe("getStreamingStatus selector", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -432,6 +436,7 @@ describe("getStreamingStatus selector", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -456,6 +461,7 @@ describe("getStreamingStatus selector", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -479,6 +485,7 @@ describe("getStreamingStatus selector", () => {
           questions: [makeQuestion("q-1", "sess-a")],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -502,6 +509,7 @@ describe("getStreamingStatus selector", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -526,6 +534,7 @@ describe("getStreamingStatus selector", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -615,6 +624,7 @@ describe("SSE event handling — session lifecycle", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -646,6 +656,7 @@ describe("SSE event handling — session lifecycle", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -677,6 +688,7 @@ describe("SSE event handling — session lifecycle", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -723,6 +735,7 @@ describe("cross-workspace SSE routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -736,6 +749,7 @@ describe("cross-workspace SSE routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -770,6 +784,7 @@ describe("cross-workspace SSE routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -804,6 +819,7 @@ describe("cross-workspace SSE routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -817,6 +833,7 @@ describe("cross-workspace SSE routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -851,6 +868,7 @@ describe("cross-workspace SSE routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -881,6 +899,7 @@ describe("cross-workspace SSE routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -911,6 +930,7 @@ describe("cross-workspace SSE routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -935,6 +955,7 @@ describe("cross-workspace SSE routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -945,6 +966,77 @@ describe("cross-workspace SSE routing", () => {
     })
 
     expect(useChatStore.getState().getWorkspaceActivity("ws-a")).toBe("waiting")
+  })
+
+  it("getActiveQuestionSessionIds returns session IDs with pending questions", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a"), "sess-b": makeSession("sess-b") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [
+            { id: "q-1", sessionID: "sess-a" } as never,
+          ],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    })
+
+    const ids = useChatStore.getState().getActiveQuestionSessionIds()
+    expect(ids.has("sess-a")).toBe(true)
+    expect(ids.has("sess-b")).toBe(false)
+  })
+
+  it("getUnifiedQuestionSessionIds merges question session IDs across workspaces", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [{ id: "q-1", sessionID: "sess-a" } as never],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionsLoaded: true,
+        },
+        "ws-b": {
+          sessions: { "sess-b": makeSession("sess-b") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [{ id: "q-2", sessionID: "sess-b" } as never],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: null,
+    })
+
+    const ids = useChatStore.getState().getUnifiedQuestionSessionIds()
+    expect(ids.has("sess-a")).toBe(true)
+    expect(ids.has("sess-b")).toBe(true)
+    expect(ids.size).toBe(2)
   })
 })
 
@@ -1051,6 +1143,7 @@ describe("message routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1093,6 +1186,7 @@ describe("message routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1138,6 +1232,7 @@ describe("message routing", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1193,6 +1288,7 @@ describe("permission lifecycle", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1220,6 +1316,7 @@ describe("permission lifecycle", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1244,6 +1341,7 @@ describe("permission lifecycle", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1277,6 +1375,7 @@ describe("question lifecycle", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1307,6 +1406,7 @@ describe("question lifecycle", () => {
           questions: [makeQuestion("q-1", "sess-a")],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1347,6 +1447,7 @@ describe("question lifecycle", () => {
           questions: [makeQuestion("q-1", "sess-a")],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1377,6 +1478,7 @@ describe("question lifecycle", () => {
           questions: [makeQuestion("q-2", "sess-a")],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1407,6 +1509,7 @@ describe("question lifecycle", () => {
           questions: [makeQuestion("q-3", "sess-a")],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1530,6 +1633,7 @@ describe("SSE connection management", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1576,6 +1680,7 @@ describe("SSE connection management", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1619,6 +1724,7 @@ describe("SSE connection management", () => {
           questions: [makeQuestion("q-stale", "sess-a")],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1682,6 +1788,7 @@ describe("streaming poll", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1728,6 +1835,7 @@ describe("refreshActiveSessionStatus", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1761,6 +1869,7 @@ describe("refreshActiveSessionStatus", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1848,6 +1957,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1861,6 +1971,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1888,6 +1999,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1915,6 +2027,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -1938,6 +2051,7 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2009,6 +2123,7 @@ describe("createSession — message initialization", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2063,6 +2178,7 @@ describe("fetchMessages — error handling", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2090,6 +2206,7 @@ describe("fetchMessages — error handling", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2119,6 +2236,7 @@ describe("fetchMessages — error handling", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2149,6 +2267,7 @@ describe("fetchMessages — error handling", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2216,6 +2335,7 @@ describe("isMessagesLoaded selector logic", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2239,6 +2359,7 @@ describe("isMessagesLoaded selector logic", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2262,6 +2383,7 @@ describe("isMessagesLoaded selector logic", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2316,8 +2438,9 @@ describe("removeSessionLocal and restoreSessionLocal", () => {
     permissions: [] as ReturnType<typeof makePermission>[],
     questions: [] as ReturnType<typeof makeQuestion>[],
     todos: {} as Record<string, never[]>,
-    sessionAgents: { "sess-a": "code" },
-    lastViewedAt: { "sess-a": 1500, "sess-b": 900 },
+     sessionAgents: { "sess-a": "code" },
+     sessionModels: {},
+     lastViewedAt: { "sess-a": 1500, "sess-b": 900 },
     pinnedSessionIds: new Set<string>(),
     sessionsLoaded: true,
   })
@@ -2445,6 +2568,7 @@ describe("revertSession", () => {
           questions: [],
           todos: {},
           sessionAgents: {},
+          sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
           sessionsLoaded: true,
@@ -2631,5 +2755,110 @@ describe("pinned sessions", () => {
     const unified = useChatStore.getState().getUnifiedPinnedSessionIds()
     expect(unified.has("sess-1")).toBe(true)
     expect(unified.has("sess-2")).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 16. fetchSessions — fallback to cached sessions on failure
+// ---------------------------------------------------------------------------
+
+describe("fetchSessions fallback to cache", () => {
+  beforeEach(resetStore)
+
+  it("falls back to cached sessions when live fetch returns 502", async () => {
+    const cachedSessions = [
+      { id: "cached-1", title: "Cached Session 1", parentId: null, time: { created: 1000, updated: 2000 }, fromCache: true },
+      { id: "cached-2", title: "Cached Session 2", parentId: null, time: { created: 1000, updated: 1500 }, fromCache: true },
+    ]
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/api/opencode/session")) {
+        return Promise.resolve({ ok: false, status: 502, json: async () => ({ error: "OpenCode proxy error" }) })
+      }
+      if ((url as string).includes("/api/sessions/cache")) {
+        return Promise.resolve({ ok: true, json: async () => cachedSessions })
+      }
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+
+    await useChatStore.getState().fetchSessions("ws-remote")
+
+    const ws = useChatStore.getState().workspaceStates["ws-remote"]
+    expect(ws.sessionsLoaded).toBe(true)
+    expect(Object.keys(ws.sessions)).toHaveLength(2)
+    expect(ws.sessions["cached-1"].title).toBe("Cached Session 1")
+    expect(ws.sessions["cached-2"].title).toBe("Cached Session 2")
+  })
+
+  it("falls back to cached sessions on network error", async () => {
+    const cachedSessions = [
+      { id: "cached-1", title: "Cached", parentId: null, time: { created: 1000, updated: 2000 }, fromCache: true },
+    ]
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/api/opencode/session")) {
+        return Promise.reject(new Error("fetch failed"))
+      }
+      if ((url as string).includes("/api/sessions/cache")) {
+        return Promise.resolve({ ok: true, json: async () => cachedSessions })
+      }
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+
+    await useChatStore.getState().fetchSessions("ws-remote")
+
+    const ws = useChatStore.getState().workspaceStates["ws-remote"]
+    expect(ws.sessionsLoaded).toBe(true)
+    expect(Object.keys(ws.sessions)).toHaveLength(1)
+    expect(ws.sessions["cached-1"].title).toBe("Cached")
+  })
+
+  it("sets sessionsLoaded even when both live and cache fetches fail", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/api/opencode/session")) {
+        return Promise.resolve({ ok: false, status: 502, json: async () => ({ error: "proxy error" }) })
+      }
+      if ((url as string).includes("/api/sessions/cache")) {
+        return Promise.resolve({ ok: false, status: 500, json: async () => ({ error: "db error" }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+
+    await useChatStore.getState().fetchSessions("ws-remote")
+
+    const ws = useChatStore.getState().workspaceStates["ws-remote"]
+    expect(ws.sessionsLoaded).toBe(true)
+  })
+
+  it("does not overwrite live sessions with cache on successful fetch", async () => {
+    const liveSessions = [
+      makeSession("live-1", { updated: 3000 }),
+      makeSession("live-2", { updated: 2500 }),
+    ]
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/api/opencode/session")) {
+        return Promise.resolve({ ok: true, json: async () => liveSessions })
+      }
+      // Cache POST (fire-and-forget after success)
+      if ((url as string).includes("/api/sessions/cache")) {
+        return Promise.resolve({ ok: true, json: async () => ({ ok: true }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+
+    await useChatStore.getState().fetchSessions("ws-remote")
+
+    const ws = useChatStore.getState().workspaceStates["ws-remote"]
+    expect(ws.sessionsLoaded).toBe(true)
+    expect(Object.keys(ws.sessions)).toHaveLength(2)
+    expect(ws.sessions["live-1"]).toBeDefined()
+    expect(ws.sessions["live-2"]).toBeDefined()
+    // Cache should not have been read (GET with ?workspaceId=), only written (POST to /api/sessions/cache)
+    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+    const cacheReads = fetchCalls.filter(
+      (args: unknown[]) => typeof args[0] === "string" && args[0].includes("/api/sessions/cache?workspaceId=")
+    )
+    expect(cacheReads).toHaveLength(0)
   })
 })

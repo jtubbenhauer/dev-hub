@@ -42,6 +42,7 @@ export interface WorkspaceState {
   questions: QuestionRequest[]
   todos: Record<string, Todo[]>
   sessionAgents: Record<string, string>
+  sessionModels: Record<string, { providerID: string; modelID: string }>
   lastViewedAt: Record<string, number>
   pinnedSessionIds: Set<string>
 }
@@ -57,6 +58,7 @@ function emptyWorkspaceState(): WorkspaceState {
     questions: [],
     todos: {},
     sessionAgents: {},
+    sessionModels: {},
     lastViewedAt: {},
     pinnedSessionIds: new Set(),
   }
@@ -90,6 +92,13 @@ let _unifiedLastViewedCacheRefs = new Map<string, Record<string, number>>()
 
 let _unifiedPinnedCache: Set<string> = EMPTY_PINNED
 let _unifiedPinnedCacheRefs = new Map<string, Set<string>>()
+
+// Memoization caches for question-session-id selectors.
+const EMPTY_QUESTION_SESSION_IDS: Set<string> = new Set()
+let _activeQuestionSessionIdsCache: Set<string> = EMPTY_QUESTION_SESSION_IDS
+let _activeQuestionSessionIdsCacheRef: QuestionRequest[] = EMPTY_QUESTIONS
+let _unifiedQuestionSessionIdsCache: Set<string> = EMPTY_QUESTION_SESSION_IDS
+let _unifiedQuestionSessionIdsCacheRefs = new Map<string, QuestionRequest[]>()
 
 // RAF-batched buffer for message.part.updated events.
 // Keyed: sessionId → messageId → partId → Part
@@ -301,6 +310,7 @@ export interface SessionSnapshot {
   sessionStatus: SessionStatus | undefined
   todos: Todo[] | undefined
   sessionAgent: string | undefined
+  sessionModel: { providerID: string; modelID: string } | undefined
   lastViewedAt: number | undefined
   wasActive: boolean
 }
@@ -394,11 +404,16 @@ interface ChatState {
   getActiveTodos: () => Todo[]
   getRecentSessionsAcrossWorkspaces: (limit: number) => SessionWithWorkspace[]
   getUnifiedSessionStatuses: () => Record<string, SessionStatus>
+  getActiveQuestionSessionIds: () => Set<string>
+  getUnifiedQuestionSessionIds: () => Set<string>
   getUnifiedLastViewedAt: () => Record<string, number>
   getUnifiedPinnedSessionIds: () => Set<string>
   getActivePinnedSessionIds: () => Set<string>
   setSessionAgent: (sessionId: string, workspaceId: string, agent: string) => void
   getSessionAgent: (sessionId: string) => string | null
+  setSessionModel: (sessionId: string, workspaceId: string, model: { providerID: string; modelID: string }) => void
+  clearSessionModel: (sessionId: string, workspaceId: string) => void
+  getSessionModel: (sessionId: string) => { providerID: string; modelID: string } | null
 
   fetchCachedSessions: (workspaceId: string) => Promise<void>
   fetchPinnedSessions: (workspaceId: string) => Promise<void>
@@ -537,10 +552,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   fetchSessions: async (workspaceId) => {
     try {
-      const response = await fetch(buildProxyUrl("session", workspaceId))
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10_000)
+      const response = await fetch(buildProxyUrl("session", workspaceId), {
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
       if (!response.ok) {
-        console.warn(`[chat] fetchSessions failed: ${response.status}`)
-        set((state) => updateWorkspace(state, workspaceId, () => ({ sessionsLoaded: true })))
+        console.warn(`[chat] fetchSessions failed: ${response.status}, falling back to cache`)
+        await get().fetchCachedSessions(workspaceId)
+        set((state) => {
+          if (state.workspaceStates[workspaceId]?.sessionsLoaded) return state
+          return updateWorkspace(state, workspaceId, () => ({ sessionsLoaded: true }))
+        })
         return
       }
 
@@ -570,6 +594,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
               sessionStatuses: prune(ws.sessionStatuses),
               todos: prune(ws.todos),
               sessionAgents: prune(ws.sessionAgents),
+              sessionModels: prune(ws.sessionModels),
               lastViewedAt: prune(ws.lastViewedAt),
             },
           },
@@ -595,7 +620,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
     } catch (error) {
       console.warn("[chat] fetchSessions error:", error)
-      set((state) => updateWorkspace(state, workspaceId, () => ({ sessionsLoaded: true })))
+      await get().fetchCachedSessions(workspaceId)
+      set((state) => {
+        if (state.workspaceStates[workspaceId]?.sessionsLoaded) return state
+        return updateWorkspace(state, workspaceId, () => ({ sessionsLoaded: true }))
+      })
     }
   },
 
@@ -650,6 +679,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const { [sessionId]: _st, ...remainingStatuses } = ws.sessionStatuses
         const { [sessionId]: _t, ...remainingTodos } = ws.todos
         const { [sessionId]: _a, ...remainingSessionAgents } = ws.sessionAgents
+        const { [sessionId]: _sm, ...remainingSessionModels } = ws.sessionModels
         const { [sessionId]: _lv, ...remainingLastViewedAt } = ws.lastViewedAt
 
         let nextActiveSessionId = state.activeSessionId
@@ -675,6 +705,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
               sessionStatuses: remainingStatuses,
               todos: remainingTodos,
               sessionAgents: remainingSessionAgents,
+              sessionModels: remainingSessionModels,
               lastViewedAt: remainingLastViewedAt,
             },
           },
@@ -699,6 +730,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       sessionStatus: ws.sessionStatuses[sessionId],
       todos: ws.todos[sessionId],
       sessionAgent: ws.sessionAgents[sessionId],
+      sessionModel: ws.sessionModels[sessionId],
       lastViewedAt: ws.lastViewedAt[sessionId],
       wasActive: state.activeSessionId === sessionId,
     }
@@ -709,6 +741,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const { [sessionId]: _st, ...remainingStatuses } = ws.sessionStatuses
     const { [sessionId]: _t, ...remainingTodos } = ws.todos
     const { [sessionId]: _a, ...remainingSessionAgents } = ws.sessionAgents
+    const { [sessionId]: _sm, ...remainingSessionModels } = ws.sessionModels
     const { [sessionId]: _lv, ...remainingLastViewedAt } = ws.lastViewedAt
 
     let nextActiveSessionId = state.activeSessionId
@@ -734,6 +767,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           sessionStatuses: remainingStatuses,
           todos: remainingTodos,
           sessionAgents: remainingSessionAgents,
+          sessionModels: remainingSessionModels,
           lastViewedAt: remainingLastViewedAt,
         },
       },
@@ -760,6 +794,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
       if (snapshot.sessionAgent !== undefined) {
         restored.sessionAgents = { ...ws.sessionAgents, [snapshot.sessionId]: snapshot.sessionAgent }
+      }
+      if (snapshot.sessionModel !== undefined) {
+        restored.sessionModels = { ...ws.sessionModels, [snapshot.sessionId]: snapshot.sessionModel }
       }
       if (snapshot.lastViewedAt !== undefined) {
         restored.lastViewedAt = { ...ws.lastViewedAt, [snapshot.sessionId]: snapshot.lastViewedAt }
@@ -1500,6 +1537,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           const { [info.id]: _st, ...remainingStatuses } = ws.sessionStatuses
           const { [info.id]: _t, ...remainingTodos } = ws.todos
           const { [info.id]: _a, ...remainingSessionAgents } = ws.sessionAgents
+          const { [info.id]: _sm, ...remainingSessionModels } = ws.sessionModels
           const { [info.id]: _lv, ...remainingLastViewedAt } = ws.lastViewedAt
 
           let nextActiveSessionId = state.activeSessionId
@@ -1525,6 +1563,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
                 sessionStatuses: remainingStatuses,
                 todos: remainingTodos,
                 sessionAgents: remainingSessionAgents,
+                sessionModels: remainingSessionModels,
                 lastViewedAt: remainingLastViewedAt,
               },
             },
@@ -1883,6 +1922,49 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     return _unifiedStatusesCache
   },
 
+  getActiveQuestionSessionIds: () => {
+    const { activeWorkspaceId, workspaceStates } = get()
+    if (!activeWorkspaceId) return EMPTY_QUESTION_SESSION_IDS
+    const ws = workspaceStates[activeWorkspaceId]
+    if (!ws) return EMPTY_QUESTION_SESSION_IDS
+    const questions = ws.questions
+    if (questions === _activeQuestionSessionIdsCacheRef) return _activeQuestionSessionIdsCache
+    _activeQuestionSessionIdsCacheRef = questions
+    if (questions.length === 0) {
+      _activeQuestionSessionIdsCache = EMPTY_QUESTION_SESSION_IDS
+      return _activeQuestionSessionIdsCache
+    }
+    const ids = new Set<string>()
+    for (const q of questions) ids.add(q.sessionID)
+    _activeQuestionSessionIdsCache = ids
+    return _activeQuestionSessionIdsCache
+  },
+
+  getUnifiedQuestionSessionIds: () => {
+    const { workspaceStates } = get()
+    const entries = Object.entries(workspaceStates)
+
+    if (entries.length === 0) return EMPTY_QUESTION_SESSION_IDS
+
+    if (
+      entries.length === _unifiedQuestionSessionIdsCacheRefs.size &&
+      entries.every(([id, ws]) => _unifiedQuestionSessionIdsCacheRefs.get(id) === ws.questions)
+    ) {
+      return _unifiedQuestionSessionIdsCache
+    }
+
+    const merged = new Set<string>()
+    const newRefs = new Map<string, QuestionRequest[]>()
+    for (const [wsId, ws] of entries) {
+      newRefs.set(wsId, ws.questions)
+      for (const q of ws.questions) merged.add(q.sessionID)
+    }
+
+    _unifiedQuestionSessionIdsCache = merged.size > 0 ? merged : EMPTY_QUESTION_SESSION_IDS
+    _unifiedQuestionSessionIdsCacheRefs = newRefs
+    return _unifiedQuestionSessionIdsCache
+  },
+
   getUnifiedLastViewedAt: () => {
     const { workspaceStates } = get()
     const entries = Object.entries(workspaceStates)
@@ -1955,12 +2037,48 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     return workspaceStates[wsId]?.sessionAgents[sessionId] ?? null
   },
 
+  setSessionModel: (sessionId, workspaceId, model) => {
+    set((state) =>
+      updateWorkspace(state, workspaceId, (ws) => ({
+        sessionModels: { ...ws.sessionModels, [sessionId]: model },
+      }))
+    )
+  },
+
+  clearSessionModel: (sessionId, workspaceId) => {
+    set((state) =>
+      updateWorkspace(state, workspaceId, (ws) => {
+        const { [sessionId]: _, ...remaining } = ws.sessionModels
+        return { sessionModels: remaining }
+      })
+    )
+  },
+
+  getSessionModel: (sessionId) => {
+    const { activeWorkspaceId, workspaceStates } = get()
+    const wsId = activeWorkspaceId ?? findWorkspaceForSession(workspaceStates, sessionId)
+    if (!wsId) return null
+    return workspaceStates[wsId]?.sessionModels[sessionId] ?? null
+  },
+
   fetchCachedSessions: async (workspaceId) => {
     try {
       const response = await fetch(`/api/sessions/cache?workspaceId=${workspaceId}`)
-      if (!response.ok) return
+      if (!response.ok) {
+        set((state) => {
+          if (state.workspaceStates[workspaceId]?.sessionsLoaded) return state
+          return updateWorkspace(state, workspaceId, () => ({ sessionsLoaded: true }))
+        })
+        return
+      }
       const data = await response.json()
-      if (!Array.isArray(data) || data.length === 0) return
+      if (!Array.isArray(data) || data.length === 0) {
+        set((state) => {
+          if (state.workspaceStates[workspaceId]?.sessionsLoaded) return state
+          return updateWorkspace(state, workspaceId, () => ({ sessionsLoaded: true }))
+        })
+        return
+      }
       const sessionsMap: Record<string, Session> = {}
       for (const session of data) {
         sessionsMap[session.id] = session
@@ -1970,7 +2088,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         if (ws && Object.keys(ws.sessions).length > 0) return state
         return updateWorkspace(state, workspaceId, () => ({ sessions: sessionsMap, sessionsLoaded: true }))
       })
-    } catch {}
+    } catch {
+      set((state) => {
+        if (state.workspaceStates[workspaceId]?.sessionsLoaded) return state
+        return updateWorkspace(state, workspaceId, () => ({ sessionsLoaded: true }))
+      })
+    }
   },
 
   fetchPinnedSessions: async (workspaceId) => {

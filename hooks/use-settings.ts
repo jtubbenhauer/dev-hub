@@ -17,7 +17,7 @@ interface SelectedModel {
 export const SETTINGS_KEYS = {
   MODEL_ALLOWLIST: "model-allowlist",
   MODEL_AGENT_BINDINGS: "model-agent-bindings",
-  VIM_MODE: "vim-mode",
+
   FONT_SIZE: "font-size",
   MOBILE_FONT_SIZE: "mobile-font-size",
   TAB_SIZE: "tab-size",
@@ -49,13 +49,12 @@ export const SETTINGS_KEYS = {
   TERMINAL_FONT: "terminal-font",
 } as const;
 
-export type EditorType = "codemirror" | "monaco" | "neovim";
+export type EditorType = "monaco" | "neovim";
 export const EDITOR_TYPE_OPTIONS: EditorType[] = [
-  "codemirror",
   "monaco",
   "neovim",
 ];
-export const DEFAULT_EDITOR_TYPE: EditorType = "codemirror";
+export const DEFAULT_EDITOR_TYPE: EditorType = "monaco";
 
 export type NvimAppName = "devhub" | "personal" | string;
 export const DEFAULT_NVIM_APPNAME: NvimAppName = "devhub";
@@ -227,14 +226,6 @@ export function useModelAgentBindings(): {
   return { bindings, isLoading };
 }
 
-export function useVimModeSetting(): {
-  isVimMode: boolean;
-  isLoading: boolean;
-} {
-  const { data, isLoading } = useSettings();
-  const raw = data?.[SETTINGS_KEYS.VIM_MODE];
-  return { isVimMode: raw === true, isLoading };
-}
 
 export function useFontSizeSetting(): {
   fontSize: FontSize;

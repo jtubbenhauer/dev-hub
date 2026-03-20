@@ -17,7 +17,6 @@ function resetStore() {
   useEditorStore.setState({
     openFiles: [],
     activeFilePath: null,
-    isVimMode: false,
     isFileTreeOpen: true,
     diffViewMode: "unified",
   })
@@ -175,25 +174,6 @@ describe("markFileSaved", () => {
     // editing back to v2 should be clean
     useEditorStore.getState().updateFileContent("a.ts", "v2")
     expect(useEditorStore.getState().openFiles[0].isDirty).toBe(false)
-  })
-})
-
-describe("toggleVimMode / setVimMode", () => {
-  beforeEach(resetStore)
-
-  it("toggles vim mode", () => {
-    expect(useEditorStore.getState().isVimMode).toBe(false)
-    useEditorStore.getState().toggleVimMode()
-    expect(useEditorStore.getState().isVimMode).toBe(true)
-    useEditorStore.getState().toggleVimMode()
-    expect(useEditorStore.getState().isVimMode).toBe(false)
-  })
-
-  it("sets vim mode directly", () => {
-    useEditorStore.getState().setVimMode(true)
-    expect(useEditorStore.getState().isVimMode).toBe(true)
-    useEditorStore.getState().setVimMode(false)
-    expect(useEditorStore.getState().isVimMode).toBe(false)
   })
 })
 

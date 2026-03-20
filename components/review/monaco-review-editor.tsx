@@ -13,7 +13,6 @@ import dynamic from "next/dynamic"
 import type { editor } from "monaco-editor"
 import { Check, ChevronRight, Loader2, Save, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { VimToggle } from "@/components/editor/vim-toggle"
 import { DiffViewToggle } from "@/components/editor/diff-view-toggle"
 import { useEditorStore } from "@/stores/editor-store"
 import { useTheme } from "@/components/providers/theme-provider"
@@ -424,7 +423,6 @@ export const MonacoReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorPro
           </span>
 
           <DiffViewToggle />
-          <VimToggle />
 
           <Button
             variant="ghost"

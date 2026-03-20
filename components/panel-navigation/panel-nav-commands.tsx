@@ -5,6 +5,7 @@ import { useLeaderAction } from "@/hooks/use-leader-action"
 import { usePanelNavigationSetting } from "@/hooks/use-settings"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { usePanelNavigationStore } from "@/stores/panel-navigation-store"
+import { isEditorElement } from "@/lib/utils"
 
 function isInputFocused(): boolean {
   const el = document.activeElement
@@ -12,7 +13,7 @@ function isInputFocused(): boolean {
   const tag = el.tagName
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true
   if ((el as HTMLElement).isContentEditable) return true
-  if (el.closest(".cm-editor")) return true
+  if (isEditorElement(el)) return true
   return false
 }
 

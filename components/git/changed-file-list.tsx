@@ -9,7 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+import { cn, isEditorElement } from "@/lib/utils"
 import type { ReviewChangedFile, ReviewFileStatus } from "@/types"
 
 const STATUS_CHAR: Record<ReviewFileStatus, string> = {
@@ -58,7 +58,7 @@ export function ChangedFileList({
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.closest(".cm-editor"))
+        (e.target instanceof HTMLElement && isEditorElement(e.target))
       ) {
         return
       }

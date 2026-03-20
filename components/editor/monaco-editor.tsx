@@ -3,7 +3,6 @@
 import { useRef, useCallback, useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 import type { editor } from "monaco-editor"
-import { useEditorStore } from "@/stores/editor-store"
 import { useTheme } from "@/components/providers/theme-provider"
 import { registerMonacoThemes, getMonacoThemeName, MONACO_FONT_FAMILY } from "@/lib/editor/monaco-themes"
 import { useFontSizeSetting, useMobileFontSizeSetting, useTabSizeSetting } from "@/hooks/use-settings"
@@ -83,7 +82,6 @@ export function MonacoEditor({
   const { mobileFontSize } = useMobileFontSizeSetting()
   const { tabSize } = useTabSizeSetting()
   const isMobile = useIsMobile()
-  const isVimMode = useEditorStore((s) => s.isVimMode)
 
   const activeSessionId = useChatStore((s) => s.activeSessionId)
   const isCommentMode = !!(workspaceId && filePath)
@@ -258,8 +256,8 @@ export function MonacoEditor({
           folding: true,
           foldingStrategy: "indentation",
           glyphMargin: isCommentMode,
-          suggestOnTriggerCharacters: !isVimMode,
-          quickSuggestions: isVimMode ? false : { other: true, comments: false, strings: false },
+          suggestOnTriggerCharacters: true,
+          quickSuggestions: { other: true, comments: false, strings: false },
         }}
       />
 

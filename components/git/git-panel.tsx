@@ -43,7 +43,7 @@ import { BranchSelector } from "@/components/git/branch-selector"
 import { CommitLog } from "@/components/git/commit-log"
 import { PrPanel } from "@/components/git/pr-panel"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
+import { cn, isEditorElement } from "@/lib/utils"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import { useLeaderAction } from "@/hooks/use-leader-action"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -409,7 +409,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           handler: () => {
             const file = selectedFileRef.current
             if (!file) return
-            const editorWasFocused = document.activeElement?.closest(".cm-editor") !== null
+            const editorWasFocused = isEditorElement(document.activeElement)
             handleToggleReviewedRef.current(file)
             const flatFiles = buildFlatFiles(statusRef.current, sortModeRef.current)
             const selectedIndex = flatFiles.findIndex(

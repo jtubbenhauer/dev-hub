@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
+import { cn, isEditorElement } from "@/lib/utils"
 import {
   Check,
   FilePlus,
@@ -74,11 +74,10 @@ export function ReviewFileList({
 
   const handleKeyboard = useCallback(
     (e: KeyboardEvent) => {
-      // Skip if user is typing in an input or inside the CodeMirror editor
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.closest(".cm-editor"))
+        (e.target instanceof HTMLElement && isEditorElement(e.target))
       ) {
         return
       }

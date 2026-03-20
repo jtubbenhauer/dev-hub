@@ -19,7 +19,6 @@ interface WorkspaceFileState {
 interface EditorState {
   openFiles: OpenFile[]
   activeFilePath: string | null
-  isVimMode: boolean
   isFileTreeOpen: boolean
   diffViewMode: DiffViewMode
   workspaceFileStates: Record<string, WorkspaceFileState>
@@ -29,8 +28,6 @@ interface EditorState {
   setActiveFile: (path: string) => void
   updateFileContent: (path: string, content: string) => void
   markFileSaved: (path: string) => void
-  toggleVimMode: () => void
-  setVimMode: (enabled: boolean) => void
   toggleFileTree: () => void
   setFileTreeOpen: (open: boolean) => void
   toggleDiffViewMode: () => void
@@ -58,7 +55,6 @@ export const useEditorStore = create<EditorState>()(
     (set, get) => ({
       openFiles: [],
       activeFilePath: null,
-      isVimMode: false,
       isFileTreeOpen: true,
       diffViewMode: "unified" as DiffViewMode,
       workspaceFileStates: {},
@@ -113,9 +109,6 @@ export const useEditorStore = create<EditorState>()(
               : f
           ),
         })),
-
-      toggleVimMode: () => set((state) => ({ isVimMode: !state.isVimMode })),
-      setVimMode: (enabled) => set({ isVimMode: enabled }),
 
       toggleFileTree: () =>
         set((state) => ({ isFileTreeOpen: !state.isFileTreeOpen })),
@@ -214,7 +207,6 @@ export const useEditorStore = create<EditorState>()(
     {
       name: "dev-hub-editor",
       partialize: (state) => ({
-        isVimMode: state.isVimMode,
         isFileTreeOpen: state.isFileTreeOpen,
         diffViewMode: state.diffViewMode,
         workspaceFileStates: state.workspaceFileStates,

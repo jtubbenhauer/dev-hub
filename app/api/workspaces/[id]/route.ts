@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
-import { workspaces, settings } from "@/drizzle/schema"
+import { workspaces, settings, cachedSessions } from "@/drizzle/schema"
 import { eq, and } from "drizzle-orm"
 import { exec } from "node:child_process"
 import { removeWorktree, pruneWorktrees } from "@/lib/git/worktrees"
@@ -152,6 +152,13 @@ export async function DELETE(
   await db
     .delete(workspaces)
     .where(eq(workspaces.id, id))
+
+  try {
+    await db
+      .delete(cachedSessions)
+      .where(eq(cachedSessions.workspaceId, id))
+  } catch {
+  }
 
   return NextResponse.json({
     deleted: true,

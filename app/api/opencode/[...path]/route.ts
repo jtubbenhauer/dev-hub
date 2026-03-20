@@ -115,6 +115,10 @@ async function proxyToOpenCode(
     fetchOptions.body = await request.text()
   }
 
+  if (!isSSE) {
+    fetchOptions.signal = AbortSignal.timeout(15_000)
+  }
+
   try {
     const upstream = await fetch(targetUrl.toString(), fetchOptions)
 
@@ -146,12 +150,13 @@ async function proxyToOpenCode(
       headers: responseHeaders,
     })
   } catch (error) {
+    const isTimeout = error instanceof DOMException && error.name === "TimeoutError"
     const message =
       error instanceof Error ? error.message : "Proxy request failed"
-    console.error(`[opencode-proxy] ${request.method} ${opencodePath} failed: ${message}`)
+    console.error(`[opencode-proxy] ${request.method} ${opencodePath} ${isTimeout ? "timed out" : "failed"}: ${message}`)
     return NextResponse.json(
       { error: "OpenCode proxy error", detail: message },
-      { status: 502 }
+      { status: isTimeout ? 504 : 502 }
     )
   }
 }

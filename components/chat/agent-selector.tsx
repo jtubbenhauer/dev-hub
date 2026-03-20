@@ -90,7 +90,7 @@ export function AgentSelector({
           size="sm"
           role="combobox"
           aria-expanded={isOpen}
-          className="max-w-[120px] gap-1.5 text-xs sm:max-w-[160px]"
+          className="min-w-0 shrink max-w-[120px] gap-1.5 overflow-hidden text-xs md:max-w-[160px]"
         >
           <span className="flex items-center gap-1.5 truncate">
             {activeAgent?.color && (

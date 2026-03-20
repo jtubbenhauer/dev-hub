@@ -10,6 +10,7 @@ import { CommandPaletteProvider } from "@/components/providers/command-palette-p
 import { CommandPalette } from "@/components/command-palette/command-palette"
 import { FilePickerProvider, FilePickerDialog } from "@/components/file-picker/file-picker"
 import { SessionPickerProvider, SessionPickerDialog } from "@/components/session-picker/session-picker"
+import { TaskPickerProvider, TaskPickerDialog } from "@/components/task-picker/task-picker"
 import { LeaderKeyProvider } from "@/components/providers/leader-key-provider"
 import { WhichKeyPanel } from "@/components/leader-key/which-key-panel"
 import { useLeaderKeyBindings, useLeaderWhichKeySetting, useLeaderTimeoutSetting } from "@/hooks/use-settings"
@@ -51,13 +52,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <CommandPaletteProvider>
               <FilePickerProvider>
                 <SessionPickerProvider>
-                  <LeaderKeySetup>
-                    {children}
-                    <CommandPalette />
-                    <FilePickerDialog />
-                    <SessionPickerDialog />
-                    <Toaster />
-                  </LeaderKeySetup>
+                  <TaskPickerProvider>
+                    <LeaderKeySetup>
+                      {children}
+                      <CommandPalette />
+                      <FilePickerDialog />
+                      <SessionPickerDialog />
+                      <TaskPickerDialog />
+                      <Toaster />
+                    </LeaderKeySetup>
+                  </TaskPickerProvider>
                 </SessionPickerProvider>
               </FilePickerProvider>
             </CommandPaletteProvider>

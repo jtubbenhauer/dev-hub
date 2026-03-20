@@ -203,3 +203,4 @@ API routes live in `app/api/` and follow Next.js App Router conventions:
 3. **DB path:** Configured via `DB_PATH` env var, defaults to `./dev-hub.db`.
 4. **Worktree types:** `WorkspaceRow` is inferred from the schema (`typeof workspaces.$inferSelect`), so adding columns to the schema auto-propagates to all typed references.
 5. **Fresh DB:** If starting from scratch, `pnpm db:push` creates all tables. The auto-migration in `instrumentation.ts` handles journal seeding. After that, never use `db:push` again — use `db:generate` + restart.
+6. **Dual editor engines:** The diff/code editor has two implementations — CodeMirror (`pr-diff-editor.tsx`, `diff-editor.tsx`) and Monaco (`monaco-pr-diff-editor.tsx`, `monaco-diff-editor.tsx`). A user setting (`editorType`) controls which one renders. Any change to editor UI (toolbar, headers, features) must be applied to **both** implementations.

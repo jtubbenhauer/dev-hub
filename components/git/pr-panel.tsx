@@ -20,6 +20,8 @@ import {
   Clock,
   FileDiff,
   RotateCcw,
+  List,
+  FolderTree,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -79,6 +81,21 @@ interface PrPanelProps {
   onClose: () => void
 }
 
+function formatRelativeDate(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMinutes = Math.floor(diffMs / 60_000)
+  const diffHours = Math.floor(diffMs / 3_600_000)
+  const diffDays = Math.floor(diffMs / 86_400_000)
+
+  if (diffMinutes < 1) return "just now"
+  if (diffMinutes < 60) return `${diffMinutes}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 30) return `${diffDays}d ago`
+  return date.toLocaleDateString()
+}
+
 function encodePrParam(pr: GitHubPullRequest): string {
   return `${pr.base.repo.full_name}/${pr.number}`
 }
@@ -96,6 +113,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false)
   const [isPrListOpen, setIsPrListOpen] = useState(false)
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false)
+  const [groupByFolder, setGroupByFolder] = useState(false)
   const restoredPrRef = useRef(false)
 
   const isMobile = useIsMobile()
@@ -339,7 +357,22 @@ export function PrPanel({ onClose }: PrPanelProps) {
           <Sheet open={isMobileFileListOpen} onOpenChange={setIsMobileFileListOpen}>
             <SheetContent side="left" className="w-[280px] p-0" showCloseButton={false}>
               <SheetHeader className="border-b px-3 py-2">
-                <SheetTitle className="text-sm">Changed files</SheetTitle>
+                <div className="flex items-center justify-between">
+                  <SheetTitle className="text-sm">Changed files</SheetTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="text-muted-foreground"
+                        onClick={() => setGroupByFolder((prev) => !prev)}
+                      >
+                        {groupByFolder ? <List className="size-3.5" /> : <FolderTree className="size-3.5" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{groupByFolder ? "Flat list" : "Group by folder"}</TooltipContent>
+                  </Tooltip>
+                </div>
               </SheetHeader>
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <PrFileList
@@ -348,6 +381,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
                   isLoading={isFilesLoading}
                   reviewedFilenames={reviewedFilenames}
                   commentCountByFilename={commentCountByFilename}
+                  groupByFolder={groupByFolder}
                   onSelectFile={handleSelectFile}
                   onToggleReviewed={handleToggleReviewed}
                 />
@@ -371,6 +405,19 @@ export function PrPanel({ onClose }: PrPanelProps) {
                   · {reviewedFilenames.size} reviewed
                 </span>
               )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="ml-auto text-muted-foreground"
+                    onClick={() => setGroupByFolder((prev) => !prev)}
+                  >
+                    {groupByFolder ? <List className="size-3.5" /> : <FolderTree className="size-3.5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{groupByFolder ? "Flat list" : "Group by folder"}</TooltipContent>
+              </Tooltip>
             </div>
             <PrFileList
               files={prFiles}
@@ -378,6 +425,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
               isLoading={isFilesLoading}
               reviewedFilenames={reviewedFilenames}
               commentCountByFilename={commentCountByFilename}
+              groupByFolder={groupByFolder}
               onSelectFile={handleSelectFile}
               onToggleReviewed={handleToggleReviewed}
             />
@@ -395,7 +443,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
         )}
 
         {/* Diff editor */}
-<div className="flex h-full min-h-0 flex-1 flex-col">
+        <div className="flex h-full min-h-0 flex-1 flex-col">
           {fileContent ? (
             <PrDiffEditor
               ref={editorHandleRef}
@@ -596,11 +644,11 @@ function PrListItems({ prs, selectedPr, onSelect, currentUser, showMyReviewStatu
               onClick={() => onSelect(pr)}
             >
               <div className="flex items-start gap-2">
-                <GitPullRequest className="mt-0.5 size-3.5 shrink-0 text-green-500" />
+                <GitPullRequest className={cn("mt-0.5 size-3.5 shrink-0", pr.draft ? "text-muted-foreground" : "text-green-500")} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-foreground leading-tight">{pr.title}</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {repoName} #{pr.number}
+                    {repoName} #{pr.number} · {formatRelativeDate(pr.created_at)}
                   </p>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                     {!isOwnPr && <span>{pr.user.login}</span>}
@@ -613,11 +661,7 @@ function PrListItems({ prs, selectedPr, onSelect, currentUser, showMyReviewStatu
                         {pr.review_comments}
                       </span>
                     )}
-                    {pr.draft && (
-                      <span className="rounded bg-muted px-1 py-px text-[10px] font-medium">
-                        Draft
-                      </span>
-                    )}
+
                     <PrListChecksBadge owner={pr.base.repo.owner.login} repo={pr.base.repo.name} headSha={pr.head.sha} />
                     <span className="ml-auto">
                       +{pr.additions} -{pr.deletions}

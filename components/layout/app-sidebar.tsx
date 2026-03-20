@@ -19,6 +19,7 @@ import { useLeaderAction } from "@/hooks/use-leader-action"
 import { useCommandPalette } from "@/components/providers/command-palette-provider"
 import { useFilePicker } from "@/components/file-picker/file-picker"
 import { useSessionPicker } from "@/components/session-picker/session-picker"
+import { useTaskPicker } from "@/components/task-picker/task-picker"
 
 const navItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
@@ -37,6 +38,7 @@ export function AppSidebar() {
   const { open: openCommandPalette } = useCommandPalette()
   const { open: openFilePicker } = useFilePicker()
   const { open: openSessionPicker } = useSessionPicker()
+  const { open: openTaskPicker } = useTaskPicker()
 
   const navCommands = useMemo(
     () =>
@@ -63,6 +65,8 @@ export function AppSidebar() {
   openFilePickerRef.current = openFilePicker
   const openSessionPickerRef = useRef(openSessionPicker)
   openSessionPickerRef.current = openSessionPicker
+  const openTaskPickerRef = useRef(openTaskPicker)
+  openTaskPickerRef.current = openTaskPicker
 
   const globalLeaderActions = useMemo(
     () => [
@@ -102,13 +106,17 @@ export function AppSidebar() {
         action: { id: "global:file-picker", label: "Open file picker", page: "global" as const },
         handler: () => openFilePickerRef.current(),
       },
-      {
-        action: { id: "global:session-picker", label: "Open session picker", page: "global" as const },
-        handler: () => openSessionPickerRef.current(),
-      },
-    ],
-    []
-  )
+       {
+         action: { id: "global:session-picker", label: "Open session picker", page: "global" as const },
+         handler: () => openSessionPickerRef.current(),
+       },
+       {
+         action: { id: "global:task-picker", label: "Open task picker", page: "global" as const },
+         handler: () => openTaskPickerRef.current(),
+       },
+     ],
+     []
+   )
 
   useLeaderAction(globalLeaderActions)
 

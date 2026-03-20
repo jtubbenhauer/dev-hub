@@ -10,11 +10,13 @@ import type { PromptInputHandle } from "@/components/chat/prompt-input";
 import { PromptInput } from "@/components/chat/prompt-input";
 import { SessionList } from "@/components/chat/session-list";
 import { TaskProgressPanel } from "@/components/chat/task-progress";
+import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { VariantSelector } from "@/components/chat/variant-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useCommand } from "@/hooks/use-command";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -237,6 +239,16 @@ export function ChatInterface() {
     }));
   }, [allWorkspaces]);
 
+  const sleepingWorkspaceIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const ws of allWorkspaces) {
+      if (!shouldSSEConnect(ws, activeWorkspaceId)) {
+        ids.add(ws.id);
+      }
+    }
+    return ids;
+  }, [allWorkspaces, activeWorkspaceId]);
+
   const { primaryAgents } = useAgents(activeWorkspaceId);
   const orderedAgents = useMemo(() => {
     const utilityNames = new Set(["compaction", "title", "summary"])
@@ -253,17 +265,50 @@ export function ChatInterface() {
   }, [primaryAgents])
   const { bindings: agentModelBindings } = useModelAgentBindings();
 
+  // Track the previous agent so we only force-set the model when the agent
+  // actually changes — not when other deps (primaryAgents, bindings) re-render.
+  // This lets the user manually override the model within a session.
+  const prevAgentRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!selectedAgent || primaryAgents.length === 0) return;
+
+    const agentChanged = prevAgentRef.current !== selectedAgent;
+    prevAgentRef.current = selectedAgent;
+
     const agent = primaryAgents.find((a) => a.name === selectedAgent);
-    if (agent?.model) {
-      setSelectedModel(agent.model);
-    } else {
-      const bound = agentModelBindings[selectedAgent];
-      if (bound) setSelectedModel(bound);
+
+    // When the session has a stored model override, skip auto-deriving model from agent.
+    // On agent change within a session, clearSessionModel is called first (see AgentSelector),
+    // so this guard only preserves overrides during session switches.
+    const hasStoredModel = activeSessionId ? !!getSessionModel(activeSessionId) : false;
+
+    if ((agentChanged || !selectedModel) && !hasStoredModel) {
+      if (agent?.model) {
+        setSelectedModel(agent.model);
+      } else {
+        const bound = agentModelBindings[selectedAgent];
+        if (bound) setSelectedModel(bound);
+      }
     }
-    setSelectedVariant(agent?.variant ?? null);
-  }, [selectedAgent, primaryAgents, agentModelBindings]);
+
+    // Agent config can advertise a variant (e.g. "high") not in the model's variant map → API error
+    if (agentChanged) {
+      const agentVariant = agent?.variant ?? null;
+      if (agentVariant && availableVariants.length > 0 && !availableVariants.includes(agentVariant)) {
+        setSelectedVariant(null);
+      } else {
+        setSelectedVariant(agentVariant);
+      }
+    }
+  }, [selectedAgent, primaryAgents, agentModelBindings, availableVariants, selectedModel]);
+
+  useEffect(() => {
+    if (selectedVariant && availableVariants.length > 0 && !availableVariants.includes(selectedVariant)) {
+      setSelectedVariant(null);
+    }
+  }, [availableVariants, selectedVariant]);
+
   const {
     activeSessionId,
     streamingError,
@@ -294,29 +339,44 @@ export function ChatInterface() {
     getRecentSessionsAcrossWorkspaces,
     getActiveTodos,
     getUnifiedSessionStatuses,
+    getActiveQuestionSessionIds,
+    getUnifiedQuestionSessionIds,
     getUnifiedLastViewedAt,
     getUnifiedPinnedSessionIds,
     getActivePinnedSessionIds,
     setSessionAgent,
     getSessionAgent,
+    setSessionModel,
+    clearSessionModel,
+    getSessionModel,
     fetchPinnedSessions,
     pinSession,
     unpinSession,
     getPinnedSessionIds,
+    fetchCachedSessions,
   } = useChatStore();
 
   // Restore per-session agent when the active session changes.
   // Falls back to "code" (or the first available agent) when the session has no stored agent.
   useEffect(() => {
     if (primaryAgents.length === 0) return;
-    const stored = activeSessionId ? getSessionAgent(activeSessionId) : null;
-    if (stored) {
-      setSelectedAgent(stored);
-    } else if (!selectedAgent) {
+
+    // Restore agent
+    const storedAgent = activeSessionId ? getSessionAgent(activeSessionId) : null;
+    if (storedAgent) {
+      setSelectedAgent(storedAgent);
+    } else {
       const defaultAgent =
         primaryAgents.find((a) => a.name === "code") ?? primaryAgents[0];
       setSelectedAgent(defaultAgent.name);
     }
+
+    // Restore model override (if session has one stored)
+    const storedModel = activeSessionId ? getSessionModel(activeSessionId) : null;
+    if (storedModel) {
+      setSelectedModel(storedModel);
+    }
+    // If no stored model, the agent-change useEffect will derive it from agent binding
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, primaryAgents]);
 
@@ -332,8 +392,13 @@ export function ChatInterface() {
     : undefined
   const [unifiedLimit, setUnifiedLimit] = useState(20)
   const effectiveUnifiedLimit = groupByWorkspace ? Number.MAX_SAFE_INTEGER : unifiedLimit
-  const unifiedSessions = useChatStore((state) =>
+  const allUnifiedSessions = useChatStore((state) =>
     state.getRecentSessionsAcrossWorkspaces(effectiveUnifiedLimit)
+  )
+  const workspaceIds = useMemo(() => new Set(allWorkspaces.map((w) => w.id)), [allWorkspaces])
+  const unifiedSessions = useMemo(
+    () => allUnifiedSessions.filter((s) => workspaceIds.has(s.workspaceId)),
+    [allUnifiedSessions, workspaceIds]
   )
   const totalUnifiedCount = useChatStore((state) => {
     let count = 0
@@ -367,6 +432,9 @@ export function ChatInterface() {
   const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
   const activePinnedIds = useChatStore(getActivePinnedSessionIds);
   const pinnedSessionIds = isUnifiedMode ? unifiedPinnedIds : activePinnedIds;
+  const activeQuestionSessionIds = useChatStore(getActiveQuestionSessionIds);
+  const unifiedQuestionSessionIds = useChatStore(getUnifiedQuestionSessionIds);
+  const questionSessionIds = isUnifiedMode ? unifiedQuestionSessionIds : activeQuestionSessionIds;
 
   const isSessionsLoading = useChatStore((s) => {
     if (isUnifiedMode) {
@@ -423,10 +491,16 @@ export function ChatInterface() {
   useEffect(() => {
     if (!isUnifiedMode) return;
     for (const ws of allWorkspaces) {
-      fetchSessions(ws.id);
-      fetchPinnedSessions(ws.id);
+      if (shouldSSEConnect(ws, activeWorkspaceId)) {
+        // Awake workspace — fetch live sessions
+        fetchSessions(ws.id);
+        fetchPinnedSessions(ws.id);
+      } else {
+        // Sleeping workspace — use cached sessions from DB
+        fetchCachedSessions(ws.id);
+      }
     }
-  }, [isUnifiedMode, allWorkspaces, fetchSessions, fetchPinnedSessions]);
+  }, [isUnifiedMode, allWorkspaces, activeWorkspaceId, fetchSessions, fetchPinnedSessions, fetchCachedSessions]);
 
   // Fetch messages when active session changes
   useEffect(() => {
@@ -691,6 +765,7 @@ export function ChatInterface() {
   const handleSelectSession = useCallback(
     (sessionId: string) => {
       setActiveSession(sessionId);
+      requestAnimationFrame(() => promptInputRef.current?.focus());
     },
     [setActiveSession],
   );
@@ -699,6 +774,7 @@ export function ChatInterface() {
     (sessionId: string) => {
       setActiveSession(sessionId);
       setIsMobileSessionsOpen(false);
+      requestAnimationFrame(() => promptInputRef.current?.focus());
     },
     [setActiveSession],
   );
@@ -711,12 +787,23 @@ export function ChatInterface() {
 
   const handleSelectUnifiedSession = useCallback(
     (sessionId: string, workspaceId: string) => {
+      const ws = allWorkspaces.find((w) => w.id === workspaceId);
+      const isSleeping = ws && !shouldSSEConnect(ws, activeWorkspaceId);
+
       useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
       setActiveWorkspaceId(workspaceId);
       setActiveSession(sessionId);
       setIsMobileSessionsOpen(false);
+      requestAnimationFrame(() => promptInputRef.current?.focus());
+
+      if (isSleeping) {
+        toast("Waking workspace…", {
+          description: "This may take a few seconds",
+        });
+        fetchSessions(workspaceId);
+      }
     },
-    [setActiveWorkspaceId, setActiveSession],
+    [allWorkspaces, activeWorkspaceId, setActiveWorkspaceId, setActiveSession, fetchSessions],
   );
 
   const handleToggleUnifiedMode = useCallback(() => {
@@ -725,12 +812,16 @@ export function ChatInterface() {
       localStorage.setItem("dev-hub:chat-unified-mode", String(next));
       if (next) {
         for (const ws of allWorkspaces) {
-          fetchSessions(ws.id);
+          if (shouldSSEConnect(ws, activeWorkspaceId)) {
+            fetchSessions(ws.id);
+          } else {
+            fetchCachedSessions(ws.id);
+          }
         }
       }
       return next;
     });
-  }, [allWorkspaces, fetchSessions]);
+  }, [allWorkspaces, activeWorkspaceId, fetchSessions, fetchCachedSessions]);
 
   const handleToggleGroupByWorkspace = useCallback(() => {
     setGroupByWorkspace((prev) => {
@@ -739,6 +830,18 @@ export function ChatInterface() {
       return next;
     });
   }, []);
+
+  const handleWakeWorkspace = useCallback(
+    (workspaceId: string) => {
+      useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
+      setActiveWorkspaceId(workspaceId);
+      toast("Waking workspace…", {
+        description: "This may take a few seconds",
+      });
+      fetchSessions(workspaceId);
+    },
+    [setActiveWorkspaceId, fetchSessions],
+  );
 
   const handleWorkspaceOrderChange = useCallback((order: string[]) => {
     setWorkspaceOrder(order);
@@ -954,7 +1057,7 @@ export function ChatInterface() {
       },
       {
         id: "chat:toggle-task-panel",
-        label: isTaskPanelOpen ? "Hide Task Progress" : "Show Task Progress",
+        label: isTaskPanelOpen ? "Hide Side Panel" : "Show Side Panel",
         group: "Chat",
         icon: ListTodo,
         onSelect: () => setIsTaskPanelOpenRef.current((prev) => {
@@ -1043,7 +1146,7 @@ export function ChatInterface() {
         {
           action: {
             id: "chat:toggle-tasks",
-            label: "Toggle task progress",
+            label: "Toggle side panel",
             page: "chat" as const,
           },
           handler: () => setIsTaskPanelOpenRef.current((prev) => {
@@ -1131,7 +1234,7 @@ export function ChatInterface() {
   const tasksPanel = usePanelZone("chat-tasks", {
     neighbors: { left: "chat-messages" },
     focusRef: taskPanelFocusRef,
-    isVisible: isTaskPanelOpen && activeTodos.length > 0 && !isMobile,
+    isVisible: isTaskPanelOpen && !isMobile,
   });
 
   // Tab / Shift+Tab cycles through agents
@@ -1147,6 +1250,15 @@ export function ChatInterface() {
   activeSessionIdRef.current = activeSessionId;
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
+
+  const handleModelChange = useCallback((model: SelectedModel) => {
+    setSelectedModel(model);
+    const sid = activeSessionIdRef.current;
+    const wid = activeWorkspaceIdRef.current;
+    if (sid && wid) {
+      setSessionModel(sid, wid, model);
+    }
+  }, [setSessionModel]);
 
   useEffect(() => {
     const handleTabCycle = (e: KeyboardEvent) => {
@@ -1215,6 +1327,7 @@ export function ChatInterface() {
               onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
+              questionSessionIds={questionSessionIds}
               lastViewedAt={lastViewedAt}
               isLoading={isSessionsLoading}
               pinnedSessionIds={pinnedSessionIds}
@@ -1231,6 +1344,8 @@ export function ChatInterface() {
               onWorkspaceOrderChange={handleWorkspaceOrderChange}
               expandedWorkspaces={expandedWorkspaces}
               onToggleWorkspaceExpanded={handleToggleWorkspaceExpanded}
+              onWakeWorkspace={handleWakeWorkspace}
+              sleepingWorkspaceIds={sleepingWorkspaceIds}
             />
           ) : (
             <SessionList
@@ -1239,6 +1354,7 @@ export function ChatInterface() {
               workspaceColor={activeWorkspaceColor}
               activeSessionId={activeSessionId}
               sessionStatuses={sessionStatuses}
+              questionSessionIds={questionSessionIds}
               lastViewedAt={lastViewedAt}
               pinnedSessionIds={pinnedSessionIds}
               isLoading={isSessionsLoading}
@@ -1281,6 +1397,7 @@ export function ChatInterface() {
                 onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
+              questionSessionIds={questionSessionIds}
               lastViewedAt={lastViewedAt}
                 isLoading={isSessionsLoading}
                 pinnedSessionIds={pinnedSessionIds}
@@ -1297,6 +1414,8 @@ export function ChatInterface() {
                 onWorkspaceOrderChange={handleWorkspaceOrderChange}
                 expandedWorkspaces={expandedWorkspaces}
                 onToggleWorkspaceExpanded={handleToggleWorkspaceExpanded}
+                onWakeWorkspace={handleWakeWorkspace}
+                sleepingWorkspaceIds={sleepingWorkspaceIds}
               />
             ) : (
               <SessionList
@@ -1305,6 +1424,7 @@ export function ChatInterface() {
                 workspaceColor={activeWorkspaceColor}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
+              questionSessionIds={questionSessionIds}
                 lastViewedAt={lastViewedAt}
                 pinnedSessionIds={pinnedSessionIds}
                 isLoading={isSessionsLoading}
@@ -1339,13 +1459,13 @@ export function ChatInterface() {
       >
         {messagesPanel.Indicator}
         {/* Chat toolbar */}
-        <div className="sticky top-0 z-30 flex shrink-0 flex-wrap items-center gap-2 border-b bg-background px-4 py-2">
+        <div className="sticky top-0 z-30 flex shrink-0 items-center gap-1.5 border-b bg-background px-3 py-2 md:gap-2 md:px-4">
           {/* Mobile: open session sheet */}
           <Button
             size="icon-xs"
             variant="ghost"
             onClick={() => setIsMobileSessionsOpen(true)}
-            className="md:hidden"
+            className="mr-1 md:hidden"
           >
             <MessageSquare className="size-4" />
           </Button>
@@ -1367,7 +1487,7 @@ export function ChatInterface() {
             </svg>
           </Button>
 
-          <div className="flex-1" />
+          <div className="md:flex-1" />
 
           <Button
             size="icon-sm"
@@ -1385,6 +1505,7 @@ export function ChatInterface() {
               setSelectedAgent(agent);
               if (activeSessionId && activeWorkspaceId) {
                 setSessionAgent(activeSessionId, activeWorkspaceId, agent);
+                clearSessionModel(activeSessionId, activeWorkspaceId);
               }
             }}
             open={isAgentSelectorOpen}
@@ -1394,7 +1515,7 @@ export function ChatInterface() {
           <ModelSelector
             workspaceId={activeWorkspaceId}
             selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
+            onModelChange={handleModelChange}
             onVariantsChange={setAvailableVariants}
             open={isModelSelectorOpen}
             onOpenChange={setIsModelSelectorOpen}
@@ -1629,7 +1750,7 @@ export function ChatInterface() {
       </div>
       </ChatDisplayContext.Provider>
 
-      {isTaskPanelOpen && activeTodos.length > 0 && (
+      {isTaskPanelOpen && (
         <>
           <div
             className="hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors md:flex"
@@ -1648,7 +1769,9 @@ export function ChatInterface() {
           >
             {tasksPanel.Indicator}
             <div className="flex items-center justify-between border-b px-3 py-2">
-              <span className="text-xs font-medium text-muted-foreground">Task Progress</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {activeTodos.length > 0 ? "Task Progress" : "Side Panel"}
+              </span>
               <Button
                 size="icon-xs"
                 variant="ghost"
@@ -1660,8 +1783,16 @@ export function ChatInterface() {
                 <X className="size-3" />
               </Button>
             </div>
-            <div className="p-3">
-              <TaskProgressPanel todos={activeTodos} />
+            {activeTodos.length > 0 && (
+              <div className="p-3">
+                <TaskProgressPanel todos={activeTodos} />
+              </div>
+            )}
+            <div className={activeTodos.length > 0 ? "border-t px-3 py-2" : "px-3 py-2"}>
+              <span className="text-xs font-medium text-muted-foreground">MCP Servers</span>
+            </div>
+            <div className="px-3 pb-3">
+              <McpStatusPanel />
             </div>
           </div>
         </>

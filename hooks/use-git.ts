@@ -36,12 +36,12 @@ async function gitPost<T>(workspaceId: string, body: Record<string, unknown>): P
   return res.json()
 }
 
-export function useGitStatus(workspaceId: string | null) {
+export function useGitStatus(workspaceId: string | null, refetchIntervalMs: number = 10_000) {
   return useQuery<GitStatusResult>({
     queryKey: ["git-status", workspaceId],
     queryFn: () => gitGet<GitStatusResult>(workspaceId!, "status"),
     enabled: !!workspaceId,
-    refetchInterval: 10_000,
+    refetchInterval: refetchIntervalMs,
   })
 }
 
@@ -477,7 +477,7 @@ export function useUpdateWorktreeSymlinks() {
 
 // Agent health
 
-export type AgentHealthStatus = "healthy" | "unreachable" | "unknown"
+export type AgentHealthStatus = "healthy" | "unreachable" | "unknown" | "suspended"
 
 interface AgentHealthResponse {
   status: "ok" | "unreachable"

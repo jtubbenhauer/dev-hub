@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Star, ChevronRight, ChevronDown, List, Folder, Layout, Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -189,6 +189,28 @@ export function TaskSidebar({ selection, onSelect, searchQuery, onSearchChange }
 
   const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(() => readStoredSet(SPACES_KEY))
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => readStoredSet(FOLDERS_KEY))
+
+  useEffect(() => {
+    const handlePickerSelect = (event: Event) => {
+      const { task } = (event as CustomEvent<{ taskId: string; task: import("@/types").ClickUpTask }>).detail
+      setExpandedSpaces((prev) => {
+        if (prev.has(task.space.id)) return prev
+        const next = new Set(prev)
+        next.add(task.space.id)
+        persistSet(SPACES_KEY, next)
+        return next
+      })
+      setExpandedFolders((prev) => {
+        if (prev.has(task.folder.id)) return prev
+        const next = new Set(prev)
+        next.add(task.folder.id)
+        persistSet(FOLDERS_KEY, next)
+        return next
+      })
+    }
+    window.addEventListener("devhub:select-task", handlePickerSelect)
+    return () => window.removeEventListener("devhub:select-task", handlePickerSelect)
+  }, [])
 
   const toggleSpace = useCallback((spaceId: string) => {
     setExpandedSpaces((prev) => {

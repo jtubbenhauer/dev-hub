@@ -502,6 +502,27 @@ export interface WorkspaceProvider {
     status: string
     shell?: string
   }
+  behaviour?: ProviderBehaviour
+}
+
+export interface ProviderBehaviour {
+  inactiveHealthIntervalMs: number
+  activeHealthIntervalMs: number
+  gitStatusIntervalMs: number
+  sseWhenInactive: boolean
+  branchPollWhenInactive: boolean
+  supportsAutoSuspend: boolean
+  resumeTimeSeconds: number
+}
+
+export const DEFAULT_PROVIDER_BEHAVIOUR: ProviderBehaviour = {
+  inactiveHealthIntervalMs: 30_000,
+  activeHealthIntervalMs: 30_000,
+  gitStatusIntervalMs: 10_000,
+  sseWhenInactive: true,
+  branchPollWhenInactive: true,
+  supportsAutoSuspend: false,
+  resumeTimeSeconds: 0,
 }
 
 export interface WorkspaceProviderCreateResult {

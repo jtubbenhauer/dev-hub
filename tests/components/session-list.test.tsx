@@ -147,6 +147,67 @@ describe("SessionList — unified mode workspace picker", () => {
     expect(onCreateInWorkspace).toHaveBeenCalledWith("ws-2")
   })
 
+  it("shows question icon instead of brain icon when session has pending question", () => {
+    const sessions: Record<string, { id: string; projectID: string; directory: string; title: string; version: string; time: { created: number; updated: number } }> = {
+      "sess-1": {
+        id: "sess-1",
+        projectID: "proj-1",
+        directory: "/workspace",
+        title: "Question Session",
+        version: "1",
+        time: { created: 1000, updated: 2000 },
+      },
+    }
+
+    const { container } = render(
+      <SessionList
+        {...baseProps}
+        mode="workspace"
+        sessions={sessions}
+        sessionStatuses={{ "sess-1": { type: "busy" } as never }}
+        questionSessionIds={new Set(["sess-1"])}
+        onSelectSession={vi.fn()}
+      />
+    )
+
+    const sessionRow = container.querySelector("[data-session-id='sess-1']")
+    expect(sessionRow).toBeTruthy()
+    const questionIcon = sessionRow?.querySelector("svg.lucide-message-circle-question-mark")
+    const brainIcon = sessionRow?.querySelector("svg.lucide-brain")
+    expect(questionIcon).toBeTruthy()
+    expect(brainIcon).toBeNull()
+  })
+
+  it("shows brain icon for busy session without pending question", () => {
+    const sessions: Record<string, { id: string; projectID: string; directory: string; title: string; version: string; time: { created: number; updated: number } }> = {
+      "sess-1": {
+        id: "sess-1",
+        projectID: "proj-1",
+        directory: "/workspace",
+        title: "Busy Session",
+        version: "1",
+        time: { created: 1000, updated: 2000 },
+      },
+    }
+
+    const { container } = render(
+      <SessionList
+        {...baseProps}
+        mode="workspace"
+        sessions={sessions}
+        sessionStatuses={{ "sess-1": { type: "busy" } as never }}
+        onSelectSession={vi.fn()}
+      />
+    )
+
+    const sessionRow = container.querySelector("[data-session-id='sess-1']")
+    expect(sessionRow).toBeTruthy()
+    const brainIcon = sessionRow?.querySelector("svg.lucide-brain")
+    const questionIcon = sessionRow?.querySelector("svg.lucide-message-circle-question-mark")
+    expect(brainIcon).toBeTruthy()
+    expect(questionIcon).toBeNull()
+  })
+
   it("renders session items with workspace badges in unified mode", () => {
     render(
       <SessionList

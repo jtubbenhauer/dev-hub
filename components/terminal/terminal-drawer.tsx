@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { TerminalPanel } from "./terminal-panel"
 import { useTerminalStore } from "@/stores/terminal-store"
 import { useWorkspaceStore } from "@/stores/workspace-store"
-import { useTerminalScrollbackSetting } from "@/hooks/use-settings"
+import { useTerminalScrollbackSetting, useTerminalFontSetting, terminalFontFamily } from "@/hooks/use-settings"
 import { cn } from "@/lib/utils"
 import { Loader2, AlertCircle, TerminalSquare, X } from "lucide-react"
 
@@ -21,6 +21,7 @@ export function TerminalDrawer() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
   const { scrollback } = useTerminalScrollbackSetting()
+  const { terminalFont } = useTerminalFontSetting()
 
   const [config, setConfig] = useState<TerminalConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -154,6 +155,7 @@ export function TerminalDrawer() {
                 cwd={config.cwd}
                 shellCommand={config.shellCommand}
                 scrollback={scrollback}
+                fontFamily={terminalFontFamily(terminalFont)}
               />
             </div>
           )}

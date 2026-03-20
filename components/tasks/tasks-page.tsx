@@ -131,6 +131,50 @@ export function TasksPage() {
     restoredTaskRef.current = true
   }, [tasks, selectedTask])
 
+  // Restore pending task context from the task picker (handles navigation TO /tasks)
+  useEffect(() => {
+    try {
+      const pendingRaw = localStorage.getItem("dev-hub:tasks-pending-context")
+      if (!pendingRaw) return
+      const pending = JSON.parse(pendingRaw) as { listId: string; listName: string; folderId: string; spaceId: string }
+      localStorage.removeItem("dev-hub:tasks-pending-context")
+
+      setSelection({ type: "list", listId: pending.listId, listName: pending.listName })
+
+      // Expand the space and folder in sidebar so the list is visible
+      const SPACES_KEY = "dev-hub:tasks-expanded-spaces"
+      const FOLDERS_KEY = "dev-hub:tasks-expanded-folders"
+      try {
+        const spaces: string[] = JSON.parse(localStorage.getItem(SPACES_KEY) ?? "[]")
+        if (!spaces.includes(pending.spaceId)) {
+          localStorage.setItem(SPACES_KEY, JSON.stringify([...spaces, pending.spaceId]))
+        }
+        const folders: string[] = JSON.parse(localStorage.getItem(FOLDERS_KEY) ?? "[]")
+        if (!folders.includes(pending.folderId)) {
+          localStorage.setItem(FOLDERS_KEY, JSON.stringify([...folders, pending.folderId]))
+        }
+      } catch {}
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const handleSelectTaskEvent = (event: Event) => {
+      const customEvent = event as CustomEvent<{ taskId: string; task: ClickUpTask }>
+      const task = customEvent.detail.task
+      setSelectedTask(task)
+      setSelection({ type: "list", listId: task.list.id, listName: task.list.name })
+      try {
+        localStorage.setItem("dev-hub:tasks-selected-task-id", customEvent.detail.taskId)
+      } catch {}
+    }
+
+    window.addEventListener("devhub:select-task", handleSelectTaskEvent)
+    return () => {
+      window.removeEventListener("devhub:select-task", handleSelectTaskEvent)
+    }
+  }, [])
+
   function handleSearchChange(query: string) {
     setSearchQuery(query)
     try { localStorage.setItem("dev-hub:tasks-search", query) } catch {}

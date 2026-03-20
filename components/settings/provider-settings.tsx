@@ -13,8 +13,57 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { useWorkspaceProviders, useSettingsMutation, SETTINGS_KEYS } from "@/hooks/use-settings"
-import type { WorkspaceProvider } from "@/types"
+import type { WorkspaceProvider, ProviderBehaviour } from "@/types"
+import { DEFAULT_PROVIDER_BEHAVIOUR } from "@/types"
+
+type ProviderTypePreset = "always-on" | "auto-suspend" | "custom"
+
+const AUTO_SUSPEND_BEHAVIOUR: ProviderBehaviour = {
+  inactiveHealthIntervalMs: 0,
+  activeHealthIntervalMs: 30_000,
+  gitStatusIntervalMs: 10_000,
+  sseWhenInactive: false,
+  branchPollWhenInactive: false,
+  supportsAutoSuspend: true,
+  resumeTimeSeconds: 5,
+}
+
+function getProviderType(behaviour?: ProviderBehaviour): ProviderTypePreset {
+  if (!behaviour) return "always-on"
+  
+  const isAlwaysOn = 
+    behaviour.inactiveHealthIntervalMs === DEFAULT_PROVIDER_BEHAVIOUR.inactiveHealthIntervalMs &&
+    behaviour.activeHealthIntervalMs === DEFAULT_PROVIDER_BEHAVIOUR.activeHealthIntervalMs &&
+    behaviour.gitStatusIntervalMs === DEFAULT_PROVIDER_BEHAVIOUR.gitStatusIntervalMs &&
+    behaviour.sseWhenInactive === DEFAULT_PROVIDER_BEHAVIOUR.sseWhenInactive &&
+    behaviour.branchPollWhenInactive === DEFAULT_PROVIDER_BEHAVIOUR.branchPollWhenInactive &&
+    behaviour.supportsAutoSuspend === DEFAULT_PROVIDER_BEHAVIOUR.supportsAutoSuspend &&
+    behaviour.resumeTimeSeconds === DEFAULT_PROVIDER_BEHAVIOUR.resumeTimeSeconds
+
+  if (isAlwaysOn) return "always-on"
+
+  const isAutoSuspend = 
+    behaviour.inactiveHealthIntervalMs === AUTO_SUSPEND_BEHAVIOUR.inactiveHealthIntervalMs &&
+    behaviour.activeHealthIntervalMs === AUTO_SUSPEND_BEHAVIOUR.activeHealthIntervalMs &&
+    behaviour.gitStatusIntervalMs === AUTO_SUSPEND_BEHAVIOUR.gitStatusIntervalMs &&
+    behaviour.sseWhenInactive === AUTO_SUSPEND_BEHAVIOUR.sseWhenInactive &&
+    behaviour.branchPollWhenInactive === AUTO_SUSPEND_BEHAVIOUR.branchPollWhenInactive &&
+    behaviour.supportsAutoSuspend === AUTO_SUSPEND_BEHAVIOUR.supportsAutoSuspend &&
+    behaviour.resumeTimeSeconds === AUTO_SUSPEND_BEHAVIOUR.resumeTimeSeconds
+
+  if (isAutoSuspend) return "auto-suspend"
+
+  return "custom"
+}
 
 interface ProviderFormState {
   name: string
@@ -23,6 +72,8 @@ interface ProviderFormState {
   destroyCommand: string
   statusCommand: string
   shellCommand: string
+  providerType: ProviderTypePreset
+  behaviour: ProviderBehaviour
 }
 
 const EMPTY_FORM: ProviderFormState = {
@@ -32,6 +83,8 @@ const EMPTY_FORM: ProviderFormState = {
   destroyCommand: "{binary} destroy --id {id}",
   statusCommand: "{binary} status --id {id}",
   shellCommand: "",
+  providerType: "always-on",
+  behaviour: DEFAULT_PROVIDER_BEHAVIOUR,
 }
 
 export function ProviderSettings() {
@@ -51,6 +104,7 @@ export function ProviderSettings() {
 
   const openEditDialog = useCallback((provider: WorkspaceProvider) => {
     setEditingProviderId(provider.id)
+    const providerType = getProviderType(provider.behaviour)
     setForm({
       name: provider.name,
       binaryPath: provider.binaryPath,
@@ -58,6 +112,8 @@ export function ProviderSettings() {
       destroyCommand: provider.commands.destroy,
       statusCommand: provider.commands.status,
       shellCommand: provider.commands.shell ?? "",
+      providerType,
+      behaviour: provider.behaviour ?? DEFAULT_PROVIDER_BEHAVIOUR,
     })
     setTestStatus("idle")
     setDialogOpen(true)
@@ -98,6 +154,11 @@ export function ProviderSettings() {
         status: form.statusCommand.trim() || EMPTY_FORM.statusCommand,
         ...(shellCmd ? { shell: shellCmd } : {}),
       },
+      behaviour: form.providerType === "always-on" 
+        ? DEFAULT_PROVIDER_BEHAVIOUR 
+        : form.providerType === "auto-suspend" 
+          ? AUTO_SUSPEND_BEHAVIOUR 
+          : form.behaviour,
     }
 
     const updatedProviders = editingProviderId
@@ -135,6 +196,33 @@ export function ProviderSettings() {
     <K extends keyof ProviderFormState>(field: K, value: ProviderFormState[K]) => {
       setForm((prev) => ({ ...prev, [field]: value }))
       if (field === "binaryPath") setTestStatus("idle")
+    },
+    []
+  )
+
+  const updateProviderType = useCallback((type: ProviderTypePreset) => {
+    setForm((prev) => {
+      let newBehaviour = prev.behaviour
+      if (type === "always-on") newBehaviour = DEFAULT_PROVIDER_BEHAVIOUR
+      else if (type === "auto-suspend") newBehaviour = AUTO_SUSPEND_BEHAVIOUR
+      
+      return {
+        ...prev,
+        providerType: type,
+        behaviour: newBehaviour,
+      }
+    })
+  }, [])
+
+  const updateBehaviourField = useCallback(
+    <K extends keyof ProviderBehaviour>(field: K, value: ProviderBehaviour[K]) => {
+      setForm((prev) => ({
+        ...prev,
+        behaviour: {
+          ...prev.behaviour,
+          [field]: value,
+        },
+      }))
     },
     []
   )
@@ -219,7 +307,7 @@ export function ProviderSettings() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingProviderId ? "Edit Provider" : "Add Provider"}
@@ -343,6 +431,123 @@ export function ProviderSettings() {
                   Command to open a terminal session. Leave blank to disable terminal access.
                 </p>
               </div>
+            </div>
+
+            <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                Behaviour
+              </p>
+              
+              <div className="space-y-1.5">
+                <Label htmlFor="provider-type" className="text-xs">
+                  Provider Type
+                </Label>
+                <Select
+                  value={form.providerType}
+                  onValueChange={(val) => updateProviderType(val as ProviderTypePreset)}
+                >
+                  <SelectTrigger id="provider-type" className="h-8 text-xs">
+                    <SelectValue placeholder="Select provider type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="always-on" className="text-xs">Always-on (Docker)</SelectItem>
+                    <SelectItem value="auto-suspend" className="text-xs">Auto-suspend (Fly.io)</SelectItem>
+                    <SelectItem value="custom" className="text-xs">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {form.providerType === "custom" && (
+                <div className="space-y-3 pt-2 border-t mt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="inactive-health" className="text-xs">
+                        Inactive health check interval (s)
+                      </Label>
+                      <Input
+                        id="inactive-health"
+                        type="number"
+                        min="0"
+                        value={form.behaviour.inactiveHealthIntervalMs / 1000}
+                        onChange={(e) => updateBehaviourField("inactiveHealthIntervalMs", Number(e.target.value) * 1000)}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="active-health" className="text-xs">
+                        Active health check interval (s)
+                      </Label>
+                      <Input
+                        id="active-health"
+                        type="number"
+                        min="0"
+                        value={form.behaviour.activeHealthIntervalMs / 1000}
+                        onChange={(e) => updateBehaviourField("activeHealthIntervalMs", Number(e.target.value) * 1000)}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="git-status" className="text-xs">
+                        Git status interval (s)
+                      </Label>
+                      <Input
+                        id="git-status"
+                        type="number"
+                        min="0"
+                        value={form.behaviour.gitStatusIntervalMs / 1000}
+                        onChange={(e) => updateBehaviourField("gitStatusIntervalMs", Number(e.target.value) * 1000)}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="resume-time" className="text-xs">
+                        Resume time (s)
+                      </Label>
+                      <Input
+                        id="resume-time"
+                        type="number"
+                        min="0"
+                        value={form.behaviour.resumeTimeSeconds}
+                        onChange={(e) => updateBehaviourField("resumeTimeSeconds", Number(e.target.value))}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="sse-inactive" className="text-xs cursor-pointer">
+                        SSE when inactive
+                      </Label>
+                      <Switch
+                        id="sse-inactive"
+                        checked={form.behaviour.sseWhenInactive}
+                        onCheckedChange={(checked) => updateBehaviourField("sseWhenInactive", checked)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="branch-poll" className="text-xs cursor-pointer">
+                        Branch poll when inactive
+                      </Label>
+                      <Switch
+                        id="branch-poll"
+                        checked={form.behaviour.branchPollWhenInactive}
+                        onCheckedChange={(checked) => updateBehaviourField("branchPollWhenInactive", checked)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="auto-suspend" className="text-xs cursor-pointer">
+                        Supports auto-suspend
+                      </Label>
+                      <Switch
+                        id="auto-suspend"
+                        checked={form.behaviour.supportsAutoSuspend}
+                        onCheckedChange={(checked) => updateBehaviourField("supportsAutoSuspend", checked)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Button

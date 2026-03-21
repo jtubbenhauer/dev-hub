@@ -1,0 +1,27 @@
+AGENTS.md
+  067ae7f686d5dacd 9,74
+.github/workflows/ci.yml
+  067ae7f686d5dacd 63-80
+package.json
+  067ae7f686d5dacd 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "54a17ff77b3f456417e4d9edadcc3f6946f319f8",
+  "prompts": {
+    "067ae7f686d5dacd": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2f1238873ffes39NxwM7ZDfRDX",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 2,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    }
+  }
+}

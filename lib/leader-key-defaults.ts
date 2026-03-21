@@ -16,6 +16,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "global:session-picker", label: "Open session picker", page: "global" },
   { id: "global:switch-workspace", label: "Open workspace switcher", page: "global" },
   { id: "global:task-picker", label: "Open task picker", page: "global" },
+  { id: "global:git-picker", label: "Open git files picker", page: "global" },
 
   // Chat page
   { id: "chat:switch-model", label: "Switch model", page: "chat" },
@@ -66,6 +67,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "global:session-picker": "e",
   "global:switch-workspace": "w",
   "global:task-picker": "t",
+  "global:git-picker": "d",
 
   // Files page
   "files:save": "S",

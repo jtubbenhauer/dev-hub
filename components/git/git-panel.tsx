@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo, useRef } from "react"
+import { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import { useGitReviewStore } from "@/stores/git-review-store"
 import { Button } from "@/components/ui/button"
 import {
@@ -109,7 +109,16 @@ interface GitPanelProps {
 }
 
 export function GitPanel({ workspace, onClose }: GitPanelProps) {
-  const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<string | null>(() => {
+    try {
+      const pickerFile = localStorage.getItem("dev-hub:git-picker-selected-file")
+      if (pickerFile) {
+        localStorage.removeItem("dev-hub:git-picker-selected-file")
+        return pickerFile
+      }
+    } catch {}
+    return null
+  })
   const [selectedStaged, setSelectedStaged] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     try {
@@ -195,6 +204,26 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   const stashSaveMutation = useGitStashSave(workspace.id)
   const stashPopMutation = useGitStashPop(workspace.id)
   const stashDropMutation = useGitStashDrop(workspace.id)
+
+  // Listen for file selection from the global git picker
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ path: string; staged: boolean }>).detail
+      if (!detail?.path) return
+      setSelectedFile(detail.path)
+      setSelectedStaged(!!detail.staged)
+
+      // Sync view mode if the picker changed it
+      try {
+        const raw = localStorage.getItem("dev-hub:git-view-mode")
+        if (raw && VALID_VIEW_MODES.includes(raw as ViewMode)) {
+          setViewMode(raw as ViewMode)
+        }
+      } catch {}
+    }
+    window.addEventListener("devhub:git-select-file", handler)
+    return () => window.removeEventListener("devhub:git-select-file", handler)
+  }, [])
 
   const handleSelectFile = useCallback((file: string, staged: boolean) => {
     setSelectedFile(file)

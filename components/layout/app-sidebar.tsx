@@ -8,6 +8,7 @@ import {
   FileCode2,
   GitMerge,
   GitBranch,
+  GitCompare,
   Terminal,
   Settings,
   CheckSquare,
@@ -20,6 +21,7 @@ import { useCommandPalette } from "@/components/providers/command-palette-provid
 import { useFilePicker } from "@/components/file-picker/file-picker"
 import { useSessionPicker } from "@/components/session-picker/session-picker"
 import { useTaskPicker } from "@/components/task-picker/task-picker"
+import { useGitPicker } from "@/components/git-picker/git-picker"
 
 const navItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
@@ -39,6 +41,7 @@ export function AppSidebar() {
   const { open: openFilePicker } = useFilePicker()
   const { open: openSessionPicker } = useSessionPicker()
   const { open: openTaskPicker } = useTaskPicker()
+  const { open: openGitPicker } = useGitPicker()
 
   const navCommands = useMemo(
     () =>
@@ -56,6 +59,24 @@ export function AppSidebar() {
 
   useCommand(navCommands)
 
+  const pickerCommands = useMemo(
+    () => [
+      {
+        id: "picker:git-files",
+        label: "Open Git Files",
+        group: "Pickers",
+        icon: GitCompare,
+        shortcut: "⎵ d",
+        onSelect: () => openGitPicker(),
+      },
+    ],
+    // openGitPicker is stable (useCallback in context)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
+
+  useCommand(pickerCommands)
+
   // Stable refs so the leader action useMemo stays stable
   const routerRef = useRef(router)
   routerRef.current = router
@@ -67,6 +88,8 @@ export function AppSidebar() {
   openSessionPickerRef.current = openSessionPicker
   const openTaskPickerRef = useRef(openTaskPicker)
   openTaskPickerRef.current = openTaskPicker
+  const openGitPickerRef = useRef(openGitPicker)
+  openGitPickerRef.current = openGitPicker
 
   const globalLeaderActions = useMemo(
     () => [
@@ -111,9 +134,13 @@ export function AppSidebar() {
          handler: () => openSessionPickerRef.current(),
        },
        {
-         action: { id: "global:task-picker", label: "Open task picker", page: "global" as const },
-         handler: () => openTaskPickerRef.current(),
-       },
+          action: { id: "global:task-picker", label: "Open task picker", page: "global" as const },
+          handler: () => openTaskPickerRef.current(),
+        },
+        {
+          action: { id: "global:git-picker", label: "Open git files picker", page: "global" as const },
+          handler: () => openGitPickerRef.current(),
+        },
        {
          action: { id: "nav:terminal", label: "Go to Terminal", page: "global" as const },
          handler: () => routerRef.current.push("/terminal"),

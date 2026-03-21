@@ -15,3 +15,16 @@ export interface LeaderBinding {
 
 // actionId -> keys (space-separated)
 export type LeaderBindingsMap = Record<string, string>
+
+export interface ActivationKeyConfig {
+  key: string
+  ctrlKey?: boolean
+  altKey?: boolean
+  shiftKey?: boolean
+  metaKey?: boolean
+}
+
+export interface ActivationKeyPreset {
+  id: string
+  config: ActivationKeyConfig
+}

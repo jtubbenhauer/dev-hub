@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { LeaderBindingsMap } from "@/types/leader-key";
+import type { LeaderBindingsMap, ActivationKeyConfig } from "@/types/leader-key";
 import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults";
+import { DEFAULT_ACTIVATION_KEY, isValidActivationKeyConfig } from "@/lib/leader-key-utils";
 import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds";
 import type { WorkspaceProvider } from "@/types";
 
@@ -34,6 +35,7 @@ export const SETTINGS_KEYS = {
   CLICKUP_PINNED_VIEWS: "clickup-pinned-views",
   WORKSPACE_PROVIDERS: "workspace-providers",
   LEADER_TIMEOUT: "leader-timeout",
+  LEADER_ACTIVATION_KEY: "leader-activation-key",
   THEME: "theme",
   SOUND_AGENT_ENABLED: "sound-agent-enabled",
   SOUND_AGENT_ID: "sound-agent-id",
@@ -382,6 +384,16 @@ export function useLeaderWhichKeySetting(): {
   const raw = data?.[SETTINGS_KEYS.LEADER_WHICH_KEY];
   // Default: true (which-key popup is on by default)
   return { isWhichKeyEnabled: raw !== false, isLoading };
+}
+
+export function useLeaderActivationKey(): {
+  activationKey: ActivationKeyConfig;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.LEADER_ACTIVATION_KEY];
+  const activationKey = isValidActivationKeyConfig(raw) ? raw : DEFAULT_ACTIVATION_KEY;
+  return { activationKey, isLoading };
 }
 
 export function useGitHubSettings(): {

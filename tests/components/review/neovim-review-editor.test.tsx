@@ -166,11 +166,13 @@ describe("NeovimReviewEditor", () => {
       await setupWithTerminal("src/foo.ts")
 
       const mockHandle: TerminalHandle = { write: vi.fn(), focus: vi.fn(), blur: vi.fn() }
-      act(() => capturedOnReady?.(mockHandle))
+      await act(() => capturedOnReady?.(mockHandle))
 
-      // Escape key sent immediately
-      expect(mockHandle.write).toHaveBeenCalledWith("\x1b")
-      // :e command sent after timeout
+      // Escape key and :e command — may come from handleTerminalReady or the
+      // file-switching effect depending on React's flush order, so wait for both.
+      await vi.waitFor(() => {
+        expect(mockHandle.write).toHaveBeenCalledWith("\x1b")
+      })
       await vi.waitFor(() => {
         expect(mockHandle.write).toHaveBeenCalledWith(":e src/foo.ts\r")
       })

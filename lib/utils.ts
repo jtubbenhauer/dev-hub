@@ -24,6 +24,14 @@ export function isEditorElement(el: Element | null): boolean {
   return el.closest(".monaco-editor, .monaco-diff-editor, .xterm") !== null
 }
 
+export function getIsMac(): boolean {
+  if (typeof navigator === "undefined") return false
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const uad = navigator as any
+  if (uad.userAgentData?.platform) return uad.userAgentData.platform === "macOS"
+  return /Mac/.test(navigator.platform ?? "")
+}
+
 export const WORKSPACE_PRESET_COLORS = [
   "#ef4444", "#f97316", "#eab308", "#22c55e",
   "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",

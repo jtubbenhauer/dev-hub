@@ -10,8 +10,9 @@ import {
   useState,
 } from "react"
 import { usePathname } from "next/navigation"
-import type { LeaderAction, LeaderBindingsMap } from "@/types/leader-key"
+import type { LeaderAction, LeaderBindingsMap, ActivationKeyConfig } from "@/types/leader-key"
 import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults"
+import { matchesActivationKey, DEFAULT_ACTIVATION_KEY } from "@/lib/leader-key-utils"
 import { buildTrie, matchKeys, getNodeAtBuffer } from "@/lib/leader-key-trie"
 import type { TrieNode } from "@/lib/leader-key-trie"
 
@@ -41,6 +42,7 @@ interface LeaderKeyProviderProps {
   children: React.ReactNode
   bindings?: LeaderBindingsMap
   timeoutMs?: number | null
+  activationKey?: ActivationKeyConfig
 }
 
 function pageFromPathname(pathname: string): string {
@@ -53,7 +55,7 @@ function pageFromPathname(pathname: string): string {
   return "unknown"
 }
 
-export function LeaderKeyProvider({ children, bindings = DEFAULT_LEADER_BINDINGS, timeoutMs = DEFAULT_LEADER_TIMEOUT_MS }: LeaderKeyProviderProps) {
+export function LeaderKeyProvider({ children, bindings = DEFAULT_LEADER_BINDINGS, timeoutMs = DEFAULT_LEADER_TIMEOUT_MS, activationKey = DEFAULT_ACTIVATION_KEY }: LeaderKeyProviderProps) {
   const pathname = usePathname()
   const activePage = pageFromPathname(pathname)
 
@@ -119,16 +121,16 @@ export function LeaderKeyProvider({ children, bindings = DEFAULT_LEADER_BINDINGS
   }, [timeoutMs, cancel])
 
   // Stable ref so keydown handler always sees latest trie/state without re-subscribing
-  const stateRef = useRef({ isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction, armLeaderTimeout })
-  stateRef.current = { isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction, armLeaderTimeout }
+  const stateRef = useRef({ isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction, armLeaderTimeout, activationKey })
+  stateRef.current = { isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction, armLeaderTimeout, activationKey }
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const { isLeaderActive, keyBuffer, trie, activePage, cancel, fireAction, armLeaderTimeout } = stateRef.current
+      const { isLeaderActive, keyBuffer, trie, cancel, fireAction, armLeaderTimeout, activationKey } = stateRef.current
 
-      // Activate leader mode: Ctrl+Space
+      // Activate leader mode with configurable activation key
       if (!isLeaderActive) {
-        if (e.key === " " && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+        if (matchesActivationKey(e, activationKey)) {
           e.preventDefault()
           setIsLeaderActive(true)
           setKeyBuffer([])

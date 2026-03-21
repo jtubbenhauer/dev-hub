@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import {
   TerminalPanel,
   type TerminalHandle,
@@ -12,6 +12,11 @@ import {
   terminalFontFamily,
 } from "@/hooks/use-settings";
 import { Loader2, AlertCircle } from "lucide-react";
+
+export interface NeovimEditorHandle {
+  focus: () => void;
+  blur: () => void;
+}
 
 interface NeovimEditorProps {
   content: string;
@@ -52,7 +57,13 @@ function escapeShellSingleQuote(str: string): string {
   return str.replace(/'/g, "'\\''");
 }
 
-export function NeovimEditor({ workspaceId, filePath, autoFocus = false }: NeovimEditorProps) {
+export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
+function NeovimEditor({ workspaceId, filePath, autoFocus = true }, ref) {
+  useImperativeHandle(ref, () => ({
+    focus: () => terminalHandleRef.current?.focus(),
+    blur: () => terminalHandleRef.current?.blur(),
+  }));
+
   const { nvimAppName } = useNvimAppNameSetting();
   const { scrollback } = useTerminalScrollbackSetting();
   const { terminalFont } = useTerminalFontSetting();
@@ -133,7 +144,10 @@ export function NeovimEditor({ workspaceId, filePath, autoFocus = false }: Neovi
     currentFileRef.current = filePath;
     // Escape to normal mode, then open the new file after a brief delay
     handle.write("\x1b");
-    setTimeout(() => handle.write(`:e ${filePath}\r`), 50);
+    setTimeout(() => {
+      handle.write(`:e ${filePath}\r`);
+      handle.focus();
+    }, 50);
   }, [filePath, terminalConfig, isResolving]);
 
   const handleTerminalReady = useCallback((handle: TerminalHandle) => {
@@ -144,7 +158,10 @@ export function NeovimEditor({ workspaceId, filePath, autoFocus = false }: Neovi
     if (desired && desired !== currentFileRef.current) {
       currentFileRef.current = desired;
       handle.write("\x1b");
-      setTimeout(() => handle.write(`:e ${desired}\r`), 50);
+      setTimeout(() => {
+        handle.write(`:e ${desired}\r`);
+        handle.focus();
+      }, 50);
     }
   }, []);
 
@@ -203,4 +220,4 @@ export function NeovimEditor({ workspaceId, filePath, autoFocus = false }: Neovi
       />
     </div>
   );
-}
+});

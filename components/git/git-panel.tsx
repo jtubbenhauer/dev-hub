@@ -523,7 +523,10 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
         },
         {
           action: { id: "git:focus-files", label: "Focus files pane", page: "git" as const },
-          handler: () => fileListFocusRef.current?.focus(),
+          handler: () => {
+            editorHandleRef.current?.blur();
+            fileListFocusRef.current?.focus();
+          },
         },
       )
 
@@ -833,7 +836,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           <div
             ref={(el) => { fileListFocusRef.current = el }}
             tabIndex={-1}
-            className="relative flex min-h-0 shrink-0 flex-col border-r"
+            className="relative flex min-h-0 shrink-0 flex-col border-r outline-none"
             style={{ width: panelWidth }}
           >
             {/* Sort bar */}

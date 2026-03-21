@@ -110,10 +110,8 @@ export const NeovimReviewEditor = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
-      focus: () =>
-        containerRef.current?.querySelector<HTMLElement>(".xterm")?.focus(),
-      blur: () =>
-        containerRef.current?.querySelector<HTMLElement>(".xterm")?.blur(),
+      focus: () => terminalHandleRef.current?.focus(),
+      blur: () => terminalHandleRef.current?.blur(),
     }),
     [],
   );
@@ -183,7 +181,9 @@ export const NeovimReviewEditor = forwardRef<
     currentFileRef.current = fileContent.path;
     // Escape to normal mode, then open the new file after a brief delay
     handle.write("\x1b");
-    setTimeout(() => handle.write(`:e ${fileContent.path}\r`), 50);
+    setTimeout(() => {
+      handle.write(`:e ${fileContent.path}\r`);
+    }, 50);
   }, [fileContent.path, terminalConfig, isResolving]);
 
   const handleTerminalReady = useCallback((handle: TerminalHandle) => {
@@ -194,7 +194,9 @@ export const NeovimReviewEditor = forwardRef<
     if (desired && desired !== currentFileRef.current) {
       currentFileRef.current = desired;
       handle.write("\x1b");
-      setTimeout(() => handle.write(`:e ${desired}\r`), 50);
+      setTimeout(() => {
+        handle.write(`:e ${desired}\r`);
+      }, 50);
     }
   }, []);
 
@@ -282,7 +284,7 @@ export const NeovimReviewEditor = forwardRef<
           envOverrides={Object.keys(nvimEnv).length > 0 ? nvimEnv : undefined}
           onReady={handleTerminalReady}
           fontFamily={terminalFontFamily(terminalFont)}
-          autoFocus={false}
+          autoFocus={true}
         />
       </div>
     </div>

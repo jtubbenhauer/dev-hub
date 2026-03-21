@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useCallback, useEffect, useState } from "react"
+import { useRef, useCallback, useEffect, useState, forwardRef, useImperativeHandle } from "react"
 import dynamic from "next/dynamic"
 import type { editor } from "monaco-editor"
 import { useTheme } from "@/components/providers/theme-provider"
@@ -57,6 +57,11 @@ function getMonacoLanguage(language: string): string {
   }
 }
 
+export interface MonacoEditorHandle {
+  focus: () => void;
+  blur: () => void;
+}
+
 interface MonacoEditorProps {
   content: string
   language: string
@@ -66,15 +71,26 @@ interface MonacoEditorProps {
   filePath?: string
 }
 
-export function MonacoEditor({
+export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
+function MonacoEditor({
   content,
   language,
   onChange,
   onSave,
   workspaceId,
   filePath,
-}: MonacoEditorProps) {
+}, ref) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => editorRef.current?.focus(),
+    blur: () => {
+      const dom = editorRef.current?.getDomNode()
+      const textarea = dom?.querySelector<HTMLTextAreaElement>("textarea")
+      textarea?.blur()
+    },
+  }));
+
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null)
   const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(null)
   const { theme, resolvedMode } = useTheme()
@@ -297,4 +313,4 @@ export function MonacoEditor({
       )}
     </div>
   )
-}
+});

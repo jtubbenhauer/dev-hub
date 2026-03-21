@@ -7,6 +7,7 @@ import { FileTree } from "@/components/editor/file-tree";
 import { OpenEditors } from "@/components/editor/open-editors";
 import { FileTabs } from "@/components/editor/file-tabs";
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
+import type { EditorHandle } from "@/components/editor/editor-switcher";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
@@ -269,7 +270,10 @@ function FilesContent() {
           label: "Focus file tree",
           page: "files" as const,
         },
-        handler: () => fileTreeFocusRef.current?.focus(),
+        handler: () => {
+          editorHandleRef.current?.blur();
+          fileTreeFocusRef.current?.focus();
+        },
       },
       {
         action: {
@@ -277,7 +281,7 @@ function FilesContent() {
           label: "Focus editor",
           page: "files" as const,
         },
-        handler: () => editorPanelFocusRef.current?.focus(),
+        handler: () => editorHandleRef.current?.focus(),
       },
     ],
     [],
@@ -286,6 +290,7 @@ function FilesContent() {
 
   const fileTreeFocusRef = useRef<HTMLDivElement>(null);
   const editorPanelFocusRef = useRef<HTMLDivElement>(null);
+  const editorHandleRef = useRef<EditorHandle>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = useCallback(
@@ -323,7 +328,7 @@ function FilesContent() {
                 <SheetTitle className="text-sm">Files</SheetTitle>
               </SheetHeader>
               <div className="h-[calc(100%-41px)]">
-                <OpenEditors />
+                {!isFileTabsDisabled && <OpenEditors />}
                 <FileTree searchInputRef={searchInputRef} />
               </div>
             </SheetContent>
@@ -337,7 +342,7 @@ function FilesContent() {
               fileTreeFocusRef.current = el;
             }}
             tabIndex={-1}
-            className="relative flex min-h-0 shrink-0 flex-col border-r"
+            className="relative flex min-h-0 shrink-0 flex-col border-r outline-none"
             style={{ width: panelWidth }}
           >
             <div className="flex shrink-0 items-center justify-between border-b px-2 py-1">
@@ -353,7 +358,7 @@ function FilesContent() {
                 <PanelLeftClose className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <OpenEditors />
+            {!isFileTabsDisabled && <OpenEditors />}
             <FileTree searchInputRef={searchInputRef} />
           </div>
         )}
@@ -433,6 +438,7 @@ function FilesContent() {
           <div className="min-h-0 flex-1 overflow-hidden">
             {activeFile ? (
               <EditorSwitcher
+                ref={editorHandleRef}
                 content={activeFile.content}
                 language={activeFile.language}
                 onChange={handleChange}

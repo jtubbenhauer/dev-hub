@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type {
   GitStatusResult,
@@ -93,6 +93,7 @@ export function useGitFileContent(workspaceId: string | null, file: string | nul
       }),
     enabled: !!workspaceId && !!file,
     staleTime: 5_000,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -114,6 +115,7 @@ export function useGitFileContentAtRef(
       }),
     enabled: !!workspaceId && !!file && !!baseRef,
     staleTime: 5_000,
+    placeholderData: keepPreviousData,
   })
 }
 

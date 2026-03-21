@@ -54,6 +54,8 @@ function buildTheme(): ITheme {
 
 export interface TerminalHandle {
   write: (data: string) => void;
+  focus: () => void;
+  blur: () => void;
 }
 
 interface TerminalPanelProps {
@@ -101,7 +103,24 @@ export function TerminalPanel({
   autoFocusRef.current = autoFocus;
   onReadyRef.current = onReady;
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
+    if (!containerRef.current) return;
+
+    // Wait for the requested font to actually finish loading before creating
+    // the xterm instance. document.fonts.ready alone is insufficient because
+    // @font-face with font-display:swap resolves immediately with a fallback,
+    // causing xterm to measure character cells with wrong metrics on first load.
+    // We explicitly trigger a load of the specific font family (14px matches our
+    // fontSize so the browser fetches the correct weight/style).
+    try {
+      await document.fonts.load(`14px ${fontFamily}`);
+    } catch {
+      // Font load can reject for CSS variable fonts or missing families —
+      // fall back to basic ready gate so the terminal still renders.
+      await document.fonts.ready;
+    }
+
+    // Container may have unmounted while waiting for fonts
     if (!containerRef.current) return;
 
     const term = new XTerm({
@@ -156,6 +175,8 @@ export function TerminalPanel({
             ws.send(data);
           }
         },
+        focus: () => term.focus(),
+        blur: () => term.blur(),
       });
     };
 
@@ -222,7 +243,7 @@ export function TerminalPanel({
   ]);
 
   useEffect(() => {
-    connect();
+    void connect();
 
     const handleResize = () => {
       try {
@@ -259,7 +280,7 @@ export function TerminalPanel({
     termRef.current = null;
     fitAddonRef.current = null;
     setConnectionState("connecting");
-    connect();
+    void connect();
   }, [connect]);
 
   return (

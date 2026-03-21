@@ -1,7 +1,12 @@
 "use client";
 
+import { forwardRef } from "react";
 import dynamic from "next/dynamic";
 import { useEditorTypeSetting } from "@/hooks/use-settings";
+import type { NeovimEditorHandle } from "@/components/editor/neovim-editor";
+import type { MonacoEditorHandle } from "@/components/editor/monaco-editor";
+
+export type EditorHandle = NeovimEditorHandle | MonacoEditorHandle;
 
 const MonacoEditor = dynamic(
   () => import("@/components/editor/monaco-editor").then((m) => m.MonacoEditor),
@@ -29,12 +34,13 @@ interface EditorSwitcherProps {
   autoFocus?: boolean;
 }
 
-export function EditorSwitcher(props: EditorSwitcherProps) {
+export const EditorSwitcher = forwardRef<EditorHandle, EditorSwitcherProps>(
+function EditorSwitcher(props, ref) {
   const { editorType } = useEditorTypeSetting();
 
   if (editorType === "neovim") {
-    return <NeovimEditor {...props} />;
+    return <NeovimEditor ref={ref} {...props} />;
   }
 
-  return <MonacoEditor {...props} />;
-}
+  return <MonacoEditor ref={ref} {...props} />;
+});

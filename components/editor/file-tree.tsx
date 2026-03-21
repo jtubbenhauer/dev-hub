@@ -9,7 +9,7 @@ import { useFileTabsSetting } from "@/hooks/use-settings"
 import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
+import { cn, isEditorElement } from "@/lib/utils"
 import {
   ChevronRight,
   ChevronDown,
@@ -35,6 +35,7 @@ interface FileTreeNodeProps {
   entry: FileTreeEntry
   depth: number
   expandedPaths: Set<string>
+  selectedPath: string | null
   onToggleExpand: (path: string) => void
   onFileClick: (entry: FileTreeEntry) => void
 }
@@ -43,12 +44,14 @@ function FileTreeNode({
   entry,
   depth,
   expandedPaths,
+  selectedPath,
   onToggleExpand,
   onFileClick,
 }: FileTreeNodeProps) {
   const isExpanded = expandedPaths.has(entry.path)
   const activeFilePath = useEditorStore((s) => s.activeFilePath)
   const isActive = entry.type === "file" && entry.path === activeFilePath
+  const isSelected = entry.path === selectedPath
   const gitColorClass = entry.gitStatus
     ? GIT_STATUS_COLORS[entry.gitStatus]
     : undefined
@@ -64,9 +67,12 @@ function FileTreeNode({
   return (
     <>
       <button
+        data-tree-path={entry.path}
         className={cn(
           "flex w-full items-center gap-1 rounded-sm px-1 py-0.5 text-sm hover:bg-accent",
           isActive && "bg-accent text-accent-foreground",
+          isSelected && !isActive && "ring-1 ring-ring",
+          isSelected && isActive && "ring-1 ring-ring",
           gitColorClass
         )}
         style={{ paddingLeft: `${depth * 12 + 4}px` }}
@@ -102,6 +108,7 @@ function FileTreeNode({
               entry={child}
               depth={depth + 1}
               expandedPaths={expandedPaths}
+              selectedPath={selectedPath}
               onToggleExpand={onToggleExpand}
               onFileClick={onFileClick}
             />
@@ -110,6 +117,20 @@ function FileTreeNode({
       )}
     </>
   )
+}
+
+function flattenVisibleEntries(
+  entries: FileTreeEntry[],
+  expandedPaths: Set<string>,
+): FileTreeEntry[] {
+  const result: FileTreeEntry[] = []
+  for (const entry of entries) {
+    result.push(entry)
+    if (entry.type === "directory" && expandedPaths.has(entry.path) && entry.children) {
+      result.push(...flattenVisibleEntries(entry.children, expandedPaths))
+    }
+  }
+  return result
 }
 
 // ---------------------------------------------------------------------------
@@ -361,6 +382,90 @@ export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<
   const { data: allFiles } = useWorkspaceFiles(activeWorkspaceId)
   const isSearching = searchQuery.length > 0
 
+  // Flat list of visible tree entries for j/k keyboard navigation
+  const flatVisible = useMemo(
+    () => flattenVisibleEntries(mergedEntries, expandedPaths),
+    [mergedEntries, expandedPaths],
+  )
+
+  const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const treeListRef = useRef<HTMLDivElement>(null)
+
+  // Clamp selectedPath when the visible list changes
+  useEffect(() => {
+    if (selectedPath === null) return
+    const stillVisible = flatVisible.some((e) => e.path === selectedPath)
+    if (!stillVisible) {
+      setSelectedPath(flatVisible[0]?.path ?? null)
+    }
+  }, [flatVisible, selectedPath])
+
+  // Scroll keyboard-selected tree entry into view
+  useEffect(() => {
+    if (!selectedPath || isSearching) return
+    const el = treeListRef.current?.querySelector(`[data-tree-path="${CSS.escape(selectedPath)}"]`)
+    if (el) el.scrollIntoView({ block: "nearest" })
+  }, [selectedPath, isSearching])
+
+  // Stable refs for the keyboard handler
+  const flatVisibleRef = useRef(flatVisible)
+  flatVisibleRef.current = flatVisible
+  const selectedPathRef = useRef(selectedPath)
+  selectedPathRef.current = selectedPath
+  const onFileClickRef = useRef(onFileClick)
+  onFileClickRef.current = onFileClick
+  const onToggleExpandRef = useRef(onToggleExpand)
+  onToggleExpandRef.current = onToggleExpand
+  const isSearchingRef = useRef(isSearching)
+  isSearchingRef.current = isSearching
+
+  useEffect(() => {
+    function handleTreeKeyboard(e: KeyboardEvent) {
+      if (isSearchingRef.current) return
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && isEditorElement(e.target))
+      ) {
+        return
+      }
+
+      const flat = flatVisibleRef.current
+      if (flat.length === 0) return
+
+      const currentIdx = flat.findIndex((entry) => entry.path === selectedPathRef.current)
+
+      switch (e.key) {
+        case "j": {
+          e.preventDefault()
+          const nextIdx = currentIdx === -1 ? 0 : Math.min(currentIdx + 1, flat.length - 1)
+          setSelectedPath(flat[nextIdx].path)
+          break
+        }
+        case "k": {
+          e.preventDefault()
+          const prevIdx = currentIdx === -1 ? 0 : Math.max(currentIdx - 1, 0)
+          setSelectedPath(flat[prevIdx].path)
+          break
+        }
+        case "Enter": {
+          if (currentIdx === -1) break
+          e.preventDefault()
+          const entry = flat[currentIdx]
+          if (entry.type === "directory") {
+            onToggleExpandRef.current(entry.path)
+          } else {
+            onFileClickRef.current(entry)
+          }
+          break
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleTreeKeyboard)
+    return () => window.removeEventListener("keydown", handleTreeKeyboard)
+  }, [])
+
   const searchResults = useMemo(() => {
     if (!isSearching || !allFiles) return []
     return fuzzySearch(searchQuery, allFiles, 100)
@@ -488,16 +593,19 @@ export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<
               Empty directory
             </p>
           ) : (
-            mergedEntries.map((entry) => (
-              <FileTreeNode
-                key={entry.path}
-                entry={entry}
-                depth={0}
-                expandedPaths={expandedPaths}
-                onToggleExpand={onToggleExpand}
-                onFileClick={onFileClick}
-              />
-            ))
+            <div ref={treeListRef}>
+              {mergedEntries.map((entry) => (
+                <FileTreeNode
+                  key={entry.path}
+                  entry={entry}
+                  depth={0}
+                  expandedPaths={expandedPaths}
+                  selectedPath={selectedPath}
+                  onToggleExpand={onToggleExpand}
+                  onFileClick={onFileClick}
+                />
+              ))}
+            </div>
           )}
         </div>
       </ScrollArea>

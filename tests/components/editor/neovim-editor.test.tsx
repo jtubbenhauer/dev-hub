@@ -132,7 +132,7 @@ describe("NeovimEditor", () => {
 
       expect(capturedShellCommand).toBe("nvim 'src/main.ts'")
       expect(capturedSessionId).toBe("nvim-file-editor")
-      expect(capturedAutoFocus).toBe(false)
+      expect(capturedAutoFocus).toBe(true)
     })
 
     it("passes autoFocus through to TerminalPanel when set", async () => {
@@ -204,7 +204,7 @@ describe("NeovimEditor", () => {
     it("sends :e command when handleTerminalReady fires", async () => {
       await setupWithTerminal("src/foo.ts")
 
-      const mockHandle: TerminalHandle = { write: vi.fn() }
+      const mockHandle: TerminalHandle = { write: vi.fn(), focus: vi.fn(), blur: vi.fn() }
       act(() => capturedOnReady?.(mockHandle))
 
       expect(mockHandle.write).toHaveBeenCalledWith("\x1b")
@@ -216,7 +216,7 @@ describe("NeovimEditor", () => {
     it("sends :e on file change via re-render", async () => {
       const { rerender } = await setupWithTerminal("src/foo.ts")
 
-      const mockHandle: TerminalHandle = { write: vi.fn() }
+      const mockHandle: TerminalHandle = { write: vi.fn(), focus: vi.fn(), blur: vi.fn() }
       act(() => capturedOnReady?.(mockHandle))
 
       await vi.waitFor(() => {
@@ -244,7 +244,7 @@ describe("NeovimEditor", () => {
     it("does not resend :e when file path is unchanged", async () => {
       const { rerender } = await setupWithTerminal("src/foo.ts")
 
-      const mockHandle: TerminalHandle = { write: vi.fn() }
+      const mockHandle: TerminalHandle = { write: vi.fn(), focus: vi.fn(), blur: vi.fn() }
       act(() => capturedOnReady?.(mockHandle))
 
       await vi.waitFor(() => {
@@ -296,7 +296,7 @@ describe("NeovimEditor", () => {
       )
 
       // Now terminal becomes ready
-      const mockHandle: TerminalHandle = { write: vi.fn() }
+      const mockHandle: TerminalHandle = { write: vi.fn(), focus: vi.fn(), blur: vi.fn() }
       act(() => capturedOnReady?.(mockHandle))
 
       expect(mockHandle.write).toHaveBeenCalledWith("\x1b")

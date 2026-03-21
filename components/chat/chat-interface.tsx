@@ -14,6 +14,7 @@ import { PromptInput } from "@/components/chat/prompt-input";
 import { SessionList } from "@/components/chat/session-list";
 import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { McpStatusPanel } from "@/components/chat/mcp-status";
+import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { VariantSelector } from "@/components/chat/variant-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -230,6 +231,9 @@ export function ChatInterface() {
   );
   const activeWorkspaceName = useWorkspaceStore(
     (state) => state.activeWorkspace?.name ?? "",
+  );
+  const activeWorkspacePath = useWorkspaceStore(
+    (state) => state.activeWorkspace?.path ?? "",
   );
   const allWorkspaces = useWorkspaceStore((state) => state.workspaces);
 
@@ -1891,6 +1895,17 @@ export function ChatInterface() {
             </div>
             <div className="px-3 pb-3">
               <McpStatusPanel />
+            </div>
+            <div className="border-t px-3 py-2">
+              <span className="text-muted-foreground text-xs font-medium">
+                Session Files
+              </span>
+            </div>
+            <div className="px-3 pb-3">
+              <SessionFilesPanel
+                messages={activeMessagesRaw}
+                workspacePath={activeWorkspacePath}
+              />
             </div>
           </div>
         </>

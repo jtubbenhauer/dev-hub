@@ -1,0 +1,33 @@
+.prettierrc
+  067ae7f686d5dacd 1-12
+tests/components/sound-settings-card.test.tsx
+  067ae7f686d5dacd 129
+package.json
+  067ae7f686d5dacd 10-11,98
+components/tasks/tasks-page.tsx
+  067ae7f686d5dacd 53-68,70-77,93,157-160,164-165,168,170,172,176-193,195,224-237,251
+.prettierignore
+  067ae7f686d5dacd 1-8
+AGENTS.md
+  067ae7f686d5dacd 25-26,79-80,199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "6782615476125ab0e131ffc7b4d1d4d9c51d6188",
+  "prompts": {
+    "067ae7f686d5dacd": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2f1238873ffes39NxwM7ZDfRDX",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 131,
+      "total_deletions": 102,
+      "accepted_lines": 97,
+      "overriden_lines": 0
+    }
+  }
+}

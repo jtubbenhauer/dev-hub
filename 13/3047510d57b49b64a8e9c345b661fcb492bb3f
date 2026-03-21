@@ -1,0 +1,59 @@
+lib/leader-key-defaults.ts
+  2d57f4e3e4a78e29 13,27,31-33,63,72-74,83
+components/settings/general-settings.tsx
+  377b668942b00564 25,37,145,154-155,221-232,423-437
+components/tasks/tasks-page.tsx
+  2d57f4e3e4a78e29 358
+hooks/use-settings.ts
+  377b668942b00564 50,567-568,572-573
+  2d57f4e3e4a78e29 47
+app/files/page.tsx
+  377b668942b00564 130,166,190-191,430,447
+  2d57f4e3e4a78e29 258-261,263-269,271-277,279-281,327,357
+components/git/git-panel.tsx
+  2d57f4e3e4a78e29 508,519,526,962
+components/layout/app-sidebar.tsx
+  2d57f4e3e4a78e29 117-120
+components/settings/keybindings-settings.tsx
+  2d57f4e3e4a78e29 33,37
+components/git/file-status.tsx
+  2d57f4e3e4a78e29 154
+components/editor/file-tree.tsx
+  377b668942b00564 8,225,230,325,335,411,421
+  2d57f4e3e4a78e29 221,461
+components/chat/chat-interface.tsx
+  2d57f4e3e4a78e29 887-889,1160-1169,1458-1459
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "133047510d57b49b64a8e9c345b661fcb492bb3f",
+  "prompts": {
+    "2d57f4e3e4a78e29": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2f2c9a133fferqazMDYLKzjSZE",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 96,
+      "total_deletions": 291,
+      "accepted_lines": 63,
+      "overriden_lines": 4
+    },
+    "377b668942b00564": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2f61c4c98ffeZ74q1gUr5FPxfM",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 62,
+      "total_deletions": 8,
+      "accepted_lines": 55,
+      "overriden_lines": 7
+    }
+  }
+}

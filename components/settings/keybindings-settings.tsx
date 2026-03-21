@@ -68,16 +68,22 @@ export function KeybindingsSettings() {
     useLeaderActivationKey();
   const mutation = useSettingsMutation();
 
-  const [localBindings, setLocalBindings] = useState<LeaderBindingsMap>({});
+  const [localBindings, setLocalBindings] =
+    useState<LeaderBindingsMap>(bindings);
   const [editingActionId, setEditingActionId] = useState<string | null>(null);
   const [capturedKeys, setCapturedKeys] = useState<string>("");
   const [conflictActionId, setConflictActionId] = useState<string | null>(null);
 
   // Sync local bindings from server data (during render)
-  const [prevBindings, setPrevBindings] = useState(bindings);
-  if (prevBindings !== bindings && !isLoadingBindings) {
-    setPrevBindings(bindings);
-    setLocalBindings({ ...bindings });
+  const [prev, setPrev] = useState({ bindings, isLoadingBindings });
+  if (
+    prev.bindings !== bindings ||
+    prev.isLoadingBindings !== isLoadingBindings
+  ) {
+    setPrev({ bindings, isLoadingBindings });
+    if (!isLoadingBindings) {
+      setLocalBindings({ ...bindings });
+    }
   }
 
   const isLoading =

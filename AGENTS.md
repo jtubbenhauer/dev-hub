@@ -6,7 +6,7 @@ This repo is fully vibe-coded. Multiple people (and agents) push directly to `ma
 
 ## Golden Rules
 
-1. **Never break existing tests.** Run `pnpm test` before considering any change complete. All tests must pass.
+1. **Never break existing tests or lint.** Run `pnpm test` and `pnpm lint` before considering any change complete. All tests must pass and lint must be clean (0 errors, 0 warnings).
 2. **Always add tests** when you add or change functionality. Test files live in `tests/` mirroring the source structure.
 3. **Pull aggressively.** `git pull` before you start, before you commit, and before you push. Rebase if needed.
 4. **Write LLM-friendly code.** This codebase is maintained by agents as much as humans. Prefer explicit over clever. Use descriptive names. Avoid abstractions that require reading 5 files to understand one function.

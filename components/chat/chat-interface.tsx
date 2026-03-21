@@ -164,7 +164,7 @@ export function ChatInterface() {
     reverse: true,
   });
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false);
-  const [hasPlanFiles, setHasPlanFiles] = useState(false);
+  const [, setHasPlanFiles] = useState(false);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -275,10 +275,10 @@ export function ChatInterface() {
 
     const agent = primaryAgents.find((a) => a.name === selectedAgent);
 
-    // When the session has a stored model override, skip auto-deriving model from agent.
-    // On agent change within a session, clearSessionModel is called first (see AgentSelector),
-    // so this guard only preserves overrides during session switches.
-    const hasStoredModel = activeSessionId ? !!getSessionModel(activeSessionId) : false;
+    // Read current session state directly from store to avoid adding deps
+    // that would re-trigger this effect on session switches
+    const { activeSessionId: currentSessionId, getSessionModel: getModel } = useChatStore.getState();
+    const hasStoredModel = currentSessionId ? !!getModel(currentSessionId) : false;
 
     if ((agentChanged || !selectedModel) && !hasStoredModel) {
       if (agent?.model) {
@@ -328,12 +328,10 @@ export function ChatInterface() {
     rejectQuestion,
     getActiveWorkspaceSessions,
     getActiveSessionMessages,
-    getActiveSessionStatus,
     getActivePermissions,
     getActiveQuestions,
     getActiveSessionStatuses,
     getStreamingStatus,
-    getRecentSessionsAcrossWorkspaces,
     getActiveTodos,
     getUnifiedSessionStatuses,
     getActiveQuestionSessionIds,
@@ -349,7 +347,6 @@ export function ChatInterface() {
     fetchPinnedSessions,
     pinSession,
     unpinSession,
-    getPinnedSessionIds,
     fetchCachedSessions,
   } = useChatStore();
 
@@ -407,7 +404,6 @@ export function ChatInterface() {
     return count
   })
   const hasMoreUnifiedSessions = totalUnifiedCount > unifiedLimit
-  const sessionStatus = useChatStore(getActiveSessionStatus)
   const commands: Command[] = useChatStore((state) => state.commands)
   // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
   // We filter by sessionID here with useMemo so we never create a new array reference
@@ -1736,12 +1732,21 @@ const StreamingIndicator = memo(function StreamingIndicator({
   messages: MessageWithParts[];
   sessionStatus: SessionStatus | null;
 }) {
+  const [now, setNow] = useState(Date.now);
+  const isRetrying = sessionStatus?.type === "retry";
+
+  useEffect(() => {
+    if (!isRetrying) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isRetrying]);
+
   const label = useMemo(() => {
     // Session-level status takes priority
     if (sessionStatus?.type === "retry") {
       const secondsUntilRetry = Math.max(
         0,
-        Math.ceil((sessionStatus.next - Date.now()) / 1000),
+        Math.ceil((sessionStatus.next - now) / 1000),
       );
       return `Retrying... attempt ${sessionStatus.attempt}${secondsUntilRetry > 0 ? ` · ${secondsUntilRetry}s` : ""}`;
     }
@@ -1773,7 +1778,7 @@ const StreamingIndicator = memo(function StreamingIndicator({
     }
 
     return "Thinking...";
-  }, [messages, sessionStatus]);
+  }, [messages, sessionStatus, now]);
 
   return (
     <div className="flex items-center gap-3 px-4 py-3">

@@ -223,7 +223,6 @@ export const MonacoReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorPro
         const modifiedEditor = diffEditor.getModifiedEditor()
 
         modifiedEditor.addCommand(
-          // eslint-disable-next-line no-bitwise
           monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
           () => handleSaveRef.current?.()
         )
@@ -298,15 +297,17 @@ export const MonacoReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorPro
       diffEditorRef.current.getModifiedEditor().updateOptions({ fontSize: effectiveFontSize, tabSize })
     }, [fontSize, mobileFontSize, tabSize, isMobile])
 
+    const currentContent = fileContent.current
+
     useEffect(() => {
       if (!diffEditorRef.current) return
       const modifiedEditor = diffEditorRef.current.getModifiedEditor()
       const model = modifiedEditor.getModel()
       if (!model) return
-      if (model.getValue() !== fileContent.current) {
-        model.setValue(fileContent.current)
+      if (model.getValue() !== currentContent) {
+        model.setValue(currentContent)
       }
-    }, [fileContent.current])
+    }, [currentContent])
 
     const handleCommentSubmit = useCallback(
       (body: string) => {
@@ -318,7 +319,6 @@ export const MonacoReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorPro
             const model = modifiedEditor.getModel()
             if (model) {
               const startLineContent = model.getLineContent(commentInput.startLine)
-              const endLineContent = model.getLineContent(commentInput.endLine)
               if (commentInput.startLine === commentInput.endLine) {
                 contentSnapshot = startLineContent
               } else {

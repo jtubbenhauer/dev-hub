@@ -6,7 +6,6 @@ let capturedOnReady: ((handle: TerminalHandle) => void) | undefined
 let capturedShellCommand: string | null | undefined
 let capturedEnvOverrides: Record<string, string> | undefined
 let capturedSessionId: string | undefined
-let capturedFontFamily: string | undefined
 let capturedAutoFocus: boolean | undefined
 
 vi.mock("@/components/terminal/terminal-panel", () => ({
@@ -22,7 +21,6 @@ vi.mock("@/components/terminal/terminal-panel", () => ({
     capturedShellCommand = props.shellCommand
     capturedEnvOverrides = props.envOverrides
     capturedSessionId = props.sessionId
-    capturedFontFamily = props.fontFamily
     capturedAutoFocus = props.autoFocus
     return <div data-testid="terminal-panel" />
   },
@@ -64,7 +62,6 @@ describe("NeovimReviewEditor", () => {
     capturedShellCommand = undefined
     capturedEnvOverrides = undefined
     capturedSessionId = undefined
-    capturedFontFamily = undefined
     capturedAutoFocus = undefined
   })
 

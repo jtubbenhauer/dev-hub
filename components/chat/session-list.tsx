@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useMemo, useRef, useState } from "react"
-import { Plus, Trash2, MessageSquare, MessageCircleQuestion, Globe, Layers, FolderGit2, Check, GitBranch, Brain, ArrowUpDown, Group, GripVertical, ChevronDown, ChevronRight, Pin, PinOff, Clock } from "lucide-react"
+import { useCallback, useMemo, useState } from "react"
+import { Plus, Trash2, MessageSquare, MessageCircleQuestion, Globe, Layers, FolderGit2, Check, GitBranch, Brain, ArrowUpDown, Group, GripVertical, ChevronRight, Pin, PinOff, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"

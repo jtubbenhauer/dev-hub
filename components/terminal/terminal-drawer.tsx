@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState } from "react"
 import { TerminalPanel } from "./terminal-panel"
 import { useTerminalStore } from "@/stores/terminal-store"
 import { useWorkspaceStore } from "@/stores/workspace-store"
@@ -27,15 +27,30 @@ export function TerminalDrawer() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null)
-  const hasEverOpened = useRef(false)
+  const [hasEverOpened, setHasEverOpened] = useState(false)
 
-  const resolve = useCallback((workspaceId: string) => {
+  // Track if the drawer has ever opened (during render)
+  if (isOpen && !hasEverOpened) {
+    setHasEverOpened(true)
+  }
+
+  // Detect workspace change during render and reset to loading state
+  const isNewWorkspace = activeWorkspaceId !== resolvedWorkspaceId
+  const needsFetch = isOpen && !!activeWorkspaceId && (isNewWorkspace || (!config && !error))
+  if (needsFetch && !isLoading) {
     setIsLoading(true)
     setError(null)
     setConfig(null)
-    setResolvedWorkspaceId(workspaceId)
+    setResolvedWorkspaceId(activeWorkspaceId)
+  }
 
-    fetch(`/api/terminal/resolve?workspaceId=${encodeURIComponent(workspaceId)}`)
+  useEffect(() => {
+    if (!isOpen || !activeWorkspaceId) return
+    if (!isLoading) return
+
+    let cancelled = false
+
+    fetch(`/api/terminal/resolve?workspaceId=${encodeURIComponent(activeWorkspaceId)}`)
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json() as { error?: string }
@@ -44,22 +59,20 @@ export function TerminalDrawer() {
         return res.json() as Promise<TerminalConfig>
       })
       .then((data) => {
-        setConfig(data)
-        setIsLoading(false)
+        if (!cancelled) {
+          setConfig(data)
+          setIsLoading(false)
+        }
       })
       .catch((err: Error) => {
-        setError(err.message)
-        setIsLoading(false)
+        if (!cancelled) {
+          setError(err.message)
+          setIsLoading(false)
+        }
       })
-  }, [])
 
-  useEffect(() => {
-    if (!isOpen || !activeWorkspaceId) return
-    hasEverOpened.current = true
-    if (activeWorkspaceId === resolvedWorkspaceId && config) return
-
-    resolve(activeWorkspaceId)
-  }, [isOpen, activeWorkspaceId, resolvedWorkspaceId, config, resolve])
+    return () => { cancelled = true }
+  }, [isOpen, activeWorkspaceId, isLoading])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -73,12 +86,11 @@ export function TerminalDrawer() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggle])
 
-  if (!hasEverOpened.current && !isOpen) return null
+  if (!hasEverOpened && !isOpen) return null
 
   return (
     <>
       {isOpen && (
-        // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- backdrop overlay requires div for full-screen coverage
         <button
           type="button"
           tabIndex={-1}

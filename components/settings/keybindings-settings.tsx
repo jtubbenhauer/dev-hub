@@ -57,9 +57,12 @@ export function KeybindingsSettings() {
   const [capturedKeys, setCapturedKeys] = useState<string>("")
   const [conflictActionId, setConflictActionId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!isLoadingBindings) setLocalBindings({ ...bindings })
-  }, [bindings, isLoadingBindings])
+  // Sync local bindings from server data (during render)
+  const [prevBindings, setPrevBindings] = useState(bindings)
+  if (prevBindings !== bindings && !isLoadingBindings) {
+    setPrevBindings(bindings)
+    setLocalBindings({ ...bindings })
+  }
 
   const isLoading = isLoadingBindings || isLoadingWhichKey || isLoadingTimeout || isLoadingActivationKey
   const activationKeyDisplay = formatActivationKey(activationKey)

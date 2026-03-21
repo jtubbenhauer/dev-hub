@@ -53,10 +53,12 @@ export function FilePicker({ workspaceId, query, onSelect, onClose }: FilePicker
 
   const filtered = allPaths.filter((p) => fuzzyMatch(p, query)).slice(0, 50)
 
-  // Reset active index when filtered list changes
-  useEffect(() => {
+  // Reset active index when query changes
+  const [prevQuery, setPrevQuery] = useState(query)
+  if (prevQuery !== query) {
+    setPrevQuery(query)
     setActiveIndex(0)
-  }, [query])
+  }
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

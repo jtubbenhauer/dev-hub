@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react"
+import { useState, useCallback, useMemo, useRef } from "react"
 import {
   ArrowLeft,
   ExternalLink,
@@ -17,7 +17,6 @@ import {
   Circle,
   CircleDot,
   AlertCircle,
-  Clock,
   FileDiff,
   RotateCcw,
   List,
@@ -114,7 +113,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const [isPrListOpen, setIsPrListOpen] = useState(false)
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false)
   const [groupByFolder, setGroupByFolder] = useState(false)
-  const restoredPrRef = useRef(false)
+  const [hasRestoredPr, setHasRestoredPr] = useState(false)
 
   const isMobile = useIsMobile()
   const editorHandleRef = useRef<PrDiffEditorHandle>(null)
@@ -128,25 +127,31 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const { data: myPrs = [], isLoading: isMyPrsLoading } = useGitHubPrsCreatedByMe()
   const { data: currentUser } = useGitHubCurrentUser()
 
-  useEffect(() => {
-    if (restoredPrRef.current || selectedPr) return
+  // Restore selected PR from localStorage (during render)
+  if (!hasRestoredPr && !selectedPr && (reviewPrs.length > 0 || myPrs.length > 0)) {
     try {
       const stored = localStorage.getItem("dev-hub:git-selected-pr")
-      if (!stored) { restoredPrRef.current = true; return }
-      const parsed = parsePrParam(stored)
-      if (!parsed) { restoredPrRef.current = true; return }
-      const allPrs = [...reviewPrs, ...myPrs]
-      const match = allPrs.find(
-        (pr) => pr.base.repo.full_name === parsed.fullName && pr.number === parsed.number
-      )
-      if (match) {
-        setSelectedPr(match)
-        if (reviewPrs.includes(match)) setActiveTab("for-review")
-        else setActiveTab("my-prs")
-        restoredPrRef.current = true
+      if (!stored) {
+        setHasRestoredPr(true)
+      } else {
+        const parsed = parsePrParam(stored)
+        if (!parsed) {
+          setHasRestoredPr(true)
+        } else {
+          const allPrs = [...reviewPrs, ...myPrs]
+          const match = allPrs.find(
+            (pr) => pr.base.repo.full_name === parsed.fullName && pr.number === parsed.number
+          )
+          if (match) {
+            setSelectedPr(match)
+            if (reviewPrs.includes(match)) setActiveTab("for-review")
+            else setActiveTab("my-prs")
+          }
+          setHasRestoredPr(true)
+        }
       }
-    } catch { restoredPrRef.current = true }
-  }, [reviewPrs, myPrs, selectedPr])
+    } catch { setHasRestoredPr(true) }
+  }
 
   const owner = selectedPr?.base.repo.owner.login ?? null
   const repo = selectedPr?.base.repo.name ?? null

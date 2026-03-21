@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import path from "node:path"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db"
 import { workspaces } from "@/drizzle/schema"
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest) {
 
     const targetPath = relativePath === "."
       ? workspace.path
-      : require("node:path").resolve(workspace.path, relativePath)
+      : path.resolve(workspace.path, relativePath)
 
     const entries = await backend.listDirectory(targetPath, depth)
 

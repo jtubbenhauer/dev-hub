@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -154,15 +154,14 @@ function EditorSettingsCard() {
     isLoadingNvim ||
     isLoadingFileTabs;
 
-  useEffect(() => {
-    if (
-      !isLoadingNvim &&
-      nvimAppName !== "devhub" &&
-      nvimAppName !== "personal"
-    ) {
+  // Sync custom nvim app name from server (during render)
+  const [prevNvimAppName, setPrevNvimAppName] = useState(nvimAppName);
+  if (prevNvimAppName !== nvimAppName && !isLoadingNvim) {
+    setPrevNvimAppName(nvimAppName);
+    if (nvimAppName !== "devhub" && nvimAppName !== "personal") {
       setCustomNvimAppName(nvimAppName);
     }
-  }, [nvimAppName, isLoadingNvim]);
+  }
 
   const editorTypeLabel = (type: EditorType): string => {
     if (type === "monaco") return "Monaco (VS Code)";
@@ -552,9 +551,12 @@ function CommandSettingsCard() {
   const mutation = useSettingsMutation();
   const [localPath, setLocalPath] = useState("");
 
-  useEffect(() => {
-    if (!isLoading) setLocalPath(shellRcPath);
-  }, [shellRcPath, isLoading]);
+  // Sync local path from server data (during render)
+  const [prevShellRcPath, setPrevShellRcPath] = useState(shellRcPath);
+  if (prevShellRcPath !== shellRcPath && !isLoading) {
+    setPrevShellRcPath(shellRcPath);
+    setLocalPath(shellRcPath);
+  }
 
   const handleSave = () => {
     mutation.mutate(

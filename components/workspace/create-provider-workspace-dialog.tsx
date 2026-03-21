@@ -108,11 +108,14 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
     }))
   }, [workspaces])
 
-  useEffect(() => {
+  // Initialize repo from linked repos when form opens (during render)
+  const [prevFormOpen, setPrevFormOpen] = useState(false)
+  if (formOpen !== prevFormOpen) {
+    setPrevFormOpen(formOpen)
     if (formOpen && !repo && !initialRepo && linkedRepos.length > 0) {
       setRepo(linkedRepos[0].url)
     }
-  }, [formOpen, repo, initialRepo, linkedRepos])
+  }
 
   const trimmedRepo = repo.trim()
 
@@ -167,7 +170,7 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
         toast.success(`Created workspace "${workspaceName}" via ${selectedProvider.name}`)
       },
     })
-  }, [canSubmit, selectedProvider, providerId, repo, branch, name, context, task, queryClient, creationStore])
+  }, [canSubmit, selectedProvider, providerId, repo, branch, name, context, selectedColor, task, queryClient, creationStore])
 
   function resetFormState() {
     setProviderId(providers.length === 1 ? providers[0].id : "")

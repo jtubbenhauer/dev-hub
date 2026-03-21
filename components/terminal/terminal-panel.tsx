@@ -98,10 +98,12 @@ export function TerminalPanel({
     "connecting" | "connected" | "disconnected" | "error"
   >("connecting");
 
-  shellCommandRef.current = shellCommand;
-  envOverridesRef.current = envOverrides;
-  autoFocusRef.current = autoFocus;
-  onReadyRef.current = onReady;
+  useEffect(() => {
+    shellCommandRef.current = shellCommand;
+    envOverridesRef.current = envOverrides;
+    autoFocusRef.current = autoFocus;
+    onReadyRef.current = onReady;
+  });
 
   const connect = useCallback(async () => {
     if (!containerRef.current) return;

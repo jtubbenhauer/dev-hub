@@ -154,7 +154,6 @@ export function TasksPage() {
         }
       } catch {}
     } catch {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

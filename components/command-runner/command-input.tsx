@@ -60,10 +60,15 @@ export function CommandInput({
     staleTime: 30_000,
   })
 
-  useEffect(() => {
-    setIsOpen(suggestions.length > 0 && value.length > 0)
-    setSelectedIndex(-1)
-  }, [suggestions, value])
+  const [prevSuggestions, setPrevSuggestions] = useState(suggestions)
+  const [prevValue, setPrevValue] = useState(value)
+  if (prevSuggestions !== suggestions || prevValue !== value) {
+    setPrevSuggestions(suggestions)
+    setPrevValue(value)
+    const shouldOpen = suggestions.length > 0 && value.length > 0
+    if (isOpen !== shouldOpen) setIsOpen(shouldOpen)
+    if (selectedIndex !== -1) setSelectedIndex(-1)
+  }
 
   const handleSelect = useCallback((suggestion: AutocompleteSuggestion) => {
     setValue(suggestion.value)

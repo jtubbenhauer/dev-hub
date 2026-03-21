@@ -72,8 +72,17 @@ export function SubAgentDialog({
     if (!open || !childSessionId || !workspaceId) return
     if (hasFetchedRef.current) return
     hasFetchedRef.current = true
-    fetchMessages()
-  }, [open, childSessionId, workspaceId, fetchMessages])
+
+    fetch(buildProxyUrl(`session/${childSessionId}/message`, workspaceId))
+      .then((res) => res.ok ? res.json() as Promise<MessageWithParts[]> : Promise.resolve(null))
+      .then((data) => {
+        if (data) {
+          setMessages(data)
+          scrollToBottom()
+        }
+      })
+      .catch(() => { /* noop */ })
+  }, [open, childSessionId, workspaceId, scrollToBottom])
 
   useEffect(() => {
     if (!open) {

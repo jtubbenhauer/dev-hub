@@ -20,7 +20,6 @@ interface ReviewFileListProps {
   selectedFileId: number | null
   onSelectFile: (file: ReviewFile) => void
   onToggleReviewed: (file: ReviewFile) => void
-  onMarkAndNext: (file: ReviewFile) => void
 }
 
 const statusIcons: Record<ReviewFileStatus, typeof File> = {
@@ -65,7 +64,6 @@ export function ReviewFileList({
   selectedFileId,
   onSelectFile,
   onToggleReviewed,
-  onMarkAndNext,
 }: ReviewFileListProps) {
   const sorted = sortFilesUnreviewedFirst(files)
   const listRef = useRef<HTMLDivElement>(null)

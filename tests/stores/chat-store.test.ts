@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { act } from "react"
+
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -108,7 +108,7 @@ function makeQuestion(id: string, sessionID: string) {
 }
 
 /** Fire a synthetic SSE event through the store's handleEvent. */
-function emitEvent(
+function _emitEvent(
   handleEvent: (event: Record<string, unknown>, sourceWorkspaceId: string) => void,
   type: string,
   properties: Record<string, unknown>,

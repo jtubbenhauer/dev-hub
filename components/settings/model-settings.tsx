@@ -143,9 +143,12 @@ function AllowlistCard({
   const [search, setSearch] = useState("")
   const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
+  // Sync local allowlist from props (during render)
+  const [prevAllowlist, setPrevAllowlist] = useState(allowlist)
+  if (prevAllowlist !== allowlist) {
+    setPrevAllowlist(allowlist)
     setLocal(new Set(allowlist))
-  }, [allowlist])
+  }
 
   const isDirty = (() => {
     if (local.size !== allowlist.length) return true
@@ -328,9 +331,12 @@ function AgentBindingsCard({
 }) {
   const [local, setLocal] = useState<Record<string, SelectedModel>>(() => ({ ...bindings }))
 
-  useEffect(() => {
+  // Sync local bindings from props (during render)
+  const [prevBindings, setPrevBindings] = useState(bindings)
+  if (prevBindings !== bindings) {
+    setPrevBindings(bindings)
     setLocal({ ...bindings })
-  }, [bindings])
+  }
 
   const isDirty = JSON.stringify(local) !== JSON.stringify(bindings)
 

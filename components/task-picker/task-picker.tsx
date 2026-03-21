@@ -165,20 +165,26 @@ export function TaskPickerDialog() {
   const isLoading = isSettingsLoading || (isServerSearch ? isSearchLoading : isMyTasksLoading)
   const error = isServerSearch ? searchError : myTasksError
 
+  // Reset state when dialog opens (during-render pattern)
+  const [prevIsOpen, setPrevIsOpen] = useState(false)
+  if (isOpen && !prevIsOpen) {
+    setPrevIsOpen(true)
+    setQuery("")
+    setDebouncedQuery("")
+    setSelectedIndex(0)
+  } else if (!isOpen && prevIsOpen) {
+    setPrevIsOpen(false)
+  }
+
+  // Focus input when dialog opens
   useEffect(() => {
-    if (isOpen) {
-      setQuery("")
-      setDebouncedQuery("")
-      setSelectedIndex(0)
-      setTimeout(() => inputRef.current?.focus(), 0)
-    }
+    if (isOpen) inputRef.current?.focus()
   }, [isOpen])
 
-  useEffect(() => {
-    if (selectedIndex >= totalItems) {
-      setSelectedIndex(Math.max(0, totalItems - 1))
-    }
-  }, [totalItems, selectedIndex])
+  // Clamp selectedIndex when results change (during render)
+  if (selectedIndex >= totalItems && totalItems > 0) {
+    setSelectedIndex(Math.max(0, totalItems - 1))
+  }
 
   useEffect(() => {
     const list = listRef.current

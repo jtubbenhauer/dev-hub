@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
@@ -38,13 +38,18 @@ export function WorkspaceSettings() {
 
   const isLoading = isLoadingDefault || isLoadingWorktree || isLoadingClone || isLoadingAutoColor
 
-  useEffect(() => {
-    if (!isLoadingWorktree) setLocalWorktreeDir(worktreeBaseDir)
-  }, [worktreeBaseDir, isLoadingWorktree])
+  // Sync local state from server data (during render)
+  const [prevWorktreeDir, setPrevWorktreeDir] = useState(worktreeBaseDir)
+  if (prevWorktreeDir !== worktreeBaseDir && !isLoadingWorktree) {
+    setPrevWorktreeDir(worktreeBaseDir)
+    setLocalWorktreeDir(worktreeBaseDir)
+  }
 
-  useEffect(() => {
-    if (!isLoadingClone) setLocalCloneDir(cloneBaseDir)
-  }, [cloneBaseDir, isLoadingClone])
+  const [prevCloneDir, setPrevCloneDir] = useState(cloneBaseDir)
+  if (prevCloneDir !== cloneBaseDir && !isLoadingClone) {
+    setPrevCloneDir(cloneBaseDir)
+    setLocalCloneDir(cloneBaseDir)
+  }
 
   const handleDefaultWorkspaceChange = (value: string) => {
     const next = value === "__none__" ? null : value

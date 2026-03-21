@@ -23,18 +23,24 @@ function TerminalPageContent() {
     : activeWorkspace
 
   const [config, setConfig] = useState<TerminalConfig | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(() =>
+    workspaceId ? null : "No workspace selected. Go to Workspaces and open a terminal from there."
+  )
+  const [isLoading, setIsLoading] = useState(() => !!workspaceId)
+  const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!workspaceId) {
-      setError("No workspace selected. Go to Workspaces and open a terminal from there.")
-      setIsLoading(false)
-      return
-    }
-
+  // Detect workspace change during render and reset to loading state
+  if (workspaceId && workspaceId !== resolvedWorkspaceId) {
     setIsLoading(true)
     setError(null)
+    setConfig(null)
+    setResolvedWorkspaceId(workspaceId)
+  }
+
+  useEffect(() => {
+    if (!workspaceId || !isLoading) return
+
+    let cancelled = false
 
     fetch(`/api/terminal/resolve?workspaceId=${encodeURIComponent(workspaceId)}`)
       .then(async (res) => {
@@ -45,14 +51,20 @@ function TerminalPageContent() {
         return res.json() as Promise<TerminalConfig>
       })
       .then((data) => {
-        setConfig(data)
-        setIsLoading(false)
+        if (!cancelled) {
+          setConfig(data)
+          setIsLoading(false)
+        }
       })
       .catch((err: Error) => {
-        setError(err.message)
-        setIsLoading(false)
+        if (!cancelled) {
+          setError(err.message)
+          setIsLoading(false)
+        }
       })
-  }, [workspaceId])
+
+    return () => { cancelled = true }
+  }, [workspaceId, isLoading])
 
   if (isLoading) {
     return (

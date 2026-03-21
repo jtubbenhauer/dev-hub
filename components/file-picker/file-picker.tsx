@@ -147,22 +147,26 @@ export function FilePickerDialog() {
     return fuzzySearch(query, files, 100)
   }, [query, files])
 
-  // Reset state when dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      setPickerWorkspaceId(activeWorkspaceId)
-      setQuery("")
-      setSelectedIndex(0)
-      setTimeout(() => inputRef.current?.focus(), 0)
-    }
-  }, [isOpen, activeWorkspaceId])
+  // Reset state when dialog opens (during-render pattern)
+  const [prevIsOpen, setPrevIsOpen] = useState(false)
+  if (isOpen && !prevIsOpen) {
+    setPrevIsOpen(true)
+    setPickerWorkspaceId(activeWorkspaceId)
+    setQuery("")
+    setSelectedIndex(0)
+  } else if (!isOpen && prevIsOpen) {
+    setPrevIsOpen(false)
+  }
 
-  // Clamp selectedIndex when results change
+  // Focus input when dialog opens
   useEffect(() => {
-    if (selectedIndex >= results.length) {
-      setSelectedIndex(Math.max(0, results.length - 1))
-    }
-  }, [results.length, selectedIndex])
+    if (isOpen) inputRef.current?.focus()
+  }, [isOpen])
+
+  // Clamp selectedIndex when results change (during render)
+  if (selectedIndex >= results.length && results.length > 0) {
+    setSelectedIndex(Math.max(0, results.length - 1))
+  }
 
   // Scroll selected item into view
   useEffect(() => {

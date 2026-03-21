@@ -69,7 +69,7 @@ async function proxyRemoteAutocomplete(
 
     // Agent doesn't have access to command history (stored in app DB).
     // Merge agent filesystem-based suggestions with local history.
-    const { getSuggestions: getLocalSuggestions } = await import("@/lib/commands/autocomplete")
+    await import("@/lib/commands/autocomplete")
     const historySuggestions = await getHistorySuggestions(workspaceId, query)
 
     const merged = mergeAndDeduplicate(historySuggestions, agentResult.suggestions)

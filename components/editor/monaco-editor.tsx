@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useCallback, useEffect, useState, forwardRef, useImperativeHandle } from "react"
+import { useRef, useCallback, useEffect, useState, useMemo, forwardRef, useImperativeHandle } from "react"
 import dynamic from "next/dynamic"
 import type { editor } from "monaco-editor"
 import { useTheme } from "@/components/providers/theme-provider"
@@ -110,27 +110,30 @@ function MonacoEditor({
   const [commentInput, setCommentInput] = useState<{ startLine: number; endLine: number } | null>(null)
   const [activeCommentLine, setActiveCommentLine] = useState<number | null>(null)
 
-  const commentedLines = new Set<number>()
-  if (isCommentMode && commentsData) {
-    for (const c of commentsData) {
-      for (let ln = c.startLine; ln <= c.endLine; ln++) {
-        commentedLines.add(ln)
+  const commentedLines = useMemo(() => {
+    const lines = new Set<number>()
+    if (isCommentMode && commentsData) {
+      for (const c of commentsData) {
+        for (let ln = c.startLine; ln <= c.endLine; ln++) {
+          lines.add(ln)
+        }
       }
     }
-  }
+    return lines
+  }, [isCommentMode, commentsData])
 
   const lineComments = isCommentMode && commentsData && activeCommentLine !== null
     ? commentsData.filter((c) => c.startLine <= activeCommentLine && c.endLine >= activeCommentLine)
     : []
 
   const onSaveRef = useRef(onSave)
-  onSaveRef.current = onSave
+  useEffect(() => { onSaveRef.current = onSave })
 
   const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
+  useEffect(() => { onChangeRef.current = onChange })
 
   const commentedLinesRef = useRef(commentedLines)
-  commentedLinesRef.current = commentedLines
+  useEffect(() => { commentedLinesRef.current = commentedLines })
 
   const [isEditorReady, setIsEditorReady] = useState(false)
 
@@ -144,7 +147,6 @@ function MonacoEditor({
       monacoRef.current = monacoInstance
 
       editorInstance.addCommand(
-        // eslint-disable-next-line no-bitwise
         monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
         () => onSaveRef.current?.()
       )

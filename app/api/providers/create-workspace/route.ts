@@ -211,7 +211,6 @@ export async function POST(request: NextRequest) {
 
         handlePostSpawn({
           provider,
-          derivedName,
           id,
           repo,
           branch,
@@ -243,7 +242,6 @@ export async function POST(request: NextRequest) {
 
 interface PostSpawnParams {
   provider: WorkspaceProvider
-  derivedName: string
   id: string
   repo: string
   branch: string
@@ -255,7 +253,7 @@ interface PostSpawnParams {
   createOutput: string
 }
 
-async function handlePostSpawn({ provider, derivedName, id, repo, branch, userId, color, linkedTaskId, linkedTaskMeta, emit, createOutput }: PostSpawnParams) {
+async function handlePostSpawn({ provider, id, repo, branch, userId, color, linkedTaskId, linkedTaskMeta, emit, createOutput }: PostSpawnParams) {
   emit("status", { message: "Processing create output..." })
 
   const parsed = extractTrailingJson(createOutput)

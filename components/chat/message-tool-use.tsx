@@ -8,13 +8,11 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  MessageSquareText,
   ExternalLink,
 } from "lucide-react"
 import AnsiToHtml from "ansi-to-html"
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/chat-store"
-import { MarkdownContent } from "@/components/chat/markdown-content"
 import { SubAgentDialog } from "@/components/chat/sub-agent-dialog"
 import type { ToolPart } from "@/lib/opencode/types"
 

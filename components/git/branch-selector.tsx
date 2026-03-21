@@ -30,7 +30,7 @@ interface BranchSelectorProps {
 
 export function BranchSelector({
   branches,
-  currentBranch,
+  currentBranch: _currentBranch,
   onSwitch,
   onCreate,
   onDelete,

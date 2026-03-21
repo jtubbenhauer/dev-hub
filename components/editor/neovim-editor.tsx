@@ -59,11 +59,6 @@ function escapeShellSingleQuote(str: string): string {
 
 export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
 function NeovimEditor({ workspaceId, filePath, autoFocus = true }, ref) {
-  useImperativeHandle(ref, () => ({
-    focus: () => terminalHandleRef.current?.focus(),
-    blur: () => terminalHandleRef.current?.blur(),
-  }));
-
   const { nvimAppName } = useNvimAppNameSetting();
   const { scrollback } = useTerminalScrollbackSetting();
   const { terminalFont } = useTerminalFontSetting();
@@ -73,10 +68,14 @@ function NeovimEditor({ workspaceId, filePath, autoFocus = true }, ref) {
   const [error, setError] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [depsChecked, setDepsChecked] = useState(false);
-  const resolvedWorkspaceRef = useRef<string | null>(null);
   const currentFileRef = useRef<string | null>(null);
-  const terminalHandleRef = useRef<TerminalHandle | null>(null);
+  const [terminalHandle, setTerminalHandle] = useState<TerminalHandle | null>(null);
   const desiredFileRef = useRef<string | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => terminalHandle?.focus(),
+    blur: () => terminalHandle?.blur(),
+  }), [terminalHandle]);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,13 +98,19 @@ function NeovimEditor({ workspaceId, filePath, autoFocus = true }, ref) {
     };
   }, []);
 
-  useEffect(() => {
-    if (!workspaceId) return;
-    if (resolvedWorkspaceRef.current === workspaceId && terminalConfig) return;
+  const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null);
 
+  // Detect workspace change during render and reset to resolving state
+  if (workspaceId && (workspaceId !== resolvedWorkspaceId || !terminalConfig) && !isResolving) {
     setIsResolving(true);
     setError(null);
-    resolvedWorkspaceRef.current = workspaceId;
+    setResolvedWorkspaceId(workspaceId);
+  }
+
+  useEffect(() => {
+    if (!workspaceId || !isResolving) return;
+
+    let cancelled = false;
 
     fetch(
       `/api/terminal/resolve?workspaceId=${encodeURIComponent(workspaceId)}`,
@@ -120,14 +125,20 @@ function NeovimEditor({ workspaceId, filePath, autoFocus = true }, ref) {
         return res.json() as Promise<TerminalConfig>;
       })
       .then((config) => {
-        setTerminalConfig(config);
-        setIsResolving(false);
+        if (!cancelled) {
+          setTerminalConfig(config);
+          setIsResolving(false);
+        }
       })
       .catch((err: Error) => {
-        setError(err.message);
-        setIsResolving(false);
+        if (!cancelled) {
+          setError(err.message);
+          setIsResolving(false);
+        }
       });
-  }, [workspaceId, terminalConfig]);
+
+    return () => { cancelled = true; };
+  }, [workspaceId, isResolving]);
 
   // Switch files by writing nvim commands directly through the PTY
   useEffect(() => {
@@ -138,20 +149,19 @@ function NeovimEditor({ workspaceId, filePath, autoFocus = true }, ref) {
 
     if (currentFileRef.current === filePath) return;
 
-    const handle = terminalHandleRef.current;
-    if (!handle) return;
+    if (!terminalHandle) return;
 
     currentFileRef.current = filePath;
     // Escape to normal mode, then open the new file after a brief delay
-    handle.write("\x1b");
+    terminalHandle.write("\x1b");
     setTimeout(() => {
-      handle.write(`:e ${filePath}\r`);
-      handle.focus();
+      terminalHandle.write(`:e ${filePath}\r`);
+      terminalHandle.focus();
     }, 50);
-  }, [filePath, terminalConfig, isResolving]);
+  }, [filePath, terminalConfig, isResolving, terminalHandle]);
 
   const handleTerminalReady = useCallback((handle: TerminalHandle) => {
-    terminalHandleRef.current = handle;
+    setTerminalHandle(handle);
 
     // If a file switch was requested before the handle was ready, apply it now
     const desired = desiredFileRef.current;

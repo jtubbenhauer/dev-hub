@@ -23,7 +23,6 @@ import {
   FolderGit2,
   Plus,
   FolderSearch,
-  Globe,
   Palette,
 } from "lucide-react"
 import { DirectoryBrowser } from "@/components/workspace/directory-browser"

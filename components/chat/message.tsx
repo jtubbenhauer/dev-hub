@@ -33,25 +33,20 @@ const THROTTLE_MS = 200
 
 function useThrottledValue<T>(value: T, delayMs: number): T {
   const [throttled, setThrottled] = useState(value)
-  const lastUpdated = useRef(0)
+  const lastUpdatedRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    const now = Date.now()
-    const elapsed = now - lastUpdated.current
+    if (value === throttled) return
 
-    if (elapsed >= delayMs) {
-      lastUpdated.current = now
-      setThrottled(value)
-      return
-    }
+    const elapsed = Date.now() - lastUpdatedRef.current
+    const remaining = Math.max(0, delayMs - elapsed)
 
-    if (timerRef.current !== null) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
       timerRef.current = null
-      lastUpdated.current = Date.now()
+      lastUpdatedRef.current = Date.now()
       setThrottled(value)
-    }, delayMs - elapsed)
+    }, remaining)
 
     return () => {
       if (timerRef.current !== null) {
@@ -59,7 +54,7 @@ function useThrottledValue<T>(value: T, delayMs: number): T {
         timerRef.current = null
       }
     }
-  }, [value, delayMs])
+  }, [value, throttled, delayMs])
 
   return throttled
 }

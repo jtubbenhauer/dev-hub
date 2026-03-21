@@ -420,7 +420,7 @@ describe("reviewed-next navigation logic", () => {
     const flatFiles = buildFlatFiles(status, "name-asc")
     // Simulate no file selected: findIndex returns -1
     const selectedIndex = flatFiles.findIndex(() => false)
-    const next = flatFiles[selectedIndex + 1]
+    const _next = flatFiles[selectedIndex + 1]
     // flatFiles[0] is "a.ts" — but the early-return guard (if !file) prevents reaching this
     // Here we just verify the algorithm: index -1 + 1 = 0, which would be the first file
     // The guard in the handler (if (!file) return) would have already exited

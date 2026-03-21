@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { useChatStore } from "@/stores/chat-store"
 import type { WorkspaceActivity } from "@/stores/chat-store"
@@ -134,11 +134,10 @@ export function WorkspaceSwitcher() {
 
   const [wakingWorkspaceId, setWakingWorkspaceId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (wakingWorkspaceId && healthStatuses[wakingWorkspaceId] === "healthy") {
-      setWakingWorkspaceId(null)
-    }
-  }, [wakingWorkspaceId, healthStatuses])
+  // Clear waking state when workspace becomes healthy (during render)
+  if (wakingWorkspaceId && healthStatuses[wakingWorkspaceId] === "healthy") {
+    setWakingWorkspaceId(null)
+  }
 
   if (isLoadingWorkspaces) {
     return <Skeleton className="h-9 w-36 sm:w-48" />

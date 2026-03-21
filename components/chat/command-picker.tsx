@@ -55,9 +55,11 @@ export function CommandPicker({ commands, query, onSelect, onClose }: CommandPic
     [allCommands, query]
   )
 
-  useEffect(() => {
+  const [prevQuery, setPrevQuery] = useState(query)
+  if (prevQuery !== query) {
+    setPrevQuery(query)
     setActiveIndex(0)
-  }, [query])
+  }
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

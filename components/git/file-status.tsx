@@ -101,12 +101,12 @@ export function FileStatusList({
   )
 
   // Flat ordered list for keyboard navigation — matches display order
-  const flatFiles = [
+  const flatFiles = useMemo(() => [
     ...sortedStaged.map((f) => ({ path: f.path, isStaged: true })),
     ...sortedUnstaged.map((f) => ({ path: f.path, isStaged: false })),
     ...sortedUntracked.map((path) => ({ path, isStaged: false })),
     ...sortedConflicted.map((path) => ({ path, isStaged: false })),
-  ]
+  ], [sortedStaged, sortedUnstaged, sortedUntracked, sortedConflicted])
 
   const selectedIndex = flatFiles.findIndex(
     (f) => f.path === selectedFile && f.isStaged === selectedStaged

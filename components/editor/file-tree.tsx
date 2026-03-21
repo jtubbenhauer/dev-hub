@@ -392,13 +392,12 @@ export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<
   const treeListRef = useRef<HTMLDivElement>(null)
 
   // Clamp selectedPath when the visible list changes
-  useEffect(() => {
-    if (selectedPath === null) return
-    const stillVisible = flatVisible.some((e) => e.path === selectedPath)
-    if (!stillVisible) {
-      setSelectedPath(flatVisible[0]?.path ?? null)
-    }
-  }, [flatVisible, selectedPath])
+  const clampedSelectedPath = selectedPath !== null && !flatVisible.some((e) => e.path === selectedPath)
+    ? flatVisible[0]?.path ?? null
+    : selectedPath
+  if (clampedSelectedPath !== selectedPath) {
+    setSelectedPath(clampedSelectedPath)
+  }
 
   // Scroll keyboard-selected tree entry into view
   useEffect(() => {
@@ -409,15 +408,17 @@ export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<
 
   // Stable refs for the keyboard handler
   const flatVisibleRef = useRef(flatVisible)
-  flatVisibleRef.current = flatVisible
   const selectedPathRef = useRef(selectedPath)
-  selectedPathRef.current = selectedPath
   const onFileClickRef = useRef(onFileClick)
-  onFileClickRef.current = onFileClick
   const onToggleExpandRef = useRef(onToggleExpand)
-  onToggleExpandRef.current = onToggleExpand
   const isSearchingRef = useRef(isSearching)
-  isSearchingRef.current = isSearching
+  useEffect(() => {
+    flatVisibleRef.current = flatVisible
+    selectedPathRef.current = selectedPath
+    onFileClickRef.current = onFileClick
+    onToggleExpandRef.current = onToggleExpand
+    isSearchingRef.current = isSearching
+  })
 
   useEffect(() => {
     function handleTreeKeyboard(e: KeyboardEvent) {
@@ -475,17 +476,14 @@ export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<
   const [selectedIndex, setSelectedIndex] = useState(0)
   const searchListRef = useRef<HTMLDivElement>(null)
 
-  // Reset selectedIndex when query changes
-  useEffect(() => {
+  // Reset selectedIndex when query changes and clamp to results length
+  const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery)
+  if (prevSearchQuery !== searchQuery) {
+    setPrevSearchQuery(searchQuery)
     setSelectedIndex(0)
-  }, [searchQuery])
-
-  // Clamp selectedIndex when results change
-  useEffect(() => {
-    if (selectedIndex >= searchResults.length) {
-      setSelectedIndex(Math.max(0, searchResults.length - 1))
-    }
-  }, [searchResults.length, selectedIndex])
+  } else if (selectedIndex >= searchResults.length && searchResults.length > 0) {
+    setSelectedIndex(Math.max(0, searchResults.length - 1))
+  }
 
   // Scroll selected search result into view
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -49,11 +49,12 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
   const createWorktree = useCreateWorktree()
   const { data: savedSymlinks } = useWorktreeSymlinks(selectedRepo?.id ?? null)
 
-  useEffect(() => {
-    if (savedSymlinks && savedSymlinks.length > 0) {
-      setSymlinkPaths(savedSymlinks)
-    }
-  }, [savedSymlinks])
+  // Sync symlink paths from saved data (during render)
+  const [prevSavedSymlinks, setPrevSavedSymlinks] = useState(savedSymlinks)
+  if (prevSavedSymlinks !== savedSymlinks && savedSymlinks && savedSymlinks.length > 0) {
+    setPrevSavedSymlinks(savedSymlinks)
+    setSymlinkPaths(savedSymlinks)
+  }
 
   // Filter to only repo-type workspaces (not worktrees)
   const repoWorkspaces = useMemo(

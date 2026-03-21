@@ -101,11 +101,20 @@ export const NeovimReviewEditor = forwardRef<
   const [error, setError] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [depsChecked, setDepsChecked] = useState(false);
+  const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const resolvedWorkspaceRef = useRef<string | null>(null);
   const currentFileRef = useRef<string | null>(null);
   const terminalHandleRef = useRef<TerminalHandle | null>(null);
   const desiredFileRef = useRef<string | null>(null);
+
+  // Track workspace changes and set loading state (during render)
+  const isNewWorkspace = resolvedWorkspaceId !== workspaceId;
+  const needsResolve = isNewWorkspace || (!terminalConfig && !error);
+  if (needsResolve && !isResolving) {
+    setIsResolving(true);
+    setError(null);
+    setResolvedWorkspaceId(workspaceId);
+  }
 
   useImperativeHandle(
     ref,
@@ -138,11 +147,9 @@ export const NeovimReviewEditor = forwardRef<
   }, []);
 
   useEffect(() => {
-    if (resolvedWorkspaceRef.current === workspaceId && terminalConfig) return;
+    if (!isResolving) return;
 
-    setIsResolving(true);
-    setError(null);
-    resolvedWorkspaceRef.current = workspaceId;
+    let cancelled = false;
 
     fetch(
       `/api/terminal/resolve?workspaceId=${encodeURIComponent(workspaceId)}`,
@@ -157,14 +164,20 @@ export const NeovimReviewEditor = forwardRef<
         return res.json() as Promise<TerminalConfig>;
       })
       .then((config) => {
-        setTerminalConfig(config);
-        setIsResolving(false);
+        if (!cancelled) {
+          setTerminalConfig(config);
+          setIsResolving(false);
+        }
       })
       .catch((err: Error) => {
-        setError(err.message);
-        setIsResolving(false);
+        if (!cancelled) {
+          setError(err.message);
+          setIsResolving(false);
+        }
       });
-  }, [workspaceId, terminalConfig]);
+
+    return () => { cancelled = true };
+  }, [isResolving, workspaceId]);
 
   // Switch files by writing nvim commands directly through the PTY
   useEffect(() => {

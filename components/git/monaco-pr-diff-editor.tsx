@@ -11,7 +11,7 @@ import {
 } from "react"
 import dynamic from "next/dynamic"
 import type { editor } from "monaco-editor"
-import { MessageSquare, Send, X, ChevronRight, Loader2, PanelLeft } from "lucide-react"
+import { MessageSquare, Send, X, Loader2, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DiffViewToggle } from "@/components/editor/diff-view-toggle"
 import { useEditorStore } from "@/stores/editor-store"
@@ -246,7 +246,7 @@ export const MonacoPrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorPro
 
     const commentedLines = useMemo(() => new Set(commentsByLine.keys()), [commentsByLine])
     const commentedLinesRef = useRef(commentedLines)
-    commentedLinesRef.current = commentedLines
+    useEffect(() => { commentedLinesRef.current = commentedLines })
 
     const getModifiedEditor = useCallback((): editor.IStandaloneCodeEditor | null => {
       return diffEditorRef.current?.getModifiedEditor() ?? null
@@ -262,7 +262,7 @@ export const MonacoPrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorPro
     )
 
     const handleOpenCommentAtRef = useRef(handleOpenCommentAt)
-    handleOpenCommentAtRef.current = handleOpenCommentAt
+    useEffect(() => { handleOpenCommentAtRef.current = handleOpenCommentAt })
 
     const handleBeforeMount = useCallback(
       (monacoInstance: typeof import("monaco-editor")) => {
@@ -342,15 +342,17 @@ export const MonacoPrDiffEditor = forwardRef<PrDiffEditorHandle, PrDiffEditorPro
       diffEditorRef.current.getModifiedEditor().updateOptions({ fontSize: effectiveFontSize, tabSize })
     }, [fontSize, mobileFontSize, tabSize, isMobile])
 
+    const currentContent = fileContent.current
+
     useEffect(() => {
       if (!diffEditorRef.current) return
       const modifiedEditor = diffEditorRef.current.getModifiedEditor()
       const model = modifiedEditor.getModel()
       if (!model) return
-      if (model.getValue() !== fileContent.current) {
-        model.setValue(fileContent.current)
+      if (model.getValue() !== currentContent) {
+        model.setValue(currentContent)
       }
-    }, [fileContent.current])
+    }, [currentContent])
 
     if (isLoading) {
       return (

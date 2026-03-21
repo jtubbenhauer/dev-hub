@@ -71,8 +71,6 @@ describe("TerminalDrawer", () => {
 
   it("does not pass autoFocus (defaults to true in TerminalPanel)", async () => {
     const resolveBody = { wsUrl: "ws://localhost:3001", cwd: "/home/test", shellCommand: null }
-    // effect re-fires while fetch is in-flight (resolvedWorkspaceId set but config still null)
-    pushFetchResponse(true, resolveBody)
     pushFetchResponse(true, resolveBody)
     useTerminalStore.setState({ isOpen: true })
 
@@ -109,8 +107,6 @@ describe("TerminalDrawer", () => {
   })
 
   it("shows error when resolve fails", async () => {
-    // effect re-fires while fetch is in-flight
-    pushFetchResponse(false, { error: "Connection refused" })
     pushFetchResponse(false, { error: "Connection refused" })
     useTerminalStore.setState({ isOpen: true })
 

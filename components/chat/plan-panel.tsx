@@ -190,8 +190,6 @@ export function PlanPanel({
 
   if (!isOpen) return null
 
-  const activePlanName = planFiles.find((f) => f.path === activePlanPath)?.name
-
   return (
     <div
       className={cn(

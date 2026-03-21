@@ -61,31 +61,30 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
   const [pickerQuery, setPickerQuery] = useState<string | null>(null)
   const [commandQuery, setCommandQuery] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const prevSessionIdRef = useRef(sessionId)
+  const [prevSessionId, setPrevSessionId] = useState(sessionId)
 
-  if (prevSessionIdRef.current !== sessionId) {
-    if (prevSessionIdRef.current) {
-      sessionDrafts.set(prevSessionIdRef.current, {
+  if (prevSessionId !== sessionId) {
+    if (prevSessionId) {
+      sessionDrafts.set(prevSessionId, {
         text: value,
         commentChips: selectedComments,
         files: selectedFiles,
       })
     }
-    prevSessionIdRef.current = sessionId
+    setPrevSessionId(sessionId)
     const draft = sessionId ? sessionDrafts.get(sessionId) : undefined
-    const restoredText = draft?.text ?? ""
-    if (restoredText !== value) {
-      setValue(restoredText)
-      requestAnimationFrame(() => {
-        const textarea = textareaRef.current
-        if (!textarea) return
-        textarea.style.height = "auto"
-        textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
-      })
-    }
+    setValue(draft?.text ?? "")
     setSelectedComments(draft?.commentChips ?? [])
     setSelectedFiles(draft?.files ?? [])
   }
+
+  useEffect(() => {
+    // Resize textarea after session switch restores text
+    const textarea = textareaRef.current
+    if (!textarea) return
+    textarea.style.height = "auto"
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+  }, [value])
 
   useEffect(() => {
     if (!sessionId) return
@@ -111,14 +110,21 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(funct
     },
   }), [])
 
+  // Pick up any pending comment chips on mount and when the workspace changes
+  const [prevWorkspaceId, setPrevWorkspaceId] = useState<string | null>(null)
+  if (prevWorkspaceId !== workspaceId) {
+    setPrevWorkspaceId(workspaceId)
+    if (workspaceId) {
+      const chips = getPendingCommentChips(workspaceId)
+      if (chips.length > 0) {
+        setSelectedComments(chips)
+        clearPendingCommentChips(workspaceId)
+      }
+    }
+  }
+
   useEffect(() => {
     if (!workspaceId) return
-
-    const chips = getPendingCommentChips(workspaceId)
-    if (chips.length > 0) {
-      setSelectedComments(chips)
-      clearPendingCommentChips(workspaceId)
-    }
 
     const handleAttach = () => {
       if (!workspaceId) return

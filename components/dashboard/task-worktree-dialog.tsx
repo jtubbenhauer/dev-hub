@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -76,11 +76,12 @@ export function TaskWorktreeDialog({ task, open, onOpenChange }: TaskWorktreeDia
   const createWorktree = useCreateWorktree()
   const { data: savedSymlinks } = useWorktreeSymlinks(selectedRepoId)
 
-  useEffect(() => {
-    if (savedSymlinks && savedSymlinks.length > 0) {
-      setSymlinkPaths(savedSymlinks)
-    }
-  }, [savedSymlinks])
+  // Sync symlink paths from saved data (during render)
+  const [prevSavedSymlinks, setPrevSavedSymlinks] = useState(savedSymlinks)
+  if (prevSavedSymlinks !== savedSymlinks && savedSymlinks && savedSymlinks.length > 0) {
+    setPrevSavedSymlinks(savedSymlinks)
+    setSymlinkPaths(savedSymlinks)
+  }
 
   const selectedRepo = useMemo(
     () => repoWorkspaces.find((w) => w.id === selectedRepoId) ?? null,

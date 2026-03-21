@@ -1,0 +1,23 @@
+components/settings/keybindings-settings.tsx
+  c778067a41b8f917 71-72,78-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "a70415ad289df1dc958a6145ffd227eddc56100f",
+  "prompts": {
+    "c778067a41b8f917": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2f09203c9ffeL86AwkzyVTz2RX",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 5,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}

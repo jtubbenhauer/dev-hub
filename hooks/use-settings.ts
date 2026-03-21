@@ -44,9 +44,10 @@ export const SETTINGS_KEYS = {
   EDITOR_TYPE: "editor-type",
   NVIM_APPNAME: "nvim-appname",
   AUTO_COLOR_WORKSPACES: "auto-color-workspaces",
-  PANEL_NAVIGATION: "panel-navigation",
+  PANEL_NAVIGATION: "panel-navigation", // deprecated — panel nav removed
   TERMINAL_SCROLLBACK: "terminal-scrollback",
   TERMINAL_FONT: "terminal-font",
+  DISABLE_FILE_TABS: "disable-file-tabs",
 } as const;
 
 export type EditorType = "monaco" | "neovim";
@@ -563,11 +564,11 @@ export function useTerminalFontSetting(): {
   };
 }
 
-export function usePanelNavigationSetting(): {
-  isPanelNavigationEnabled: boolean;
+export function useFileTabsSetting(): {
+  isFileTabsDisabled: boolean;
   isLoading: boolean;
 } {
   const { data, isLoading } = useSettings();
-  const raw = data?.[SETTINGS_KEYS.PANEL_NAVIGATION];
-  return { isPanelNavigationEnabled: raw === true, isLoading };
+  const raw = data?.[SETTINGS_KEYS.DISABLE_FILE_TABS];
+  return { isFileTabsDisabled: raw === true, isLoading };
 }

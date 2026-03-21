@@ -114,6 +114,10 @@ export function AppSidebar() {
          action: { id: "global:task-picker", label: "Open task picker", page: "global" as const },
          handler: () => openTaskPickerRef.current(),
        },
+       {
+         action: { id: "nav:terminal", label: "Go to Terminal", page: "global" as const },
+         handler: () => routerRef.current.push("/terminal"),
+       },
      ],
      []
    )

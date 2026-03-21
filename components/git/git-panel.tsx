@@ -47,9 +47,6 @@ import { cn, isEditorElement } from "@/lib/utils"
 import { useResizablePanel } from "@/hooks/use-resizable-panel"
 import { useLeaderAction } from "@/hooks/use-leader-action"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { usePanelZone } from "@/hooks/use-panel-zone"
-import { usePanelNavigationSetting } from "@/hooks/use-settings"
-import type { StandardActions } from "@/stores/panel-navigation-store"
 import { sortFiles, buildFlatFiles } from "@/lib/git-panel-logic"
 import type { SortMode } from "@/lib/git-panel-logic"
 import {
@@ -393,8 +390,6 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   const handlePushRef = useRef(handlePush)
   handlePushRef.current = handlePush
 
-  const { isPanelNavigationEnabled } = usePanelNavigationSetting()
-
   const gitLeaderActions = useMemo(
     () => {
       const actions = [
@@ -499,93 +494,46 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
         },
       ]
 
-      // When panel nav is ON, panel:focus-left/right (h/l) and panel:focus-down/up (j/k) replace these
-      if (!isPanelNavigationEnabled) {
-        actions.push(
-          {
-            action: { id: "git:next-file", label: "Select next file", page: "git" as const },
-            handler: () => {
-              const flatFiles = buildFlatFiles(statusRef.current, sortModeRef.current)
-              const selectedIndex = flatFiles.findIndex(
-                (f) => f.path === selectedFileRef.current && f.isStaged === selectedStagedRef.current
-              )
-              const next = flatFiles[Math.min(selectedIndex + 1, flatFiles.length - 1)]
-              if (next) handleSelectFileRef.current(next.path, next.isStaged)
-            },
+      actions.push(
+        {
+          action: { id: "git:next-file", label: "Select next file", page: "git" as const },
+          handler: () => {
+            const flatFiles = buildFlatFiles(statusRef.current, sortModeRef.current)
+            const selectedIndex = flatFiles.findIndex(
+              (f) => f.path === selectedFileRef.current && f.isStaged === selectedStagedRef.current
+            )
+            const next = flatFiles[Math.min(selectedIndex + 1, flatFiles.length - 1)]
+            if (next) handleSelectFileRef.current(next.path, next.isStaged)
           },
-          {
-            action: { id: "git:prev-file", label: "Select previous file", page: "git" as const },
-            handler: () => {
-              const flatFiles = buildFlatFiles(statusRef.current, sortModeRef.current)
-              const selectedIndex = flatFiles.findIndex(
-                (f) => f.path === selectedFileRef.current && f.isStaged === selectedStagedRef.current
-              )
-              const prev = flatFiles[Math.max(selectedIndex - 1, 0)]
-              if (prev) handleSelectFileRef.current(prev.path, prev.isStaged)
-            },
+        },
+        {
+          action: { id: "git:prev-file", label: "Select previous file", page: "git" as const },
+          handler: () => {
+            const flatFiles = buildFlatFiles(statusRef.current, sortModeRef.current)
+            const selectedIndex = flatFiles.findIndex(
+              (f) => f.path === selectedFileRef.current && f.isStaged === selectedStagedRef.current
+            )
+            const prev = flatFiles[Math.max(selectedIndex - 1, 0)]
+            if (prev) handleSelectFileRef.current(prev.path, prev.isStaged)
           },
-          {
-            action: { id: "git:focus-editor", label: "Focus code pane", page: "git" as const },
-            handler: () => editorHandleRef.current?.focus(),
-          },
-          {
-            action: { id: "git:focus-files", label: "Focus files pane", page: "git" as const },
-            handler: () => editorHandleRef.current?.blur(),
-          },
-        )
-      }
+        },
+        {
+          action: { id: "git:focus-editor", label: "Focus code pane", page: "git" as const },
+          handler: () => editorHandleRef.current?.focus(),
+        },
+        {
+          action: { id: "git:focus-files", label: "Focus files pane", page: "git" as const },
+          handler: () => fileListFocusRef.current?.focus(),
+        },
+      )
 
       return actions
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isPanelNavigationEnabled]
+    []
   )
 
   useLeaderAction(gitLeaderActions)
-
-  // Panel zone registration
-  const fileListPanelActions = useMemo<StandardActions>(
-    () => ({
-      "navigate-next": () => {
-        const flatFiles = buildFlatFiles(statusRef.current, sortModeRef.current)
-        const selectedIndex = flatFiles.findIndex(
-          (f) => f.path === selectedFileRef.current && f.isStaged === selectedStagedRef.current
-        )
-        const next = flatFiles[Math.min(selectedIndex + 1, flatFiles.length - 1)]
-        if (next) handleSelectFileRef.current(next.path, next.isStaged)
-      },
-      "navigate-prev": () => {
-        const flatFiles = buildFlatFiles(statusRef.current, sortModeRef.current)
-        const selectedIndex = flatFiles.findIndex(
-          (f) => f.path === selectedFileRef.current && f.isStaged === selectedStagedRef.current
-        )
-        const prev = flatFiles[Math.max(selectedIndex - 1, 0)]
-        if (prev) handleSelectFileRef.current(prev.path, prev.isStaged)
-      },
-      "select-item": () => {
-        if (selectedFileRef.current) editorHandleRef.current?.focus()
-      },
-    }),
-    [],
-  )
-
-  const filesPanel = usePanelZone("git-files", {
-    neighbors: { right: "git-editor", down: "git-bottom" },
-    focusRef: fileListFocusRef,
-    isVisible: !isMobile,
-    actions: fileListPanelActions,
-  })
-
-  const editorPanel = usePanelZone("git-editor", {
-    neighbors: { left: "git-files", down: "git-bottom" },
-    focusRef: editorPanelFocusRef,
-  })
-
-  const bottomPanel = usePanelZone("git-bottom", {
-    neighbors: { up: "git-editor" },
-    focusRef: bottomPanelFocusRef,
-    isVisible: openPanel !== null,
-  })
 
   if (isStatusLoading) {
     return (
@@ -883,15 +831,11 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
         {/* File list (left) - desktop */}
         {!isMobile && (
           <div
-            ref={(el) => {
-              filesPanel.containerRef.current = el
-              fileListFocusRef.current = el
-            }}
+            ref={(el) => { fileListFocusRef.current = el }}
             tabIndex={-1}
             className="relative flex min-h-0 shrink-0 flex-col border-r"
             style={{ width: panelWidth }}
           >
-            {filesPanel.Indicator}
             {/* Sort bar */}
             <div className="flex shrink-0 items-center justify-between border-b px-2 py-1">
               <Tooltip>
@@ -964,14 +908,10 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
 
         {/* Editor (right) */}
         <div
-          ref={(el) => {
-            editorPanel.containerRef.current = el
-            editorPanelFocusRef.current = el
-          }}
+          ref={(el) => { editorPanelFocusRef.current = el }}
           tabIndex={-1}
           className="relative flex min-h-0 min-w-0 flex-1 flex-col"
         >
-          {editorPanel.Indicator}
           {fileContent ? (
              <ReviewEditor
               ref={editorHandleRef}
@@ -1019,14 +959,10 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
         {/* Panel body — flex column so inner ScrollArea can fill */}
         {openPanel !== null && (
           <div
-            ref={(el) => {
-              bottomPanel.containerRef.current = el
-              bottomPanelFocusRef.current = el
-            }}
+            ref={(el) => { bottomPanelFocusRef.current = el }}
             tabIndex={-1}
             className="relative flex h-56 flex-col"
           >
-            {bottomPanel.Indicator}
             {openPanel === "branches" && (
               <BranchSelector
                 branches={branches}

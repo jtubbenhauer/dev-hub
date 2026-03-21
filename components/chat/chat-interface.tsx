@@ -20,11 +20,8 @@ import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useCommand } from "@/hooks/use-command";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { usePanelZone } from "@/hooks/use-panel-zone";
-import type { StandardActions } from "@/stores/panel-navigation-store";
-import { usePanelNavigationStore } from "@/stores/panel-navigation-store";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
-import { useModelAgentBindings, usePanelNavigationSetting } from "@/hooks/use-settings";
+import { useModelAgentBindings } from "@/hooks/use-settings";
 import type { Command, MessageWithParts, PermissionRequest, QuestionAnswer, QuestionInfo, QuestionRequest, SessionStatus } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
 import type { SessionWithWorkspace } from "@/stores/chat-store";
@@ -887,6 +884,9 @@ export function ChatInterface() {
   setIsAgentSelectorOpenRef.current = setIsAgentSelectorOpen;
   const setIsTaskPanelOpenRef = useRef(setIsTaskPanelOpen);
   setIsTaskPanelOpenRef.current = setIsTaskPanelOpen;
+  const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
+  const setIsVariantSelectorOpenRef = useRef(setIsVariantSelectorOpen);
+  setIsVariantSelectorOpenRef.current = setIsVariantSelectorOpen;
   const setShowThinkingRef = useRef(setShowThinking);
   setShowThinkingRef.current = setShowThinking;
   const setShowToolCallsRef = useRef(setShowToolCalls);
@@ -927,9 +927,6 @@ export function ChatInterface() {
       return next;
     });
   }, []);
-
-  // Panel navigation setting — must be before chatLeaderActions which conditionally excludes chat:focus-prompt
-  const { isPanelNavigationEnabled } = usePanelNavigationSetting();
 
   // Session list j/k navigation: build flat list of visible session IDs in render order
   const COLLAPSED_SESSION_LIMIT = 3
@@ -1004,40 +1001,6 @@ export function ChatInterface() {
       handleSelectSession(sessionId)
     }
   }
-
-  const sessionsPanelActions = useMemo<StandardActions>(
-    () => ({
-      "navigate-next": () => {
-        const ids = visibleSessionIdsRef.current
-        const currentIndex = ids.indexOf(activeSessionIdForNavRef.current ?? "")
-        const nextIndex = Math.min(currentIndex + 1, ids.length - 1)
-        const nextId = ids[nextIndex]
-        if (nextId) {
-          selectSessionByIdRef.current(nextId)
-          sessionListFocusRef.current
-            ?.querySelector(`[data-session-id="${nextId}"]`)
-            ?.scrollIntoView({ block: "nearest" })
-        }
-      },
-      "navigate-prev": () => {
-        const ids = visibleSessionIdsRef.current
-        const currentIndex = ids.indexOf(activeSessionIdForNavRef.current ?? "")
-        const prevIndex = Math.max(currentIndex - 1, 0)
-        const prevId = ids[prevIndex]
-        if (prevId) {
-          selectSessionByIdRef.current(prevId)
-          sessionListFocusRef.current
-            ?.querySelector(`[data-session-id="${prevId}"]`)
-            ?.scrollIntoView({ block: "nearest" })
-        }
-      },
-      "select-item": () => {
-        usePanelNavigationStore.getState().focusPanel("chat-messages")
-      },
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
 
   const chatCommands = useMemo(
     () => [
@@ -1187,55 +1150,30 @@ export function ChatInterface() {
           },
           handler: toggleTimestamps,
         },
-      ];
-
-      // When panel nav is ON, panel:focus-input (bound to "i") replaces chat:focus-prompt
-      if (!isPanelNavigationEnabled) {
-        actions.push({
+        {
           action: {
             id: "chat:focus-prompt",
             label: "Focus prompt input",
             page: "chat" as const,
           },
           handler: () => promptInputRef.current?.focus(),
-        });
-      }
+        },
+        {
+          action: {
+            id: "chat:toggle-variant",
+            label: "Toggle variant selector",
+            page: "chat" as const,
+          },
+          handler: () => setIsVariantSelectorOpenRef.current((prev) => !prev),
+        },
+      ];
 
       return actions;
     },
-    [toggleThinking, toggleToolCalls, toggleTokens, toggleTimestamps, isPanelNavigationEnabled],
+    [toggleThinking, toggleToolCalls, toggleTokens, toggleTimestamps],
   );
 
   useLeaderAction(chatLeaderActions);
-
-  // Panel zone registration
-
-  const messagesPanelActions = useMemo<StandardActions>(
-    () => ({
-      "focus-input": () => promptInputRef.current?.focus(),
-    }),
-    [],
-  );
-
-  const sessionsPanel = usePanelZone("chat-sessions", {
-    neighbors: { right: "chat-messages" },
-    focusRef: sessionListFocusRef,
-    isVisible: isSessionListOpen && !isMobile,
-    actions: sessionsPanelActions,
-  });
-
-  const messagesPanel = usePanelZone("chat-messages", {
-    neighbors: { left: "chat-sessions", right: "chat-tasks" },
-    focusRef: messagesPanelFocusRef,
-    actions: messagesPanelActions,
-    onFocus: () => promptInputRef.current?.focus(),
-  });
-
-  const tasksPanel = usePanelZone("chat-tasks", {
-    neighbors: { left: "chat-messages" },
-    focusRef: taskPanelFocusRef,
-    isVisible: isTaskPanelOpen && !isMobile,
-  });
 
   // Tab / Shift+Tab cycles through agents
   const primaryAgentsRef = useRef(orderedAgents);
@@ -1374,15 +1312,11 @@ export function ChatInterface() {
       {isSessionListOpen && (
         <>
           <div
-            ref={(el) => {
-              sessionsPanel.containerRef.current = el;
-              sessionListFocusRef.current = el;
-            }}
+            ref={(el) => { sessionListFocusRef.current = el }}
             tabIndex={-1}
             className="hidden shrink-0 overflow-hidden md:block relative"
             style={{ width: sessionListWidth }}
           >
-            {sessionsPanel.Indicator}
             {isUnifiedMode ? (
               <SessionList
                 mode="unified"
@@ -1450,14 +1384,10 @@ export function ChatInterface() {
       {/* Main chat area */}
       <ChatDisplayContext.Provider value={chatDisplaySettings}>
       <div
-        ref={(el) => {
-          messagesPanel.containerRef.current = el;
-          messagesPanelFocusRef.current = el;
-        }}
+        ref={(el) => { messagesPanelFocusRef.current = el }}
         tabIndex={-1}
         className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
       >
-        {messagesPanel.Indicator}
         {/* Chat toolbar */}
         <div className="sticky top-0 z-30 flex shrink-0 items-center gap-1.5 border-b bg-background px-3 py-2 md:gap-2 md:px-4">
           {/* Mobile: open session sheet */}
@@ -1525,6 +1455,8 @@ export function ChatInterface() {
             variants={availableVariants}
             selectedVariant={selectedVariant}
             onVariantChange={setSelectedVariant}
+            open={isVariantSelectorOpen}
+            onOpenChange={setIsVariantSelectorOpen}
           />
         </div>
 
@@ -1759,15 +1691,11 @@ export function ChatInterface() {
             <GripVertical className="size-3.5 text-muted-foreground/30" />
           </div>
           <div
-            ref={(el) => {
-              tasksPanel.containerRef.current = el;
-              taskPanelFocusRef.current = el;
-            }}
+            ref={(el) => { taskPanelFocusRef.current = el }}
             tabIndex={-1}
             className="hidden shrink-0 overflow-y-auto border-l md:block relative"
             style={{ width: taskPanelWidth }}
           >
-            {tasksPanel.Indicator}
             <div className="flex items-center justify-between border-b px-3 py-2">
               <span className="text-xs font-medium text-muted-foreground">
                 {activeTodos.length > 0 ? "Task Progress" : "Side Panel"}

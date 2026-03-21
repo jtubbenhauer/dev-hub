@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   useFontSizeSetting,
   useMobileFontSizeSetting,
@@ -33,6 +34,7 @@ import {
   useTerminalFontSetting,
   useSettingsMutation,
   useSoundSettings,
+  useFileTabsSetting,
   SETTINGS_KEYS,
   FONT_SIZE_OPTIONS,
   MOBILE_FONT_SIZE_OPTIONS,
@@ -140,6 +142,7 @@ function EditorSettingsCard() {
   const { tabSize, isLoading: isLoadingTab } = useTabSizeSetting();
   const { editorType, isLoading: isLoadingEditorType } = useEditorTypeSetting();
   const { nvimAppName, isLoading: isLoadingNvim } = useNvimAppNameSetting();
+  const { isFileTabsDisabled, isLoading: isLoadingFileTabs } = useFileTabsSetting();
   const mutation = useSettingsMutation();
   const [customNvimAppName, setCustomNvimAppName] = useState("");
 
@@ -148,7 +151,8 @@ function EditorSettingsCard() {
     isLoadingMobileFont ||
     isLoadingTab ||
     isLoadingEditorType ||
-    isLoadingNvim;
+    isLoadingNvim ||
+    isLoadingFileTabs;
 
   useEffect(() => {
     if (
@@ -209,6 +213,18 @@ function EditorSettingsCard() {
         onSuccess: () =>
           toast.success(
             `Neovim config set to ${value === "devhub" ? "bundled (devhub)" : value === "personal" ? "personal (~/.config/nvim)" : value}`,
+          ),
+      },
+    );
+  };
+
+  const handleFileTabsToggle = (checked: boolean) => {
+    mutation.mutate(
+      { key: SETTINGS_KEYS.DISABLE_FILE_TABS, value: checked },
+      {
+        onSuccess: () =>
+          toast.success(
+            checked ? "File tabs disabled" : "File tabs enabled",
           ),
       },
     );
@@ -403,6 +419,21 @@ function EditorSettingsCard() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="disable-file-tabs">Disable file tabs</Label>
+            <p className="text-xs text-muted-foreground">
+              Only show one file at a time with no tab bar
+            </p>
+          </div>
+          <Switch
+            id="disable-file-tabs"
+            checked={isFileTabsDisabled}
+            onCheckedChange={handleFileTabsToggle}
+            disabled={mutation.isPending}
+          />
         </div>
       </CardContent>
     </Card>

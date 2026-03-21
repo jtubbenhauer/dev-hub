@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { useEditorStore } from "@/stores/editor-store"
 import { useWorkspaceFiles } from "@/components/file-picker/file-picker"
+import { useFileTabsSetting } from "@/hooks/use-settings"
 import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
@@ -217,13 +218,16 @@ function FuzzyResultList({ results, selectedIndex, onSelect, onHover }: FuzzyRes
   )
 }
 
-export function FileTree() {
+export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<HTMLInputElement | null> }) {
   const [searchQuery, setSearchQuery] = useState("")
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   const openFile = useEditorStore((s) => s.openFile)
+  const closeAllFiles = useEditorStore((s) => s.closeAllFiles)
   const toggleExpandedPath = useEditorStore((s) => s.toggleExpandedPath)
   const expandPathToFile = useEditorStore((s) => s.expandPathToFile)
   const workspaceFileStates = useEditorStore((s) => s.workspaceFileStates)
+
+  const { isFileTabsDisabled } = useFileTabsSetting()
 
   const expandedPaths = useMemo(() => {
     if (!activeWorkspaceId) return new Set<string>()
@@ -318,6 +322,7 @@ export function FileTree() {
 
       const data = await response.json()
 
+      if (isFileTabsDisabled) closeAllFiles()
       openFile({
         path: entry.path,
         name: entry.name,
@@ -327,7 +332,7 @@ export function FileTree() {
         originalContent: data.content,
       })
     },
-    [activeWorkspaceId, openFile, expandPathToFile]
+    [activeWorkspaceId, openFile, closeAllFiles, isFileTabsDisabled, expandPathToFile]
   )
 
   // Merge lazy-loaded children into root entries
@@ -403,6 +408,7 @@ export function FileTree() {
       if (!response.ok) return
 
       const data = await response.json()
+      if (isFileTabsDisabled) closeAllFiles()
       openFile({
         path: filePath,
         name,
@@ -412,7 +418,7 @@ export function FileTree() {
         originalContent: data.content,
       })
     },
-    [activeWorkspaceId, openFile, expandPathToFile]
+    [activeWorkspaceId, openFile, closeAllFiles, isFileTabsDisabled, expandPathToFile]
   )
 
   const handleSearchKeyDown = useCallback(
@@ -452,6 +458,7 @@ export function FileTree() {
         <div className="relative">
           <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             placeholder="Search files..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

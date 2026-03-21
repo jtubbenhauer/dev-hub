@@ -20,7 +20,6 @@ import {
   useLeaderKeyBindings,
   useLeaderWhichKeySetting,
   useLeaderTimeoutSetting,
-  usePanelNavigationSetting,
   useSettingsMutation,
   SETTINGS_KEYS,
   DEFAULT_LEADER_TIMEOUT,
@@ -31,16 +30,16 @@ import type { LeaderAction, LeaderBindingsMap } from "@/types/leader-key"
 const PAGE_LABELS: Record<string, string> = {
   global: "Global",
   chat: "Chat",
+  files: "Files",
   git: "Git",
 }
 
-const PAGE_ORDER = ["global", "chat", "git"]
+const PAGE_ORDER = ["global", "chat", "files", "git"]
 
 export function KeybindingsSettings() {
   const { bindings, isLoading: isLoadingBindings } = useLeaderKeyBindings()
   const { isWhichKeyEnabled, isLoading: isLoadingWhichKey } = useLeaderWhichKeySetting()
   const { leaderTimeout, isLoading: isLoadingTimeout } = useLeaderTimeoutSetting()
-  const { isPanelNavigationEnabled, isLoading: isLoadingPanelNav } = usePanelNavigationSetting()
   const mutation = useSettingsMutation()
 
   const [localBindings, setLocalBindings] = useState<LeaderBindingsMap>({})
@@ -52,19 +51,12 @@ export function KeybindingsSettings() {
     if (!isLoadingBindings) setLocalBindings({ ...bindings })
   }, [bindings, isLoadingBindings])
 
-  const isLoading = isLoadingBindings || isLoadingWhichKey || isLoadingTimeout || isLoadingPanelNav
+  const isLoading = isLoadingBindings || isLoadingWhichKey || isLoadingTimeout
 
   const handleWhichKeyToggle = (checked: boolean) => {
     mutation.mutate(
       { key: SETTINGS_KEYS.LEADER_WHICH_KEY, value: checked },
       { onSuccess: () => toast.success(checked ? "Which-key popup enabled" : "Which-key popup disabled") }
-    )
-  }
-
-  const handlePanelNavToggle = (checked: boolean) => {
-    mutation.mutate(
-      { key: SETTINGS_KEYS.PANEL_NAVIGATION, value: checked },
-      { onSuccess: () => toast.success(checked ? "Panel navigation enabled" : "Panel navigation disabled") }
     )
   }
 
@@ -167,28 +159,6 @@ export function KeybindingsSettings() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Panel Navigation</CardTitle>
-          <CardDescription>
-            Navigate between panels using leader+hjkl, like tmux. When enabled, standardized actions
-            (j/k for list navigation, Enter to select, leader+i to focus input) work across all pages.
-            Desktop only.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="panel-nav-toggle">Enable panel navigation</Label>
-            <Switch
-              id="panel-nav-toggle"
-              checked={isPanelNavigationEnabled}
-              onCheckedChange={handlePanelNavToggle}
-              disabled={mutation.isPending}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle>Which-key Popup</CardTitle>

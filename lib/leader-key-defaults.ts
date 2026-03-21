@@ -10,19 +10,12 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "nav:dashboard", label: "Go to Dashboard", page: "global" },
   { id: "nav:repos", label: "Go to Repos", page: "global" },
   { id: "nav:settings", label: "Go to Settings", page: "global" },
+  { id: "nav:terminal", label: "Go to Terminal", page: "global" },
   { id: "global:command-palette", label: "Open command palette", page: "global" },
   { id: "global:file-picker", label: "Open file picker", page: "global" },
   { id: "global:session-picker", label: "Open session picker", page: "global" },
   { id: "global:switch-workspace", label: "Open workspace switcher", page: "global" },
   { id: "global:task-picker", label: "Open task picker", page: "global" },
-
-  // Panel navigation (only active when panel-navigation setting is on)
-  { id: "panel:focus-left", label: "Focus panel left", page: "global" },
-  { id: "panel:focus-down", label: "Focus panel below", page: "global" },
-  { id: "panel:focus-up", label: "Focus panel above", page: "global" },
-  { id: "panel:focus-right", label: "Focus panel right", page: "global" },
-  { id: "panel:focus-input", label: "Focus input", page: "global" },
-  { id: "panel:search", label: "Search in panel", page: "global" },
 
   // Chat page
   { id: "chat:switch-model", label: "Switch model", page: "chat" },
@@ -31,9 +24,13 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "chat:toggle-sessions", label: "Toggle session list", page: "chat" },
   { id: "chat:toggle-plan", label: "Toggle plan panel", page: "chat" },
   { id: "chat:focus-prompt", label: "Focus prompt input", page: "chat" },
+  { id: "chat:toggle-variant", label: "Toggle variant selector", page: "chat" },
 
   // Files page
   { id: "files:save", label: "Save file", page: "files" },
+  { id: "files:focus-search", label: "Focus file search", page: "files" },
+  { id: "files:focus-tree", label: "Focus file tree", page: "files" },
+  { id: "files:focus-editor", label: "Focus editor", page: "files" },
 
   // Git page
   { id: "git:toggle-reviewed", label: "Toggle file reviewed", page: "git" },
@@ -63,22 +60,18 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "nav:dashboard": "g d",
   "nav:repos": "g r",
   "nav:settings": "g s",
+  "nav:terminal": "g m",
   "global:command-palette": ",",
   "global:file-picker": "f",
   "global:session-picker": "e",
   "global:switch-workspace": "w",
   "global:task-picker": "t",
 
-  // Panel navigation
-  "panel:focus-left": "h",
-  "panel:focus-down": "j",
-  "panel:focus-up": "k",
-  "panel:focus-right": "l",
-  "panel:focus-input": "i",
-  "panel:search": "/",
-
   // Files page
   "files:save": "S",
+  "files:focus-search": "i",
+  "files:focus-tree": "h",
+  "files:focus-editor": "l",
 
   // Chat page
   "chat:switch-model": "m",
@@ -87,6 +80,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "chat:toggle-sessions": "s",
   "chat:toggle-plan": "p",
   "chat:focus-prompt": "i",
+  "chat:toggle-variant": "v",
 
   // Git page
   "git:toggle-reviewed": "r",

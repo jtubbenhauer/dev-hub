@@ -9,7 +9,6 @@ import { MobileNav } from "@/components/layout/mobile-nav"
 import { Header } from "@/components/layout/header"
 import { WorkspaceCommands } from "@/components/command-palette/workspace-commands"
 import { SoundSettingsSync } from "@/components/providers/sound-settings-sync"
-import { PanelNavCommands } from "@/components/panel-navigation/panel-nav-commands"
 import { useWorkspaceStore } from "@/stores/workspace-store"
 import { useChatStore } from "@/stores/chat-store"
 import { useDefaultWorkspaceSetting } from "@/hooks/use-settings"
@@ -112,7 +111,6 @@ export function AuthenticatedLayout({
       <MobileNav />
       <WorkspaceCommands />
       <SoundSettingsSync />
-      <PanelNavCommands />
     </div>
   )
 }

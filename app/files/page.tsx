@@ -1,20 +1,26 @@
-"use client"
+"use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef } from "react"
-import { useSearchParams } from "next/navigation"
-import { AuthenticatedLayout } from "@/components/layout/authenticated-layout"
-import { FileTree } from "@/components/editor/file-tree"
-import { OpenEditors } from "@/components/editor/open-editors"
-import { FileTabs } from "@/components/editor/file-tabs"
-import { EditorSwitcher } from "@/components/editor/editor-switcher"
-import { useEditorStore } from "@/stores/editor-store"
-import { useWorkspaceStore } from "@/stores/workspace-store"
-import { useResizablePanel } from "@/hooks/use-resizable-panel"
-import { useIsMobile } from "@/hooks/use-mobile"
-import { useLeaderAction } from "@/hooks/use-leader-action"
-import { usePanelZone } from "@/hooks/use-panel-zone"
-import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
+import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
+import { FileTree } from "@/components/editor/file-tree";
+import { OpenEditors } from "@/components/editor/open-editors";
+import { FileTabs } from "@/components/editor/file-tabs";
+import { EditorSwitcher } from "@/components/editor/editor-switcher";
+import { useEditorStore } from "@/stores/editor-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useResizablePanel } from "@/hooks/use-resizable-panel";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useLeaderAction } from "@/hooks/use-leader-action";
+
+import { useFileTabsSetting } from "@/hooks/use-settings";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   GripVertical,
   PanelLeftClose,
@@ -23,75 +29,78 @@ import {
   Loader2,
   FolderOpen,
   FileCode2,
-} from "lucide-react"
-import { toast } from "sonner"
-import { useState } from "react"
+} from "lucide-react";
+import { toast } from "sonner";
+import { useState } from "react";
 
-const MIN_PANEL_WIDTH = 180
-const MAX_PANEL_WIDTH = 500
-const DEFAULT_PANEL_WIDTH = 260
+const MIN_PANEL_WIDTH = 180;
+const MAX_PANEL_WIDTH = 500;
+const DEFAULT_PANEL_WIDTH = 260;
 
 export default function FilesPage() {
   return (
     <Suspense>
       <FilesContent />
     </Suspense>
-  )
+  );
 }
 
 function FilesContent() {
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
-  const workspaces = useWorkspaceStore((s) => s.workspaces)
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
   const activeWorkspace = useMemo(
     () => workspaces.find((w) => w.id === activeWorkspaceId) ?? null,
-    [workspaces, activeWorkspaceId]
-  )
+    [workspaces, activeWorkspaceId],
+  );
 
-  const openFiles = useEditorStore((s) => s.openFiles)
-  const activeFilePath = useEditorStore((s) => s.activeFilePath)
-  const isFileTreeOpen = useEditorStore((s) => s.isFileTreeOpen)
-  const toggleFileTree = useEditorStore((s) => s.toggleFileTree)
-  const updateFileContent = useEditorStore((s) => s.updateFileContent)
-  const markFileSaved = useEditorStore((s) => s.markFileSaved)
-  const editorOpenFile = useEditorStore((s) => s.openFile)
-  const setActiveFile = useEditorStore((s) => s.setActiveFile)
-  const saveWorkspaceState = useEditorStore((s) => s.saveWorkspaceState)
-  const getSavedTabs = useEditorStore((s) => s.getSavedTabs)
-  const getSavedActiveFile = useEditorStore((s) => s.getSavedActiveFile)
-  const expandPathToFile = useEditorStore((s) => s.expandPathToFile)
-  const expandFolder = useEditorStore((s) => s.expandFolder)
+  const openFiles = useEditorStore((s) => s.openFiles);
+  const activeFilePath = useEditorStore((s) => s.activeFilePath);
+  const isFileTreeOpen = useEditorStore((s) => s.isFileTreeOpen);
+  const toggleFileTree = useEditorStore((s) => s.toggleFileTree);
+  const updateFileContent = useEditorStore((s) => s.updateFileContent);
+  const markFileSaved = useEditorStore((s) => s.markFileSaved);
+  const editorOpenFile = useEditorStore((s) => s.openFile);
+  const setActiveFile = useEditorStore((s) => s.setActiveFile);
+  const saveWorkspaceState = useEditorStore((s) => s.saveWorkspaceState);
+  const getSavedTabs = useEditorStore((s) => s.getSavedTabs);
+  const getSavedActiveFile = useEditorStore((s) => s.getSavedActiveFile);
+  const expandPathToFile = useEditorStore((s) => s.expandPathToFile);
+  const expandFolder = useEditorStore((s) => s.expandFolder);
+  const closeAllFiles = useEditorStore((s) => s.closeAllFiles);
 
-  const searchParams = useSearchParams()
-  const isMobile = useIsMobile()
-  const [isMobileTreeOpen, setIsMobileTreeOpen] = useState(false)
-  const [savingPath, setSavingPath] = useState<string | null>(null)
-  const [isRestoring, setIsRestoring] = useState(false)
-  const restoredForRef = useRef<string | null>(null)
-  const openedFromParamRef = useRef<string | null>(null)
+  const { isFileTabsDisabled } = useFileTabsSetting();
+
+  const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
+  const [isMobileTreeOpen, setIsMobileTreeOpen] = useState(false);
+  const [savingPath, setSavingPath] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const restoredForRef = useRef<string | null>(null);
+  const openedFromParamRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!activeWorkspaceId || isRestoring) return
-    if (restoredForRef.current === activeWorkspaceId) return
+    if (!activeWorkspaceId || isRestoring || isFileTabsDisabled) return;
+    if (restoredForRef.current === activeWorkspaceId) return;
 
-    const savedTabs = getSavedTabs(activeWorkspaceId)
+    const savedTabs = getSavedTabs(activeWorkspaceId);
     if (savedTabs.length === 0 || openFiles.length > 0) {
-      restoredForRef.current = activeWorkspaceId
-      return
+      restoredForRef.current = activeWorkspaceId;
+      return;
     }
 
-    restoredForRef.current = activeWorkspaceId
-    setIsRestoring(true)
+    restoredForRef.current = activeWorkspaceId;
+    setIsRestoring(true);
 
-    const savedActive = getSavedActiveFile(activeWorkspaceId)
+    const savedActive = getSavedActiveFile(activeWorkspaceId);
 
     Promise.all(
       savedTabs.map(async (tab) => {
         try {
           const res = await fetch(
-            `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(tab.path)}`
-          )
-          if (!res.ok) return null
-          const data = await res.json()
+            `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(tab.path)}`,
+          );
+          if (!res.ok) return null;
+          const data = await res.json();
           return {
             path: tab.path,
             name: tab.name,
@@ -99,50 +108,69 @@ function FilesContent() {
             language: data.language as string,
             isDirty: false,
             originalContent: data.content as string,
-          }
+          };
         } catch {
-          return null
+          return null;
         }
-      })
+      }),
     ).then((results) => {
       for (const file of results) {
-        if (file) editorOpenFile(file)
+        if (file) editorOpenFile(file);
       }
       if (savedActive) {
-        const restored = results.find((f) => f?.path === savedActive)
-        if (restored) setActiveFile(restored.path)
+        const restored = results.find((f) => f?.path === savedActive);
+        if (restored) setActiveFile(restored.path);
       }
-      setIsRestoring(false)
-    })
-  }, [activeWorkspaceId, openFiles.length, isRestoring, getSavedTabs, getSavedActiveFile, editorOpenFile, setActiveFile])
+      setIsRestoring(false);
+    });
+  }, [
+    activeWorkspaceId,
+    openFiles.length,
+    isRestoring,
+    isFileTabsDisabled,
+    getSavedTabs,
+    getSavedActiveFile,
+    editorOpenFile,
+    setActiveFile,
+  ]);
 
   useEffect(() => {
-    if (!activeWorkspaceId || isRestoring) return
-    saveWorkspaceState(activeWorkspaceId)
+    if (!activeWorkspaceId || isRestoring) return;
+    saveWorkspaceState(activeWorkspaceId);
     // openFiles and activeFilePath must trigger this save even though saveWorkspaceState reads them internally
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWorkspaceId, openFiles, activeFilePath, isRestoring, saveWorkspaceState])
+  }, [
+    activeWorkspaceId,
+    openFiles,
+    activeFilePath,
+    isRestoring,
+    saveWorkspaceState,
+  ]);
 
   useEffect(() => {
-    const openPath = searchParams.get("open")
-    if (!openPath || !activeWorkspaceId) return
-    if (openedFromParamRef.current === openPath) return
+    const openPath = searchParams.get("open");
+    if (!openPath || !activeWorkspaceId) return;
+    if (openedFromParamRef.current === openPath) return;
 
-    openedFromParamRef.current = openPath
+    openedFromParamRef.current = openPath;
 
-    expandPathToFile(activeWorkspaceId, openPath)
+    expandPathToFile(activeWorkspaceId, openPath);
 
-    const alreadyOpen = openFiles.find((f) => f.path === openPath)
+    const alreadyOpen = openFiles.find((f) => f.path === openPath);
     if (alreadyOpen) {
-      setActiveFile(openPath)
-      return
+      if (isFileTabsDisabled) closeAllFiles();
+      setActiveFile(openPath);
+      return;
     }
 
-    fetch(`/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(openPath)}`)
+    if (isFileTabsDisabled) closeAllFiles();
+
+    fetch(
+      `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(openPath)}`,
+    )
       .then(async (res) => {
-        if (!res.ok) return
-        const data = await res.json()
-        const name = openPath.split("/").pop() ?? openPath
+        if (!res.ok) return;
+        const data = await res.json();
+        const name = openPath.split("/").pop() ?? openPath;
         editorOpenFile({
           path: openPath,
           name,
@@ -150,38 +178,47 @@ function FilesContent() {
           language: data.language,
           isDirty: false,
           originalContent: data.content,
-        })
+        });
       })
-      .catch(() => {})
-  }, [searchParams, activeWorkspaceId, openFiles, editorOpenFile, setActiveFile, expandPathToFile])
+      .catch(() => {});
+  }, [
+    searchParams,
+    activeWorkspaceId,
+    openFiles,
+    editorOpenFile,
+    setActiveFile,
+    expandPathToFile,
+    isFileTabsDisabled,
+    closeAllFiles,
+  ]);
 
-  const expandedFolderRef = useRef<string | null>(null)
+  const expandedFolderRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const folderPath = searchParams.get("expand")
-    if (!folderPath || !activeWorkspaceId) return
-    if (expandedFolderRef.current === folderPath) return
+    const folderPath = searchParams.get("expand");
+    if (!folderPath || !activeWorkspaceId) return;
+    if (expandedFolderRef.current === folderPath) return;
 
-    expandedFolderRef.current = folderPath
-    expandFolder(activeWorkspaceId, folderPath)
-  }, [searchParams, activeWorkspaceId, expandFolder])
+    expandedFolderRef.current = folderPath;
+    expandFolder(activeWorkspaceId, folderPath);
+  }, [searchParams, activeWorkspaceId, expandFolder]);
 
   const { width: panelWidth, handleDragStart } = useResizablePanel({
     minWidth: MIN_PANEL_WIDTH,
     maxWidth: MAX_PANEL_WIDTH,
     defaultWidth: DEFAULT_PANEL_WIDTH,
     storageKey: "dev-hub:file-tree-width",
-  })
+  });
 
   const activeFile = useMemo(
     () => openFiles.find((f) => f.path === activeFilePath) ?? null,
-    [openFiles, activeFilePath]
-  )
+    [openFiles, activeFilePath],
+  );
 
   const handleSave = useCallback(async () => {
-    if (!activeFile || !activeWorkspaceId) return
+    if (!activeFile || !activeWorkspaceId) return;
 
-    setSavingPath(activeFile.path)
+    setSavingPath(activeFile.path);
     try {
       const res = await fetch("/api/files/content", {
         method: "PUT",
@@ -191,57 +228,74 @@ function FilesContent() {
           path: activeFile.path,
           content: activeFile.content,
         }),
-      })
+      });
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Save failed")
+        const err = await res.json();
+        throw new Error(err.error || "Save failed");
       }
-      markFileSaved(activeFile.path)
-      toast.success("Saved")
+      markFileSaved(activeFile.path);
+      toast.success("Saved");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Save failed")
+      toast.error(error instanceof Error ? error.message : "Save failed");
     } finally {
-      setSavingPath(null)
+      setSavingPath(null);
     }
-  }, [activeFile, activeWorkspaceId, markFileSaved])
+  }, [activeFile, activeWorkspaceId, markFileSaved]);
 
-  const handleSaveRef = useRef(handleSave)
-  handleSaveRef.current = handleSave
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
 
   const filesLeaderActions = useMemo(
     () => [
       {
-        action: { id: "files:save", label: "Save file", page: "files" as const },
+        action: {
+          id: "files:save",
+          label: "Save file",
+          page: "files" as const,
+        },
         handler: () => void handleSaveRef.current(),
+      },
+      {
+        action: {
+          id: "files:focus-search",
+          label: "Focus file search",
+          page: "files" as const,
+        },
+        handler: () => searchInputRef.current?.focus(),
+      },
+      {
+        action: {
+          id: "files:focus-tree",
+          label: "Focus file tree",
+          page: "files" as const,
+        },
+        handler: () => fileTreeFocusRef.current?.focus(),
+      },
+      {
+        action: {
+          id: "files:focus-editor",
+          label: "Focus editor",
+          page: "files" as const,
+        },
+        handler: () => editorPanelFocusRef.current?.focus(),
       },
     ],
     [],
-  )
-  useLeaderAction(filesLeaderActions)
+  );
+  useLeaderAction(filesLeaderActions);
 
-  // Panel zone registration
-  const fileTreeFocusRef = useRef<HTMLDivElement>(null)
-  const editorPanelFocusRef = useRef<HTMLDivElement>(null)
-
-  const treePanel = usePanelZone("files-tree", {
-    neighbors: { right: "files-editor" },
-    focusRef: fileTreeFocusRef,
-    isVisible: isFileTreeOpen && !isMobile,
-  })
-
-  const editorPanel = usePanelZone("files-editor", {
-    neighbors: { left: "files-tree" },
-    focusRef: editorPanelFocusRef,
-  })
+  const fileTreeFocusRef = useRef<HTMLDivElement>(null);
+  const editorPanelFocusRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = useCallback(
     (content: string) => {
       if (activeFilePath) {
-        updateFileContent(activeFilePath, content)
+        updateFileContent(activeFilePath, content);
       }
     },
-    [activeFilePath, updateFileContent]
-  )
+    [activeFilePath, updateFileContent],
+  );
 
   if (!activeWorkspace) {
     return (
@@ -253,10 +307,10 @@ function FilesContent() {
           </p>
         </div>
       </AuthenticatedLayout>
-    )
+    );
   }
 
-  const isSaving = savingPath === activeFile?.path
+  const isSaving = savingPath === activeFile?.path;
 
   return (
     <AuthenticatedLayout>
@@ -270,7 +324,7 @@ function FilesContent() {
               </SheetHeader>
               <div className="h-[calc(100%-41px)]">
                 <OpenEditors />
-                <FileTree />
+                <FileTree searchInputRef={searchInputRef} />
               </div>
             </SheetContent>
           </Sheet>
@@ -280,14 +334,12 @@ function FilesContent() {
         {!isMobile && isFileTreeOpen && (
           <div
             ref={(el) => {
-              treePanel.containerRef.current = el
-              fileTreeFocusRef.current = el
+              fileTreeFocusRef.current = el;
             }}
             tabIndex={-1}
             className="relative flex min-h-0 shrink-0 flex-col border-r"
             style={{ width: panelWidth }}
           >
-            {treePanel.Indicator}
             <div className="flex shrink-0 items-center justify-between border-b px-2 py-1">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                 Explorer
@@ -302,7 +354,7 @@ function FilesContent() {
               </Button>
             </div>
             <OpenEditors />
-            <FileTree />
+            <FileTree searchInputRef={searchInputRef} />
           </div>
         )}
 
@@ -319,13 +371,11 @@ function FilesContent() {
         {/* Editor panel (right) */}
         <div
           ref={(el) => {
-            editorPanel.containerRef.current = el
-            editorPanelFocusRef.current = el
+            editorPanelFocusRef.current = el;
           }}
           tabIndex={-1}
           className="relative flex min-h-0 min-w-0 flex-1 flex-col"
         >
-          {editorPanel.Indicator}
           {/* Editor header bar */}
           <div className="flex shrink-0 items-center gap-1.5 border-b bg-muted/30 px-2 py-1.5">
             {/* Toggle file tree button */}
@@ -377,7 +427,7 @@ function FilesContent() {
           </div>
 
           {/* File tabs */}
-          <FileTabs />
+          {!isFileTabsDisabled && <FileTabs />}
 
           {/* Editor area */}
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -394,7 +444,7 @@ function FilesContent() {
               <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
                 <FileCode2 className="h-12 w-12 text-muted-foreground/20" />
                 <p className="text-sm">
-                  {openFiles.length > 0
+                  {!isFileTabsDisabled && openFiles.length > 0
                     ? "Select a tab to view the file"
                     : "Open a file from the explorer"}
                 </p>
@@ -415,5 +465,5 @@ function FilesContent() {
         </div>
       </div>
     </AuthenticatedLayout>
-  )
+  );
 }

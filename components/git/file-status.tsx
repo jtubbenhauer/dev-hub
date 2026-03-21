@@ -19,7 +19,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn, isEditorElement } from "@/lib/utils"
-import { usePanelNavigationSetting } from "@/hooks/use-settings"
 import type { GitFileStatus } from "@/types"
 
 type SortMode = "name-asc" | "name-desc" | "status" | "path"
@@ -86,7 +85,6 @@ export function FileStatusList({
   onDiscardFiles,
   onToggleReviewed,
 }: FileStatusListProps) {
-  const { isPanelNavigationEnabled } = usePanelNavigationSetting()
   const hasUnstaged = unstaged.length > 0 || untracked.length > 0
   const hasStaged = staged.length > 0
 
@@ -126,7 +124,6 @@ export function FileStatusList({
 
       switch (e.key) {
         case "j": {
-          if (isPanelNavigationEnabled) break
           e.preventDefault()
           const nextIdx = Math.min(selectedIndex + 1, flatFiles.length - 1)
           const next = flatFiles[nextIdx]
@@ -134,7 +131,6 @@ export function FileStatusList({
           break
         }
         case "k": {
-          if (isPanelNavigationEnabled) break
           e.preventDefault()
           const prevIdx = Math.max(selectedIndex - 1, 0)
           const prev = flatFiles[prevIdx]
@@ -155,7 +151,7 @@ export function FileStatusList({
         }
       }
     },
-    [selectedIndex, flatFiles, selectedFile, onSelectFile, onStageFiles, onUnstageFiles, isPanelNavigationEnabled]
+    [selectedIndex, flatFiles, selectedFile, onSelectFile, onStageFiles, onUnstageFiles]
   )
 
   useEffect(() => {

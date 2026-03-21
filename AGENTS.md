@@ -6,7 +6,7 @@ This repo is fully vibe-coded. Multiple people (and agents) push directly to `ma
 
 ## Golden Rules
 
-1. **Never break existing tests or lint.** Run `pnpm test` and `pnpm lint` before considering any change complete. All tests must pass and lint must be clean (0 errors, 0 warnings).
+1. **Never break formatting, lint, tests, or build.** Run `pnpm check` before considering any change complete. This runs `pnpm format && pnpm lint && pnpm test && pnpm build` — all four must pass. There is no CI safety net; everyone pushes directly to main.
 2. **Always add tests** when you add or change functionality. Test files live in `tests/` mirroring the source structure.
 3. **Pull aggressively.** `git pull` before you start, before you commit, and before you push. Rebase if needed.
 4. **Write LLM-friendly code.** This codebase is maintained by agents as much as humans. Prefer explicit over clever. Use descriptive names. Avoid abstractions that require reading 5 files to understand one function.
@@ -71,6 +71,7 @@ instrumentation.ts      # Auto-migration on Next.js server startup
 ## Scripts
 
 ```bash
+pnpm check            # Run ALL checks: format, lint, test, build (run before pushing)
 pnpm dev              # Start dev server (Turbopack)
 pnpm build            # Production build
 pnpm test              # Run unit tests (vitest run)

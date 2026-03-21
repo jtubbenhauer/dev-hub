@@ -1,14 +1,20 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react"
-import { Loader2, ChevronDown, ChevronRight, Search } from "lucide-react"
-import { toast } from "sonner"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Loader2, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -17,85 +23,98 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { useModelAllowlist, useModelAgentBindings, useSettingsMutation, SETTINGS_KEYS } from "@/hooks/use-settings"
-import { useAgents } from "@/components/chat/agent-selector"
-import type { Provider, Model, Agent } from "@/lib/opencode/types"
+} from "@/components/ui/select";
+import {
+  useModelAllowlist,
+  useModelAgentBindings,
+  useSettingsMutation,
+  SETTINGS_KEYS,
+} from "@/hooks/use-settings";
+import { useAgents } from "@/components/chat/agent-selector";
+import type { Provider, Model, Agent } from "@/lib/opencode/types";
 
 interface ProviderWithModels {
-  provider: Provider
-  models: Model[]
+  provider: Provider;
+  models: Model[];
 }
 
 interface ConfigProvidersResponse {
-  providers: Provider[]
-  default: Record<string, string>
+  providers: Provider[];
+  default: Record<string, string>;
 }
 
 interface SelectedModel {
-  providerID: string
-  modelID: string
+  providerID: string;
+  modelID: string;
 }
 
 interface ModelSettingsProps {
-  workspaceId: string | null
+  workspaceId: string | null;
 }
 
 export function ModelSettings({ workspaceId }: ModelSettingsProps) {
-  const [providers, setProviders] = useState<ProviderWithModels[]>([])
-  const [isLoadingProviders, setIsLoadingProviders] = useState(false)
-  const { allowlist, isLoading: isLoadingAllowlist } = useModelAllowlist()
-  const { bindings, isLoading: isLoadingBindings } = useModelAgentBindings()
-  const { primaryAgents, isLoading: isLoadingAgents } = useAgents(workspaceId ?? "")
-  const mutation = useSettingsMutation()
+  const [providers, setProviders] = useState<ProviderWithModels[]>([]);
+  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
+  const { allowlist, isLoading: isLoadingAllowlist } = useModelAllowlist();
+  const { bindings, isLoading: isLoadingBindings } = useModelAgentBindings();
+  const { primaryAgents, isLoading: isLoadingAgents } = useAgents(
+    workspaceId ?? "",
+  );
+  const mutation = useSettingsMutation();
 
   const fetchProviders = useCallback(async () => {
-    if (!workspaceId) return
-    setIsLoadingProviders(true)
+    if (!workspaceId) return;
+    setIsLoadingProviders(true);
     try {
-      const params = new URLSearchParams({ workspaceId })
-      const response = await fetch(`/api/opencode/config/providers?${params.toString()}`)
-      if (!response.ok) return
-      const data: ConfigProvidersResponse = await response.json()
+      const params = new URLSearchParams({ workspaceId });
+      const response = await fetch(
+        `/api/opencode/config/providers?${params.toString()}`,
+      );
+      if (!response.ok) return;
+      const data: ConfigProvidersResponse = await response.json();
       setProviders(
         data.providers.map((provider) => ({
           provider,
           models: Object.values(provider.models),
-        }))
-      )
+        })),
+      );
     } catch {
-      toast.error("Failed to load providers")
+      toast.error("Failed to load providers");
     } finally {
-      setIsLoadingProviders(false)
+      setIsLoadingProviders(false);
     }
-  }, [workspaceId])
+  }, [workspaceId]);
 
   useEffect(() => {
-    fetchProviders()
-  }, [fetchProviders])
+    fetchProviders();
+  }, [fetchProviders]);
 
-  const isLoading = isLoadingProviders || isLoadingAllowlist || isLoadingBindings || isLoadingAgents
+  const isLoading =
+    isLoadingProviders ||
+    isLoadingAllowlist ||
+    isLoadingBindings ||
+    isLoadingAgents;
 
   if (!workspaceId) {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Select a workspace from the sidebar to configure model settings.
           </p>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (isLoading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -106,7 +125,7 @@ export function ModelSettings({ workspaceId }: ModelSettingsProps) {
         onSave={(next) =>
           mutation.mutate(
             { key: SETTINGS_KEYS.MODEL_ALLOWLIST, value: next },
-            { onSuccess: () => toast.success("Model allowlist updated") }
+            { onSuccess: () => toast.success("Model allowlist updated") },
           )
         }
         isSaving={mutation.isPending}
@@ -119,13 +138,13 @@ export function ModelSettings({ workspaceId }: ModelSettingsProps) {
         onSave={(next) =>
           mutation.mutate(
             { key: SETTINGS_KEYS.MODEL_AGENT_BINDINGS, value: next },
-            { onSuccess: () => toast.success("Agent bindings updated") }
+            { onSuccess: () => toast.success("Agent bindings updated") },
           )
         }
         isSaving={mutation.isPending}
       />
     </div>
-  )
+  );
 }
 
 function AllowlistCard({
@@ -134,30 +153,32 @@ function AllowlistCard({
   onSave,
   isSaving,
 }: {
-  providers: ProviderWithModels[]
-  allowlist: string[]
-  onSave: (allowlist: string[]) => void
-  isSaving: boolean
+  providers: ProviderWithModels[];
+  allowlist: string[];
+  onSave: (allowlist: string[]) => void;
+  isSaving: boolean;
 }) {
-  const [local, setLocal] = useState<Set<string>>(() => new Set(allowlist))
-  const [search, setSearch] = useState("")
-  const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(new Set())
+  const [local, setLocal] = useState<Set<string>>(() => new Set(allowlist));
+  const [search, setSearch] = useState("");
+  const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Sync local allowlist from props (during render)
-  const [prevAllowlist, setPrevAllowlist] = useState(allowlist)
+  const [prevAllowlist, setPrevAllowlist] = useState(allowlist);
   if (prevAllowlist !== allowlist) {
-    setPrevAllowlist(allowlist)
-    setLocal(new Set(allowlist))
+    setPrevAllowlist(allowlist);
+    setLocal(new Set(allowlist));
   }
 
   const isDirty = (() => {
-    if (local.size !== allowlist.length) return true
-    return allowlist.some((key) => !local.has(key))
-  })()
+    if (local.size !== allowlist.length) return true;
+    return allowlist.some((key) => !local.has(key));
+  })();
 
   const filteredProviders = useMemo(() => {
-    const query = search.toLowerCase().trim()
-    if (!query) return providers
+    const query = search.toLowerCase().trim();
+    if (!query) return providers;
     return providers
       .map((p) => ({
         ...p,
@@ -165,43 +186,46 @@ function AllowlistCard({
           (m) =>
             (m.name || m.id).toLowerCase().includes(query) ||
             p.provider.name?.toLowerCase().includes(query) ||
-            p.provider.id.toLowerCase().includes(query)
+            p.provider.id.toLowerCase().includes(query),
         ),
       }))
-      .filter((p) => p.models.length > 0)
-  }, [providers, search])
+      .filter((p) => p.models.length > 0);
+  }, [providers, search]);
 
   const toggleModel = (key: string) => {
     setLocal((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
-  const toggleProvider = (providerWithModels: ProviderWithModels, selectAll: boolean) => {
+  const toggleProvider = (
+    providerWithModels: ProviderWithModels,
+    selectAll: boolean,
+  ) => {
     setLocal((prev) => {
-      const next = new Set(prev)
+      const next = new Set(prev);
       for (const model of providerWithModels.models) {
-        const key = `${providerWithModels.provider.id}::${model.id}`
-        if (selectAll) next.add(key)
-        else next.delete(key)
+        const key = `${providerWithModels.provider.id}::${model.id}`;
+        if (selectAll) next.add(key);
+        else next.delete(key);
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   const toggleCollapse = (providerId: string) => {
     setCollapsedProviders((prev) => {
-      const next = new Set(prev)
-      if (next.has(providerId)) next.delete(providerId)
-      else next.add(providerId)
-      return next
-    })
-  }
+      const next = new Set(prev);
+      if (next.has(providerId)) next.delete(providerId);
+      else next.add(providerId);
+      return next;
+    });
+  };
 
-  const selectedCount = local.size
+  const selectedCount = local.size;
 
   return (
     <Card>
@@ -210,11 +234,12 @@ function AllowlistCard({
           <div>
             <CardTitle>Model Allowlist</CardTitle>
             <CardDescription>
-              Select which models appear in the model selector. Leave all unchecked to show everything.
+              Select which models appear in the model selector. Leave all
+              unchecked to show everything.
             </CardDescription>
           </div>
           {selectedCount > 0 && (
-            <Badge variant="secondary" className="shrink-0 mt-0.5">
+            <Badge variant="secondary" className="mt-0.5 shrink-0">
               {selectedCount} selected
             </Badge>
           )}
@@ -222,7 +247,7 @@ function AllowlistCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+          <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-3.5" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -232,18 +257,20 @@ function AllowlistCard({
         </div>
 
         {filteredProviders.map((p) => {
-          const isCollapsed = collapsedProviders.has(p.provider.id)
-          const providerKeys = p.models.map((m) => `${p.provider.id}::${m.id}`)
-          const selectedInProvider = providerKeys.filter((k) => local.has(k)).length
-          const allSelected = selectedInProvider === providerKeys.length
-          const providerLabel = p.provider.name || p.provider.id
+          const isCollapsed = collapsedProviders.has(p.provider.id);
+          const providerKeys = p.models.map((m) => `${p.provider.id}::${m.id}`);
+          const selectedInProvider = providerKeys.filter((k) =>
+            local.has(k),
+          ).length;
+          const allSelected = selectedInProvider === providerKeys.length;
+          const providerLabel = p.provider.name || p.provider.id;
 
           return (
             <div key={p.provider.id} className="space-y-2">
               <div className="flex items-center justify-between">
                 <button
                   type="button"
-                  className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-medium transition-colors"
                   onClick={() => toggleCollapse(p.provider.id)}
                 >
                   {isCollapsed ? (
@@ -260,7 +287,7 @@ function AllowlistCard({
                 </button>
                 <button
                   type="button"
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-muted-foreground hover:text-foreground text-xs transition-colors"
                   onClick={() => toggleProvider(p, !allSelected)}
                 >
                   {allSelected ? "Deselect all" : "Select all"}
@@ -270,7 +297,7 @@ function AllowlistCard({
               {!isCollapsed && (
                 <div className="space-y-1.5 pl-5">
                   {p.models.map((m) => {
-                    const key = `${p.provider.id}::${m.id}`
+                    const key = `${p.provider.id}::${m.id}`;
                     return (
                       <div key={key} className="flex items-center gap-2">
                         <Checkbox
@@ -280,27 +307,33 @@ function AllowlistCard({
                         />
                         <Label
                           htmlFor={`allowlist-${key}`}
-                          className="text-sm font-normal cursor-pointer"
+                          className="cursor-pointer text-sm font-normal"
                         >
                           {m.name || m.id}
                         </Label>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               )}
             </div>
-          )
+          );
         })}
 
         {filteredProviders.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            {search ? "No models match your search." : "No providers available."}
+          <p className="text-muted-foreground text-sm">
+            {search
+              ? "No models match your search."
+              : "No providers available."}
           </p>
         )}
 
         <div className="flex justify-end pt-2">
-          <Button size="sm" onClick={() => onSave(Array.from(local))} disabled={!isDirty || isSaving}>
+          <Button
+            size="sm"
+            onClick={() => onSave(Array.from(local))}
+            disabled={!isDirty || isSaving}
+          >
             {isSaving ? (
               <>
                 <Loader2 className="size-3 animate-spin" />
@@ -313,7 +346,7 @@ function AllowlistCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function AgentBindingsCard({
@@ -323,37 +356,39 @@ function AgentBindingsCard({
   onSave,
   isSaving,
 }: {
-  agents: Agent[]
-  providers: ProviderWithModels[]
-  bindings: Record<string, SelectedModel>
-  onSave: (bindings: Record<string, SelectedModel>) => void
-  isSaving: boolean
+  agents: Agent[];
+  providers: ProviderWithModels[];
+  bindings: Record<string, SelectedModel>;
+  onSave: (bindings: Record<string, SelectedModel>) => void;
+  isSaving: boolean;
 }) {
-  const [local, setLocal] = useState<Record<string, SelectedModel>>(() => ({ ...bindings }))
+  const [local, setLocal] = useState<Record<string, SelectedModel>>(() => ({
+    ...bindings,
+  }));
 
   // Sync local bindings from props (during render)
-  const [prevBindings, setPrevBindings] = useState(bindings)
+  const [prevBindings, setPrevBindings] = useState(bindings);
   if (prevBindings !== bindings) {
-    setPrevBindings(bindings)
-    setLocal({ ...bindings })
+    setPrevBindings(bindings);
+    setLocal({ ...bindings });
   }
 
-  const isDirty = JSON.stringify(local) !== JSON.stringify(bindings)
+  const isDirty = JSON.stringify(local) !== JSON.stringify(bindings);
 
   const setBinding = (agentName: string, value: string) => {
     setLocal((prev) => {
-      const next = { ...prev }
+      const next = { ...prev };
       if (value === "__none__") {
-        delete next[agentName]
+        delete next[agentName];
       } else {
-        const [providerID, modelID] = value.split("::")
+        const [providerID, modelID] = value.split("::");
         if (providerID && modelID) {
-          next[agentName] = { providerID, modelID }
+          next[agentName] = { providerID, modelID };
         }
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   return (
     <Card>
@@ -366,15 +401,20 @@ function AgentBindingsCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {agents.map((agent) => {
-          const bound = local[agent.name]
-          const currentValue = bound ? `${bound.providerID}::${bound.modelID}` : "__none__"
+          const bound = local[agent.name];
+          const currentValue = bound
+            ? `${bound.providerID}::${bound.modelID}`
+            : "__none__";
 
           return (
             <div key={agent.name} className="flex items-center gap-4">
               <Label className="w-28 shrink-0 text-sm font-medium">
                 {agent.name}
               </Label>
-              <Select value={currentValue} onValueChange={(v) => setBinding(agent.name, v)}>
+              <Select
+                value={currentValue}
+                onValueChange={(v) => setBinding(agent.name, v)}
+              >
                 <SelectTrigger className="flex-1">
                   <SelectValue placeholder="No binding (use last selected)" />
                 </SelectTrigger>
@@ -382,7 +422,9 @@ function AgentBindingsCard({
                   <SelectItem value="__none__">No binding</SelectItem>
                   {providers.map((p) => (
                     <SelectGroup key={p.provider.id}>
-                      <SelectLabel>{p.provider.name || p.provider.id}</SelectLabel>
+                      <SelectLabel>
+                        {p.provider.name || p.provider.id}
+                      </SelectLabel>
                       {p.models.map((m) => (
                         <SelectItem
                           key={`${p.provider.id}::${m.id}`}
@@ -396,15 +438,19 @@ function AgentBindingsCard({
                 </SelectContent>
               </Select>
             </div>
-          )
+          );
         })}
 
         {agents.length === 0 && (
-          <p className="text-sm text-muted-foreground">No agents available.</p>
+          <p className="text-muted-foreground text-sm">No agents available.</p>
         )}
 
         <div className="flex justify-end pt-2">
-          <Button size="sm" onClick={() => onSave(local)} disabled={!isDirty || isSaving}>
+          <Button
+            size="sm"
+            onClick={() => onSave(local)}
+            disabled={!isDirty || isSaving}
+          >
             {isSaving ? (
               <>
                 <Loader2 className="size-3 animate-spin" />
@@ -417,5 +463,5 @@ function AgentBindingsCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

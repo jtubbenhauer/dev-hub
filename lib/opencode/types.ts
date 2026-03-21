@@ -11,7 +11,7 @@ import type {
   Model,
   SessionStatus,
   Todo,
-} from "@opencode-ai/sdk"
+} from "@opencode-ai/sdk";
 
 import type {
   Agent,
@@ -21,48 +21,69 @@ import type {
   QuestionInfo,
   QuestionOption,
   QuestionAnswer,
-} from "@opencode-ai/sdk/v2"
+} from "@opencode-ai/sdk/v2";
 
-export type { Session, Message, Part, TextPart, ToolPart, ReasoningPart, StepFinishPart, Event, Provider, Model, SessionStatus, Todo, Agent }
-export type { Command, PermissionRequest, QuestionRequest, QuestionInfo, QuestionOption, QuestionAnswer }
+export type {
+  Session,
+  Message,
+  Part,
+  TextPart,
+  ToolPart,
+  ReasoningPart,
+  StepFinishPart,
+  Event,
+  Provider,
+  Model,
+  SessionStatus,
+  Todo,
+  Agent,
+};
+export type {
+  Command,
+  PermissionRequest,
+  QuestionRequest,
+  QuestionInfo,
+  QuestionOption,
+  QuestionAnswer,
+};
 
 export interface OpenCodeInstance {
-  workspaceId: string
-  workspacePath: string
-  port: number
-  url: string
-  pid: number | null
-  status: "starting" | "ready" | "error" | "stopped"
-  lastActivity: number
-  errorMessage?: string
+  workspaceId: string;
+  workspacePath: string;
+  port: number;
+  url: string;
+  pid: number | null;
+  status: "starting" | "ready" | "error" | "stopped";
+  lastActivity: number;
+  errorMessage?: string;
 }
 
 export interface MessageWithParts {
-  info: Message
-  parts: Part[]
+  info: Message;
+  parts: Part[];
 }
 
 export interface SessionWithMessages {
-  session: Session
-  messages: MessageWithParts[]
+  session: Session;
+  messages: MessageWithParts[];
 }
 
 export interface ProviderWithModels {
-  provider: Provider
-  models: Model[]
+  provider: Provider;
+  models: Model[];
 }
 
 export interface ChatPromptInput {
-  sessionId: string
-  text: string
+  sessionId: string;
+  text: string;
   model?: {
-    providerID: string
-    modelID: string
-  }
-  agent?: string
+    providerID: string;
+    modelID: string;
+  };
+  agent?: string;
 }
 
 export interface ServerPoolStatus {
-  instances: OpenCodeInstance[]
-  totalActive: number
+  instances: OpenCodeInstance[];
+  totalActive: number;
 }

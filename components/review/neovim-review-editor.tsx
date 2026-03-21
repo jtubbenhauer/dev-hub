@@ -101,7 +101,9 @@ export const NeovimReviewEditor = forwardRef<
   const [error, setError] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [depsChecked, setDepsChecked] = useState(false);
-  const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null);
+  const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(
+    null,
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const currentFileRef = useRef<string | null>(null);
   const terminalHandleRef = useRef<TerminalHandle | null>(null);
@@ -176,7 +178,9 @@ export const NeovimReviewEditor = forwardRef<
         }
       });
 
-    return () => { cancelled = true };
+    return () => {
+      cancelled = true;
+    };
   }, [isResolving, workspaceId]);
 
   // Switch files by writing nvim commands directly through the PTY
@@ -216,15 +220,15 @@ export const NeovimReviewEditor = forwardRef<
   if (isLoading || isResolving || !depsChecked) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-        <AlertCircle className="h-6 w-6 text-destructive" />
+      <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 text-sm">
+        <AlertCircle className="text-destructive h-6 w-6" />
         <span>{error}</span>
       </div>
     );
@@ -243,7 +247,7 @@ export const NeovimReviewEditor = forwardRef<
 
   return (
     <div ref={containerRef} className="flex h-full min-h-0 min-w-0 flex-col">
-      <div className="flex shrink-0 items-center gap-1.5 overflow-hidden border-b bg-muted/30 px-2 py-1.5 md:gap-2 md:px-3">
+      <div className="bg-muted/30 flex shrink-0 items-center gap-1.5 overflow-hidden border-b px-2 py-1.5 md:gap-2 md:px-3">
         {onOpenFileList && (
           <Button
             variant="ghost"
@@ -255,7 +259,7 @@ export const NeovimReviewEditor = forwardRef<
           </Button>
         )}
 
-        <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+        <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
           {fileName}
         </span>
 

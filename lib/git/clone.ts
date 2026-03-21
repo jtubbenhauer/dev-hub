@@ -1,13 +1,13 @@
-import simpleGit from "simple-git"
-import path from "node:path"
-import os from "node:os"
-import fs from "node:fs"
+import simpleGit from "simple-git";
+import path from "node:path";
+import os from "node:os";
+import fs from "node:fs";
 
 /**
  * Default base directory for cloned repos: ~/dev/
  */
 export function getDefaultCloneBaseDir(): string {
-  return path.join(os.homedir(), "dev")
+  return path.join(os.homedir(), "dev");
 }
 
 /**
@@ -21,12 +21,12 @@ export function getDefaultCloneBaseDir(): string {
  */
 export function extractRepoName(url: string): string {
   // Remove trailing slashes and .git suffix
-  const cleaned = url.replace(/\/+$/, "").replace(/\.git$/, "")
+  const cleaned = url.replace(/\/+$/, "").replace(/\.git$/, "");
   // Get the last path/segment
-  const parts = cleaned.split(/[/:]/)
-  const name = parts[parts.length - 1]
-  if (!name) throw new Error(`Could not extract repo name from URL: ${url}`)
-  return name
+  const parts = cleaned.split(/[/:]/);
+  const name = parts[parts.length - 1];
+  if (!name) throw new Error(`Could not extract repo name from URL: ${url}`);
+  return name;
 }
 
 /**
@@ -40,33 +40,33 @@ export function extractRepoName(url: string): string {
 export async function cloneRepo(
   url: string,
   targetDir?: string,
-  depth?: number
+  depth?: number,
 ): Promise<string> {
-  const repoName = extractRepoName(url)
+  const repoName = extractRepoName(url);
   const clonePath = targetDir
     ? path.resolve(targetDir)
-    : path.join(getDefaultCloneBaseDir(), repoName)
+    : path.join(getDefaultCloneBaseDir(), repoName);
 
   // Check if target already exists
   if (fs.existsSync(clonePath)) {
-    throw new Error(`Directory already exists: ${clonePath}`)
+    throw new Error(`Directory already exists: ${clonePath}`);
   }
 
   // Ensure parent directory exists
-  const parentDir = path.dirname(clonePath)
+  const parentDir = path.dirname(clonePath);
   if (!fs.existsSync(parentDir)) {
-    fs.mkdirSync(parentDir, { recursive: true })
+    fs.mkdirSync(parentDir, { recursive: true });
   }
 
   // Clone using simple-git from the parent directory
-  const git = simpleGit(parentDir)
+  const git = simpleGit(parentDir);
 
-  const options: string[] = []
+  const options: string[] = [];
   if (depth && depth > 0) {
-    options.push("--depth", String(depth))
+    options.push("--depth", String(depth));
   }
 
-  await git.clone(url, clonePath, options)
+  await git.clone(url, clonePath, options);
 
-  return clonePath
+  return clonePath;
 }

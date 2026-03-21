@@ -1,14 +1,14 @@
-import { create } from "zustand"
+import { create } from "zustand";
 
 interface PendingChat {
-  workspaceId: string
-  message: string
+  workspaceId: string;
+  message: string;
 }
 
 interface PendingChatStore {
-  pending: PendingChat | null
-  setPending: (pending: PendingChat) => void
-  clear: () => void
+  pending: PendingChat | null;
+  setPending: (pending: PendingChat) => void;
+  clear: () => void;
 }
 
 /**
@@ -25,4 +25,4 @@ export const usePendingChatStore = create<PendingChatStore>((set) => ({
   pending: null,
   setPending: (pending) => set({ pending }),
   clear: () => set({ pending: null }),
-}))
+}));

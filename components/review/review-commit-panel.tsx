@@ -1,46 +1,46 @@
-"use client"
+"use client";
 
-import { useState, useCallback } from "react"
+import { useState, useCallback } from "react";
 import {
   useGitStatus,
   useGitStage,
   useGitCommit,
   useGitPush,
-} from "@/hooks/use-git"
-import { Button } from "@/components/ui/button"
+} from "@/hooks/use-git";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   ArrowUpFromLine,
   Loader2,
   Check,
   GitCommitHorizontal,
-} from "lucide-react"
+} from "lucide-react";
 
 interface ReviewCommitPanelProps {
-  workspaceId: string
+  workspaceId: string;
 }
 
 export function ReviewCommitPanel({ workspaceId }: ReviewCommitPanelProps) {
-  const { data: status } = useGitStatus(workspaceId)
-  const [commitMessage, setCommitMessage] = useState("")
-  const [justCommitted, setJustCommitted] = useState(false)
+  const { data: status } = useGitStatus(workspaceId);
+  const [commitMessage, setCommitMessage] = useState("");
+  const [justCommitted, setJustCommitted] = useState(false);
 
-  const stageAll = useGitStage(workspaceId)
-  const commit = useGitCommit(workspaceId)
-  const push = useGitPush(workspaceId)
+  const stageAll = useGitStage(workspaceId);
+  const commit = useGitCommit(workspaceId);
+  const push = useGitPush(workspaceId);
 
   const dirtyCount = status
     ? status.staged.length + status.unstaged.length + status.untracked.length
-    : 0
+    : 0;
 
   const handleCommitAll = useCallback(() => {
-    const trimmed = commitMessage.trim()
-    if (!trimmed) return
+    const trimmed = commitMessage.trim();
+    if (!trimmed) return;
 
     stageAll.mutate(
       { action: "stage-all", files: [] },
@@ -50,41 +50,41 @@ export function ReviewCommitPanel({ workspaceId }: ReviewCommitPanelProps) {
             { action: "commit", message: trimmed },
             {
               onSuccess: () => {
-                setCommitMessage("")
-                setJustCommitted(true)
+                setCommitMessage("");
+                setJustCommitted(true);
               },
-            }
-          )
+            },
+          );
         },
-      }
-    )
-  }, [commitMessage, stageAll, commit])
+      },
+    );
+  }, [commitMessage, stageAll, commit]);
 
   const handlePush = useCallback(() => {
     push.mutate(
       { action: "push" },
       {
         onSuccess: () => {
-          setJustCommitted(false)
+          setJustCommitted(false);
         },
-      }
-    )
-  }, [push])
+      },
+    );
+  }, [push]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        handleCommitAll()
+        e.preventDefault();
+        handleCommitAll();
       }
     },
-    [handleCommitAll]
-  )
+    [handleCommitAll],
+  );
 
-  if (!status || !status.isRepo) return null
+  if (!status || !status.isRepo) return null;
 
-  const isCommitting = stageAll.isPending || commit.isPending
-  const isPushing = push.isPending
+  const isCommitting = stageAll.isPending || commit.isPending;
+  const isPushing = push.isPending;
 
   // After committing, show push prompt
   if (justCommitted && dirtyCount === 0) {
@@ -123,14 +123,14 @@ export function ReviewCommitPanel({ workspaceId }: ReviewCommitPanelProps) {
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   // Nothing to commit
   if (dirtyCount === 0) {
     return (
       <div className="shrink-0 border-t p-2">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="text-muted-foreground flex items-center justify-between text-xs">
           <span className="flex items-center gap-1.5">
             <Check className="size-3 text-green-500" />
             Working tree clean
@@ -153,25 +153,32 @@ export function ReviewCommitPanel({ workspaceId }: ReviewCommitPanelProps) {
                   Push ({status.ahead})
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Push {status.ahead} commit{status.ahead !== 1 ? "s" : ""} to remote</TooltipContent>
+              <TooltipContent>
+                Push {status.ahead} commit{status.ahead !== 1 ? "s" : ""} to
+                remote
+              </TooltipContent>
             </Tooltip>
           )}
         </div>
       </div>
-    )
+    );
   }
 
   // Dirty state — show commit form
   return (
     <div className="shrink-0 space-y-2 border-t p-2">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex items-center gap-2 text-xs">
         <GitCommitHorizontal className="size-3" />
         <span>
           {status.staged.length > 0 && (
-            <span className="text-green-500">{status.staged.length} staged</span>
+            <span className="text-green-500">
+              {status.staged.length} staged
+            </span>
           )}
-          {status.staged.length > 0 && (status.unstaged.length + status.untracked.length) > 0 && ", "}
-          {(status.unstaged.length + status.untracked.length) > 0 && (
+          {status.staged.length > 0 &&
+            status.unstaged.length + status.untracked.length > 0 &&
+            ", "}
+          {status.unstaged.length + status.untracked.length > 0 && (
             <span className="text-amber-500">
               {status.unstaged.length + status.untracked.length} unstaged
             </span>
@@ -185,9 +192,9 @@ export function ReviewCommitPanel({ workspaceId }: ReviewCommitPanelProps) {
         placeholder="Commit message..."
         rows={2}
         className={cn(
-          "w-full resize-none rounded-md border bg-muted/50 px-2.5 py-1.5 text-sm",
+          "bg-muted/50 w-full resize-none rounded-md border px-2.5 py-1.5 text-sm",
           "placeholder:text-muted-foreground",
-          "focus:outline-none focus:ring-2 focus:ring-ring"
+          "focus:ring-ring focus:ring-2 focus:outline-none",
         )}
       />
       <Button
@@ -206,5 +213,5 @@ export function ReviewCommitPanel({ workspaceId }: ReviewCommitPanelProps) {
         )}
       </Button>
     </div>
-  )
+  );
 }

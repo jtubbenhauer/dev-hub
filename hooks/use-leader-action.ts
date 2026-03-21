@@ -1,10 +1,10 @@
-import { useEffect } from "react"
-import { useLeaderKey } from "@/components/providers/leader-key-provider"
-import type { LeaderAction } from "@/types/leader-key"
+import { useEffect } from "react";
+import { useLeaderKey } from "@/components/providers/leader-key-provider";
+import type { LeaderAction } from "@/types/leader-key";
 
 interface LeaderActionRegistration {
-  action: LeaderAction
-  handler: () => void
+  action: LeaderAction;
+  handler: () => void;
 }
 
 /**
@@ -15,19 +15,19 @@ interface LeaderActionRegistration {
  * re-registering on every render.
  */
 export function useLeaderAction(registrations: LeaderActionRegistration[]) {
-  const { registerAction, deregisterAction } = useLeaderKey()
+  const { registerAction, deregisterAction } = useLeaderKey();
 
   useEffect(() => {
     for (const { action, handler } of registrations) {
-      registerAction(action, handler)
+      registerAction(action, handler);
     }
 
     return () => {
       for (const { action } of registrations) {
-        deregisterAction(action.id)
+        deregisterAction(action.id);
       }
-    }
+    };
     // Intentionally omit `registrations` from deps — callers must pass a stable ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registerAction, deregisterAction])
+  }, [registerAction, deregisterAction]);
 }

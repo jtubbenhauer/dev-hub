@@ -1,8 +1,8 @@
-import type { editor } from "monaco-editor"
+import type { editor } from "monaco-editor";
 
-type MonacoThemeData = editor.IStandaloneThemeData
+type MonacoThemeData = editor.IStandaloneThemeData;
 
-export const MONACO_FONT_FAMILY = "Menlo, Monaco, 'Courier New', monospace"
+export const MONACO_FONT_FAMILY = "Menlo, Monaco, 'Courier New', monospace";
 
 // ---------------------------------------------------------------------------
 // Catppuccin Mocha
@@ -68,7 +68,7 @@ const catppuccinMocha: MonacoThemeData = {
     "diffEditorGutter.removedLineBackground": "#f38ba830",
     "diffEditor.diagonalFill": "#45475a33",
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // Catppuccin Macchiato
@@ -134,7 +134,7 @@ const catppuccinMacchiato: MonacoThemeData = {
     "diffEditorGutter.removedLineBackground": "#ed879630",
     "diffEditor.diagonalFill": "#494d6433",
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // Catppuccin Frappé
@@ -200,7 +200,7 @@ const catppuccinFrappe: MonacoThemeData = {
     "diffEditorGutter.removedLineBackground": "#e7828430",
     "diffEditor.diagonalFill": "#51576d33",
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // Catppuccin Latte
@@ -266,7 +266,7 @@ const catppuccinLatte: MonacoThemeData = {
     "diffEditorGutter.removedLineBackground": "#d20f3928",
     "diffEditor.diagonalFill": "#bcc0cc33",
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // Dracula
@@ -332,7 +332,7 @@ const draculaTheme: MonacoThemeData = {
     "diffEditorGutter.removedLineBackground": "#ff555530",
     "diffEditor.diagonalFill": "#44475a33",
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // GitHub Dark
@@ -401,7 +401,7 @@ const githubDark: MonacoThemeData = {
     "diffEditorGutter.removedLineBackground": "#da36334d",
     "diffEditor.diagonalFill": "#30363d55",
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // Default Dark (neutral dark matching the app's default-dark CSS vars)
@@ -451,7 +451,7 @@ const defaultDark: MonacoThemeData = {
     "diffEditorGutter.removedLineBackground": "#f851494d",
     "diffEditor.diagonalFill": "#4a4a4a33",
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // Default Light (neutral light matching the app's default-light CSS vars)
@@ -501,7 +501,7 @@ const defaultLight: MonacoThemeData = {
     "diffEditorGutter.removedLineBackground": "#cf222e28",
     "diffEditor.diagonalFill": "#acb0be33",
   },
-}
+};
 
 // ---------------------------------------------------------------------------
 // Theme registry: maps AppTheme values to Monaco theme definitions
@@ -511,19 +511,21 @@ const MONACO_THEMES: Record<string, MonacoThemeData> = {
   "catppuccin-macchiato": catppuccinMacchiato,
   "catppuccin-frappe": catppuccinFrappe,
   "catppuccin-latte": catppuccinLatte,
-  "dracula": draculaTheme,
+  dracula: draculaTheme,
   "github-dark": githubDark,
   "default-dark": defaultDark,
   "default-light": defaultLight,
-}
+};
 
 /**
  * Register all custom themes with the Monaco instance.
  * Call this in the `beforeMount` callback of @monaco-editor/react.
  */
-export function registerMonacoThemes(monaco: typeof import("monaco-editor")): void {
+export function registerMonacoThemes(
+  monaco: typeof import("monaco-editor"),
+): void {
   for (const [name, themeData] of Object.entries(MONACO_THEMES)) {
-    monaco.editor.defineTheme(name, themeData)
+    monaco.editor.defineTheme(name, themeData);
   }
 }
 
@@ -531,11 +533,14 @@ export function registerMonacoThemes(monaco: typeof import("monaco-editor")): vo
  * Get the Monaco theme name for a given app theme.
  * Returns a registered custom theme name, or falls back to built-in "vs"/"vs-dark".
  */
-export function getMonacoThemeName(appTheme: string, resolvedMode: "dark" | "light"): string {
+export function getMonacoThemeName(
+  appTheme: string,
+  resolvedMode: "dark" | "light",
+): string {
   if (appTheme in MONACO_THEMES) {
-    return appTheme
+    return appTheme;
   }
 
   // "system" theme — use the appropriate default based on resolved mode
-  return resolvedMode === "light" ? "default-light" : "default-dark"
+  return resolvedMode === "light" ? "default-light" : "default-dark";
 }

@@ -1,36 +1,40 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useMemo } from "react"
-import AnsiToHtml from "ansi-to-html"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
+import { useEffect, useRef, useMemo } from "react";
+import AnsiToHtml from "ansi-to-html";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 const converter = new AnsiToHtml({
   fg: "hsl(var(--foreground))",
   bg: "transparent",
   newline: true,
   escapeXML: true,
-})
+});
 
 interface CommandOutputProps {
-  lines: string[]
-  isRunning: boolean
-  className?: string
+  lines: string[];
+  isRunning: boolean;
+  className?: string;
 }
 
-export function CommandOutput({ lines, isRunning, className }: CommandOutputProps) {
-  const bottomRef = useRef<HTMLDivElement>(null)
+export function CommandOutput({
+  lines,
+  isRunning,
+  className,
+}: CommandOutputProps) {
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [lines])
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [lines]);
 
   const html = useMemo(() => {
-    const combined = lines.join("")
-    return converter.toHtml(combined)
-  }, [lines])
+    const combined = lines.join("");
+    return converter.toHtml(combined);
+  }, [lines]);
 
-  if (lines.length === 0 && !isRunning) return null
+  if (lines.length === 0 && !isRunning) return null;
 
   return (
     <ScrollArea className={cn("rounded-md border bg-black/90", className)}>
@@ -41,10 +45,12 @@ export function CommandOutput({ lines, isRunning, className }: CommandOutputProp
           dangerouslySetInnerHTML={{ __html: html }}
         />
         {isRunning && (
-          <span className="animate-pulse font-mono text-xs text-white/50">▋</span>
+          <span className="animate-pulse font-mono text-xs text-white/50">
+            ▋
+          </span>
         )}
         <div ref={bottomRef} />
       </div>
     </ScrollArea>
-  )
+  );
 }

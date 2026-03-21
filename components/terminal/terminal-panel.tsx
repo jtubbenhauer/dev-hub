@@ -158,7 +158,8 @@ export function TerminalPanel({
       cwd,
       scrollback: String(scrollback),
     });
-    if (shellCommandRef.current) params.set("shellCommand", shellCommandRef.current);
+    if (shellCommandRef.current)
+      params.set("shellCommand", shellCommandRef.current);
     if (sessionId) params.set("sessionId", sessionId);
     const env = envOverridesRef.current;
     if (env && Object.keys(env).length > 0) {
@@ -235,14 +236,7 @@ export function TerminalPanel({
         ws.send(JSON.stringify({ type: "resize", cols, rows }));
       }
     });
-  }, [
-    wsUrl,
-    workspaceId,
-    cwd,
-    scrollback,
-    sessionId,
-    fontFamily,
-  ]);
+  }, [wsUrl, workspaceId, cwd, scrollback, sessionId, fontFamily]);
 
   useEffect(() => {
     void connect();
@@ -288,7 +282,7 @@ export function TerminalPanel({
   return (
     <div className="flex h-full flex-col">
       {connectionState !== "connected" && (
-        <div className="flex items-center gap-2 px-3 py-1.5 text-xs border-b bg-muted/50">
+        <div className="bg-muted/50 flex items-center gap-2 border-b px-3 py-1.5 text-xs">
           {connectionState === "connecting" && (
             <span className="text-muted-foreground">Connecting...</span>
           )}
@@ -318,7 +312,7 @@ export function TerminalPanel({
           )}
         </div>
       )}
-      <div ref={containerRef} className="flex-1 min-h-0 p-1" />
+      <div ref={containerRef} className="min-h-0 flex-1 p-1" />
     </div>
   );
 }

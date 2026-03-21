@@ -1,25 +1,20 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from "react"
-import Link from "next/link"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useWorkspaceStore } from "@/stores/workspace-store"
-import { useCommandStore } from "@/stores/command-store"
-import { useGitStatus, useAgentHealth } from "@/hooks/use-git"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useCommandStore } from "@/stores/command-store";
+import { useGitStatus, useAgentHealth } from "@/hooks/use-git";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,12 +25,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
 import {
   Trash2,
   MessageSquare,
@@ -53,15 +48,15 @@ import {
   Pencil,
   CheckSquare,
   TerminalSquare,
-} from "lucide-react"
-import { toast } from "sonner"
-import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils"
-import type { Workspace, QuickCommand, LinkedTaskMeta } from "@/types"
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils";
+import type { Workspace, QuickCommand, LinkedTaskMeta } from "@/types";
 
 interface WorkspaceCardProps {
-  workspace: Workspace
-  onDelete: (id: string, destroyProvider?: boolean) => void
-  isDeleting: boolean
+  workspace: Workspace;
+  onDelete: (id: string, destroyProvider?: boolean) => void;
+  isDeleting: boolean;
 }
 
 export function WorkspaceCard({
@@ -69,50 +64,60 @@ export function WorkspaceCard({
   onDelete,
   isDeleting,
 }: WorkspaceCardProps) {
-  const { setActiveWorkspaceId } = useWorkspaceStore()
-  const { data: gitStatus } = useGitStatus(workspace.id)
-  const { data: healthStatus } = useAgentHealth(workspace.id, workspace.backend === "remote")
-  const runCommand = useCommandStore((s) => s.runCommand)
-  const setDrawerOpen = useCommandStore((s) => s.setDrawerOpen)
+  const { setActiveWorkspaceId } = useWorkspaceStore();
+  const { data: gitStatus } = useGitStatus(workspace.id);
+  const { data: healthStatus } = useAgentHealth(
+    workspace.id,
+    workspace.backend === "remote",
+  );
+  const runCommand = useCommandStore((s) => s.runCommand);
+  const setDrawerOpen = useCommandStore((s) => s.setDrawerOpen);
 
   const totalChanges = gitStatus
-    ? gitStatus.staged.length + gitStatus.unstaged.length + gitStatus.untracked.length
-    : 0
+    ? gitStatus.staged.length +
+      gitStatus.unstaged.length +
+      gitStatus.untracked.length
+    : 0;
 
   const relativeDate = gitStatus?.lastCommit?.date
     ? formatRelativeDate(gitStatus.lastCommit.date)
-    : null
+    : null;
 
-  const hasProvider = workspace.backend === "remote" &&
+  const hasProvider =
+    workspace.backend === "remote" &&
     workspace.providerMeta &&
-    typeof (workspace.providerMeta as Record<string, unknown>).providerId === "string"
+    typeof (workspace.providerMeta as Record<string, unknown>).providerId ===
+      "string";
 
-  const quickCommands = workspace.quickCommands ?? []
+  const quickCommands = workspace.quickCommands ?? [];
 
   const handleRunQuickCommand = (cmd: QuickCommand) => {
-    runCommand(cmd.command, workspace.id)
-    setDrawerOpen(true)
-  }
+    runCommand(cmd.command, workspace.id);
+    setDrawerOpen(true);
+  };
 
   return (
-    <Card className="overflow-hidden hover:border-primary/50">
+    <Card className="hover:border-primary/50 overflow-hidden">
       <CardHeader className="pb-2">
         <div className="flex min-w-0 items-center justify-between">
           <div className="flex min-w-0 items-center gap-2">
             <WorkspaceColorPicker workspace={workspace} />
             <EditableWorkspaceName workspace={workspace} />
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex shrink-0 items-center gap-1.5">
             {workspace.backend === "remote" && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-500 gap-1">
+                  <Badge
+                    variant="outline"
+                    className="gap-1 border-blue-500/50 text-xs text-blue-500"
+                  >
                     <span
                       className={cn(
                         "size-1.5 rounded-full",
                         healthStatus === "healthy" && "bg-emerald-500",
                         healthStatus === "unreachable" && "bg-red-500",
-                        !healthStatus && "bg-muted-foreground/50"
+                        !healthStatus && "bg-muted-foreground/50",
                       )}
                     />
                     remote
@@ -128,16 +133,17 @@ export function WorkspaceCard({
             <Badge variant="secondary" className="text-xs">
               {workspace.type}
             </Badge>
-            {workspace.packageManager && workspace.packageManager !== "none" && (
-              <Badge variant="outline" className="text-xs">
-                {workspace.packageManager}
-              </Badge>
-            )}
+            {workspace.packageManager &&
+              workspace.packageManager !== "none" && (
+                <Badge variant="outline" className="text-xs">
+                  {workspace.packageManager}
+                </Badge>
+              )}
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground truncate font-mono">
+        <p className="text-muted-foreground truncate font-mono text-xs">
           {workspace.path}
         </p>
 
@@ -147,7 +153,7 @@ export function WorkspaceCard({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group/task"
+            className="text-muted-foreground hover:text-foreground group/task flex items-center gap-1.5 text-xs transition-colors"
           >
             <CheckSquare className="size-3 shrink-0 text-purple-500" />
             <span className="truncate group-hover/task:underline">
@@ -163,14 +169,14 @@ export function WorkspaceCard({
           <div className="space-y-2">
             {/* Branch + tracking info */}
             <div className="flex items-center gap-2 text-xs">
-              <div className="flex items-center gap-1 text-foreground">
+              <div className="text-foreground flex items-center gap-1">
                 <GitBranch className="size-3.5" />
-                <span className="font-medium truncate max-w-32">
+                <span className="max-w-32 truncate font-medium">
                   {gitStatus.branch}
                 </span>
               </div>
               {(gitStatus.ahead > 0 || gitStatus.behind > 0) && (
-                <div className="flex items-center gap-1.5 text-muted-foreground">
+                <div className="text-muted-foreground flex items-center gap-1.5">
                   {gitStatus.ahead > 0 && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -180,7 +186,8 @@ export function WorkspaceCard({
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        {gitStatus.ahead} commit{gitStatus.ahead > 1 ? "s" : ""} ahead
+                        {gitStatus.ahead} commit{gitStatus.ahead > 1 ? "s" : ""}{" "}
+                        ahead
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -193,7 +200,8 @@ export function WorkspaceCard({
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        {gitStatus.behind} commit{gitStatus.behind > 1 ? "s" : ""} behind
+                        {gitStatus.behind} commit
+                        {gitStatus.behind > 1 ? "s" : ""} behind
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -208,7 +216,9 @@ export function WorkspaceCard({
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {gitStatus.staged.length} staged, {gitStatus.unstaged.length} modified, {gitStatus.untracked.length} untracked
+                    {gitStatus.staged.length} staged,{" "}
+                    {gitStatus.unstaged.length} modified,{" "}
+                    {gitStatus.untracked.length} untracked
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -216,10 +226,12 @@ export function WorkspaceCard({
 
             {/* Last commit */}
             {gitStatus.lastCommit && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                 <GitCommitHorizontal className="size-3 shrink-0" />
-                <span className="truncate flex-1">{gitStatus.lastCommit.message}</span>
-                <span className="flex items-center gap-0.5 shrink-0">
+                <span className="flex-1 truncate">
+                  {gitStatus.lastCommit.message}
+                </span>
+                <span className="flex shrink-0 items-center gap-0.5">
                   <Clock className="size-3" />
                   {relativeDate}
                 </span>
@@ -239,8 +251,8 @@ export function WorkspaceCard({
                     size="sm"
                     className="h-6 gap-1 px-2 text-xs"
                     onClick={(event) => {
-                      event.stopPropagation()
-                      handleRunQuickCommand(cmd)
+                      event.stopPropagation();
+                      handleRunQuickCommand(cmd);
                     }}
                   >
                     <Play className="size-2.5" />
@@ -261,10 +273,10 @@ export function WorkspaceCard({
             <Link
               href="/chat"
               onClick={(event) => {
-                event.stopPropagation()
-                setActiveWorkspaceId(workspace.id)
+                event.stopPropagation();
+                setActiveWorkspaceId(workspace.id);
               }}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
             >
               <MessageSquare className="size-3" />
               Chat
@@ -272,10 +284,10 @@ export function WorkspaceCard({
             <Link
               href="/git"
               onClick={(event) => {
-                event.stopPropagation()
-                setActiveWorkspaceId(workspace.id)
+                event.stopPropagation();
+                setActiveWorkspaceId(workspace.id);
               }}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
             >
               <FolderOpen className="size-3" />
               Git
@@ -283,10 +295,10 @@ export function WorkspaceCard({
             <Link
               href={`/terminal?workspace=${workspace.id}`}
               onClick={(event) => {
-                event.stopPropagation()
-                setActiveWorkspaceId(workspace.id)
+                event.stopPropagation();
+                setActiveWorkspaceId(workspace.id);
               }}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
             >
               <TerminalSquare className="size-3" />
               Terminal
@@ -325,7 +337,7 @@ export function WorkspaceCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="w-full justify-start text-xs text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive w-full justify-start text-xs"
                       onClick={() => onDelete(workspace.id, true)}
                       disabled={isDeleting}
                     >
@@ -347,11 +359,14 @@ export function WorkspaceCard({
                     <Trash2 className="size-3.5" />
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent onClick={(event) => event.stopPropagation()}>
+                <AlertDialogContent
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete worktree</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will remove the worktree from disk. The branch itself will not be deleted.
+                      This will remove the worktree from disk. The branch itself
+                      will not be deleted.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -370,8 +385,8 @@ export function WorkspaceCard({
                 variant="ghost"
                 size="icon-xs"
                 onClick={(event) => {
-                  event.stopPropagation()
-                  onDelete(workspace.id)
+                  event.stopPropagation();
+                  onDelete(workspace.id);
                 }}
                 disabled={isDeleting}
                 className="text-muted-foreground hover:text-destructive"
@@ -383,12 +398,12 @@ export function WorkspaceCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function WorkspaceColorPicker({ workspace }: { workspace: Workspace }) {
-  const queryClient = useQueryClient()
-  const [isOpen, setIsOpen] = useState(false)
+  const queryClient = useQueryClient();
+  const [isOpen, setIsOpen] = useState(false);
 
   const updateMutation = useMutation({
     mutationFn: async (color: string | null) => {
@@ -396,22 +411,22 @@ function WorkspaceColorPicker({ workspace }: { workspace: Workspace }) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ color }),
-      })
+      });
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Failed to update color")
+        const err = await res.json();
+        throw new Error(err.error || "Failed to update color");
       }
-      return res.json()
+      return res.json();
     },
     onSuccess: (_, color) => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
-      useWorkspaceStore.getState().updateWorkspace(workspace.id, { color })
-      setIsOpen(false)
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      useWorkspaceStore.getState().updateWorkspace(workspace.id, { color });
+      setIsOpen(false);
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      toast.error(err.message);
     },
-  })
+  });
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -420,11 +435,15 @@ function WorkspaceColorPicker({ workspace }: { workspace: Workspace }) {
           type="button"
           className={cn(
             "size-3 shrink-0 rounded-full border transition-colors hover:opacity-80",
-            workspace.color ? "border-transparent" : "border-muted-foreground/30 bg-transparent"
+            workspace.color
+              ? "border-transparent"
+              : "border-muted-foreground/30 bg-transparent",
           )}
-          style={workspace.color ? { backgroundColor: workspace.color } : undefined}
+          style={
+            workspace.color ? { backgroundColor: workspace.color } : undefined
+          }
           onClick={(e) => {
-            e.stopPropagation()
+            e.stopPropagation();
           }}
         />
       </PopoverTrigger>
@@ -441,7 +460,8 @@ function WorkspaceColorPicker({ workspace }: { workspace: Workspace }) {
                 type="button"
                 className={cn(
                   "size-5 rounded-full border border-transparent transition-transform hover:scale-110",
-                  workspace.color === color && "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                  workspace.color === color &&
+                    "ring-primary ring-offset-background ring-2 ring-offset-1",
                 )}
                 style={{ backgroundColor: color }}
                 onClick={() => updateMutation.mutate(color)}
@@ -452,31 +472,31 @@ function WorkspaceColorPicker({ workspace }: { workspace: Workspace }) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-xs w-full justify-start text-muted-foreground"
+            className="text-muted-foreground h-7 w-full justify-start text-xs"
             onClick={() => updateMutation.mutate(null)}
             disabled={updateMutation.isPending || !workspace.color}
           >
-            <X className="size-3 mr-1.5" />
+            <X className="mr-1.5 size-3" />
             Clear color
           </Button>
         </div>
       </PopoverContent>
     </Popover>
-  )
+  );
 }
 
 function EditableWorkspaceName({ workspace }: { workspace: Workspace }) {
-  const queryClient = useQueryClient()
-  const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState(workspace.name)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(workspace.name);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isEditing) {
-      inputRef.current?.focus()
-      inputRef.current?.select()
+      inputRef.current?.focus();
+      inputRef.current?.select();
     }
-  }, [isEditing])
+  }, [isEditing]);
 
   const renameMutation = useMutation({
     mutationFn: async (newName: string) => {
@@ -484,33 +504,33 @@ function EditableWorkspaceName({ workspace }: { workspace: Workspace }) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newName }),
-      })
+      });
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Failed to rename")
+        const err = await res.json();
+        throw new Error(err.error || "Failed to rename");
       }
-      return res.json()
+      return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
-      toast.success("Workspace renamed")
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      toast.success("Workspace renamed");
     },
     onError: (err: Error) => {
-      toast.error(err.message)
-      setEditValue(workspace.name)
+      toast.error(err.message);
+      setEditValue(workspace.name);
     },
-  })
+  });
 
   const handleSave = useCallback(() => {
-    const trimmed = editValue.trim()
+    const trimmed = editValue.trim();
     if (!trimmed || trimmed === workspace.name) {
-      setEditValue(workspace.name)
-      setIsEditing(false)
-      return
+      setEditValue(workspace.name);
+      setIsEditing(false);
+      return;
     }
-    renameMutation.mutate(trimmed)
-    setIsEditing(false)
-  }, [editValue, workspace.name, renameMutation])
+    renameMutation.mutate(trimmed);
+    setIsEditing(false);
+  }, [editValue, workspace.name, renameMutation]);
 
   if (isEditing) {
     return (
@@ -520,16 +540,16 @@ function EditableWorkspaceName({ workspace }: { workspace: Workspace }) {
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={(e) => {
-          if (e.key === "Enter") handleSave()
+          if (e.key === "Enter") handleSave();
           if (e.key === "Escape") {
-            setEditValue(workspace.name)
-            setIsEditing(false)
+            setEditValue(workspace.name);
+            setIsEditing(false);
           }
         }}
-        className="h-7 min-w-0 text-base font-semibold px-1"
+        className="h-7 min-w-0 px-1 text-base font-semibold"
         onClick={(e) => e.stopPropagation()}
       />
-    )
+    );
   }
 
   return (
@@ -537,28 +557,32 @@ function EditableWorkspaceName({ workspace }: { workspace: Workspace }) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="group/name flex min-w-0 items-center gap-1.5 hover:text-primary transition-colors"
+          className="group/name hover:text-primary flex min-w-0 items-center gap-1.5 transition-colors"
           onClick={(e) => {
-            e.stopPropagation()
-            setEditValue(workspace.name)
-            setIsEditing(true)
+            e.stopPropagation();
+            setEditValue(workspace.name);
+            setIsEditing(true);
           }}
         >
-          <CardTitle className="min-w-0 text-base truncate">{workspace.name}</CardTitle>
-          <Pencil className="size-3 shrink-0 opacity-0 group-hover/name:opacity-50 transition-opacity" />
+          <CardTitle className="min-w-0 truncate text-base">
+            {workspace.name}
+          </CardTitle>
+          <Pencil className="size-3 shrink-0 opacity-0 transition-opacity group-hover/name:opacity-50" />
         </button>
       </TooltipTrigger>
       <TooltipContent>Click to rename</TooltipContent>
     </Tooltip>
-  )
+  );
 }
 
 function QuickCommandsEditor({ workspace }: { workspace: Workspace }) {
-  const queryClient = useQueryClient()
-  const [commands, setCommands] = useState<QuickCommand[]>(workspace.quickCommands ?? [])
-  const [newLabel, setNewLabel] = useState("")
-  const [newCommand, setNewCommand] = useState("")
-  const [isOpen, setIsOpen] = useState(false)
+  const queryClient = useQueryClient();
+  const [commands, setCommands] = useState<QuickCommand[]>(
+    workspace.quickCommands ?? [],
+  );
+  const [newLabel, setNewLabel] = useState("");
+  const [newCommand, setNewCommand] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
 
   const saveMutation = useMutation({
     mutationFn: async (quickCommands: QuickCommand[]) => {
@@ -566,45 +590,48 @@ function QuickCommandsEditor({ workspace }: { workspace: Workspace }) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quickCommands }),
-      })
+      });
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Failed to save")
+        const err = await res.json();
+        throw new Error(err.error || "Failed to save");
       }
-      return res.json()
+      return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
-      toast.success("Quick commands saved")
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      toast.success("Quick commands saved");
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      toast.error(err.message);
     },
-  })
+  });
 
   const handleAdd = () => {
-    const label = newLabel.trim()
-    const command = newCommand.trim()
-    if (!label || !command) return
+    const label = newLabel.trim();
+    const command = newCommand.trim();
+    if (!label || !command) return;
 
-    const updated = [...commands, { label, command }]
-    setCommands(updated)
-    setNewLabel("")
-    setNewCommand("")
-    saveMutation.mutate(updated)
-  }
+    const updated = [...commands, { label, command }];
+    setCommands(updated);
+    setNewLabel("");
+    setNewCommand("");
+    saveMutation.mutate(updated);
+  };
 
   const handleRemove = (index: number) => {
-    const updated = commands.filter((_, i) => i !== index)
-    setCommands(updated)
-    saveMutation.mutate(updated)
-  }
+    const updated = commands.filter((_, i) => i !== index);
+    setCommands(updated);
+    saveMutation.mutate(updated);
+  };
 
   return (
-    <Popover open={isOpen} onOpenChange={(open) => {
-      setIsOpen(open)
-      if (open) setCommands(workspace.quickCommands ?? [])
-    }}>
+    <Popover
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (open) setCommands(workspace.quickCommands ?? []);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -627,16 +654,16 @@ function QuickCommandsEditor({ workspace }: { workspace: Workspace }) {
             <div className="space-y-1.5">
               {commands.map((cmd, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{cmd.label}</p>
-                    <p className="text-xs text-muted-foreground truncate font-mono">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">{cmd.label}</p>
+                    <p className="text-muted-foreground truncate font-mono text-xs">
                       {cmd.command}
                     </p>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon-xs"
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive shrink-0"
                     onClick={() => handleRemove(index)}
                     disabled={saveMutation.isPending}
                   >
@@ -658,38 +685,40 @@ function QuickCommandsEditor({ workspace }: { workspace: Workspace }) {
               placeholder="Command (e.g. pnpm dev)"
               value={newCommand}
               onChange={(e) => setNewCommand(e.target.value)}
-              className="h-7 text-xs font-mono"
+              className="h-7 font-mono text-xs"
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleAdd()
+                if (e.key === "Enter") handleAdd();
               }}
             />
             <Button
               size="sm"
-              className="w-full h-7 text-xs"
+              className="h-7 w-full text-xs"
               onClick={handleAdd}
-              disabled={!newLabel.trim() || !newCommand.trim() || saveMutation.isPending}
+              disabled={
+                !newLabel.trim() || !newCommand.trim() || saveMutation.isPending
+              }
             >
-              <Plus className="size-3 mr-1" />
+              <Plus className="mr-1 size-3" />
               Add Command
             </Button>
           </div>
         </div>
       </PopoverContent>
     </Popover>
-  )
+  );
 }
 
 function formatRelativeDate(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMinutes = Math.floor(diffMs / 60_000)
-  const diffHours = Math.floor(diffMs / 3_600_000)
-  const diffDays = Math.floor(diffMs / 86_400_000)
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60_000);
+  const diffHours = Math.floor(diffMs / 3_600_000);
+  const diffDays = Math.floor(diffMs / 86_400_000);
 
-  if (diffMinutes < 1) return "just now"
-  if (diffMinutes < 60) return `${diffMinutes}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 30) return `${diffDays}d ago`
-  return date.toLocaleDateString()
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
 }

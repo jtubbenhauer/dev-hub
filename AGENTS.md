@@ -22,7 +22,8 @@ This repo is fully vibe-coded. Multiple people (and agents) push directly to `ma
 - **UI Primitives:** `radix-ui` (unified package — NOT individual `@radix-ui/react-*` packages)
 - **Icons:** lucide-react
 - **Testing:** Vitest 4 + Testing Library (jsdom environment)
-- **Linting:** ESLint 9 flat config (no Prettier, no Biome)
+- **Linting:** ESLint 9 flat config
+- **Formatting:** Prettier 3 (with `prettier-plugin-tailwindcss` for class sorting)
 - **Package Manager:** pnpm (workspace monorepo)
 - **Editor Integration:** Monaco Editor, Neovim (via node-pty/xterm)
 
@@ -75,6 +76,8 @@ pnpm build            # Production build
 pnpm test              # Run unit tests (vitest run)
 pnpm test:watch       # Run unit tests in watch mode
 pnpm lint             # ESLint
+pnpm format           # Format all files with Prettier
+pnpm format:check     # Check formatting (CI-friendly, no writes)
 pnpm typecheck        # TypeScript check (app + shared + agent)
 pnpm db:generate      # Generate Drizzle migration from schema changes
 pnpm db:push          # Push schema directly to DB (dev convenience)
@@ -193,7 +196,7 @@ API routes live in `app/api/` and follow Next.js App Router conventions:
 - No `any` types. Use proper interfaces/types or `unknown` with type guards.
 - Descriptive names: `getUserPermissions` not `getPerms`, `filteredWorkspaces` not `fw`.
 - Boolean names start with `is`, `has`, `can`, `should`.
-- No formatting tool configured — follow the existing patterns in each file.
+- **Formatting:** Prettier is configured (`.prettierrc`). Run `pnpm format` to format all files, or `pnpm format:check` to verify. Prettier runs with semicolons, double quotes, 80-char print width, 2-space indent, trailing commas, and `prettier-plugin-tailwindcss` for automatic Tailwind class sorting.
 - Schema types are inferred from Drizzle (`typeof table.$inferSelect`, `typeof table.$inferInsert`).
 
 ## Common Gotchas

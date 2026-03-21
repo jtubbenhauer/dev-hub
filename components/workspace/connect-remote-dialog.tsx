@@ -1,77 +1,78 @@
-"use client"
+"use client";
 
-import { useState, useMemo } from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useState, useMemo } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Globe, Loader2, CheckCircle2, XCircle } from "lucide-react"
-import { toast } from "sonner"
+} from "@/components/ui/dialog";
+import { Globe, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
-type HealthStatus = "idle" | "checking" | "healthy" | "unreachable"
+type HealthStatus = "idle" | "checking" | "healthy" | "unreachable";
 
 export function ConnectRemoteDialog() {
-  const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
-  const [agentUrl, setAgentUrl] = useState("")
-  const [opencodeUrl, setOpencodeUrl] = useState("")
-  const [name, setName] = useState("")
-  const [shellCommand, setShellCommand] = useState("")
-  const [healthStatus, setHealthStatus] = useState<HealthStatus>("idle")
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [agentUrl, setAgentUrl] = useState("");
+  const [opencodeUrl, setOpencodeUrl] = useState("");
+  const [name, setName] = useState("");
+  const [shellCommand, setShellCommand] = useState("");
+  const [healthStatus, setHealthStatus] = useState<HealthStatus>("idle");
 
   const isValidAgentUrl = useMemo(() => {
-    if (!agentUrl) return false
+    if (!agentUrl) return false;
     try {
-      new URL(agentUrl)
-      return true
+      new URL(agentUrl);
+      return true;
     } catch {
-      return false
+      return false;
     }
-  }, [agentUrl])
+  }, [agentUrl]);
 
   const isValidOpencodeUrl = useMemo(() => {
-    if (!opencodeUrl) return false
+    if (!opencodeUrl) return false;
     try {
-      new URL(opencodeUrl)
-      return true
+      new URL(opencodeUrl);
+      return true;
     } catch {
-      return false
+      return false;
     }
-  }, [opencodeUrl])
+  }, [opencodeUrl]);
 
-  const canSubmit = isValidAgentUrl && isValidOpencodeUrl && healthStatus !== "checking"
+  const canSubmit =
+    isValidAgentUrl && isValidOpencodeUrl && healthStatus !== "checking";
 
   async function checkHealth() {
-    if (!isValidAgentUrl) return
-    setHealthStatus("checking")
+    if (!isValidAgentUrl) return;
+    setHealthStatus("checking");
     try {
       const res = await fetch(new URL("/health", agentUrl).toString(), {
         signal: AbortSignal.timeout(5000),
-      })
+      });
       if (!res.ok) {
-        setHealthStatus("unreachable")
-        return
+        setHealthStatus("unreachable");
+        return;
       }
-      const body = (await res.json()) as { status?: string }
-      setHealthStatus(body.status === "ok" ? "healthy" : "unreachable")
+      const body = (await res.json()) as { status?: string };
+      setHealthStatus(body.status === "ok" ? "healthy" : "unreachable");
     } catch {
-      setHealthStatus("unreachable")
+      setHealthStatus("unreachable");
     }
   }
 
   const connectMutation = useMutation({
     mutationFn: async (data: {
-      agentUrl: string
-      opencodeUrl: string
-      name?: string
-      shellCommand?: string
+      agentUrl: string;
+      opencodeUrl: string;
+      name?: string;
+      shellCommand?: string;
     }) => {
       const res = await fetch("/api/workspaces", {
         method: "POST",
@@ -83,52 +84,56 @@ export function ConnectRemoteDialog() {
           name: data.name || undefined,
           shellCommand: data.shellCommand || undefined,
         }),
-      })
+      });
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Failed to connect remote workspace")
+        const err = await res.json();
+        throw new Error(err.error || "Failed to connect remote workspace");
       }
-      return res.json()
+      return res.json();
     },
     onSuccess: (workspace) => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] })
-      setOpen(false)
-      resetState()
-      toast.success(`Connected remote workspace "${workspace.name}"`)
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      setOpen(false);
+      resetState();
+      toast.success(`Connected remote workspace "${workspace.name}"`);
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      toast.error(err.message);
     },
-  })
+  });
 
   function handleConnect() {
-    if (!canSubmit) return
+    if (!canSubmit) return;
     connectMutation.mutate({
       agentUrl,
       opencodeUrl,
       name: name || undefined,
       shellCommand: shellCommand || undefined,
-    })
+    });
   }
 
   function resetState() {
-    setAgentUrl("")
-    setOpencodeUrl("")
-    setName("")
-    setShellCommand("")
-    setHealthStatus("idle")
+    setAgentUrl("");
+    setOpencodeUrl("");
+    setName("");
+    setShellCommand("");
+    setHealthStatus("idle");
   }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(isOpen) => {
-        setOpen(isOpen)
-        if (!isOpen) resetState()
+        setOpen(isOpen);
+        if (!isOpen) resetState();
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon" className="sm:size-auto sm:px-3 sm:py-2">
+        <Button
+          variant="outline"
+          size="icon"
+          className="sm:size-auto sm:px-3 sm:py-2"
+        >
           <Globe className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">Connect Remote</span>
         </Button>
@@ -146,8 +151,8 @@ export function ConnectRemoteDialog() {
                 id="agent-url"
                 value={agentUrl}
                 onChange={(e) => {
-                  setAgentUrl(e.target.value)
-                  setHealthStatus("idle")
+                  setAgentUrl(e.target.value);
+                  setHealthStatus("idle");
                 }}
                 placeholder="http://container.tailnet:7500"
                 className="font-mono text-sm"
@@ -168,7 +173,7 @@ export function ConnectRemoteDialog() {
               </Button>
             </div>
             {agentUrl && !isValidAgentUrl && (
-              <p className="text-xs text-destructive">Must be a valid URL</p>
+              <p className="text-destructive text-xs">Must be a valid URL</p>
             )}
             {healthStatus === "healthy" && (
               <p className="flex items-center gap-1 text-xs text-green-500">
@@ -177,7 +182,7 @@ export function ConnectRemoteDialog() {
               </p>
             )}
             {healthStatus === "unreachable" && (
-              <p className="flex items-center gap-1 text-xs text-destructive">
+              <p className="text-destructive flex items-center gap-1 text-xs">
                 <XCircle className="h-3 w-3" />
                 Cannot reach agent — ensure it is running
               </p>
@@ -194,12 +199,15 @@ export function ConnectRemoteDialog() {
               className="font-mono text-sm"
             />
             {opencodeUrl && !isValidOpencodeUrl && (
-              <p className="text-xs text-destructive">Must be a valid URL</p>
+              <p className="text-destructive text-xs">Must be a valid URL</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="remote-name" className="text-xs text-muted-foreground">
+            <Label
+              htmlFor="remote-name"
+              className="text-muted-foreground text-xs"
+            >
               Display name (optional)
             </Label>
             <Input
@@ -209,13 +217,16 @@ export function ConnectRemoteDialog() {
               placeholder="Remote Workspace"
               className="text-sm"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && canSubmit) handleConnect()
+                if (e.key === "Enter" && canSubmit) handleConnect();
               }}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="shell-command" className="text-xs text-muted-foreground">
+            <Label
+              htmlFor="shell-command"
+              className="text-muted-foreground text-xs"
+            >
               Shell command (optional)
             </Label>
             <Input
@@ -225,21 +236,21 @@ export function ConnectRemoteDialog() {
               placeholder="docker exec -it container_name sh"
               className="font-mono text-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Command to open a terminal session into this workspace.
             </p>
           </div>
 
           {isValidAgentUrl && isValidOpencodeUrl && (
-            <div className="space-y-1.5 rounded-md border bg-muted/30 px-3 py-2">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="bg-muted/30 space-y-1.5 rounded-md border px-3 py-2">
+              <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                 <Globe className="h-3 w-3" />
                 <span>Will connect to:</span>
               </div>
               <div className="font-mono text-xs break-all">{agentUrl}</div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-muted-foreground text-xs">
                 as{" "}
-                <span className="font-medium text-foreground">
+                <span className="text-foreground font-medium">
                   {name || "Remote Workspace"}
                 </span>
               </div>
@@ -266,5 +277,5 @@ export function ConnectRemoteDialog() {
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

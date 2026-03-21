@@ -123,11 +123,17 @@ function evictNvimSessionsIfNeeded() {
 
     if (!session.ws) {
       // Prefer evicting idle sessions (no WebSocket attached)
-      if (!idleCandidate || session.createdAt < idleCandidate.session.createdAt) {
+      if (
+        !idleCandidate ||
+        session.createdAt < idleCandidate.session.createdAt
+      ) {
         idleCandidate = { key, session };
       }
     } else {
-      if (!activeCandidate || session.createdAt < activeCandidate.session.createdAt) {
+      if (
+        !activeCandidate ||
+        session.createdAt < activeCandidate.session.createdAt
+      ) {
         activeCandidate = { key, session };
       }
     }
@@ -424,5 +430,3 @@ export function startPtyServer(): number {
 
   return port;
 }
-
-

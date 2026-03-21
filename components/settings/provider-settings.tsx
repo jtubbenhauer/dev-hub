@@ -1,31 +1,49 @@
-"use client"
+"use client";
 
-import { useState, useCallback } from "react"
-import { Loader2, Plus, Trash2, CheckCircle2, XCircle, Terminal, Pencil } from "lucide-react"
-import { toast } from "sonner"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { useState, useCallback } from "react";
+import {
+  Loader2,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+  Terminal,
+  Pencil,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { useWorkspaceProviders, useSettingsMutation, SETTINGS_KEYS } from "@/hooks/use-settings"
-import type { WorkspaceProvider, ProviderBehaviour } from "@/types"
-import { DEFAULT_PROVIDER_BEHAVIOUR } from "@/types"
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import {
+  useWorkspaceProviders,
+  useSettingsMutation,
+  SETTINGS_KEYS,
+} from "@/hooks/use-settings";
+import type { WorkspaceProvider, ProviderBehaviour } from "@/types";
+import { DEFAULT_PROVIDER_BEHAVIOUR } from "@/types";
 
-type ProviderTypePreset = "always-on" | "auto-suspend" | "custom"
+type ProviderTypePreset = "always-on" | "auto-suspend" | "custom";
 
 const AUTO_SUSPEND_BEHAVIOUR: ProviderBehaviour = {
   inactiveHealthIntervalMs: 0,
@@ -35,45 +53,56 @@ const AUTO_SUSPEND_BEHAVIOUR: ProviderBehaviour = {
   branchPollWhenInactive: false,
   supportsAutoSuspend: true,
   resumeTimeSeconds: 5,
-}
+};
 
 function getProviderType(behaviour?: ProviderBehaviour): ProviderTypePreset {
-  if (!behaviour) return "always-on"
-  
-  const isAlwaysOn = 
-    behaviour.inactiveHealthIntervalMs === DEFAULT_PROVIDER_BEHAVIOUR.inactiveHealthIntervalMs &&
-    behaviour.activeHealthIntervalMs === DEFAULT_PROVIDER_BEHAVIOUR.activeHealthIntervalMs &&
-    behaviour.gitStatusIntervalMs === DEFAULT_PROVIDER_BEHAVIOUR.gitStatusIntervalMs &&
+  if (!behaviour) return "always-on";
+
+  const isAlwaysOn =
+    behaviour.inactiveHealthIntervalMs ===
+      DEFAULT_PROVIDER_BEHAVIOUR.inactiveHealthIntervalMs &&
+    behaviour.activeHealthIntervalMs ===
+      DEFAULT_PROVIDER_BEHAVIOUR.activeHealthIntervalMs &&
+    behaviour.gitStatusIntervalMs ===
+      DEFAULT_PROVIDER_BEHAVIOUR.gitStatusIntervalMs &&
     behaviour.sseWhenInactive === DEFAULT_PROVIDER_BEHAVIOUR.sseWhenInactive &&
-    behaviour.branchPollWhenInactive === DEFAULT_PROVIDER_BEHAVIOUR.branchPollWhenInactive &&
-    behaviour.supportsAutoSuspend === DEFAULT_PROVIDER_BEHAVIOUR.supportsAutoSuspend &&
-    behaviour.resumeTimeSeconds === DEFAULT_PROVIDER_BEHAVIOUR.resumeTimeSeconds
+    behaviour.branchPollWhenInactive ===
+      DEFAULT_PROVIDER_BEHAVIOUR.branchPollWhenInactive &&
+    behaviour.supportsAutoSuspend ===
+      DEFAULT_PROVIDER_BEHAVIOUR.supportsAutoSuspend &&
+    behaviour.resumeTimeSeconds ===
+      DEFAULT_PROVIDER_BEHAVIOUR.resumeTimeSeconds;
 
-  if (isAlwaysOn) return "always-on"
+  if (isAlwaysOn) return "always-on";
 
-  const isAutoSuspend = 
-    behaviour.inactiveHealthIntervalMs === AUTO_SUSPEND_BEHAVIOUR.inactiveHealthIntervalMs &&
-    behaviour.activeHealthIntervalMs === AUTO_SUSPEND_BEHAVIOUR.activeHealthIntervalMs &&
-    behaviour.gitStatusIntervalMs === AUTO_SUSPEND_BEHAVIOUR.gitStatusIntervalMs &&
+  const isAutoSuspend =
+    behaviour.inactiveHealthIntervalMs ===
+      AUTO_SUSPEND_BEHAVIOUR.inactiveHealthIntervalMs &&
+    behaviour.activeHealthIntervalMs ===
+      AUTO_SUSPEND_BEHAVIOUR.activeHealthIntervalMs &&
+    behaviour.gitStatusIntervalMs ===
+      AUTO_SUSPEND_BEHAVIOUR.gitStatusIntervalMs &&
     behaviour.sseWhenInactive === AUTO_SUSPEND_BEHAVIOUR.sseWhenInactive &&
-    behaviour.branchPollWhenInactive === AUTO_SUSPEND_BEHAVIOUR.branchPollWhenInactive &&
-    behaviour.supportsAutoSuspend === AUTO_SUSPEND_BEHAVIOUR.supportsAutoSuspend &&
-    behaviour.resumeTimeSeconds === AUTO_SUSPEND_BEHAVIOUR.resumeTimeSeconds
+    behaviour.branchPollWhenInactive ===
+      AUTO_SUSPEND_BEHAVIOUR.branchPollWhenInactive &&
+    behaviour.supportsAutoSuspend ===
+      AUTO_SUSPEND_BEHAVIOUR.supportsAutoSuspend &&
+    behaviour.resumeTimeSeconds === AUTO_SUSPEND_BEHAVIOUR.resumeTimeSeconds;
 
-  if (isAutoSuspend) return "auto-suspend"
+  if (isAutoSuspend) return "auto-suspend";
 
-  return "custom"
+  return "custom";
 }
 
 interface ProviderFormState {
-  name: string
-  binaryPath: string
-  createCommand: string
-  destroyCommand: string
-  statusCommand: string
-  shellCommand: string
-  providerType: ProviderTypePreset
-  behaviour: ProviderBehaviour
+  name: string;
+  binaryPath: string;
+  createCommand: string;
+  destroyCommand: string;
+  statusCommand: string;
+  shellCommand: string;
+  providerType: ProviderTypePreset;
+  behaviour: ProviderBehaviour;
 }
 
 const EMPTY_FORM: ProviderFormState = {
@@ -85,26 +114,30 @@ const EMPTY_FORM: ProviderFormState = {
   shellCommand: "",
   providerType: "always-on",
   behaviour: DEFAULT_PROVIDER_BEHAVIOUR,
-}
+};
 
 export function ProviderSettings() {
-  const { providers, isLoading } = useWorkspaceProviders()
-  const mutation = useSettingsMutation()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingProviderId, setEditingProviderId] = useState<string | null>(null)
-  const [form, setForm] = useState<ProviderFormState>(EMPTY_FORM)
-  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "found" | "not-found">("idle")
+  const { providers, isLoading } = useWorkspaceProviders();
+  const mutation = useSettingsMutation();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingProviderId, setEditingProviderId] = useState<string | null>(
+    null,
+  );
+  const [form, setForm] = useState<ProviderFormState>(EMPTY_FORM);
+  const [testStatus, setTestStatus] = useState<
+    "idle" | "testing" | "found" | "not-found"
+  >("idle");
 
   const openAddDialog = useCallback(() => {
-    setEditingProviderId(null)
-    setForm(EMPTY_FORM)
-    setTestStatus("idle")
-    setDialogOpen(true)
-  }, [])
+    setEditingProviderId(null);
+    setForm(EMPTY_FORM);
+    setTestStatus("idle");
+    setDialogOpen(true);
+  }, []);
 
   const openEditDialog = useCallback((provider: WorkspaceProvider) => {
-    setEditingProviderId(provider.id)
-    const providerType = getProviderType(provider.behaviour)
+    setEditingProviderId(provider.id);
+    const providerType = getProviderType(provider.behaviour);
     setForm({
       name: provider.name,
       binaryPath: provider.binaryPath,
@@ -114,36 +147,36 @@ export function ProviderSettings() {
       shellCommand: provider.commands.shell ?? "",
       providerType,
       behaviour: provider.behaviour ?? DEFAULT_PROVIDER_BEHAVIOUR,
-    })
-    setTestStatus("idle")
-    setDialogOpen(true)
-  }, [])
+    });
+    setTestStatus("idle");
+    setDialogOpen(true);
+  }, []);
 
   const handleTest = useCallback(async () => {
-    if (!form.binaryPath.trim()) return
-    setTestStatus("testing")
+    if (!form.binaryPath.trim()) return;
+    setTestStatus("testing");
     try {
       const res = await fetch("/api/providers/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ binaryPath: form.binaryPath.trim() }),
-      })
-      const data = await res.json() as { ok?: boolean }
-      setTestStatus(data.ok ? "found" : "not-found")
+      });
+      const data = (await res.json()) as { ok?: boolean };
+      setTestStatus(data.ok ? "found" : "not-found");
     } catch {
-      setTestStatus("not-found")
+      setTestStatus("not-found");
     }
-  }, [form.binaryPath])
+  }, [form.binaryPath]);
 
   const handleSave = useCallback(() => {
-    const trimmedName = form.name.trim()
-    const trimmedBinary = form.binaryPath.trim()
+    const trimmedName = form.name.trim();
+    const trimmedBinary = form.binaryPath.trim();
     if (!trimmedName || !trimmedBinary) {
-      toast.error("Name and binary path are required")
-      return
+      toast.error("Name and binary path are required");
+      return;
     }
 
-    const shellCmd = form.shellCommand.trim() || undefined
+    const shellCmd = form.shellCommand.trim() || undefined;
     const newProvider: WorkspaceProvider = {
       id: editingProviderId ?? crypto.randomUUID(),
       name: trimmedName,
@@ -154,87 +187,98 @@ export function ProviderSettings() {
         status: form.statusCommand.trim() || EMPTY_FORM.statusCommand,
         ...(shellCmd ? { shell: shellCmd } : {}),
       },
-      behaviour: form.providerType === "always-on" 
-        ? DEFAULT_PROVIDER_BEHAVIOUR 
-        : form.providerType === "auto-suspend" 
-          ? AUTO_SUSPEND_BEHAVIOUR 
-          : form.behaviour,
-    }
+      behaviour:
+        form.providerType === "always-on"
+          ? DEFAULT_PROVIDER_BEHAVIOUR
+          : form.providerType === "auto-suspend"
+            ? AUTO_SUSPEND_BEHAVIOUR
+            : form.behaviour,
+    };
 
     const updatedProviders = editingProviderId
       ? providers.map((p) => (p.id === editingProviderId ? newProvider : p))
-      : [...providers, newProvider]
+      : [...providers, newProvider];
 
     mutation.mutate(
       { key: SETTINGS_KEYS.WORKSPACE_PROVIDERS, value: updatedProviders },
       {
         onSuccess: () => {
-          setDialogOpen(false)
-          toast.success(editingProviderId ? `Updated provider "${trimmedName}"` : `Added provider "${trimmedName}"`)
+          setDialogOpen(false);
+          toast.success(
+            editingProviderId
+              ? `Updated provider "${trimmedName}"`
+              : `Added provider "${trimmedName}"`,
+          );
         },
-      }
-    )
-  }, [form, editingProviderId, providers, mutation])
+      },
+    );
+  }, [form, editingProviderId, providers, mutation]);
 
   const handleDelete = useCallback(
     (providerId: string) => {
-      const provider = providers.find((p) => p.id === providerId)
-      const updatedProviders = providers.filter((p) => p.id !== providerId)
+      const provider = providers.find((p) => p.id === providerId);
+      const updatedProviders = providers.filter((p) => p.id !== providerId);
       mutation.mutate(
         { key: SETTINGS_KEYS.WORKSPACE_PROVIDERS, value: updatedProviders },
         {
           onSuccess: () => {
-            toast.success(`Removed provider "${provider?.name}"`)
+            toast.success(`Removed provider "${provider?.name}"`);
           },
-        }
-      )
+        },
+      );
     },
-    [providers, mutation]
-  )
+    [providers, mutation],
+  );
 
   const updateField = useCallback(
-    <K extends keyof ProviderFormState>(field: K, value: ProviderFormState[K]) => {
-      setForm((prev) => ({ ...prev, [field]: value }))
-      if (field === "binaryPath") setTestStatus("idle")
+    <K extends keyof ProviderFormState>(
+      field: K,
+      value: ProviderFormState[K],
+    ) => {
+      setForm((prev) => ({ ...prev, [field]: value }));
+      if (field === "binaryPath") setTestStatus("idle");
     },
-    []
-  )
+    [],
+  );
 
   const updateProviderType = useCallback((type: ProviderTypePreset) => {
     setForm((prev) => {
-      let newBehaviour = prev.behaviour
-      if (type === "always-on") newBehaviour = DEFAULT_PROVIDER_BEHAVIOUR
-      else if (type === "auto-suspend") newBehaviour = AUTO_SUSPEND_BEHAVIOUR
-      
+      let newBehaviour = prev.behaviour;
+      if (type === "always-on") newBehaviour = DEFAULT_PROVIDER_BEHAVIOUR;
+      else if (type === "auto-suspend") newBehaviour = AUTO_SUSPEND_BEHAVIOUR;
+
       return {
         ...prev,
         providerType: type,
         behaviour: newBehaviour,
-      }
-    })
-  }, [])
+      };
+    });
+  }, []);
 
   const updateBehaviourField = useCallback(
-    <K extends keyof ProviderBehaviour>(field: K, value: ProviderBehaviour[K]) => {
+    <K extends keyof ProviderBehaviour>(
+      field: K,
+      value: ProviderBehaviour[K],
+    ) => {
       setForm((prev) => ({
         ...prev,
         behaviour: {
           ...prev.behaviour,
           [field]: value,
         },
-      }))
+      }));
     },
-    []
-  )
+    [],
+  );
 
   if (isLoading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -250,7 +294,7 @@ export function ProviderSettings() {
               </CardDescription>
             </div>
             <Button size="sm" variant="outline" onClick={openAddDialog}>
-              <Plus className="size-4 mr-1.5" />
+              <Plus className="mr-1.5 size-4" />
               Add Provider
             </Button>
           </div>
@@ -258,8 +302,8 @@ export function ProviderSettings() {
         <CardContent>
           {providers.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
-              <Terminal className="size-10 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
+              <Terminal className="text-muted-foreground size-10" />
+              <p className="text-muted-foreground text-sm">
                 No providers registered. Add a CLI provider to create remote
                 workspaces automatically.
               </p>
@@ -273,14 +317,16 @@ export function ProviderSettings() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <Terminal className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="font-medium text-sm">{provider.name}</span>
+                      <Terminal className="text-muted-foreground size-4 shrink-0" />
+                      <span className="text-sm font-medium">
+                        {provider.name}
+                      </span>
                     </div>
-                    <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                    <p className="text-muted-foreground mt-0.5 truncate font-mono text-xs">
                       {provider.binaryPath}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 ml-3">
+                  <div className="ml-3 flex items-center gap-1">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -292,7 +338,7 @@ export function ProviderSettings() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="size-8 text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive size-8"
                       onClick={() => handleDelete(provider.id)}
                       disabled={mutation.isPending}
                     >
@@ -307,7 +353,7 @@ export function ProviderSettings() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>
               {editingProviderId ? "Edit Provider" : "Add Provider"}
@@ -357,19 +403,20 @@ export function ProviderSettings() {
                 </p>
               )}
               {testStatus === "not-found" && (
-                <p className="flex items-center gap-1 text-xs text-destructive">
+                <p className="text-destructive flex items-center gap-1 text-xs">
                   <XCircle className="size-3" />
                   Binary not found or not executable
                 </p>
               )}
             </div>
 
-            <div className="space-y-3 rounded-md border bg-muted/30 p-3">
-              <p className="text-xs font-medium text-muted-foreground">
+            <div className="bg-muted/30 space-y-3 rounded-md border p-3">
+              <p className="text-muted-foreground text-xs font-medium">
                 Command Templates
               </p>
-              <p className="text-xs text-muted-foreground">
-                Available placeholders: <code className="text-foreground">{"{binary}"}</code>,{" "}
+              <p className="text-muted-foreground text-xs">
+                Available placeholders:{" "}
+                <code className="text-foreground">{"{binary}"}</code>,{" "}
                 <code className="text-foreground">{"{repo}"}</code>,{" "}
                 <code className="text-foreground">{"{branch}"}</code>,{" "}
                 <code className="text-foreground">{"{name}"}</code>,{" "}
@@ -386,7 +433,7 @@ export function ProviderSettings() {
                   value={form.createCommand}
                   onChange={(e) => updateField("createCommand", e.target.value)}
                   placeholder="{binary} create --repo {repo} --branch {branch}"
-                  className="font-mono text-xs h-8"
+                  className="h-8 font-mono text-xs"
                 />
               </div>
 
@@ -397,9 +444,11 @@ export function ProviderSettings() {
                 <Input
                   id="cmd-destroy"
                   value={form.destroyCommand}
-                  onChange={(e) => updateField("destroyCommand", e.target.value)}
+                  onChange={(e) =>
+                    updateField("destroyCommand", e.target.value)
+                  }
                   placeholder="{binary} destroy --id {id}"
-                  className="font-mono text-xs h-8"
+                  className="h-8 font-mono text-xs"
                 />
               </div>
 
@@ -412,7 +461,7 @@ export function ProviderSettings() {
                   value={form.statusCommand}
                   onChange={(e) => updateField("statusCommand", e.target.value)}
                   placeholder="{binary} status --id {id}"
-                  className="font-mono text-xs h-8"
+                  className="h-8 font-mono text-xs"
                 />
               </div>
 
@@ -425,40 +474,49 @@ export function ProviderSettings() {
                   value={form.shellCommand}
                   onChange={(e) => updateField("shellCommand", e.target.value)}
                   placeholder="{binary} exec --id {id} sh"
-                  className="font-mono text-xs h-8"
+                  className="h-8 font-mono text-xs"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Command to open a terminal session. Leave blank to disable terminal access.
+                <p className="text-muted-foreground text-xs">
+                  Command to open a terminal session. Leave blank to disable
+                  terminal access.
                 </p>
               </div>
             </div>
 
-            <div className="space-y-3 rounded-md border bg-muted/30 p-3">
-              <p className="text-xs font-medium text-muted-foreground">
+            <div className="bg-muted/30 space-y-3 rounded-md border p-3">
+              <p className="text-muted-foreground text-xs font-medium">
                 Behaviour
               </p>
-              
+
               <div className="space-y-1.5">
                 <Label htmlFor="provider-type" className="text-xs">
                   Provider Type
                 </Label>
                 <Select
                   value={form.providerType}
-                  onValueChange={(val) => updateProviderType(val as ProviderTypePreset)}
+                  onValueChange={(val) =>
+                    updateProviderType(val as ProviderTypePreset)
+                  }
                 >
                   <SelectTrigger id="provider-type" className="h-8 text-xs">
                     <SelectValue placeholder="Select provider type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="always-on" className="text-xs">Always-on (Docker)</SelectItem>
-                    <SelectItem value="auto-suspend" className="text-xs">Auto-suspend (Fly.io)</SelectItem>
-                    <SelectItem value="custom" className="text-xs">Custom</SelectItem>
+                    <SelectItem value="always-on" className="text-xs">
+                      Always-on (Docker)
+                    </SelectItem>
+                    <SelectItem value="auto-suspend" className="text-xs">
+                      Auto-suspend (Fly.io)
+                    </SelectItem>
+                    <SelectItem value="custom" className="text-xs">
+                      Custom
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {form.providerType === "custom" && (
-                <div className="space-y-3 pt-2 border-t mt-2">
+                <div className="mt-2 space-y-3 border-t pt-2">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="inactive-health" className="text-xs">
@@ -469,7 +527,12 @@ export function ProviderSettings() {
                         type="number"
                         min="0"
                         value={form.behaviour.inactiveHealthIntervalMs / 1000}
-                        onChange={(e) => updateBehaviourField("inactiveHealthIntervalMs", Number(e.target.value) * 1000)}
+                        onChange={(e) =>
+                          updateBehaviourField(
+                            "inactiveHealthIntervalMs",
+                            Number(e.target.value) * 1000,
+                          )
+                        }
                         className="h-8 text-xs"
                       />
                     </div>
@@ -482,7 +545,12 @@ export function ProviderSettings() {
                         type="number"
                         min="0"
                         value={form.behaviour.activeHealthIntervalMs / 1000}
-                        onChange={(e) => updateBehaviourField("activeHealthIntervalMs", Number(e.target.value) * 1000)}
+                        onChange={(e) =>
+                          updateBehaviourField(
+                            "activeHealthIntervalMs",
+                            Number(e.target.value) * 1000,
+                          )
+                        }
                         className="h-8 text-xs"
                       />
                     </div>
@@ -495,7 +563,12 @@ export function ProviderSettings() {
                         type="number"
                         min="0"
                         value={form.behaviour.gitStatusIntervalMs / 1000}
-                        onChange={(e) => updateBehaviourField("gitStatusIntervalMs", Number(e.target.value) * 1000)}
+                        onChange={(e) =>
+                          updateBehaviourField(
+                            "gitStatusIntervalMs",
+                            Number(e.target.value) * 1000,
+                          )
+                        }
                         className="h-8 text-xs"
                       />
                     </div>
@@ -508,7 +581,12 @@ export function ProviderSettings() {
                         type="number"
                         min="0"
                         value={form.behaviour.resumeTimeSeconds}
-                        onChange={(e) => updateBehaviourField("resumeTimeSeconds", Number(e.target.value))}
+                        onChange={(e) =>
+                          updateBehaviourField(
+                            "resumeTimeSeconds",
+                            Number(e.target.value),
+                          )
+                        }
                         className="h-8 text-xs"
                       />
                     </div>
@@ -516,33 +594,51 @@ export function ProviderSettings() {
 
                   <div className="space-y-2 pt-1">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="sse-inactive" className="text-xs cursor-pointer">
+                      <Label
+                        htmlFor="sse-inactive"
+                        className="cursor-pointer text-xs"
+                      >
                         SSE when inactive
                       </Label>
                       <Switch
                         id="sse-inactive"
                         checked={form.behaviour.sseWhenInactive}
-                        onCheckedChange={(checked) => updateBehaviourField("sseWhenInactive", checked)}
+                        onCheckedChange={(checked) =>
+                          updateBehaviourField("sseWhenInactive", checked)
+                        }
                       />
                     </div>
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="branch-poll" className="text-xs cursor-pointer">
+                      <Label
+                        htmlFor="branch-poll"
+                        className="cursor-pointer text-xs"
+                      >
                         Branch poll when inactive
                       </Label>
                       <Switch
                         id="branch-poll"
                         checked={form.behaviour.branchPollWhenInactive}
-                        onCheckedChange={(checked) => updateBehaviourField("branchPollWhenInactive", checked)}
+                        onCheckedChange={(checked) =>
+                          updateBehaviourField(
+                            "branchPollWhenInactive",
+                            checked,
+                          )
+                        }
                       />
                     </div>
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="auto-suspend" className="text-xs cursor-pointer">
+                      <Label
+                        htmlFor="auto-suspend"
+                        className="cursor-pointer text-xs"
+                      >
                         Supports auto-suspend
                       </Label>
                       <Switch
                         id="auto-suspend"
                         checked={form.behaviour.supportsAutoSuspend}
-                        onCheckedChange={(checked) => updateBehaviourField("supportsAutoSuspend", checked)}
+                        onCheckedChange={(checked) =>
+                          updateBehaviourField("supportsAutoSuspend", checked)
+                        }
                       />
                     </div>
                   </div>
@@ -552,12 +648,16 @@ export function ProviderSettings() {
 
             <Button
               onClick={handleSave}
-              disabled={mutation.isPending || !form.name.trim() || !form.binaryPath.trim()}
+              disabled={
+                mutation.isPending ||
+                !form.name.trim() ||
+                !form.binaryPath.trim()
+              }
               className="w-full"
             >
               {mutation.isPending ? (
                 <>
-                  <Loader2 className="size-4 animate-spin mr-2" />
+                  <Loader2 className="mr-2 size-4 animate-spin" />
                   Saving...
                 </>
               ) : editingProviderId ? (
@@ -570,5 +670,5 @@ export function ProviderSettings() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

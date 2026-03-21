@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type {
   GitHubPullRequest,
   GitHubPullRequestFile,
@@ -12,7 +12,7 @@ import type {
   GitHubUser,
   GitHubCheckRun,
   GitHubMergeMethod,
-} from "@/types"
+} from "@/types";
 
 const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
   ".ts": "typescript",
@@ -36,59 +36,62 @@ const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
   ".go": "go",
   ".yaml": "yaml",
   ".yml": "yaml",
-}
+};
 
 function getLanguageFromPath(filePath: string): string {
-  const lastDot = filePath.lastIndexOf(".")
-  if (lastDot === -1) return "plaintext"
-  const ext = filePath.slice(lastDot).toLowerCase()
-  return EXTENSION_LANGUAGE_MAP[ext] ?? "plaintext"
+  const lastDot = filePath.lastIndexOf(".");
+  if (lastDot === -1) return "plaintext";
+  const ext = filePath.slice(lastDot).toLowerCase();
+  return EXTENSION_LANGUAGE_MAP[ext] ?? "plaintext";
 }
 
 async function githubFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`/api/github/${path}`, options)
+  const res = await fetch(`/api/github/${path}`, options);
   if (!res.ok) {
-    let message = `GitHub API error (${res.status})`
+    let message = `GitHub API error (${res.status})`;
     try {
-      const err = await res.json()
-      if (err.message) message = err.message
-      else if (err.error) message = err.error
+      const err = await res.json();
+      if (err.message) message = err.message;
+      else if (err.error) message = err.error;
     } catch {
       // non-JSON body
     }
-    throw new Error(message)
+    throw new Error(message);
   }
-  return res.json() as Promise<T>
+  return res.json() as Promise<T>;
 }
 
 // ─── GitHub GraphQL helper ───────────────────────────────────────────────────
 
 interface GraphQLResponse<T> {
-  data: T
-  errors?: { message: string }[]
+  data: T;
+  errors?: { message: string }[];
 }
 
-async function githubGraphQL<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+async function githubGraphQL<T>(
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
   const res = await fetch("/api/github/graphql", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables }),
-  })
+  });
   if (!res.ok) {
-    let message = `GitHub GraphQL error (${res.status})`
+    let message = `GitHub GraphQL error (${res.status})`;
     try {
-      const err = await res.json()
-      if (err.message) message = err.message
+      const err = await res.json();
+      if (err.message) message = err.message;
     } catch {
       // non-JSON body
     }
-    throw new Error(message)
+    throw new Error(message);
   }
-  const json = (await res.json()) as GraphQLResponse<T>
+  const json = (await res.json()) as GraphQLResponse<T>;
   if (json.errors?.length) {
-    throw new Error(json.errors[0].message)
+    throw new Error(json.errors[0].message);
   }
-  return json.data
+  return json.data;
 }
 
 // The GitHub search/pulls API returns paginated results. For the review-requested list
@@ -98,25 +101,29 @@ export function useGitHubPrsAwaitingReview() {
     queryKey: ["github", "prs-awaiting-review"],
     queryFn: async () => {
       const data = await githubFetch<{ items: GitHubPullRequest[] }>(
-        "search/issues?q=is:open+is:pr+review-requested:@me&per_page=50"
-      )
+        "search/issues?q=is:open+is:pr+review-requested:@me&per_page=50",
+      );
       // The search API returns issue objects; we need to fetch the full PR for each
       // to get head/base sha etc. We do this in parallel but cap at 20 to avoid rate limits.
-      const items = data.items.slice(0, 20)
+      const items = data.items.slice(0, 20);
       const prs = await Promise.all(
         items.map((item) => {
           // item.pull_request.url is the full PR API URL, e.g.
           // https://api.github.com/repos/owner/repo/pulls/123
           // We strip the base to get the path for our proxy.
-          const url = (item as unknown as { pull_request: { url: string } }).pull_request?.url ?? ""
-          const path = url.replace("https://api.github.com/", "")
-          return path ? githubFetch<GitHubPullRequest>(path) : Promise.resolve(item as unknown as GitHubPullRequest)
-        })
-      )
-      return prs
+          const url =
+            (item as unknown as { pull_request: { url: string } }).pull_request
+              ?.url ?? "";
+          const path = url.replace("https://api.github.com/", "");
+          return path
+            ? githubFetch<GitHubPullRequest>(path)
+            : Promise.resolve(item as unknown as GitHubPullRequest);
+        }),
+      );
+      return prs;
     },
     staleTime: 60_000,
-  })
+  });
 }
 
 export function useGitHubPrsCreatedByMe() {
@@ -124,56 +131,72 @@ export function useGitHubPrsCreatedByMe() {
     queryKey: ["github", "prs-created-by-me"],
     queryFn: async () => {
       const data = await githubFetch<{ items: GitHubPullRequest[] }>(
-        "search/issues?q=is:open+is:pr+author:@me&per_page=50"
-      )
-      const items = data.items.slice(0, 20)
+        "search/issues?q=is:open+is:pr+author:@me&per_page=50",
+      );
+      const items = data.items.slice(0, 20);
       const prs = await Promise.all(
         items.map((item) => {
-          const url = (item as unknown as { pull_request: { url: string } }).pull_request?.url ?? ""
-          const path = url.replace("https://api.github.com/", "")
-          return path ? githubFetch<GitHubPullRequest>(path) : Promise.resolve(item as unknown as GitHubPullRequest)
-        })
-      )
-      return prs
+          const url =
+            (item as unknown as { pull_request: { url: string } }).pull_request
+              ?.url ?? "";
+          const path = url.replace("https://api.github.com/", "");
+          return path
+            ? githubFetch<GitHubPullRequest>(path)
+            : Promise.resolve(item as unknown as GitHubPullRequest);
+        }),
+      );
+      return prs;
     },
     staleTime: 60_000,
-  })
+  });
 }
 
-export function useGitHubPrFiles(owner: string | null, repo: string | null, prNumber: number | null) {
+export function useGitHubPrFiles(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
   return useQuery<GitHubPullRequestFile[]>({
     queryKey: ["github", "pr-files", owner, repo, prNumber],
     queryFn: () =>
       githubFetch<GitHubPullRequestFile[]>(
-        `repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=100`
+        `repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=100`,
       ),
     enabled: !!(owner && repo && prNumber),
     staleTime: 30_000,
-  })
+  });
 }
 
-export function useGitHubPrComments(owner: string | null, repo: string | null, prNumber: number | null) {
+export function useGitHubPrComments(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
   return useQuery<GitHubReviewComment[]>({
     queryKey: ["github", "pr-comments", owner, repo, prNumber],
     queryFn: () =>
       githubFetch<GitHubReviewComment[]>(
-        `repos/${owner}/${repo}/pulls/${prNumber}/comments?per_page=100`
+        `repos/${owner}/${repo}/pulls/${prNumber}/comments?per_page=100`,
       ),
     enabled: !!(owner && repo && prNumber),
     staleTime: 15_000,
-  })
+  });
 }
 
-export function useGitHubPrReviews(owner: string | null, repo: string | null, prNumber: number | null) {
+export function useGitHubPrReviews(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
   return useQuery<GitHubReview[]>({
     queryKey: ["github", "pr-reviews", owner, repo, prNumber],
     queryFn: () =>
       githubFetch<GitHubReview[]>(
-        `repos/${owner}/${repo}/pulls/${prNumber}/reviews?per_page=100`
+        `repos/${owner}/${repo}/pulls/${prNumber}/reviews?per_page=100`,
       ),
     enabled: !!(owner && repo && prNumber),
     staleTime: 15_000,
-  })
+  });
 }
 
 export function useGitHubCurrentUser() {
@@ -181,21 +204,25 @@ export function useGitHubCurrentUser() {
     queryKey: ["github", "current-user"],
     queryFn: () => githubFetch<GitHubUser>("user"),
     staleTime: 300_000,
-  })
+  });
 }
 
-export function useGitHubPrChecks(owner: string | null, repo: string | null, headSha: string | null) {
+export function useGitHubPrChecks(
+  owner: string | null,
+  repo: string | null,
+  headSha: string | null,
+) {
   return useQuery<GitHubCheckRun[]>({
     queryKey: ["github", "pr-checks", owner, repo, headSha],
     queryFn: async () => {
       const data = await githubFetch<{ check_runs: GitHubCheckRun[] }>(
-        `repos/${owner}/${repo}/commits/${headSha}/check-runs?per_page=100`
-      )
-      return data.check_runs
+        `repos/${owner}/${repo}/commits/${headSha}/check-runs?per_page=100`,
+      );
+      return data.check_runs;
     },
     enabled: !!(owner && repo && headSha),
     staleTime: 30_000,
-  })
+  });
 }
 
 // Fetch file content at a specific ref, returns decoded string
@@ -203,22 +230,22 @@ async function fetchFileContentAtRef(
   owner: string,
   repo: string,
   path: string,
-  ref: string
+  ref: string,
 ): Promise<string> {
   try {
     const data = await githubFetch<{ content: string; encoding: string }>(
-      `repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${ref}`
-    )
+      `repos/${owner}/${repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${ref}`,
+    );
     if (data.encoding === "base64") {
-      const raw = data.content.replace(/\n/g, "")
-      const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
-      return new TextDecoder("utf-8").decode(bytes)
+      const raw = data.content.replace(/\n/g, "");
+      const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+      return new TextDecoder("utf-8").decode(bytes);
     }
-    return data.content
+    return data.content;
   } catch (err) {
     // File may not exist at that ref (e.g. newly added / deleted file) — return empty for 404 only
-    if (err instanceof Error && err.message.includes("404")) return ""
-    throw err
+    if (err instanceof Error && err.message.includes("404")) return "";
+    throw err;
   }
 }
 
@@ -227,13 +254,21 @@ export function useGitHubPrFileContent(
   repo: string | null,
   file: GitHubPullRequestFile | null,
   baseSha: string | null,
-  headSha: string | null
+  headSha: string | null,
 ) {
   return useQuery<GitHubPrFileContent>({
-    queryKey: ["github", "pr-file-content", owner, repo, file?.filename, baseSha, headSha],
+    queryKey: [
+      "github",
+      "pr-file-content",
+      owner,
+      repo,
+      file?.filename,
+      baseSha,
+      headSha,
+    ],
     queryFn: async () => {
-      const path = file!.filename
-      const previousPath = file!.previous_filename ?? path
+      const path = file!.filename;
+      const previousPath = file!.previous_filename ?? path;
 
       const [original, current] = await Promise.all([
         file!.status === "added"
@@ -242,7 +277,7 @@ export function useGitHubPrFileContent(
         file!.status === "removed"
           ? Promise.resolve("")
           : fetchFileContentAtRef(owner!, repo!, path, headSha!),
-      ])
+      ]);
 
       return {
         original,
@@ -250,28 +285,32 @@ export function useGitHubPrFileContent(
         path,
         language: getLanguageFromPath(path),
         patch: file!.patch,
-      }
+      };
     },
     enabled: !!(owner && repo && file && baseSha && headSha),
     staleTime: 60_000,
-  })
+  });
 }
 
 interface AddCommentInput {
-  owner: string
-  repo: string
-  prNumber: number
-  body: string
-  commitId: string
-  path: string
-  line: number
-  startLine?: number
-  side?: "LEFT" | "RIGHT"
-  startSide?: "LEFT" | "RIGHT"
+  owner: string;
+  repo: string;
+  prNumber: number;
+  body: string;
+  commitId: string;
+  path: string;
+  line: number;
+  startLine?: number;
+  side?: "LEFT" | "RIGHT";
+  startSide?: "LEFT" | "RIGHT";
 }
 
-export function useGitHubAddComment(owner: string | null, repo: string | null, prNumber: number | null) {
-  const queryClient = useQueryClient()
+export function useGitHubAddComment(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: AddCommentInput) => {
@@ -281,10 +320,10 @@ export function useGitHubAddComment(owner: string | null, repo: string | null, p
         path: input.path,
         line: input.line,
         side: input.side ?? "RIGHT",
-      }
+      };
       if (input.startLine !== undefined && input.startLine !== input.line) {
-        payload.start_line = input.startLine
-        payload.start_side = input.startSide ?? "RIGHT"
+        payload.start_line = input.startLine;
+        payload.start_side = input.startSide ?? "RIGHT";
       }
       return githubFetch<GitHubReviewComment>(
         `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/comments`,
@@ -292,30 +331,34 @@ export function useGitHubAddComment(owner: string | null, repo: string | null, p
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }
-      )
+        },
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["github", "pr-comments", owner, repo, prNumber],
-      })
+      });
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      toast.error(err.message);
     },
-  })
+  });
 }
 
 interface ReplyToCommentInput {
-  owner: string
-  repo: string
-  prNumber: number
-  commentId: number
-  body: string
+  owner: string;
+  repo: string;
+  prNumber: number;
+  commentId: number;
+  body: string;
 }
 
-export function useGitHubReplyToComment(owner: string | null, repo: string | null, prNumber: number | null) {
-  const queryClient = useQueryClient()
+export function useGitHubReplyToComment(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: ReplyToCommentInput) =>
@@ -324,30 +367,37 @@ export function useGitHubReplyToComment(owner: string | null, repo: string | nul
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body: input.body, in_reply_to: input.commentId }),
-        }
+          body: JSON.stringify({
+            body: input.body,
+            in_reply_to: input.commentId,
+          }),
+        },
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["github", "pr-comments", owner, repo, prNumber],
-      })
+      });
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      toast.error(err.message);
     },
-  })
+  });
 }
 
 interface SubmitReviewInput {
-  owner: string
-  repo: string
-  prNumber: number
-  event: GitHubReviewEvent
-  body: string
+  owner: string;
+  repo: string;
+  prNumber: number;
+  event: GitHubReviewEvent;
+  body: string;
 }
 
-export function useGitHubSubmitReview(owner: string | null, repo: string | null, prNumber: number | null) {
-  const queryClient = useQueryClient()
+export function useGitHubSubmitReview(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: SubmitReviewInput) =>
@@ -357,37 +407,37 @@ export function useGitHubSubmitReview(owner: string | null, repo: string | null,
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ event: input.event, body: input.body }),
-        }
+        },
       ),
     onSuccess: (_, input) => {
       queryClient.invalidateQueries({
         queryKey: ["github", "pr-reviews", owner, repo, prNumber],
-      })
+      });
       const label =
         input.event === "APPROVE"
           ? "Approved"
           : input.event === "REQUEST_CHANGES"
             ? "Changes requested"
-            : "Review submitted"
-      toast.success(label)
+            : "Review submitted";
+      toast.success(label);
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      toast.error(err.message);
     },
-  })
+  });
 }
 
 interface MergePrInput {
-  owner: string
-  repo: string
-  prNumber: number
-  mergeMethod: GitHubMergeMethod
-  commitTitle?: string
-  commitMessage?: string
+  owner: string;
+  repo: string;
+  prNumber: number;
+  mergeMethod: GitHubMergeMethod;
+  commitTitle?: string;
+  commitMessage?: string;
 }
 
 export function useGitHubMergePr() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: MergePrInput) =>
@@ -401,17 +451,21 @@ export function useGitHubMergePr() {
             commit_title: input.commitTitle,
             commit_message: input.commitMessage,
           }),
-        }
+        },
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["github", "prs-awaiting-review"] })
-      queryClient.invalidateQueries({ queryKey: ["github", "prs-created-by-me"] })
-      toast.success("Pull request merged")
+      queryClient.invalidateQueries({
+        queryKey: ["github", "prs-awaiting-review"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["github", "prs-created-by-me"],
+      });
+      toast.success("Pull request merged");
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      toast.error(err.message);
     },
-  })
+  });
 }
 
 // ─── PR file viewed state (GitHub GraphQL) ───────────────────────────────────
@@ -427,105 +481,111 @@ const PR_VIEWED_FILES_QUERY = `
       }
     }
   }
-`
+`;
 
 const MARK_FILE_AS_VIEWED = `
   mutation MarkFileAsViewed($input: MarkFileAsViewedInput!) {
     markFileAsViewed(input: $input) { pullRequest { id } }
   }
-`
+`;
 
 const UNMARK_FILE_AS_VIEWED = `
   mutation UnmarkFileAsViewed($input: UnmarkFileAsViewedInput!) {
     unmarkFileAsViewed(input: $input) { pullRequest { id } }
   }
-`
+`;
 
 interface PrViewedFilesPage {
   repository: {
     pullRequest: {
       files: {
-        nodes: { path: string; viewerViewedState: "VIEWED" | "UNVIEWED" | "DISMISSED" }[]
-        pageInfo: { hasNextPage: boolean; endCursor: string }
-      }
-    }
-  } | null
+        nodes: {
+          path: string;
+          viewerViewedState: "VIEWED" | "UNVIEWED" | "DISMISSED";
+        }[];
+        pageInfo: { hasNextPage: boolean; endCursor: string };
+      };
+    };
+  } | null;
 }
 
 export function useGitHubPrViewedFiles(
   owner: string | null,
   repo: string | null,
-  prNumber: number | null
+  prNumber: number | null,
 ) {
   return useQuery<string[]>({
     queryKey: ["github", "pr-viewed-files", owner, repo, prNumber],
     queryFn: async (): Promise<string[]> => {
-      const viewed: string[] = []
-      let after: string | null = null
+      const viewed: string[] = [];
+      let after: string | null = null;
 
       for (;;) {
         const page: PrViewedFilesPage = await githubGraphQL<PrViewedFilesPage>(
           PR_VIEWED_FILES_QUERY,
-          { owner, name: repo, number: prNumber, after }
-        )
+          { owner, name: repo, number: prNumber, after },
+        );
 
-        const files = page.repository?.pullRequest?.files
-        if (!files) break
+        const files = page.repository?.pullRequest?.files;
+        if (!files) break;
 
         for (const node of files.nodes) {
-          if (node.viewerViewedState === "VIEWED") viewed.push(node.path)
+          if (node.viewerViewedState === "VIEWED") viewed.push(node.path);
         }
 
-        if (!files.pageInfo.hasNextPage) break
-        after = files.pageInfo.endCursor
+        if (!files.pageInfo.hasNextPage) break;
+        after = files.pageInfo.endCursor;
       }
 
-      return viewed
+      return viewed;
     },
     enabled: !!(owner && repo && prNumber),
     staleTime: 30_000,
-  })
+  });
 }
 
 interface ToggleFileViewedInput {
-  pullRequestId: string
-  path: string
-  viewed: boolean
+  pullRequestId: string;
+  path: string;
+  viewed: boolean;
 }
 
 export function useGitHubToggleFileViewed(
   owner: string | null,
   repo: string | null,
-  prNumber: number | null
+  prNumber: number | null,
 ) {
-  const queryClient = useQueryClient()
-  const queryKey = ["github", "pr-viewed-files", owner, repo, prNumber]
+  const queryClient = useQueryClient();
+  const queryKey = ["github", "pr-viewed-files", owner, repo, prNumber];
 
   return useMutation({
     mutationFn: async (input: ToggleFileViewedInput) => {
-      const mutation = input.viewed ? MARK_FILE_AS_VIEWED : UNMARK_FILE_AS_VIEWED
+      const mutation = input.viewed
+        ? MARK_FILE_AS_VIEWED
+        : UNMARK_FILE_AS_VIEWED;
       return githubGraphQL(mutation, {
         input: { pullRequestId: input.pullRequestId, path: input.path },
-      })
+      });
     },
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey })
-      const previous = queryClient.getQueryData<string[]>(queryKey)
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<string[]>(queryKey);
 
       queryClient.setQueryData<string[]>(queryKey, (old = []) =>
         input.viewed
           ? [...old, input.path]
-          : old.filter((p) => p !== input.path)
-      )
+          : old.filter((p) => p !== input.path),
+      );
 
-      return { previous }
+      return { previous };
     },
     onError: (err: Error, _, context) => {
-      if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
-      toast.error(`Failed to update viewed state: ${err.message}`)
+      if (context?.previous)
+        queryClient.setQueryData(queryKey, context.previous);
+      toast.error(`Failed to update viewed state: ${err.message}`);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey })
+      queryClient.invalidateQueries({ queryKey });
     },
-  })
+  });
 }

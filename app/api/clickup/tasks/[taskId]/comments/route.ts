@@ -1,59 +1,65 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth/config"
-import { db } from "@/lib/db"
-import { settings } from "@/drizzle/schema"
-import { eq, and } from "drizzle-orm"
-import type { ClickUpComment } from "@/types"
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth/config";
+import { db } from "@/lib/db";
+import { settings } from "@/drizzle/schema";
+import { eq, and } from "drizzle-orm";
+import type { ClickUpComment } from "@/types";
 
-const CLICKUP_API_BASE = "https://api.clickup.com/api/v2"
+const CLICKUP_API_BASE = "https://api.clickup.com/api/v2";
 
 interface CommentsResponse {
-  comments: ClickUpComment[]
+  comments: ClickUpComment[];
 }
 
 async function getSetting(userId: string, key: string): Promise<string | null> {
   const [row] = await db
     .select()
     .from(settings)
-    .where(and(eq(settings.userId, userId), eq(settings.key, key)))
-  const value = row?.value
-  return typeof value === "string" && value.length > 0 ? value : null
+    .where(and(eq(settings.userId, userId), eq(settings.key, key)));
+  const value = row?.value;
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ taskId: string }> }
+  { params }: { params: Promise<{ taskId: string }> },
 ): Promise<Response> {
-  const session = await auth()
+  const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const token = await getSetting(session.user.id, "clickup-api-token")
+  const token = await getSetting(session.user.id, "clickup-api-token");
   if (!token) {
-    return NextResponse.json({ error: "ClickUp not configured" }, { status: 422 })
+    return NextResponse.json(
+      { error: "ClickUp not configured" },
+      { status: 422 },
+    );
   }
 
-  const { taskId } = await params
+  const { taskId } = await params;
 
   try {
     const upstream = await fetch(`${CLICKUP_API_BASE}/task/${taskId}/comment`, {
       headers: { Authorization: token },
-    })
+    });
 
     if (!upstream.ok) {
-      const body: unknown = await upstream.json().catch(() => ({}))
+      const body: unknown = await upstream.json().catch(() => ({}));
       return NextResponse.json(
         { error: "ClickUp API error", detail: body },
-        { status: upstream.status }
-      )
+        { status: upstream.status },
+      );
     }
 
-    const data = (await upstream.json()) as CommentsResponse
-    return NextResponse.json({ comments: data.comments ?? [] })
+    const data = (await upstream.json()) as CommentsResponse;
+    return NextResponse.json({ comments: data.comments ?? [] });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Request failed"
-    console.error(`[clickup] comments fetch failed (${taskId}): ${message}`)
-    return NextResponse.json({ error: "Failed to fetch comments", detail: message }, { status: 502 })
+    const message = error instanceof Error ? error.message : "Request failed";
+    console.error(`[clickup] comments fetch failed (${taskId}): ${message}`);
+    return NextResponse.json(
+      { error: "Failed to fetch comments", detail: message },
+      { status: 502 },
+    );
   }
 }

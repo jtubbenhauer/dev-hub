@@ -3,9 +3,15 @@
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { LeaderBindingsMap, ActivationKeyConfig } from "@/types/leader-key";
+import type {
+  LeaderBindingsMap,
+  ActivationKeyConfig,
+} from "@/types/leader-key";
 import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults";
-import { DEFAULT_ACTIVATION_KEY, isValidActivationKeyConfig } from "@/lib/leader-key-utils";
+import {
+  DEFAULT_ACTIVATION_KEY,
+  isValidActivationKeyConfig,
+} from "@/lib/leader-key-utils";
 import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds";
 import type { WorkspaceProvider } from "@/types";
 
@@ -53,10 +59,7 @@ export const SETTINGS_KEYS = {
 } as const;
 
 export type EditorType = "monaco" | "neovim";
-export const EDITOR_TYPE_OPTIONS: EditorType[] = [
-  "monaco",
-  "neovim",
-];
+export const EDITOR_TYPE_OPTIONS: EditorType[] = ["monaco", "neovim"];
 export const DEFAULT_EDITOR_TYPE: EditorType = "monaco";
 
 export type NvimAppName = "devhub" | "personal" | string;
@@ -229,7 +232,6 @@ export function useModelAgentBindings(): {
   return { bindings, isLoading };
 }
 
-
 export function useFontSizeSetting(): {
   fontSize: FontSize;
   isLoading: boolean;
@@ -392,7 +394,9 @@ export function useLeaderActivationKey(): {
 } {
   const { data, isLoading } = useSettings();
   const raw = data?.[SETTINGS_KEYS.LEADER_ACTIVATION_KEY];
-  const activationKey = isValidActivationKeyConfig(raw) ? raw : DEFAULT_ACTIVATION_KEY;
+  const activationKey = isValidActivationKeyConfig(raw)
+    ? raw
+    : DEFAULT_ACTIVATION_KEY;
   return { activationKey, isLoading };
 }
 

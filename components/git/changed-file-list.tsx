@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
-import { useCallback, useEffect } from "react"
-import { FileIcon, Check } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useCallback, useEffect } from "react";
+import { FileIcon, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { cn, isEditorElement } from "@/lib/utils"
-import type { ReviewChangedFile, ReviewFileStatus } from "@/types"
+} from "@/components/ui/tooltip";
+import { cn, isEditorElement } from "@/lib/utils";
+import type { ReviewChangedFile, ReviewFileStatus } from "@/types";
 
 const STATUS_CHAR: Record<ReviewFileStatus, string> = {
   added: "A",
@@ -20,7 +20,7 @@ const STATUS_CHAR: Record<ReviewFileStatus, string> = {
   copied: "C",
   "type-changed": "T",
   untracked: "?",
-}
+};
 
 const STATUS_COLOR: Record<ReviewFileStatus, string> = {
   added: "text-green-500",
@@ -30,16 +30,16 @@ const STATUS_COLOR: Record<ReviewFileStatus, string> = {
   copied: "text-blue-500",
   "type-changed": "text-yellow-500",
   untracked: "text-muted-foreground",
-}
+};
 
 interface ChangedFileListProps {
-  files: ReviewChangedFile[]
-  selectedFile: string | null
-  isLoading: boolean
-  reviewedFiles: Set<string>
-  emptyMessage?: string
-  onSelectFile: (file: string) => void
-  onToggleReviewed: (path: string) => void
+  files: ReviewChangedFile[];
+  selectedFile: string | null;
+  isLoading: boolean;
+  reviewedFiles: Set<string>;
+  emptyMessage?: string;
+  onSelectFile: (file: string) => void;
+  onToggleReviewed: (path: string) => void;
 }
 
 export function ChangedFileList({
@@ -51,7 +51,7 @@ export function ChangedFileList({
   onSelectFile,
   onToggleReviewed,
 }: ChangedFileListProps) {
-  const selectedIndex = files.findIndex((f) => f.path === selectedFile)
+  const selectedIndex = files.findIndex((f) => f.path === selectedFile);
 
   const handleKeyboard = useCallback(
     (e: KeyboardEvent) => {
@@ -60,78 +60,87 @@ export function ChangedFileList({
         e.target instanceof HTMLTextAreaElement ||
         (e.target instanceof HTMLElement && isEditorElement(e.target))
       ) {
-        return
+        return;
       }
 
       switch (e.key) {
         case "j": {
-          e.preventDefault()
-          const next = files[Math.min(selectedIndex + 1, files.length - 1)]
-          if (next) onSelectFile(next.path)
-          break
+          e.preventDefault();
+          const next = files[Math.min(selectedIndex + 1, files.length - 1)];
+          if (next) onSelectFile(next.path);
+          break;
         }
         case "k": {
-          e.preventDefault()
-          const prev = files[Math.max(selectedIndex - 1, 0)]
-          if (prev) onSelectFile(prev.path)
-          break
+          e.preventDefault();
+          const prev = files[Math.max(selectedIndex - 1, 0)];
+          if (prev) onSelectFile(prev.path);
+          break;
         }
       }
     },
-    [selectedIndex, files, onSelectFile]
-  )
+    [selectedIndex, files, onSelectFile],
+  );
 
   useEffect(() => {
-    window.addEventListener("keydown", handleKeyboard)
-    return () => window.removeEventListener("keydown", handleKeyboard)
-  }, [handleKeyboard])
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, [handleKeyboard]);
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex flex-1 items-center justify-center text-xs">
         Loading…
       </div>
-    )
+    );
   }
 
   if (files.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex flex-1 items-center justify-center text-xs">
         {emptyMessage}
       </div>
-    )
+    );
   }
 
   return (
     <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
       <div className="space-y-px p-2">
         {files.map((file) => {
-          const statusChar = STATUS_CHAR[file.status] ?? file.status[0].toUpperCase()
-          const statusColor = STATUS_COLOR[file.status] ?? "text-muted-foreground"
-          const fileName = file.path.split("/").pop() ?? file.path
+          const statusChar =
+            STATUS_CHAR[file.status] ?? file.status[0].toUpperCase();
+          const statusColor =
+            STATUS_COLOR[file.status] ?? "text-muted-foreground";
+          const fileName = file.path.split("/").pop() ?? file.path;
           const dirPath = file.path.includes("/")
             ? file.path.slice(0, file.path.lastIndexOf("/"))
-            : ""
-          const isReviewed = reviewedFiles.has(file.path)
+            : "";
+          const isReviewed = reviewedFiles.has(file.path);
 
           return (
             <div
               key={file.path}
               className={cn(
-                "group flex min-w-0 items-center gap-1.5 rounded-sm px-2 py-1 text-xs cursor-pointer hover:bg-accent/50",
+                "group hover:bg-accent/50 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-xs",
                 selectedFile === file.path && "bg-accent",
-                isReviewed && "opacity-60"
+                isReviewed && "opacity-60",
               )}
               onClick={() => onSelectFile(file.path)}
             >
-              <span className={cn("w-4 shrink-0 text-center font-mono font-bold", statusColor)}>
+              <span
+                className={cn(
+                  "w-4 shrink-0 text-center font-mono font-bold",
+                  statusColor,
+                )}
+              >
                 {statusChar}
               </span>
-              <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate flex-1">
+              <FileIcon className="text-muted-foreground size-3.5 shrink-0" />
+              <span className="flex-1 truncate">
                 {fileName}
                 {dirPath && (
-                  <span className="text-muted-foreground/60 ml-1">{dirPath}</span>
+                  <span className="text-muted-foreground/60 ml-1">
+                    {dirPath}
+                  </span>
                 )}
               </span>
               <div className="flex shrink-0 items-center">
@@ -141,23 +150,27 @@ export function ChangedFileList({
                       variant="ghost"
                       size="icon-xs"
                       className={cn(
-                        isReviewed ? "text-green-500 hover:text-green-400" : "text-muted-foreground/40 hover:text-muted-foreground"
+                        isReviewed
+                          ? "text-green-500 hover:text-green-400"
+                          : "text-muted-foreground/40 hover:text-muted-foreground",
                       )}
                       onClick={(e) => {
-                        e.stopPropagation()
-                        onToggleReviewed(file.path)
+                        e.stopPropagation();
+                        onToggleReviewed(file.path);
                       }}
                     >
                       <Check className="size-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{isReviewed ? "Unmark reviewed" : "Mark as reviewed"}</TooltipContent>
+                  <TooltipContent>
+                    {isReviewed ? "Unmark reviewed" : "Mark as reviewed"}
+                  </TooltipContent>
                 </Tooltip>
               </div>
             </div>
-          )
+          );
         })}
       </div>
     </ScrollArea>
-  )
+  );
 }

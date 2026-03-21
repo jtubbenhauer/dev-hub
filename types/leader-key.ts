@@ -1,30 +1,30 @@
-import type { LucideIcon } from "lucide-react"
+import type { LucideIcon } from "lucide-react";
 
 export interface LeaderAction {
-  id: string
-  label: string
-  description?: string
-  page: string | "global"
-  icon?: LucideIcon
+  id: string;
+  label: string;
+  description?: string;
+  page: string | "global";
+  icon?: LucideIcon;
 }
 
 export interface LeaderBinding {
-  actionId: string
-  keys: string // space-separated, e.g. "r n"
+  actionId: string;
+  keys: string; // space-separated, e.g. "r n"
 }
 
 // actionId -> keys (space-separated)
-export type LeaderBindingsMap = Record<string, string>
+export type LeaderBindingsMap = Record<string, string>;
 
 export interface ActivationKeyConfig {
-  key: string
-  ctrlKey?: boolean
-  altKey?: boolean
-  shiftKey?: boolean
-  metaKey?: boolean
+  key: string;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
+  metaKey?: boolean;
 }
 
 export interface ActivationKeyPreset {
-  id: string
-  config: ActivationKeyConfig
+  id: string;
+  config: ActivationKeyConfig;
 }

@@ -1,23 +1,19 @@
-"use client"
+"use client";
 
-import { useState, useMemo } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Download,
-  Loader2,
-  FolderOpen,
-} from "lucide-react"
-import { useCloneRepo } from "@/hooks/use-git"
+} from "@/components/ui/dialog";
+import { Download, Loader2, FolderOpen } from "lucide-react";
+import { useCloneRepo } from "@/hooks/use-git";
 
 /**
  * Extract repo name from a git URL for preview purposes.
@@ -25,11 +21,11 @@ import { useCloneRepo } from "@/hooks/use-git"
  */
 function extractRepoName(url: string): string {
   try {
-    const cleaned = url.replace(/\/+$/, "").replace(/\.git$/, "")
-    const parts = cleaned.split(/[/:]/)
-    return parts[parts.length - 1] || ""
+    const cleaned = url.replace(/\/+$/, "").replace(/\.git$/, "");
+    const parts = cleaned.split(/[/:]/);
+    return parts[parts.length - 1] || "";
   } catch {
-    return ""
+    return "";
   }
 }
 
@@ -38,56 +34,56 @@ function extractRepoName(url: string): string {
  */
 function extractOwnerRepo(url: string): string {
   try {
-    const cleaned = url.replace(/\/+$/, "").replace(/\.git$/, "")
+    const cleaned = url.replace(/\/+$/, "").replace(/\.git$/, "");
 
     // Handle git@github.com:owner/repo
-    const sshMatch = cleaned.match(/git@[^:]+:(.+)/)
-    if (sshMatch) return sshMatch[1]
+    const sshMatch = cleaned.match(/git@[^:]+:(.+)/);
+    if (sshMatch) return sshMatch[1];
 
     // Handle https://github.com/owner/repo
-    const httpsMatch = cleaned.match(/https?:\/\/[^/]+\/(.+)/)
-    if (httpsMatch) return httpsMatch[1]
+    const httpsMatch = cleaned.match(/https?:\/\/[^/]+\/(.+)/);
+    if (httpsMatch) return httpsMatch[1];
 
-    return ""
+    return "";
   } catch {
-    return ""
+    return "";
   }
 }
 
-const DEFAULT_BASE_DIR = "~/dev"
+const DEFAULT_BASE_DIR = "~/dev";
 
 export function CloneRepoDialog() {
-  const [open, setOpen] = useState(false)
-  const [url, setUrl] = useState("")
-  const [customDir, setCustomDir] = useState("")
-  const [customName, setCustomName] = useState("")
-  const [shallowClone, setShallowClone] = useState(false)
-  const [shallowDepth, setShallowDepth] = useState("1")
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const [customDir, setCustomDir] = useState("");
+  const [customName, setCustomName] = useState("");
+  const [shallowClone, setShallowClone] = useState(false);
+  const [shallowDepth, setShallowDepth] = useState("1");
 
-  const cloneRepo = useCloneRepo()
+  const cloneRepo = useCloneRepo();
 
-  const repoName = useMemo(() => extractRepoName(url), [url])
-  const ownerRepo = useMemo(() => extractOwnerRepo(url), [url])
+  const repoName = useMemo(() => extractRepoName(url), [url]);
+  const ownerRepo = useMemo(() => extractOwnerRepo(url), [url]);
 
   // Preview of where it will be cloned
   const targetPath = useMemo(() => {
-    if (customDir) return customDir
-    if (!repoName) return ""
-    return `${DEFAULT_BASE_DIR}/${repoName}`
-  }, [customDir, repoName])
+    if (customDir) return customDir;
+    if (!repoName) return "";
+    return `${DEFAULT_BASE_DIR}/${repoName}`;
+  }, [customDir, repoName]);
 
   // Display name preview
   const displayName = useMemo(() => {
-    return customName || repoName
-  }, [customName, repoName])
+    return customName || repoName;
+  }, [customName, repoName]);
 
   const isValidUrl = useMemo(() => {
-    if (!url) return false
-    return /^(https?:\/\/|git:\/\/|ssh:\/\/|git@)/.test(url)
-  }, [url])
+    if (!url) return false;
+    return /^(https?:\/\/|git:\/\/|ssh:\/\/|git@)/.test(url);
+  }, [url]);
 
   function handleClone() {
-    if (!url || !isValidUrl) return
+    if (!url || !isValidUrl) return;
 
     cloneRepo.mutate(
       {
@@ -98,31 +94,35 @@ export function CloneRepoDialog() {
       },
       {
         onSuccess: () => {
-          setOpen(false)
-          resetState()
+          setOpen(false);
+          resetState();
         },
-      }
-    )
+      },
+    );
   }
 
   function resetState() {
-    setUrl("")
-    setCustomDir("")
-    setCustomName("")
-    setShallowClone(false)
-    setShallowDepth("1")
+    setUrl("");
+    setCustomDir("");
+    setCustomName("");
+    setShallowClone(false);
+    setShallowDepth("1");
   }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(isOpen) => {
-        setOpen(isOpen)
-        if (!isOpen) resetState()
+        setOpen(isOpen);
+        if (!isOpen) resetState();
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon" className="sm:size-auto sm:px-3 sm:py-2">
+        <Button
+          variant="outline"
+          size="icon"
+          className="sm:size-auto sm:px-3 sm:py-2"
+        >
           <Download className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">Clone Repo</span>
         </Button>
@@ -143,12 +143,12 @@ export function CloneRepoDialog() {
               placeholder="https://github.com/user/repo.git"
               className="font-mono text-sm"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && isValidUrl) handleClone()
+                if (e.key === "Enter" && isValidUrl) handleClone();
               }}
               autoFocus
             />
             {url && !isValidUrl && (
-              <p className="text-xs text-destructive">
+              <p className="text-destructive text-xs">
                 Must be a valid git URL (https://, git://, ssh://, or git@)
               </p>
             )}
@@ -156,7 +156,10 @@ export function CloneRepoDialog() {
 
           {/* Target directory override */}
           <div className="space-y-2">
-            <Label htmlFor="clone-dir" className="text-xs text-muted-foreground">
+            <Label
+              htmlFor="clone-dir"
+              className="text-muted-foreground text-xs"
+            >
               Clone directory (optional)
             </Label>
             <Input
@@ -170,7 +173,10 @@ export function CloneRepoDialog() {
 
           {/* Custom display name */}
           <div className="space-y-2">
-            <Label htmlFor="clone-name" className="text-xs text-muted-foreground">
+            <Label
+              htmlFor="clone-name"
+              className="text-muted-foreground text-xs"
+            >
               Display name (optional)
             </Label>
             <Input
@@ -188,7 +194,7 @@ export function CloneRepoDialog() {
               <Label htmlFor="shallow-clone" className="text-sm">
                 Shallow clone
               </Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Faster for large repos (limited history)
               </p>
             </div>
@@ -201,7 +207,10 @@ export function CloneRepoDialog() {
 
           {shallowClone && (
             <div className="space-y-2">
-              <Label htmlFor="shallow-depth" className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="shallow-depth"
+                className="text-muted-foreground text-xs"
+              >
                 Depth (number of commits)
               </Label>
               <Input
@@ -217,19 +226,20 @@ export function CloneRepoDialog() {
 
           {/* Preview */}
           {isValidUrl && repoName && (
-            <div className="space-y-1.5 rounded-md border bg-muted/30 px-3 py-2">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="bg-muted/30 space-y-1.5 rounded-md border px-3 py-2">
+              <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                 <FolderOpen className="h-3 w-3" />
                 <span>Will clone:</span>
               </div>
               {ownerRepo && (
-                <div className="text-xs text-muted-foreground">
-                  {ownerRepo}
-                </div>
+                <div className="text-muted-foreground text-xs">{ownerRepo}</div>
               )}
               <div className="font-mono text-xs break-all">{targetPath}</div>
-              <div className="text-xs text-muted-foreground">
-                as <span className="font-medium text-foreground">{displayName}</span>
+              <div className="text-muted-foreground text-xs">
+                as{" "}
+                <span className="text-foreground font-medium">
+                  {displayName}
+                </span>
               </div>
             </div>
           )}
@@ -255,5 +265,5 @@ export function CloneRepoDialog() {
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

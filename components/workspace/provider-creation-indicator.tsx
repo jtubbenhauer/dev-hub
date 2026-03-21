@@ -1,28 +1,28 @@
-"use client"
+"use client";
 
-import { useProviderCreationStore } from "@/stores/provider-creation-store"
-import { Button } from "@/components/ui/button"
+import { useProviderCreationStore } from "@/stores/provider-creation-store";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { Loader2, CheckCircle2, XCircle } from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/tooltip";
+import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function ProviderCreationIndicator() {
-  const phase = useProviderCreationStore((s) => s.phase)
-  const providerName = useProviderCreationStore((s) => s.providerName)
-  const expand = useProviderCreationStore((s) => s.expand)
+  const phase = useProviderCreationStore((s) => s.phase);
+  const providerName = useProviderCreationStore((s) => s.providerName);
+  const expand = useProviderCreationStore((s) => s.expand);
 
-  if (phase === "idle") return null
+  if (phase === "idle") return null;
 
   const tooltipText =
     phase === "running"
       ? `Creating workspace via ${providerName}...`
       : phase === "done"
         ? "Workspace created successfully"
-        : "Workspace creation failed"
+        : "Workspace creation failed";
 
   return (
     <Tooltip>
@@ -33,18 +33,16 @@ export function ProviderCreationIndicator() {
           className={cn(
             "relative",
             phase === "done" && "text-green-500 hover:text-green-600",
-            phase === "error" && "text-destructive hover:text-destructive"
+            phase === "error" && "text-destructive hover:text-destructive",
           )}
           onClick={expand}
         >
-          {phase === "running" && (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          )}
+          {phase === "running" && <Loader2 className="h-4 w-4 animate-spin" />}
           {phase === "done" && <CheckCircle2 className="h-4 w-4" />}
           {phase === "error" && <XCircle className="h-4 w-4" />}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{tooltipText}</TooltipContent>
     </Tooltip>
-  )
+  );
 }

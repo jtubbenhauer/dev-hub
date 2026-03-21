@@ -1,80 +1,113 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import Link from "next/link"
-import { CheckSquare, GripVertical, PanelLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { TaskSidebar } from "@/components/tasks/task-sidebar"
-import { TaskList } from "@/components/tasks/task-list"
-import { TaskDetailPanel } from "@/components/tasks/task-detail-panel"
-import { useClickUpSearch, useClickUpViewTasks } from "@/hooks/use-clickup"
-import { useClickUpSettings } from "@/hooks/use-settings"
-import { useResizablePanel } from "@/hooks/use-resizable-panel"
-import { useIsMobile } from "@/hooks/use-mobile"
-import type { ClickUpTask, ClickUpPinnedView } from "@/types"
+import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
+import { CheckSquare, GripVertical, PanelLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { TaskSidebar } from "@/components/tasks/task-sidebar";
+import { TaskList } from "@/components/tasks/task-list";
+import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
+import { useClickUpSearch, useClickUpViewTasks } from "@/hooks/use-clickup";
+import { useClickUpSettings } from "@/hooks/use-settings";
+import { useResizablePanel } from "@/hooks/use-resizable-panel";
+import { useIsMobile } from "@/hooks/use-mobile";
+import type { ClickUpTask, ClickUpPinnedView } from "@/types";
 
-const MIN_SIDEBAR_WIDTH = 180
-const MAX_SIDEBAR_WIDTH = 500
-const DEFAULT_SIDEBAR_WIDTH = 224
+const MIN_SIDEBAR_WIDTH = 180;
+const MAX_SIDEBAR_WIDTH = 500;
+const DEFAULT_SIDEBAR_WIDTH = 224;
 
-const MIN_DETAIL_WIDTH = 280
-const MAX_DETAIL_WIDTH = 700
-const DEFAULT_DETAIL_WIDTH = 384
+const MIN_DETAIL_WIDTH = 280;
+const MAX_DETAIL_WIDTH = 700;
+const DEFAULT_DETAIL_WIDTH = 384;
 
 type SidebarSelection =
   | { type: "search"; query: string }
   | { type: "view"; view: ClickUpPinnedView }
-  | { type: "list"; listId: string; listName: string }
+  | { type: "list"; listId: string; listName: string };
 
 export function TasksPage() {
-  const { isConfigured, isLoading: isLoadingSettings } = useClickUpSettings()
-  const isMobile = useIsMobile()
-  const { width: sidebarWidth, handleDragStart: handleSidebarDragStart } = useResizablePanel({
-    minWidth: MIN_SIDEBAR_WIDTH,
-    maxWidth: MAX_SIDEBAR_WIDTH,
-    defaultWidth: DEFAULT_SIDEBAR_WIDTH,
-    storageKey: "dev-hub:tasks-sidebar-width",
-  })
-  const { width: detailWidth, handleDragStart: handleDetailDragStart } = useResizablePanel({
-    minWidth: MIN_DETAIL_WIDTH,
-    maxWidth: MAX_DETAIL_WIDTH,
-    defaultWidth: DEFAULT_DETAIL_WIDTH,
-    storageKey: "dev-hub:tasks-detail-width",
-    reverse: true,
-  })
-  const [selection, setSelection] = useState<SidebarSelection | null>(() => {
+  const { isConfigured, isLoading: isLoadingSettings } = useClickUpSettings();
+  const isMobile = useIsMobile();
+  const { width: sidebarWidth, handleDragStart: handleSidebarDragStart } =
+    useResizablePanel({
+      minWidth: MIN_SIDEBAR_WIDTH,
+      maxWidth: MAX_SIDEBAR_WIDTH,
+      defaultWidth: DEFAULT_SIDEBAR_WIDTH,
+      storageKey: "dev-hub:tasks-sidebar-width",
+    });
+  const { width: detailWidth, handleDragStart: handleDetailDragStart } =
+    useResizablePanel({
+      minWidth: MIN_DETAIL_WIDTH,
+      maxWidth: MAX_DETAIL_WIDTH,
+      defaultWidth: DEFAULT_DETAIL_WIDTH,
+      storageKey: "dev-hub:tasks-detail-width",
+      reverse: true,
+    });
+  const [pendingContext] = useState(() => {
     try {
-      const stored = localStorage.getItem("dev-hub:tasks-selection")
-      return stored ? JSON.parse(stored) : null
+      const raw = localStorage.getItem("dev-hub:tasks-pending-context");
+      if (!raw) return null;
+      localStorage.removeItem("dev-hub:tasks-pending-context");
+      return JSON.parse(raw) as {
+        listId: string;
+        listName: string;
+        folderId: string;
+        spaceId: string;
+      };
     } catch {
-      return null
+      return null;
     }
-  })
+  });
+
+  const [selection, setSelection] = useState<SidebarSelection | null>(() => {
+    const pending = pendingContext;
+    if (pending) {
+      return {
+        type: "list",
+        listId: pending.listId,
+        listName: pending.listName,
+      };
+    }
+    try {
+      const stored = localStorage.getItem("dev-hub:tasks-selection");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [searchQuery, setSearchQuery] = useState(() => {
     try {
-      return localStorage.getItem("dev-hub:tasks-search") ?? ""
+      return localStorage.getItem("dev-hub:tasks-search") ?? "";
     } catch {
-      return ""
+      return "";
     }
-  })
-  const [selectedTask, setSelectedTask] = useState<ClickUpTask | null>(null)
-  const [viewPage, _setViewPage] = useState(0)
-  const restoredTaskRef = useRef(false)
+  });
+  const [selectedTask, setSelectedTask] = useState<ClickUpTask | null>(null);
+  const [viewPage] = useState(0);
 
-  const sidebarFocusRef = useRef<HTMLDivElement>(null)
-  const taskListFocusRef = useRef<HTMLDivElement>(null)
-  const detailFocusRef = useRef<HTMLDivElement>(null)
+  const sidebarFocusRef = useRef<HTMLDivElement>(null);
+  const taskListFocusRef = useRef<HTMLDivElement>(null);
+  const detailFocusRef = useRef<HTMLDivElement>(null);
 
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
-  const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
 
-  const activeViewId = selection?.type === "view" ? selection.view.id : null
-  const viewTasksResult = useClickUpViewTasks(activeViewId, viewPage, { enabled: !!activeViewId })
+  const activeViewId = selection?.type === "view" ? selection.view.id : null;
+  const viewTasksResult = useClickUpViewTasks(activeViewId, viewPage, {
+    enabled: !!activeViewId,
+  });
 
-  const isSearch = selection?.type === "search" || (searchQuery.length >= 2 && !selection)
-  const isListBrowse = selection?.type === "list"
-  const listId = isListBrowse ? selection.listId : null
+  const isSearch =
+    selection?.type === "search" || (searchQuery.length >= 2 && !selection);
+  const isListBrowse = selection?.type === "list";
+  const listId = isListBrowse ? selection.listId : null;
 
   const searchResults = useClickUpSearch(
     selection?.type === "search"
@@ -83,157 +116,182 @@ export function TasksPage() {
         ? ""
         : searchQuery,
     isListBrowse && listId ? { listIds: [listId] } : {},
-    { enabled: isSearch || isListBrowse }
-  )
+    { enabled: isSearch || isListBrowse },
+  );
 
-  let tasks: ClickUpTask[] | undefined
-  let isLoading = false
-  let error: Error | null = null
-  let contextLabel: string | undefined
+  let tasks: ClickUpTask[] | undefined;
+  let isLoading = false;
+  let error: Error | null = null;
+  let contextLabel: string | undefined;
 
   if (selection?.type === "view") {
-    tasks = viewTasksResult.data
-    isLoading = viewTasksResult.isLoading
-    error = viewTasksResult.error
-    contextLabel = selection.view.name
+    tasks = viewTasksResult.data;
+    isLoading = viewTasksResult.isLoading;
+    error = viewTasksResult.error;
+    contextLabel = selection.view.name;
   } else if (selection?.type === "list") {
-    tasks = searchResults.data
-    isLoading = searchResults.isLoading
-    error = searchResults.error
-    contextLabel = selection.listName
+    tasks = searchResults.data;
+    isLoading = searchResults.isLoading;
+    error = searchResults.error;
+    contextLabel = selection.listName;
   } else if (isSearch) {
-    tasks = searchResults.data
-    isLoading = searchResults.isLoading
-    error = searchResults.error
-    contextLabel = "Search results"
+    tasks = searchResults.data;
+    isLoading = searchResults.isLoading;
+    error = searchResults.error;
+    contextLabel = "Search results";
   }
 
   useEffect(() => {
     try {
       if (selection) {
-        localStorage.setItem("dev-hub:tasks-selection", JSON.stringify(selection))
+        localStorage.setItem(
+          "dev-hub:tasks-selection",
+          JSON.stringify(selection),
+        );
       } else {
-        localStorage.removeItem("dev-hub:tasks-selection")
+        localStorage.removeItem("dev-hub:tasks-selection");
       }
     } catch {}
-  }, [selection])
+  }, [selection]);
 
-  useEffect(() => {
-    if (restoredTaskRef.current || selectedTask) return
-    if (!tasks?.length) return
+  // Restore selected task from localStorage when tasks data arrives
+  const [restoredTask, setRestoredTask] = useState(false);
+  if (!restoredTask && !selectedTask && tasks?.length) {
+    setRestoredTask(true);
     try {
-      const id = localStorage.getItem("dev-hub:tasks-selected-task-id")
-      if (!id) { restoredTaskRef.current = true; return }
-      const found = tasks.find((t) => t.id === id)
-      if (found) setSelectedTask(found)
+      const id = localStorage.getItem("dev-hub:tasks-selected-task-id");
+      if (id) {
+        const found = tasks.find((t) => t.id === id);
+        if (found) setSelectedTask(found);
+      }
     } catch {}
-    restoredTaskRef.current = true
-  }, [tasks, selectedTask])
+  }
 
-  // Restore pending task context from the task picker (handles navigation TO /tasks)
+  // Expand sidebar spaces/folders for pending task context on mount
   useEffect(() => {
+    if (!pendingContext) return;
     try {
-      const pendingRaw = localStorage.getItem("dev-hub:tasks-pending-context")
-      if (!pendingRaw) return
-      const pending = JSON.parse(pendingRaw) as { listId: string; listName: string; folderId: string; spaceId: string }
-      localStorage.removeItem("dev-hub:tasks-pending-context")
-
-      setSelection({ type: "list", listId: pending.listId, listName: pending.listName })
-
-      // Expand the space and folder in sidebar so the list is visible
-      const SPACES_KEY = "dev-hub:tasks-expanded-spaces"
-      const FOLDERS_KEY = "dev-hub:tasks-expanded-folders"
-      try {
-        const spaces: string[] = JSON.parse(localStorage.getItem(SPACES_KEY) ?? "[]")
-        if (!spaces.includes(pending.spaceId)) {
-          localStorage.setItem(SPACES_KEY, JSON.stringify([...spaces, pending.spaceId]))
-        }
-        const folders: string[] = JSON.parse(localStorage.getItem(FOLDERS_KEY) ?? "[]")
-        if (!folders.includes(pending.folderId)) {
-          localStorage.setItem(FOLDERS_KEY, JSON.stringify([...folders, pending.folderId]))
-        }
-      } catch {}
+      const SPACES_KEY = "dev-hub:tasks-expanded-spaces";
+      const FOLDERS_KEY = "dev-hub:tasks-expanded-folders";
+      const spaces: string[] = JSON.parse(
+        localStorage.getItem(SPACES_KEY) ?? "[]",
+      );
+      if (!spaces.includes(pendingContext.spaceId)) {
+        localStorage.setItem(
+          SPACES_KEY,
+          JSON.stringify([...spaces, pendingContext.spaceId]),
+        );
+      }
+      const folders: string[] = JSON.parse(
+        localStorage.getItem(FOLDERS_KEY) ?? "[]",
+      );
+      if (!folders.includes(pendingContext.folderId)) {
+        localStorage.setItem(
+          FOLDERS_KEY,
+          JSON.stringify([...folders, pendingContext.folderId]),
+        );
+      }
     } catch {}
-  }, [])
+  }, [pendingContext]);
 
   useEffect(() => {
     const handleSelectTaskEvent = (event: Event) => {
-      const customEvent = event as CustomEvent<{ taskId: string; task: ClickUpTask }>
-      const task = customEvent.detail.task
-      setSelectedTask(task)
-      setSelection({ type: "list", listId: task.list.id, listName: task.list.name })
+      const customEvent = event as CustomEvent<{
+        taskId: string;
+        task: ClickUpTask;
+      }>;
+      const task = customEvent.detail.task;
+      setSelectedTask(task);
+      setSelection({
+        type: "list",
+        listId: task.list.id,
+        listName: task.list.name,
+      });
       try {
-        localStorage.setItem("dev-hub:tasks-selected-task-id", customEvent.detail.taskId)
+        localStorage.setItem(
+          "dev-hub:tasks-selected-task-id",
+          customEvent.detail.taskId,
+        );
       } catch {}
-    }
+    };
 
-    window.addEventListener("devhub:select-task", handleSelectTaskEvent)
+    window.addEventListener("devhub:select-task", handleSelectTaskEvent);
     return () => {
-      window.removeEventListener("devhub:select-task", handleSelectTaskEvent)
-    }
-  }, [])
+      window.removeEventListener("devhub:select-task", handleSelectTaskEvent);
+    };
+  }, []);
 
-  function handleSearchChange(query: string) {
-    setSearchQuery(query)
-    try { localStorage.setItem("dev-hub:tasks-search", query) } catch {}
-    if (query.length >= 2) {
-      setSelection({ type: "search", query })
-    } else if (selection?.type === "search") {
-      setSelection(null)
-    }
-  }
+  const handleSearchChange = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      try {
+        localStorage.setItem("dev-hub:tasks-search", query);
+      } catch {}
+      if (query.length >= 2) {
+        setSelection({ type: "search", query });
+      } else if (selection?.type === "search") {
+        setSelection(null);
+      }
+    },
+    [selection],
+  );
 
   const handleMobileSelect = useCallback((sel: SidebarSelection) => {
-    setSelection(sel)
-    setIsMobileSidebarOpen(false)
-  }, [])
+    setSelection(sel);
+    setIsMobileSidebarOpen(false);
+  }, []);
 
-  const handleMobileSearchChange = useCallback((query: string) => {
-    handleSearchChange(query)
-    if (query.length >= 2) {
-      setIsMobileSidebarOpen(false)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection])
+  const handleMobileSearchChange = useCallback(
+    (query: string) => {
+      handleSearchChange(query);
+      if (query.length >= 2) {
+        setIsMobileSidebarOpen(false);
+      }
+    },
+    [handleSearchChange],
+  );
 
   function handleSelectTask(task: ClickUpTask) {
     setSelectedTask((prev) => {
-      const next = prev?.id === task.id ? null : task
+      const next = prev?.id === task.id ? null : task;
       try {
         if (next) {
-          localStorage.setItem("dev-hub:tasks-selected-task-id", next.id)
+          localStorage.setItem("dev-hub:tasks-selected-task-id", next.id);
         } else {
-          localStorage.removeItem("dev-hub:tasks-selected-task-id")
+          localStorage.removeItem("dev-hub:tasks-selected-task-id");
         }
       } catch {}
-      return next
-    })
+      return next;
+    });
     if (isMobile && task.id !== selectedTask?.id) {
-      setIsMobileDetailOpen(true)
+      setIsMobileDetailOpen(true);
     }
   }
 
   function handleCloseTask() {
-    setSelectedTask(null)
-    setIsMobileDetailOpen(false)
-    try { localStorage.removeItem("dev-hub:tasks-selected-task-id") } catch {}
+    setSelectedTask(null);
+    setIsMobileDetailOpen(false);
+    try {
+      localStorage.removeItem("dev-hub:tasks-selected-task-id");
+    } catch {}
   }
 
   if (!isLoadingSettings && !isConfigured) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-        <CheckSquare className="size-12 text-muted-foreground" />
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+        <CheckSquare className="text-muted-foreground size-12" />
         <div>
           <h2 className="text-lg font-semibold">ClickUp not connected</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Configure your ClickUp API token and team in settings to get started.
+          <p className="text-muted-foreground mt-1 text-sm">
+            Configure your ClickUp API token and team in settings to get
+            started.
           </p>
         </div>
-        <Link href="/settings" className="text-sm text-primary hover:underline">
+        <Link href="/settings" className="text-primary text-sm hover:underline">
           Go to Settings
         </Link>
       </div>
-    )
+    );
   }
 
   const sidebarContent = (
@@ -243,16 +301,20 @@ export function TasksPage() {
       searchQuery={searchQuery}
       onSearchChange={isMobile ? handleMobileSearchChange : handleSearchChange}
     />
-  )
+  );
 
-  const hasSelection = selection != null || isSearch
+  const hasSelection = selection != null || isSearch;
 
   return (
     <div className="flex h-full overflow-hidden">
       {/* Mobile: sidebar Sheet */}
       {isMobile && (
         <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
-          <SheetContent side="left" className="w-[280px] p-0" showCloseButton={false}>
+          <SheetContent
+            side="left"
+            className="w-[280px] p-0"
+            showCloseButton={false}
+          >
             <SheetHeader className="sr-only">
               <SheetTitle>Task browser</SheetTitle>
             </SheetHeader>
@@ -265,7 +327,9 @@ export function TasksPage() {
       {!isMobile && (
         <>
           <div
-            ref={(el) => { sidebarFocusRef.current = el }}
+            ref={(el) => {
+              sidebarFocusRef.current = el;
+            }}
             tabIndex={-1}
             style={{ width: sidebarWidth }}
             className="relative shrink-0"
@@ -273,18 +337,20 @@ export function TasksPage() {
             {sidebarContent}
           </div>
           <div
-            className="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors"
+            className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
             onMouseDown={handleSidebarDragStart}
           >
-            <GripVertical className="size-3.5 text-muted-foreground/30" />
+            <GripVertical className="text-muted-foreground/30 size-3.5" />
           </div>
         </>
       )}
 
       <div
-        ref={(el) => { taskListFocusRef.current = el }}
+        ref={(el) => {
+          taskListFocusRef.current = el;
+        }}
         tabIndex={-1}
-        className="relative flex flex-1 flex-col min-w-0 overflow-hidden"
+        className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
       >
         {/* Mobile toolbar */}
         {isMobile && (
@@ -297,7 +363,7 @@ export function TasksPage() {
               <PanelLeft className="size-3.5" />
             </Button>
             {contextLabel && (
-              <span className="text-xs font-medium text-muted-foreground truncate">
+              <span className="text-muted-foreground truncate text-xs font-medium">
                 {contextLabel}
               </span>
             )}
@@ -306,9 +372,9 @@ export function TasksPage() {
 
         <div className="flex flex-1 overflow-hidden">
           {!hasSelection ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
-              <CheckSquare className="size-10 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+              <CheckSquare className="text-muted-foreground size-10" />
+              <p className="text-muted-foreground text-sm">
                 {isMobile
                   ? "Tap the sidebar button to browse views and lists, or search for tasks."
                   : "Select a view or list from the sidebar, or search for tasks."}
@@ -327,11 +393,18 @@ export function TasksPage() {
 
           {/* Mobile: detail Sheet */}
           {isMobile && selectedTask && (
-            <Sheet open={isMobileDetailOpen} onOpenChange={(open) => {
-              setIsMobileDetailOpen(open)
-              if (!open) handleCloseTask()
-            }}>
-              <SheetContent side="right" className="w-full sm:w-[380px] p-0" showCloseButton={false}>
+            <Sheet
+              open={isMobileDetailOpen}
+              onOpenChange={(open) => {
+                setIsMobileDetailOpen(open);
+                if (!open) handleCloseTask();
+              }}
+            >
+              <SheetContent
+                side="right"
+                className="w-full p-0 sm:w-[380px]"
+                showCloseButton={false}
+              >
                 <SheetHeader className="sr-only">
                   <SheetTitle>Task detail</SheetTitle>
                 </SheetHeader>
@@ -348,13 +421,15 @@ export function TasksPage() {
           {!isMobile && selectedTask && (
             <>
               <div
-                className="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors"
+                className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
                 onMouseDown={handleDetailDragStart}
               >
-                <GripVertical className="size-3.5 text-muted-foreground/30" />
+                <GripVertical className="text-muted-foreground/30 size-3.5" />
               </div>
               <div
-                ref={(el) => { detailFocusRef.current = el }}
+                ref={(el) => {
+                  detailFocusRef.current = el;
+                }}
                 tabIndex={-1}
                 style={{ width: detailWidth }}
                 className="relative min-w-0 shrink-0"
@@ -370,5 +445,5 @@ export function TasksPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,29 +1,29 @@
-"use client"
+"use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -31,73 +31,88 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { Terminal, Loader2, ChevronsUpDown, Check, Plus, GitBranch, Minus } from "lucide-react"
-import { toast } from "sonner"
-import { cn, WORKSPACE_PRESET_COLORS, sanitizeBranchName } from "@/lib/utils"
-import { pickNextColor } from "@/lib/workspace-color-utils"
-import { useWorkspaceProviders } from "@/hooks/use-settings"
-import { useProviderCreationStore } from "@/stores/provider-creation-store"
-import type { Workspace, ClickUpTask, LinkedTaskMeta } from "@/types"
+} from "@/components/ui/command";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import {
+  Terminal,
+  Loader2,
+  ChevronsUpDown,
+  Check,
+  Plus,
+  GitBranch,
+  Minus,
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn, WORKSPACE_PRESET_COLORS, sanitizeBranchName } from "@/lib/utils";
+import { pickNextColor } from "@/lib/workspace-color-utils";
+import { useWorkspaceProviders } from "@/hooks/use-settings";
+import { useProviderCreationStore } from "@/stores/provider-creation-store";
+import type { Workspace, ClickUpTask, LinkedTaskMeta } from "@/types";
 
 interface CreateProviderWorkspaceDialogProps {
-  workspaces: Workspace[]
-  initialRepo?: string
-  initialBranch?: string
-  triggerSize?: "sm" | "default"
-  task?: ClickUpTask
-  dropdownItem?: boolean
+  workspaces: Workspace[];
+  initialRepo?: string;
+  initialBranch?: string;
+  triggerSize?: "sm" | "default";
+  task?: ClickUpTask;
+  dropdownItem?: boolean;
 }
 
-export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initialBranch, triggerSize, task, dropdownItem }: CreateProviderWorkspaceDialogProps) {
-  const queryClient = useQueryClient()
-  const { providers } = useWorkspaceProviders()
+export function CreateProviderWorkspaceDialog({
+  workspaces,
+  initialRepo,
+  initialBranch,
+  triggerSize,
+  task,
+  dropdownItem,
+}: CreateProviderWorkspaceDialogProps) {
+  const queryClient = useQueryClient();
+  const { providers } = useWorkspaceProviders();
 
-  const [formOpen, setFormOpen] = useState(false)
+  const [formOpen, setFormOpen] = useState(false);
   const [providerId, setProviderId] = useState(() =>
-    providers.length === 1 ? providers[0].id : ""
-  )
-  const [repo, setRepo] = useState(initialRepo ?? "")
-  const [branch, setBranch] = useState(initialBranch ?? "")
-  const [name, setName] = useState("")
-  const [context, setContext] = useState("")
-  const [repoPopoverOpen, setRepoPopoverOpen] = useState(false)
-  const [repoSearch, setRepoSearch] = useState("")
-  const [branchPopoverOpen, setBranchPopoverOpen] = useState(false)
-  const [branchSearch, setBranchSearch] = useState("")
+    providers.length === 1 ? providers[0].id : "",
+  );
+  const [repo, setRepo] = useState(initialRepo ?? "");
+  const [branch, setBranch] = useState(initialBranch ?? "");
+  const [name, setName] = useState("");
+  const [context, setContext] = useState("");
+  const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
+  const [repoSearch, setRepoSearch] = useState("");
+  const [branchPopoverOpen, setBranchPopoverOpen] = useState(false);
+  const [branchSearch, setBranchSearch] = useState("");
 
-  const autoColor = useMemo(() => pickNextColor(workspaces), [workspaces])
-  const [selectedColor, setSelectedColor] = useState<string | null>(autoColor)
+  const autoColor = useMemo(() => pickNextColor(workspaces), [workspaces]);
+  const [selectedColor, setSelectedColor] = useState<string | null>(autoColor);
 
-  const creationStore = useProviderCreationStore()
-  const phase = creationStore.phase
-  const storeDialogOpen = creationStore.dialogOpen
+  const creationStore = useProviderCreationStore();
+  const phase = creationStore.phase;
+  const storeDialogOpen = creationStore.dialogOpen;
 
   // Dialog is open when: showing form OR store says dialog should be open (running/done/error)
-  const isDialogOpen = phase === "idle" ? formOpen : storeDialogOpen
+  const isDialogOpen = phase === "idle" ? formOpen : storeDialogOpen;
 
-  const outputEndRef = useRef<HTMLDivElement>(null)
+  const outputEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (creationStore.outputLines.length > 0 || creationStore.statusMessage) {
-      outputEndRef.current?.scrollIntoView({ behavior: "smooth" })
+      outputEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [creationStore.outputLines.length, creationStore.statusMessage])
+  }, [creationStore.outputLines.length, creationStore.statusMessage]);
 
   const selectedProvider = useMemo(
     () => providers.find((p) => p.id === providerId),
-    [providers, providerId]
-  )
+    [providers, providerId],
+  );
 
   const linkedRepos = useMemo(() => {
-    const repos = new Map<string, string>()
+    const repos = new Map<string, string>();
     for (const ws of workspaces) {
       if (ws.backend === "remote" && ws.providerMeta) {
-        const meta = ws.providerMeta as Record<string, unknown>
+        const meta = ws.providerMeta as Record<string, unknown>;
         if (typeof meta.repo === "string" && meta.repo.trim()) {
           if (!repos.has(meta.repo)) {
-            repos.set(meta.repo, ws.name)
+            repos.set(meta.repo, ws.name);
           }
         }
       }
@@ -105,45 +120,48 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
     return Array.from(repos.entries()).map(([url, wsName]) => ({
       url,
       label: wsName,
-    }))
-  }, [workspaces])
+    }));
+  }, [workspaces]);
 
   // Initialize repo from linked repos when form opens (during render)
-  const [prevFormOpen, setPrevFormOpen] = useState(false)
+  const [prevFormOpen, setPrevFormOpen] = useState(false);
   if (formOpen !== prevFormOpen) {
-    setPrevFormOpen(formOpen)
+    setPrevFormOpen(formOpen);
     if (formOpen && !repo && !initialRepo && linkedRepos.length > 0) {
-      setRepo(linkedRepos[0].url)
+      setRepo(linkedRepos[0].url);
     }
   }
 
-  const trimmedRepo = repo.trim()
+  const trimmedRepo = repo.trim();
 
-  const { data: remoteBranches = [], isFetching: isFetchingBranches } = useQuery<string[]>({
-    queryKey: ["remote-branches", trimmedRepo],
-    queryFn: async () => {
-      const res = await fetch(`/api/providers/remote-branches?repo=${encodeURIComponent(trimmedRepo)}`)
-      if (!res.ok) return []
-      const data = await res.json() as { branches: string[] }
-      return data.branches
-    },
-    enabled: !!trimmedRepo,
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  })
+  const { data: remoteBranches = [], isFetching: isFetchingBranches } =
+    useQuery<string[]>({
+      queryKey: ["remote-branches", trimmedRepo],
+      queryFn: async () => {
+        const res = await fetch(
+          `/api/providers/remote-branches?repo=${encodeURIComponent(trimmedRepo)}`,
+        );
+        if (!res.ok) return [];
+        const data = (await res.json()) as { branches: string[] };
+        return data.branches;
+      },
+      enabled: !!trimmedRepo,
+      staleTime: 5 * 60 * 1000,
+      retry: false,
+    });
 
   const filteredBranches = useMemo(() => {
-    if (!branchSearch) return remoteBranches
-    const lower = branchSearch.toLowerCase()
-    return remoteBranches.filter((b) => b.toLowerCase().includes(lower))
-  }, [remoteBranches, branchSearch])
+    if (!branchSearch) return remoteBranches;
+    const lower = branchSearch.toLowerCase();
+    return remoteBranches.filter((b) => b.toLowerCase().includes(lower));
+  }, [remoteBranches, branchSearch]);
 
-  const canSubmit = !!providerId && !!repo.trim()
+  const canSubmit = !!providerId && !!repo.trim();
 
   const handleCreate = useCallback(() => {
-    if (!canSubmit || !selectedProvider) return
+    if (!canSubmit || !selectedProvider) return;
 
-    setFormOpen(false)
+    setFormOpen(false);
 
     const taskMeta: LinkedTaskMeta | undefined = task
       ? {
@@ -153,7 +171,7 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
           status: task.status.status,
           provider: "clickup",
         }
-      : undefined
+      : undefined;
 
     creationStore.startCreation({
       providerId,
@@ -166,48 +184,62 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
       linkedTaskId: task?.id,
       linkedTaskMeta: taskMeta,
       onSuccess: (workspaceName) => {
-        queryClient.invalidateQueries({ queryKey: ["workspaces"] })
-        toast.success(`Created workspace "${workspaceName}" via ${selectedProvider.name}`)
+        queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+        toast.success(
+          `Created workspace "${workspaceName}" via ${selectedProvider.name}`,
+        );
       },
-    })
-  }, [canSubmit, selectedProvider, providerId, repo, branch, name, context, selectedColor, task, queryClient, creationStore])
+    });
+  }, [
+    canSubmit,
+    selectedProvider,
+    providerId,
+    repo,
+    branch,
+    name,
+    context,
+    selectedColor,
+    task,
+    queryClient,
+    creationStore,
+  ]);
 
   function resetFormState() {
-    setProviderId(providers.length === 1 ? providers[0].id : "")
-    setRepo(initialRepo ?? "")
-    setBranch(initialBranch ?? "")
-    setName("")
-    setContext("")
-    setRepoSearch("")
-    setBranchSearch("")
-    setSelectedColor(autoColor)
+    setProviderId(providers.length === 1 ? providers[0].id : "");
+    setRepo(initialRepo ?? "");
+    setBranch(initialBranch ?? "");
+    setName("");
+    setContext("");
+    setRepoSearch("");
+    setBranchSearch("");
+    setSelectedColor(autoColor);
   }
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && canSubmit && phase === "idle") handleCreate()
+      if (e.key === "Enter" && canSubmit && phase === "idle") handleCreate();
     },
-    [canSubmit, phase, handleCreate]
-  )
+    [canSubmit, phase, handleCreate],
+  );
 
   function handleDialogChange(isOpen: boolean) {
     if (!isOpen) {
       if (phase === "running") {
         // Minimize instead of closing when running
-        creationStore.minimize()
-        return
+        creationStore.minimize();
+        return;
       }
       if (phase === "done" || phase === "error") {
-        creationStore.dismiss()
+        creationStore.dismiss();
       }
-      resetFormState()
+      resetFormState();
     }
-    setFormOpen(isOpen)
+    setFormOpen(isOpen);
   }
 
-  if (providers.length === 0) return null
+  if (providers.length === 0) return null;
 
-  const isRunning = phase === "running"
+  const isRunning = phase === "running";
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
@@ -223,13 +255,17 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
             Create via Provider
           </Button>
         ) : (
-          <Button variant="outline" size="icon" className="sm:size-auto sm:px-3 sm:py-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="sm:size-auto sm:px-3 sm:py-2"
+          >
             <Terminal className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Create via Provider</span>
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Create Workspace via Provider</DialogTitle>
         </DialogHeader>
@@ -255,21 +291,32 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
 
               <div className="space-y-1.5">
                 <Label>Repository</Label>
-                <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
+                <Popover
+                  open={repoPopoverOpen}
+                  onOpenChange={setRepoPopoverOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
                       aria-expanded={repoPopoverOpen}
-                      className="w-full justify-between font-mono text-sm h-9"
+                      className="h-9 w-full justify-between font-mono text-sm"
                     >
-                      <span className={cn("truncate", !repo && "text-muted-foreground")}>
+                      <span
+                        className={cn(
+                          "truncate",
+                          !repo && "text-muted-foreground",
+                        )}
+                      >
                         {repo || "Select or enter a repository URL"}
                       </span>
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="!w-[--radix-popover-trigger-width] p-0" align="start">
+                  <PopoverContent
+                    className="!w-[--radix-popover-trigger-width] p-0"
+                    align="start"
+                  >
                     <Command shouldFilter={false}>
                       <CommandInput
                         placeholder="Search or paste a repo URL..."
@@ -280,31 +327,40 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                         {linkedRepos.length > 0 && (
                           <CommandGroup heading="Linked repositories">
                             {linkedRepos
-                              .filter((r) =>
-                                !repoSearch ||
-                                r.url.toLowerCase().includes(repoSearch.toLowerCase()) ||
-                                r.label.toLowerCase().includes(repoSearch.toLowerCase())
+                              .filter(
+                                (r) =>
+                                  !repoSearch ||
+                                  r.url
+                                    .toLowerCase()
+                                    .includes(repoSearch.toLowerCase()) ||
+                                  r.label
+                                    .toLowerCase()
+                                    .includes(repoSearch.toLowerCase()),
                               )
                               .map((r) => (
                                 <CommandItem
                                   key={r.url}
                                   value={r.url}
                                   onSelect={(value) => {
-                                    setRepo(value)
-                                    setBranch("")
-                                    setRepoSearch("")
-                                    setRepoPopoverOpen(false)
+                                    setRepo(value);
+                                    setBranch("");
+                                    setRepoSearch("");
+                                    setRepoPopoverOpen(false);
                                   }}
                                 >
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      repo === r.url ? "opacity-100" : "opacity-0"
+                                      repo === r.url
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-sm truncate">{r.label}</span>
-                                    <span className="text-xs text-muted-foreground font-mono truncate">
+                                  <div className="flex min-w-0 flex-col">
+                                    <span className="truncate text-sm">
+                                      {r.label}
+                                    </span>
+                                    <span className="text-muted-foreground truncate font-mono text-xs">
                                       {r.url}
                                     </span>
                                   </div>
@@ -312,26 +368,31 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                               ))}
                           </CommandGroup>
                         )}
-                        {repoSearch.trim() && !linkedRepos.some((r) => r.url === repoSearch.trim()) && (
-                          <CommandGroup heading="New repository">
-                            <CommandItem
-                              value={repoSearch.trim()}
-                              onSelect={(value) => {
-                                setRepo(value)
-                                setBranch("")
-                                setRepoSearch("")
-                                setRepoPopoverOpen(false)
-                              }}
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              <span className="font-mono text-sm truncate">
-                                {repoSearch.trim()}
-                              </span>
-                            </CommandItem>
-                          </CommandGroup>
-                        )}
+                        {repoSearch.trim() &&
+                          !linkedRepos.some(
+                            (r) => r.url === repoSearch.trim(),
+                          ) && (
+                            <CommandGroup heading="New repository">
+                              <CommandItem
+                                value={repoSearch.trim()}
+                                onSelect={(value) => {
+                                  setRepo(value);
+                                  setBranch("");
+                                  setRepoSearch("");
+                                  setRepoPopoverOpen(false);
+                                }}
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                <span className="truncate font-mono text-sm">
+                                  {repoSearch.trim()}
+                                </span>
+                              </CommandItem>
+                            </CommandGroup>
+                          )}
                         {!repoSearch.trim() && linkedRepos.length === 0 && (
-                          <CommandEmpty>Type a repository URL to get started</CommandEmpty>
+                          <CommandEmpty>
+                            Type a repository URL to get started
+                          </CommandEmpty>
                         )}
                       </CommandList>
                     </Command>
@@ -340,26 +401,36 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">
+                <Label className="text-muted-foreground text-xs">
                   Branch (optional, defaults to main)
                 </Label>
-                <Popover open={branchPopoverOpen} onOpenChange={setBranchPopoverOpen}>
+                <Popover
+                  open={branchPopoverOpen}
+                  onOpenChange={setBranchPopoverOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
                       aria-expanded={branchPopoverOpen}
                       disabled={!trimmedRepo}
-                      className="w-full justify-between text-sm h-9"
+                      className="h-9 w-full justify-between text-sm"
                     >
-                      <span className={cn("truncate flex items-center gap-1.5", !branch && "text-muted-foreground")}>
+                      <span
+                        className={cn(
+                          "flex items-center gap-1.5 truncate",
+                          !branch && "text-muted-foreground",
+                        )}
+                      >
                         {branch ? (
                           <>
                             <GitBranch className="h-3.5 w-3.5 shrink-0" />
                             {branch}
                           </>
+                        ) : trimmedRepo ? (
+                          "Select or enter a branch"
                         ) : (
-                          trimmedRepo ? "Select or enter a branch" : "Select a repository first"
+                          "Select a repository first"
                         )}
                       </span>
                       {isFetchingBranches ? (
@@ -369,12 +440,17 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="!w-[--radix-popover-trigger-width] p-0" align="start">
+                  <PopoverContent
+                    className="!w-[--radix-popover-trigger-width] p-0"
+                    align="start"
+                  >
                     <Command shouldFilter={false}>
                       <CommandInput
                         placeholder="Search or type a new branch..."
                         value={branchSearch}
-                        onValueChange={(v) => setBranchSearch(sanitizeBranchName(v))}
+                        onValueChange={(v) =>
+                          setBranchSearch(sanitizeBranchName(v))
+                        }
                       />
                       <CommandList>
                         {filteredBranches.length > 0 && (
@@ -384,52 +460,60 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                                 key={b}
                                 value={b}
                                 onSelect={(value) => {
-                                  setBranch(value)
-                                  setBranchSearch("")
-                                  setBranchPopoverOpen(false)
+                                  setBranch(value);
+                                  setBranchSearch("");
+                                  setBranchPopoverOpen(false);
                                 }}
                               >
                                 <Check
                                   className={cn(
                                     "mr-2 h-4 w-4",
-                                    branch === b ? "opacity-100" : "opacity-0"
+                                    branch === b ? "opacity-100" : "opacity-0",
                                   )}
                                 />
-                                <GitBranch className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                                <GitBranch className="text-muted-foreground mr-1.5 h-3.5 w-3.5" />
                                 {b}
                               </CommandItem>
                             ))}
                           </CommandGroup>
                         )}
-                        {branchSearch.trim() && !remoteBranches.includes(branchSearch.trim()) && (
-                          <CommandGroup heading="New branch">
-                            <CommandItem
-                              value={branchSearch.trim()}
-                              onSelect={(value) => {
-                                setBranch(value)
-                                setBranchSearch("")
-                                setBranchPopoverOpen(false)
-                              }}
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              <span className="text-sm truncate">
-                                {branchSearch.trim()}
-                              </span>
-                            </CommandItem>
-                          </CommandGroup>
-                        )}
+                        {branchSearch.trim() &&
+                          !remoteBranches.includes(branchSearch.trim()) && (
+                            <CommandGroup heading="New branch">
+                              <CommandItem
+                                value={branchSearch.trim()}
+                                onSelect={(value) => {
+                                  setBranch(value);
+                                  setBranchSearch("");
+                                  setBranchPopoverOpen(false);
+                                }}
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                <span className="truncate text-sm">
+                                  {branchSearch.trim()}
+                                </span>
+                              </CommandItem>
+                            </CommandGroup>
+                          )}
                         {isFetchingBranches && (
-                          <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+                          <div className="text-muted-foreground flex items-center justify-center gap-2 py-4 text-xs">
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             Fetching branches...
                           </div>
                         )}
-                        {!isFetchingBranches && remoteBranches.length === 0 && !branchSearch.trim() && (
-                          <CommandEmpty>No branches found. Type a branch name.</CommandEmpty>
-                        )}
-                        {!isFetchingBranches && filteredBranches.length === 0 && branchSearch.trim() && remoteBranches.length > 0 && (
-                          <CommandEmpty>No matching branches</CommandEmpty>
-                        )}
+                        {!isFetchingBranches &&
+                          remoteBranches.length === 0 &&
+                          !branchSearch.trim() && (
+                            <CommandEmpty>
+                              No branches found. Type a branch name.
+                            </CommandEmpty>
+                          )}
+                        {!isFetchingBranches &&
+                          filteredBranches.length === 0 &&
+                          branchSearch.trim() &&
+                          remoteBranches.length > 0 && (
+                            <CommandEmpty>No matching branches</CommandEmpty>
+                          )}
                       </CommandList>
                     </Command>
                   </PopoverContent>
@@ -437,7 +521,10 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="provider-name" className="text-xs text-muted-foreground">
+                <Label
+                  htmlFor="provider-name"
+                  className="text-muted-foreground text-xs"
+                >
                   Display name (optional)
                 </Label>
                 <Input
@@ -451,7 +538,10 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="provider-context" className="text-xs text-muted-foreground">
+                <Label
+                  htmlFor="provider-context"
+                  className="text-muted-foreground text-xs"
+                >
                   Extra context (optional)
                 </Label>
                 <Input
@@ -465,7 +555,7 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Color</Label>
+                <Label className="text-muted-foreground text-xs">Color</Label>
                 <div className="flex items-center gap-1.5">
                   {WORKSPACE_PRESET_COLORS.map((color) => (
                     <button
@@ -473,36 +563,50 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                       type="button"
                       className={cn(
                         "size-5 rounded-full border border-transparent transition-transform hover:scale-110",
-                        selectedColor === color && "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                        selectedColor === color &&
+                          "ring-primary ring-offset-background ring-2 ring-offset-1",
                       )}
                       style={{ backgroundColor: color }}
-                      onClick={() => setSelectedColor(selectedColor === color ? null : color)}
+                      onClick={() =>
+                        setSelectedColor(selectedColor === color ? null : color)
+                      }
                     />
                   ))}
                 </div>
               </div>
 
               {selectedProvider && repo.trim() && (
-                <div className="space-y-1.5 rounded-md border bg-muted/30 px-3 py-2">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="bg-muted/30 space-y-1.5 rounded-md border px-3 py-2">
+                  <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                     <Terminal className="size-3" />
                     <span>Will run:</span>
                   </div>
                   <p className="font-mono text-xs break-all">
                     {(() => {
-                      const toKebab = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
-                      const repoName = repo.split("/").pop()?.replace(/\.git$/, "") || "workspace"
-                      const derivedName = name.trim() || repoName
-                      const branchVal = branch.trim() || "main"
-                      const isDefaultBranch = branchVal === "main" || branchVal === "master"
-                      const idSource = name.trim() || (!isDefaultBranch ? branchVal : repoName)
+                      const toKebab = (s: string) =>
+                        s
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]+/g, "-")
+                          .replace(/^-+|-+$/g, "");
+                      const repoName =
+                        repo
+                          .split("/")
+                          .pop()
+                          ?.replace(/\.git$/, "") || "workspace";
+                      const derivedName = name.trim() || repoName;
+                      const branchVal = branch.trim() || "main";
+                      const isDefaultBranch =
+                        branchVal === "main" || branchVal === "master";
+                      const idSource =
+                        name.trim() ||
+                        (!isDefaultBranch ? branchVal : repoName);
                       return selectedProvider.commands.create
                         .replaceAll("{binary}", selectedProvider.binaryPath)
                         .replaceAll("{repo}", repo.trim())
                         .replaceAll("{branch}", branchVal)
                         .replaceAll("{name}", derivedName)
                         .replaceAll("{id}", toKebab(idSource))
-                        .replaceAll("{context}", context.trim())
+                        .replaceAll("{context}", context.trim());
                     })()}
                   </p>
                 </div>
@@ -523,35 +627,50 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
             <>
               <div className="flex flex-col gap-1 text-sm">
                 <div className="flex items-center gap-2">
-                  {isRunning && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                  {phase === "done" && <Check className="h-4 w-4 text-green-500" />}
-                  {phase === "error" && <span className="h-4 w-4 text-destructive">✕</span>}
-                  <span className={cn(
-                    "text-muted-foreground",
-                    phase === "done" && "text-green-500",
-                    phase === "error" && "text-destructive"
-                  )}>
-                    {phase === "error" ? creationStore.errorMessage : creationStore.statusMessage}
+                  {isRunning && (
+                    <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+                  )}
+                  {phase === "done" && (
+                    <Check className="h-4 w-4 text-green-500" />
+                  )}
+                  {phase === "error" && (
+                    <span className="text-destructive h-4 w-4">✕</span>
+                  )}
+                  <span
+                    className={cn(
+                      "text-muted-foreground",
+                      phase === "done" && "text-green-500",
+                      phase === "error" && "text-destructive",
+                    )}
+                  >
+                    {phase === "error"
+                      ? creationStore.errorMessage
+                      : creationStore.statusMessage}
                   </span>
                 </div>
-                {phase === "error" && (() => {
-                  const lastStderr = [...creationStore.outputLines].reverse().find((l) => l.stream === "stderr")
-                  return lastStderr ? (
-                    <p className="text-xs text-amber-400 font-mono pl-6 break-all">
-                      {lastStderr.data.trim()}
-                    </p>
-                  ) : null
-                })()}
+                {phase === "error" &&
+                  (() => {
+                    const lastStderr = [...creationStore.outputLines]
+                      .reverse()
+                      .find((l) => l.stream === "stderr");
+                    return lastStderr ? (
+                      <p className="pl-6 font-mono text-xs break-all text-amber-400">
+                        {lastStderr.data.trim()}
+                      </p>
+                    ) : null;
+                  })()}
               </div>
 
-              <div className="rounded-md border bg-black/90 p-3 font-mono text-xs text-green-400 max-h-[300px] overflow-y-auto">
+              <div className="max-h-[300px] overflow-y-auto rounded-md border bg-black/90 p-3 font-mono text-xs text-green-400">
                 {creationStore.outputLines.length === 0 && isRunning && (
-                  <span className="text-muted-foreground">Waiting for output...</span>
+                  <span className="text-muted-foreground">
+                    Waiting for output...
+                  </span>
                 )}
                 {creationStore.outputLines.map((line, i) => (
                   <div
                     key={`${i}-${line.data.slice(0, 20)}`}
-                    className="whitespace-pre-wrap break-all"
+                    className="break-all whitespace-pre-wrap"
                   >
                     {line.data}
                   </div>
@@ -573,9 +692,9 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                     <Button
                       variant="destructive"
                       onClick={() => {
-                        creationStore.abort()
-                        resetFormState()
-                        toast.info("Provider creation cancelled")
+                        creationStore.abort();
+                        resetFormState();
+                        toast.info("Provider creation cancelled");
                       }}
                       className="flex-1"
                     >
@@ -587,8 +706,8 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                   <Button
                     variant="outline"
                     onClick={() => {
-                      creationStore.dismiss()
-                      resetFormState()
+                      creationStore.dismiss();
+                      resetFormState();
                     }}
                     className="w-full"
                   >
@@ -599,8 +718,8 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
                   <Button
                     variant="outline"
                     onClick={() => {
-                      creationStore.dismiss()
-                      setFormOpen(true)
+                      creationStore.dismiss();
+                      setFormOpen(true);
                     }}
                     className="w-full"
                   >
@@ -613,5 +732,5 @@ export function CreateProviderWorkspaceDialog({ workspaces, initialRepo, initial
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

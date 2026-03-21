@@ -45,11 +45,11 @@ cp .env.example .env.local
 
 Edit `.env.local` and set:
 
-| Variable | Description |
-|----------|-------------|
-| `AUTH_SECRET` | JWT signing secret. Generate with `openssl rand -base64 32` |
-| `AUTH_URL` | The URL where Dev Hub will be accessible (e.g. `https://hub.example.com` or `http://localhost:3000`) |
-| `DB_PATH` | Path to SQLite database file (defaults to `./dev-hub.db`) |
+| Variable      | Description                                                                                          |
+| ------------- | ---------------------------------------------------------------------------------------------------- |
+| `AUTH_SECRET` | JWT signing secret. Generate with `openssl rand -base64 32`                                          |
+| `AUTH_URL`    | The URL where Dev Hub will be accessible (e.g. `https://hub.example.com` or `http://localhost:3000`) |
+| `DB_PATH`     | Path to SQLite database file (defaults to `./dev-hub.db`)                                            |
 
 ### 3. Set up the database
 
@@ -139,20 +139,20 @@ Any reverse proxy or tunnel will work — nginx, Caddy, Tailscale Funnel, ngrok,
 
 ## Scripts
 
-| Script | Command | Description |
-|--------|---------|-------------|
-| `dev` | `next dev --turbopack` | Development server with Turbopack HMR |
-| `build` | `next build` | Production build |
-| `start` | `next start` | Production server |
-| `lint` | `eslint` | Run linter |
-| `test` | `vitest run` | Run tests |
-| `test:watch` | `vitest` | Run tests in watch mode |
-| `typecheck` | `tsc --noEmit && ...` | Type check all packages |
-| `db:generate` | `drizzle-kit generate` | Generate database migrations |
-| `db:push` | `drizzle-kit push` | Push schema directly to database |
-| `db:studio` | `drizzle-kit studio` | Open Drizzle Studio database GUI |
-| `agent:dev` | `pnpm --filter @devhub/agent dev` | Run agent in dev mode (tsx watch) |
-| `agent:start` | `pnpm --filter @devhub/agent start` | Run agent in production mode |
+| Script        | Command                             | Description                           |
+| ------------- | ----------------------------------- | ------------------------------------- |
+| `dev`         | `next dev --turbopack`              | Development server with Turbopack HMR |
+| `build`       | `next build`                        | Production build                      |
+| `start`       | `next start`                        | Production server                     |
+| `lint`        | `eslint`                            | Run linter                            |
+| `test`        | `vitest run`                        | Run tests                             |
+| `test:watch`  | `vitest`                            | Run tests in watch mode               |
+| `typecheck`   | `tsc --noEmit && ...`               | Type check all packages               |
+| `db:generate` | `drizzle-kit generate`              | Generate database migrations          |
+| `db:push`     | `drizzle-kit push`                  | Push schema directly to database      |
+| `db:studio`   | `drizzle-kit studio`                | Open Drizzle Studio database GUI      |
+| `agent:dev`   | `pnpm --filter @devhub/agent dev`   | Run agent in dev mode (tsx watch)     |
+| `agent:start` | `pnpm --filter @devhub/agent start` | Run agent in production mode          |
 
 ## Tech Stack
 

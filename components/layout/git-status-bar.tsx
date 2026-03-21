@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useCallback } from "react"
-import { useWorkspaceStore } from "@/stores/workspace-store"
+import { useState, useCallback } from "react";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 import {
   useGitStatus,
   useGitStage,
@@ -9,19 +9,19 @@ import {
   useGitPush,
   useGitPull,
   useGitStashSave,
-} from "@/hooks/use-git"
-import { Button } from "@/components/ui/button"
+} from "@/hooks/use-git";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   GitBranch,
   ArrowUpFromLine,
@@ -30,27 +30,27 @@ import {
   Loader2,
   Check,
   Archive,
-} from "lucide-react"
+} from "lucide-react";
 
 export function GitStatusBar() {
-  const { activeWorkspaceId } = useWorkspaceStore()
-  const { data: status, isLoading } = useGitStatus(activeWorkspaceId)
-  const [commitMessage, setCommitMessage] = useState("")
-  const [open, setOpen] = useState(false)
+  const { activeWorkspaceId } = useWorkspaceStore();
+  const { data: status, isLoading } = useGitStatus(activeWorkspaceId);
+  const [commitMessage, setCommitMessage] = useState("");
+  const [open, setOpen] = useState(false);
 
-  const stageAll = useGitStage(activeWorkspaceId)
-  const commit = useGitCommit(activeWorkspaceId)
-  const push = useGitPush(activeWorkspaceId)
-  const pull = useGitPull(activeWorkspaceId)
-  const stashSave = useGitStashSave(activeWorkspaceId)
+  const stageAll = useGitStage(activeWorkspaceId);
+  const commit = useGitCommit(activeWorkspaceId);
+  const push = useGitPush(activeWorkspaceId);
+  const pull = useGitPull(activeWorkspaceId);
+  const stashSave = useGitStashSave(activeWorkspaceId);
 
   const dirtyCount = status
     ? status.staged.length + status.unstaged.length + status.untracked.length
-    : 0
+    : 0;
 
   const handleCommitAll = useCallback(() => {
-    const trimmed = commitMessage.trim()
-    if (!trimmed) return
+    const trimmed = commitMessage.trim();
+    if (!trimmed) return;
 
     // Stage all then commit
     stageAll.mutate(
@@ -61,39 +61,39 @@ export function GitStatusBar() {
             { action: "commit", message: trimmed },
             {
               onSuccess: () => {
-                setCommitMessage("")
+                setCommitMessage("");
               },
-            }
-          )
+            },
+          );
         },
-      }
-    )
-  }, [commitMessage, stageAll, commit])
+      },
+    );
+  }, [commitMessage, stageAll, commit]);
 
   const handlePush = useCallback(() => {
-    push.mutate({ action: "push" })
-  }, [push])
+    push.mutate({ action: "push" });
+  }, [push]);
 
   const handlePull = useCallback(() => {
-    pull.mutate({ action: "pull" })
-  }, [pull])
+    pull.mutate({ action: "pull" });
+  }, [pull]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        handleCommitAll()
+        e.preventDefault();
+        handleCommitAll();
       }
     },
-    [handleCommitAll]
-  )
+    [handleCommitAll],
+  );
 
-  if (isLoading || !status || !status.isRepo) return null
+  if (isLoading || !status || !status.isRepo) return null;
 
-  const isCommitting = stageAll.isPending || commit.isPending
-  const isPushing = push.isPending
-  const isPulling = pull.isPending
-  const isStashing = stashSave.isPending
+  const isCommitting = stageAll.isPending || commit.isPending;
+  const isPushing = push.isPending;
+  const isPulling = pull.isPending;
+  const isStashing = stashSave.isPending;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -103,27 +103,29 @@ export function GitStatusBar() {
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors",
               "hover:bg-accent/50",
-              open && "bg-accent/50"
+              open && "bg-accent/50",
             )}
           >
-            <GitBranch className="size-3.5 text-muted-foreground" />
-            <span className="font-mono text-muted-foreground">
+            <GitBranch className="text-muted-foreground size-3.5" />
+            <span className="text-muted-foreground font-mono">
               {status.branch}
             </span>
             {dirtyCount > 0 && (
               <span className="flex items-center gap-0.5">
                 <Circle className="size-2 fill-amber-500 text-amber-500" />
-                <span className="text-amber-500 font-medium">{dirtyCount}</span>
+                <span className="font-medium text-amber-500">{dirtyCount}</span>
               </span>
             )}
             {status.ahead > 0 && (
-              <span className="text-blue-500 font-medium">
-                {"\u2191"}{status.ahead}
+              <span className="font-medium text-blue-500">
+                {"\u2191"}
+                {status.ahead}
               </span>
             )}
             {status.behind > 0 && (
-              <span className="text-orange-500 font-medium">
-                {"\u2193"}{status.behind}
+              <span className="font-medium text-orange-500">
+                {"\u2193"}
+                {status.behind}
               </span>
             )}
           </button>
@@ -132,18 +134,22 @@ export function GitStatusBar() {
           <div className="space-y-3">
             {/* Status summary */}
             <div className="flex items-center justify-between text-xs">
-              <span className="font-medium">
-                {status.branch}
-              </span>
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <span className="font-medium">{status.branch}</span>
+              <div className="text-muted-foreground flex items-center gap-2">
                 {status.staged.length > 0 && (
-                  <span className="text-green-500">{status.staged.length} staged</span>
+                  <span className="text-green-500">
+                    {status.staged.length} staged
+                  </span>
                 )}
                 {status.unstaged.length > 0 && (
-                  <span className="text-amber-500">{status.unstaged.length} modified</span>
+                  <span className="text-amber-500">
+                    {status.unstaged.length} modified
+                  </span>
                 )}
                 {status.untracked.length > 0 && (
-                  <span className="text-muted-foreground">{status.untracked.length} untracked</span>
+                  <span className="text-muted-foreground">
+                    {status.untracked.length} untracked
+                  </span>
                 )}
                 {dirtyCount === 0 && (
                   <span className="flex items-center gap-1 text-green-500">
@@ -164,9 +170,9 @@ export function GitStatusBar() {
                   placeholder="Commit message..."
                   rows={2}
                   className={cn(
-                    "w-full resize-none rounded-md border bg-muted/50 px-2.5 py-1.5 text-sm",
+                    "bg-muted/50 w-full resize-none rounded-md border px-2.5 py-1.5 text-sm",
                     "placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-ring"
+                    "focus:ring-ring focus:ring-2 focus:outline-none",
                   )}
                 />
                 <Button
@@ -205,7 +211,9 @@ export function GitStatusBar() {
                     )}
                     Pull
                     {status.behind > 0 && (
-                      <span className="ml-1 text-orange-500">({status.behind})</span>
+                      <span className="ml-1 text-orange-500">
+                        ({status.behind})
+                      </span>
                     )}
                   </Button>
                 </TooltipTrigger>
@@ -227,7 +235,9 @@ export function GitStatusBar() {
                     )}
                     Push
                     {status.ahead > 0 && (
-                      <span className="ml-1 text-blue-500">({status.ahead})</span>
+                      <span className="ml-1 text-blue-500">
+                        ({status.ahead})
+                      </span>
                     )}
                   </Button>
                 </TooltipTrigger>
@@ -259,5 +269,5 @@ export function GitStatusBar() {
         </Tooltip>
       )}
     </div>
-  )
+  );
 }

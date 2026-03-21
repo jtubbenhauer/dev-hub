@@ -1,32 +1,32 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   attachCommentToChat,
   getPendingCommentChips,
   clearPendingCommentChips,
   removePendingCommentChip,
-} from "@/lib/comment-chat-bridge"
+} from "@/lib/comment-chat-bridge";
 
-const store: Record<string, string> = {}
+const store: Record<string, string> = {};
 
 vi.stubGlobal("localStorage", {
   getItem: (k: string) => store[k] ?? null,
   setItem: (k: string, v: string) => {
-    store[k] = v
+    store[k] = v;
   },
   removeItem: (k: string) => {
-    delete store[k]
+    delete store[k];
   },
-})
+});
 
-const dispatchEventMock = vi.fn()
-vi.stubGlobal("window", { dispatchEvent: dispatchEventMock })
+const dispatchEventMock = vi.fn();
+vi.stubGlobal("window", { dispatchEvent: dispatchEventMock });
 
 beforeEach(() => {
   Object.keys(store).forEach((k) => {
-    delete store[k]
-  })
-  dispatchEventMock.mockClear()
-})
+    delete store[k];
+  });
+  dispatchEventMock.mockClear();
+});
 
 describe("comment-chat-bridge", () => {
   describe("attachCommentToChat", () => {
@@ -39,13 +39,13 @@ describe("comment-chat-bridge", () => {
         body: "This is a comment",
         workspaceId: "ws-test",
         sessionId: null,
-      }
-      attachCommentToChat(comment)
+      };
+      attachCommentToChat(comment);
 
-      const stored = getPendingCommentChips("ws-test")
-      expect(stored).toHaveLength(1)
-      expect(stored[0]).toEqual(comment)
-    })
+      const stored = getPendingCommentChips("ws-test");
+      expect(stored).toHaveLength(1);
+      expect(stored[0]).toEqual(comment);
+    });
 
     it("deduplicates by id (second call with same id is no-op)", () => {
       const comment = {
@@ -56,13 +56,13 @@ describe("comment-chat-bridge", () => {
         body: "This is a comment",
         workspaceId: "ws-test",
         sessionId: null,
-      }
-      attachCommentToChat(comment)
-      attachCommentToChat(comment)
+      };
+      attachCommentToChat(comment);
+      attachCommentToChat(comment);
 
-      const stored = getPendingCommentChips("ws-test")
-      expect(stored).toHaveLength(1)
-    })
+      const stored = getPendingCommentChips("ws-test");
+      expect(stored).toHaveLength(1);
+    });
 
     it("dispatches CustomEvent", () => {
       const comment = {
@@ -73,20 +73,20 @@ describe("comment-chat-bridge", () => {
         body: "This is a comment",
         workspaceId: "ws-test",
         sessionId: null,
-      }
-      attachCommentToChat(comment)
+      };
+      attachCommentToChat(comment);
 
-      expect(dispatchEventMock).toHaveBeenCalledTimes(1)
-      const event = dispatchEventMock.mock.calls[0][0] as CustomEvent
-      expect(event.type).toBe("attach-comment-to-chat")
-    })
-  })
+      expect(dispatchEventMock).toHaveBeenCalledTimes(1);
+      const event = dispatchEventMock.mock.calls[0][0] as CustomEvent;
+      expect(event.type).toBe("attach-comment-to-chat");
+    });
+  });
 
   describe("getPendingCommentChips", () => {
     it("returns empty array when localStorage is empty", () => {
-      const result = getPendingCommentChips("ws-test")
-      expect(result).toEqual([])
-    })
+      const result = getPendingCommentChips("ws-test");
+      expect(result).toEqual([]);
+    });
 
     it("returns stored items", () => {
       const comments = [
@@ -108,29 +108,40 @@ describe("comment-chat-bridge", () => {
           workspaceId: "ws-test",
           sessionId: null,
         },
-      ]
-      localStorage.setItem("devhub:pending-comment-chips:ws-test", JSON.stringify(comments))
+      ];
+      localStorage.setItem(
+        "devhub:pending-comment-chips:ws-test",
+        JSON.stringify(comments),
+      );
 
-      const result = getPendingCommentChips("ws-test")
-      expect(result).toEqual(comments)
-    })
+      const result = getPendingCommentChips("ws-test");
+      expect(result).toEqual(comments);
+    });
 
     it("returns empty array when JSON parsing fails", () => {
-      localStorage.setItem("devhub:pending-comment-chips:ws-test", "invalid json")
-      const result = getPendingCommentChips("ws-test")
-      expect(result).toEqual([])
-    })
-  })
+      localStorage.setItem(
+        "devhub:pending-comment-chips:ws-test",
+        "invalid json",
+      );
+      const result = getPendingCommentChips("ws-test");
+      expect(result).toEqual([]);
+    });
+  });
 
   describe("clearPendingCommentChips", () => {
     it("removes the key from localStorage", () => {
-      localStorage.setItem("devhub:pending-comment-chips:ws-test", JSON.stringify([{ id: 1 }]))
-      clearPendingCommentChips("ws-test")
+      localStorage.setItem(
+        "devhub:pending-comment-chips:ws-test",
+        JSON.stringify([{ id: 1 }]),
+      );
+      clearPendingCommentChips("ws-test");
 
-      const result = localStorage.getItem("devhub:pending-comment-chips:ws-test")
-      expect(result).toBeNull()
-    })
-  })
+      const result = localStorage.getItem(
+        "devhub:pending-comment-chips:ws-test",
+      );
+      expect(result).toBeNull();
+    });
+  });
 
   describe("removePendingCommentChip", () => {
     it("removes specific item by id and leaves others", () => {
@@ -153,15 +164,18 @@ describe("comment-chat-bridge", () => {
           workspaceId: "ws-test",
           sessionId: null,
         },
-      ]
-      localStorage.setItem("devhub:pending-comment-chips:ws-test", JSON.stringify(comments))
+      ];
+      localStorage.setItem(
+        "devhub:pending-comment-chips:ws-test",
+        JSON.stringify(comments),
+      );
 
-      removePendingCommentChip("ws-test", 1)
+      removePendingCommentChip("ws-test", 1);
 
-      const result = getPendingCommentChips("ws-test")
-      expect(result).toHaveLength(1)
-      expect(result[0].id).toBe(2)
-    })
+      const result = getPendingCommentChips("ws-test");
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(2);
+    });
 
     it("calls clearPendingCommentChips when last item is removed", () => {
       const comment = {
@@ -172,13 +186,18 @@ describe("comment-chat-bridge", () => {
         body: "Comment",
         workspaceId: "ws-test",
         sessionId: null,
-      }
-      localStorage.setItem("devhub:pending-comment-chips:ws-test", JSON.stringify([comment]))
+      };
+      localStorage.setItem(
+        "devhub:pending-comment-chips:ws-test",
+        JSON.stringify([comment]),
+      );
 
-      removePendingCommentChip("ws-test", 1)
+      removePendingCommentChip("ws-test", 1);
 
-      const result = localStorage.getItem("devhub:pending-comment-chips:ws-test")
-      expect(result).toBeNull()
-    })
-  })
-})
+      const result = localStorage.getItem(
+        "devhub:pending-comment-chips:ws-test",
+      );
+      expect(result).toBeNull();
+    });
+  });
+});

@@ -1,57 +1,60 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth/config"
-import { db } from "@/lib/db"
-import { workspaces, commandHistory } from "@/drizzle/schema"
-import { eq, and } from "drizzle-orm"
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth/config";
+import { db } from "@/lib/db";
+import { workspaces, commandHistory } from "@/drizzle/schema";
+import { eq, and } from "drizzle-orm";
 import {
   spawnProcess,
   subscribe,
   getOutputBuffer,
   getProcess,
-} from "@/lib/commands/process-manager"
-import { toWorkspace } from "@/lib/workspaces/backend"
-import type { RunCommandRequest } from "@/lib/commands/types"
+} from "@/lib/commands/process-manager";
+import { toWorkspace } from "@/lib/workspaces/backend";
+import type { RunCommandRequest } from "@/lib/commands/types";
 
 export async function POST(request: NextRequest) {
-  const session = await auth()
+  const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: RunCommandRequest
+  let body: RunCommandRequest;
   try {
-    body = await request.json()
+    body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { command, workspaceId } = body
+  const { command, workspaceId } = body;
   if (!command || !workspaceId) {
     return NextResponse.json(
       { error: "command and workspaceId are required" },
-      { status: 400 }
-    )
+      { status: 400 },
+    );
   }
 
   const [row] = await db
     .select()
     .from(workspaces)
     .where(
-      and(eq(workspaces.id, workspaceId), eq(workspaces.userId, session.user.id))
+      and(
+        eq(workspaces.id, workspaceId),
+        eq(workspaces.userId, session.user.id),
+      ),
     )
-    .limit(1)
+    .limit(1);
 
   if (!row) {
-    return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
+    return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
-  const workspace = toWorkspace(row)
+  const workspace = toWorkspace(row);
 
   if (workspace.backend === "remote") {
-    return proxyRemoteRun(workspace.agentUrl!, command, workspaceId)
+    return proxyRemoteRun(workspace.agentUrl!, command, workspaceId);
   }
 
-  return runLocalCommand(request, command, workspaceId, workspace.path)
+  return runLocalCommand(request, command, workspaceId, workspace.path);
 }
 
 function runLocalCommand(
@@ -60,61 +63,68 @@ function runLocalCommand(
   workspaceId: string,
   workspacePath: string,
 ): Response {
-  const sessionId = crypto.randomUUID()
+  const sessionId = crypto.randomUUID();
 
-  spawnProcess(sessionId, command, workspacePath, workspaceId)
+  spawnProcess(sessionId, command, workspacePath, workspaceId);
 
-  const managed = getProcess(sessionId)
+  const managed = getProcess(sessionId);
   if (!managed) {
     return NextResponse.json(
       { error: "Failed to spawn process" },
-      { status: 500 }
-    )
+      { status: 500 },
+    );
   }
 
-  const encoder = new TextEncoder()
+  const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(
-        encoder.encode(`event: session\ndata: ${JSON.stringify({ sessionId })}\n\n`)
-      )
+        encoder.encode(
+          `event: session\ndata: ${JSON.stringify({ sessionId })}\n\n`,
+        ),
+      );
 
-      const buffer = getOutputBuffer(sessionId)
+      const buffer = getOutputBuffer(sessionId);
       for (const chunk of buffer) {
         controller.enqueue(
-          encoder.encode(`event: data\ndata: ${JSON.stringify({ data: chunk })}\n\n`)
-        )
+          encoder.encode(
+            `event: data\ndata: ${JSON.stringify({ data: chunk })}\n\n`,
+          ),
+        );
       }
 
       if (managed.exited) {
         controller.enqueue(
           encoder.encode(
-            `event: exit\ndata: ${JSON.stringify({ exitCode: managed.exitCode })}\n\n`
-          )
-        )
-        controller.close()
-        return
+            `event: exit\ndata: ${JSON.stringify({ exitCode: managed.exitCode })}\n\n`,
+          ),
+        );
+        controller.close();
+        return;
       }
 
       const unsubscribe = subscribe(sessionId, (event) => {
         try {
-          controller.enqueue(encoder.encode(event))
+          controller.enqueue(encoder.encode(event));
 
-          if (event.startsWith("event: exit") || event.startsWith("event: error")) {
-            recordToHistory(workspaceId, command, managed.exitCode)
-            unsubscribe?.()
-            controller.close()
+          if (
+            event.startsWith("event: exit") ||
+            event.startsWith("event: error")
+          ) {
+            recordToHistory(workspaceId, command, managed.exitCode);
+            unsubscribe?.();
+            controller.close();
           }
         } catch {
-          unsubscribe?.()
+          unsubscribe?.();
         }
-      })
+      });
 
       request.signal.addEventListener("abort", () => {
-        unsubscribe?.()
-      })
+        unsubscribe?.();
+      });
     },
-  })
+  });
 
   return new Response(stream, {
     status: 200,
@@ -124,7 +134,7 @@ function runLocalCommand(
       connection: "keep-alive",
       "x-session-id": sessionId,
     },
-  })
+  });
 }
 
 async function proxyRemoteRun(
@@ -132,50 +142,51 @@ async function proxyRemoteRun(
   command: string,
   workspaceId: string,
 ): Promise<Response> {
-  const url = new URL("/commands/run", agentUrl)
+  const url = new URL("/commands/run", agentUrl);
 
   const agentResponse = await globalThis.fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ command }),
-  })
+  });
 
   if (!agentResponse.ok) {
-    const text = await agentResponse.text()
+    const text = await agentResponse.text();
     return NextResponse.json(
       { error: `Agent error: ${text}` },
-      { status: agentResponse.status }
-    )
+      { status: agentResponse.status },
+    );
   }
 
   if (!agentResponse.body) {
     return NextResponse.json(
       { error: "Agent returned no stream body" },
-      { status: 502 }
-    )
+      { status: 502 },
+    );
   }
 
   // Pipe the SSE stream through, recording history when done
-  const agentBody = agentResponse.body
-  let lastExitCode: number | null = null
+  const agentBody = agentResponse.body;
+  let lastExitCode: number | null = null;
 
   const transformStream = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
-      controller.enqueue(chunk)
+      controller.enqueue(chunk);
 
       // Try to detect exit events for history recording
-      const text = new TextDecoder().decode(chunk)
-      const exitMatch = text.match(/"exitCode"\s*:\s*(-?\d+|null)/)
+      const text = new TextDecoder().decode(chunk);
+      const exitMatch = text.match(/"exitCode"\s*:\s*(-?\d+|null)/);
       if (exitMatch) {
-        lastExitCode = exitMatch[1] === "null" ? null : parseInt(exitMatch[1], 10)
+        lastExitCode =
+          exitMatch[1] === "null" ? null : parseInt(exitMatch[1], 10);
       }
     },
     flush() {
-      recordToHistory(workspaceId, command, lastExitCode)
+      recordToHistory(workspaceId, command, lastExitCode);
     },
-  })
+  });
 
-  const proxiedStream = agentBody.pipeThrough(transformStream)
+  const proxiedStream = agentBody.pipeThrough(transformStream);
 
   return new Response(proxiedStream, {
     status: 200,
@@ -184,19 +195,19 @@ async function proxyRemoteRun(
       "cache-control": "no-cache",
       connection: "keep-alive",
     },
-  })
+  });
 }
 
 async function recordToHistory(
   workspaceId: string,
   command: string,
-  exitCode: number | null
+  exitCode: number | null,
 ): Promise<void> {
   try {
-    await db.insert(commandHistory).values({ workspaceId, command, exitCode })
+    await db.insert(commandHistory).values({ workspaceId, command, exitCode });
   } catch (err) {
-    console.error("[commands/run] Failed to record command history:", err)
+    console.error("[commands/run] Failed to record command history:", err);
   }
 }
 
-export const maxDuration = 300
+export const maxDuration = 300;

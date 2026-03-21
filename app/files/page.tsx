@@ -306,8 +306,8 @@ function FilesContent() {
     return (
       <AuthenticatedLayout>
         <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
-          <FolderOpen className="h-10 w-10 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">
+          <FolderOpen className="text-muted-foreground/40 h-10 w-10" />
+          <p className="text-muted-foreground text-sm">
             Select a workspace to browse files
           </p>
         </div>
@@ -346,7 +346,7 @@ function FilesContent() {
             style={{ width: panelWidth }}
           >
             <div className="flex shrink-0 items-center justify-between border-b px-2 py-1">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
                 Explorer
               </span>
               <Button
@@ -366,10 +366,10 @@ function FilesContent() {
         {/* Drag handle - desktop only */}
         {!isMobile && isFileTreeOpen && (
           <div
-            className="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors"
+            className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
             onMouseDown={handleDragStart}
           >
-            <GripVertical className="size-3.5 text-muted-foreground/30" />
+            <GripVertical className="text-muted-foreground/30 size-3.5" />
           </div>
         )}
 
@@ -382,7 +382,7 @@ function FilesContent() {
           className="relative flex min-h-0 min-w-0 flex-1 flex-col"
         >
           {/* Editor header bar */}
-          <div className="flex shrink-0 items-center gap-1.5 border-b bg-muted/30 px-2 py-1.5">
+          <div className="bg-muted/30 flex shrink-0 items-center gap-1.5 border-b px-2 py-1.5">
             {/* Toggle file tree button */}
             {!isMobile && !isFileTreeOpen && (
               <Button
@@ -408,7 +408,7 @@ function FilesContent() {
             )}
 
             {/* File path breadcrumb */}
-            <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+            <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
               {activeFile?.path ?? "No file open"}
             </span>
 
@@ -447,8 +447,8 @@ function FilesContent() {
                 filePath={activeFile.path}
               />
             ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-                <FileCode2 className="h-12 w-12 text-muted-foreground/20" />
+              <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-3">
+                <FileCode2 className="text-muted-foreground/20 h-12 w-12" />
                 <p className="text-sm">
                   {!isFileTabsDisabled && openFiles.length > 0
                     ? "Select a tab to view the file"

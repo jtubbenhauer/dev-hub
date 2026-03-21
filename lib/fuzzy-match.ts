@@ -4,15 +4,15 @@
  * dependency isolated here.
  */
 
-import { Fzf, type FzfResultItem } from "fzf"
+import { Fzf, type FzfResultItem } from "fzf";
 
 export interface FuzzyMatch {
   /** The original string that was matched */
-  path: string
+  path: string;
   /** Score (higher = better match). 0 means no match. */
-  score: number
+  score: number;
   /** Character index ranges for highlighting: [start, end+1] pairs */
-  positions: Set<number>
+  positions: Set<number>;
 }
 
 function toFuzzyMatch(entry: FzfResultItem<string>): FuzzyMatch {
@@ -20,7 +20,7 @@ function toFuzzyMatch(entry: FzfResultItem<string>): FuzzyMatch {
     path: entry.item,
     score: entry.score,
     positions: entry.positions,
-  }
+  };
 }
 
 /**
@@ -30,20 +30,20 @@ function toFuzzyMatch(entry: FzfResultItem<string>): FuzzyMatch {
 export function fuzzySearch(
   query: string,
   paths: string[],
-  maxResults = 50
+  maxResults = 50,
 ): FuzzyMatch[] {
   if (query.length === 0) {
     return paths
       .slice(0, maxResults)
-      .map((p) => ({ path: p, score: 0, positions: new Set<number>() }))
+      .map((p) => ({ path: p, score: 0, positions: new Set<number>() }));
   }
 
   const fzf = new Fzf(paths, {
     limit: maxResults,
     // Use v2 algorithm with extended-search disabled for simple fuzzy matching
     fuzzy: "v2",
-  })
+  });
 
-  const results = fzf.find(query)
-  return results.map(toFuzzyMatch)
+  const results = fzf.find(query);
+  return results.map(toFuzzyMatch);
 }

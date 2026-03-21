@@ -4,7 +4,10 @@ import { AgentSelector, useAgents } from "@/components/chat/agent-selector";
 import type { SlashCommand } from "@/components/chat/command-picker";
 import { ChatDisplayContext } from "@/components/chat/chat-display-context";
 import { ChatMessage, isMessageVisible } from "@/components/chat/message";
-import { ModelSelector, loadPersistedModel } from "@/components/chat/model-selector";
+import {
+  ModelSelector,
+  loadPersistedModel,
+} from "@/components/chat/model-selector";
 import { PlanPanel } from "@/components/chat/plan-panel";
 import type { PromptInputHandle } from "@/components/chat/prompt-input";
 import { PromptInput } from "@/components/chat/prompt-input";
@@ -14,7 +17,12 @@ import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { VariantSelector } from "@/components/chat/variant-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useCommand } from "@/hooks/use-command";
@@ -22,15 +30,52 @@ import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useModelAgentBindings } from "@/hooks/use-settings";
-import type { Command, MessageWithParts, PermissionRequest, QuestionAnswer, QuestionInfo, QuestionRequest, SessionStatus } from "@/lib/opencode/types";
+import type {
+  Command,
+  MessageWithParts,
+  PermissionRequest,
+  QuestionAnswer,
+  QuestionInfo,
+  QuestionRequest,
+  SessionStatus,
+} from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
 import type { SessionWithWorkspace } from "@/stores/chat-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useQueries } from "@tanstack/react-query";
-import { AlertCircle, ArrowDown, Brain, Check, ChevronDown, ChevronRight, Clock, Coins, GripVertical, LayoutList, ListTodo, Loader2, MessageCircleQuestion, MessageSquare, PanelTop, Plus, ScrollText, ShieldAlert, Wrench, X } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowDown,
+  Brain,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Coins,
+  GripVertical,
+  LayoutList,
+  ListTodo,
+  Loader2,
+  MessageCircleQuestion,
+  MessageSquare,
+  PanelTop,
+  Plus,
+  ScrollText,
+  ShieldAlert,
+  Wrench,
+  X,
+} from "lucide-react";
 import type { ReactNode } from "react";
-import { Component, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Component,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { Virtuoso } from "react-virtuoso";
@@ -60,7 +105,7 @@ class QuestionErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
           <span>Could not display question.</span>
           <Button
             size="sm"
@@ -78,7 +123,7 @@ class QuestionErrorBoundary extends Component<
   }
 }
 
-const EMPTY_LAST_VIEWED: Record<string, number> = {}
+const EMPTY_LAST_VIEWED: Record<string, number> = {};
 
 export function ChatInterface() {
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(() =>
@@ -100,24 +145,32 @@ export function ChatInterface() {
   const [workspaceOrder, setWorkspaceOrder] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try {
-      return JSON.parse(localStorage.getItem("dev-hub:chat-workspace-order") ?? "[]");
+      return JSON.parse(
+        localStorage.getItem("dev-hub:chat-workspace-order") ?? "[]",
+      );
     } catch {
       return [];
     }
   });
-  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Record<string, boolean>>(() => {
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<
+    Record<string, boolean>
+  >(() => {
     if (typeof window === "undefined") return {};
     try {
-      return JSON.parse(localStorage.getItem("dev-hub:chat-expanded-workspaces") ?? "{}");
+      return JSON.parse(
+        localStorage.getItem("dev-hub:chat-expanded-workspaces") ?? "{}",
+      );
     } catch {
       return {};
     }
   });
-  const [questionViewMode, setQuestionViewMode] = useState<"list" | "tabs">(() => {
-    if (typeof window === "undefined") return "list";
-    const stored = localStorage.getItem("dev-hub:chat-question-view");
-    return stored === "tabs" ? "tabs" : "list";
-  });
+  const [questionViewMode, setQuestionViewMode] = useState<"list" | "tabs">(
+    () => {
+      if (typeof window === "undefined") return "list";
+      const stored = localStorage.getItem("dev-hub:chat-question-view");
+      return stored === "tabs" ? "tabs" : "list";
+    },
+  );
   const [isQuestionsMinimized, setIsQuestionsMinimized] = useState(false);
 
   const {
@@ -153,16 +206,14 @@ export function ChatInterface() {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("dev-hub:chat-task-panel") === "true";
   });
-  const {
-    width: taskPanelWidth,
-    handleDragStart: handleTaskPanelDragStart,
-  } = useResizablePanel({
-    minWidth: 200,
-    maxWidth: 400,
-    defaultWidth: 280,
-    storageKey: "dev-hub:chat-task-panel-width",
-    reverse: true,
-  });
+  const { width: taskPanelWidth, handleDragStart: handleTaskPanelDragStart } =
+    useResizablePanel({
+      minWidth: 200,
+      maxWidth: 400,
+      defaultWidth: 280,
+      storageKey: "dev-hub:chat-task-panel-width",
+      reverse: true,
+    });
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false);
   const [, setHasPlanFiles] = useState(false);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
@@ -206,27 +257,27 @@ export function ChatInterface() {
     queries: allWorkspaces.map((ws) => ({
       queryKey: ["git-status", ws.id],
       queryFn: async () => {
-        const params = new URLSearchParams({ action: "status" })
-        const res = await fetch(`/api/workspaces/${ws.id}/git?${params}`)
-        if (!res.ok) return null
-        return res.json() as Promise<{ branch: string }>
+        const params = new URLSearchParams({ action: "status" });
+        const res = await fetch(`/api/workspaces/${ws.id}/git?${params}`);
+        if (!res.ok) return null;
+        return res.json() as Promise<{ branch: string }>;
       },
       enabled: isUnifiedMode,
       staleTime: 30_000,
       retry: false,
     })),
-  })
+  });
 
   const workspaceBranches = useMemo(() => {
-    const map: Record<string, string> = {}
+    const map: Record<string, string> = {};
     for (let i = 0; i < allWorkspaces.length; i++) {
-      const data = branchQueryResults[i]?.data
+      const data = branchQueryResults[i]?.data;
       if (data?.branch) {
-        map[allWorkspaces[i].id] = data.branch
+        map[allWorkspaces[i].id] = data.branch;
       }
     }
-    return map
-  }, [allWorkspaces, branchQueryResults])
+    return map;
+  }, [allWorkspaces, branchQueryResults]);
 
   const workspaceOptions = useMemo(() => {
     return allWorkspaces.map((ws) => ({
@@ -248,18 +299,18 @@ export function ChatInterface() {
 
   const { primaryAgents } = useAgents(activeWorkspaceId);
   const orderedAgents = useMemo(() => {
-    const utilityNames = new Set(["compaction", "title", "summary"])
-    const regular: typeof primaryAgents = []
-    const utility: typeof primaryAgents = []
+    const utilityNames = new Set(["compaction", "title", "summary"]);
+    const regular: typeof primaryAgents = [];
+    const utility: typeof primaryAgents = [];
     for (const agent of primaryAgents) {
       if (utilityNames.has(agent.name.toLowerCase())) {
-        utility.push(agent)
+        utility.push(agent);
       } else {
-        regular.push(agent)
+        regular.push(agent);
       }
     }
-    return [...regular, ...utility]
-  }, [primaryAgents])
+    return [...regular, ...utility];
+  }, [primaryAgents]);
   const { bindings: agentModelBindings } = useModelAgentBindings();
 
   // Track the previous agent so we only force-set the model when the agent
@@ -277,8 +328,11 @@ export function ChatInterface() {
 
     // Read current session state directly from store to avoid adding deps
     // that would re-trigger this effect on session switches
-    const { activeSessionId: currentSessionId, getSessionModel: getModel } = useChatStore.getState();
-    const hasStoredModel = currentSessionId ? !!getModel(currentSessionId) : false;
+    const { activeSessionId: currentSessionId, getSessionModel: getModel } =
+      useChatStore.getState();
+    const hasStoredModel = currentSessionId
+      ? !!getModel(currentSessionId)
+      : false;
 
     if ((agentChanged || !selectedModel) && !hasStoredModel) {
       if (agent?.model) {
@@ -292,16 +346,30 @@ export function ChatInterface() {
     // Agent config can advertise a variant (e.g. "high") not in the model's variant map → API error
     if (agentChanged) {
       const agentVariant = agent?.variant ?? null;
-      if (agentVariant && availableVariants.length > 0 && !availableVariants.includes(agentVariant)) {
+      if (
+        agentVariant &&
+        availableVariants.length > 0 &&
+        !availableVariants.includes(agentVariant)
+      ) {
         setSelectedVariant(null);
       } else {
         setSelectedVariant(agentVariant);
       }
     }
-  }, [selectedAgent, primaryAgents, agentModelBindings, availableVariants, selectedModel]);
+  }, [
+    selectedAgent,
+    primaryAgents,
+    agentModelBindings,
+    availableVariants,
+    selectedModel,
+  ]);
 
   useEffect(() => {
-    if (selectedVariant && availableVariants.length > 0 && !availableVariants.includes(selectedVariant)) {
+    if (
+      selectedVariant &&
+      availableVariants.length > 0 &&
+      !availableVariants.includes(selectedVariant)
+    ) {
       setSelectedVariant(null);
     }
   }, [availableVariants, selectedVariant]);
@@ -356,7 +424,9 @@ export function ChatInterface() {
     if (primaryAgents.length === 0) return;
 
     // Restore agent
-    const storedAgent = activeSessionId ? getSessionAgent(activeSessionId) : null;
+    const storedAgent = activeSessionId
+      ? getSessionAgent(activeSessionId)
+      : null;
     if (storedAgent) {
       setSelectedAgent(storedAgent);
     } else {
@@ -366,7 +436,9 @@ export function ChatInterface() {
     }
 
     // Restore model override (if session has one stored)
-    const storedModel = activeSessionId ? getSessionModel(activeSessionId) : null;
+    const storedModel = activeSessionId
+      ? getSessionModel(activeSessionId)
+      : null;
     if (storedModel) {
       setSelectedModel(storedModel);
     }
@@ -380,31 +452,36 @@ export function ChatInterface() {
   const streamingStatus = useChatStore(getStreamingStatus);
   const isMobile = useIsMobile();
 
-  const sessions = useChatStore(getActiveWorkspaceSessions)
+  const sessions = useChatStore(getActiveWorkspaceSessions);
   const activeSessionDirectory = activeSessionId
     ? sessions[activeSessionId]?.directory
-    : undefined
-  const [unifiedLimit, setUnifiedLimit] = useState(20)
-  const effectiveUnifiedLimit = groupByWorkspace ? Number.MAX_SAFE_INTEGER : unifiedLimit
+    : undefined;
+  const [unifiedLimit, setUnifiedLimit] = useState(20);
+  const effectiveUnifiedLimit = groupByWorkspace
+    ? Number.MAX_SAFE_INTEGER
+    : unifiedLimit;
   const allUnifiedSessions = useChatStore((state) =>
-    state.getRecentSessionsAcrossWorkspaces(effectiveUnifiedLimit)
-  )
-  const workspaceIds = useMemo(() => new Set(allWorkspaces.map((w) => w.id)), [allWorkspaces])
+    state.getRecentSessionsAcrossWorkspaces(effectiveUnifiedLimit),
+  );
+  const workspaceIds = useMemo(
+    () => new Set(allWorkspaces.map((w) => w.id)),
+    [allWorkspaces],
+  );
   const unifiedSessions = useMemo(
     () => allUnifiedSessions.filter((s) => workspaceIds.has(s.workspaceId)),
-    [allUnifiedSessions, workspaceIds]
-  )
+    [allUnifiedSessions, workspaceIds],
+  );
   const totalUnifiedCount = useChatStore((state) => {
-    let count = 0
+    let count = 0;
     for (const ws of Object.values(state.workspaceStates)) {
       for (const session of Object.values(ws.sessions)) {
-        if (!session.parentID) count++
+        if (!session.parentID) count++;
       }
     }
-    return count
-  })
-  const hasMoreUnifiedSessions = totalUnifiedCount > unifiedLimit
-  const commands: Command[] = useChatStore((state) => state.commands)
+    return count;
+  });
+  const hasMoreUnifiedSessions = totalUnifiedCount > unifiedLimit;
+  const commands: Command[] = useChatStore((state) => state.commands);
   // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
   // We filter by sessionID here with useMemo so we never create a new array reference
   // on every render — that would violate useSyncExternalStore's snapshot contract and
@@ -413,13 +490,15 @@ export function ChatInterface() {
   const allQuestions = useChatStore(getActiveQuestions);
   const activeWsSessionStatuses = useChatStore(getActiveSessionStatuses);
   const activeWsLastViewedAt = useChatStore((s) => {
-    const wsId = s.activeWorkspaceId
-    if (!wsId) return EMPTY_LAST_VIEWED
-    return s.workspaceStates[wsId]?.lastViewedAt ?? EMPTY_LAST_VIEWED
+    const wsId = s.activeWorkspaceId;
+    if (!wsId) return EMPTY_LAST_VIEWED;
+    return s.workspaceStates[wsId]?.lastViewedAt ?? EMPTY_LAST_VIEWED;
   });
   const unifiedStatuses = useChatStore(getUnifiedSessionStatuses);
   const unifiedLastViewed = useChatStore(getUnifiedLastViewedAt);
-  const sessionStatuses = isUnifiedMode ? unifiedStatuses : activeWsSessionStatuses;
+  const sessionStatuses = isUnifiedMode
+    ? unifiedStatuses
+    : activeWsSessionStatuses;
   const lastViewedAt = isUnifiedMode ? unifiedLastViewed : activeWsLastViewedAt;
   const activeTodos = useChatStore(getActiveTodos);
   const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
@@ -427,45 +506,57 @@ export function ChatInterface() {
   const pinnedSessionIds = isUnifiedMode ? unifiedPinnedIds : activePinnedIds;
   const activeQuestionSessionIds = useChatStore(getActiveQuestionSessionIds);
   const unifiedQuestionSessionIds = useChatStore(getUnifiedQuestionSessionIds);
-  const questionSessionIds = isUnifiedMode ? unifiedQuestionSessionIds : activeQuestionSessionIds;
+  const questionSessionIds = isUnifiedMode
+    ? unifiedQuestionSessionIds
+    : activeQuestionSessionIds;
 
   const isSessionsLoading = useChatStore((s) => {
     if (isUnifiedMode) {
-      return allWorkspaces.some((ws) => !s.workspaceStates[ws.id]?.sessionsLoaded)
+      return allWorkspaces.some(
+        (ws) => !s.workspaceStates[ws.id]?.sessionsLoaded,
+      );
     }
-    const wsId = s.activeWorkspaceId
-    if (!wsId) return false
-    return !s.workspaceStates[wsId]?.sessionsLoaded
+    const wsId = s.activeWorkspaceId;
+    if (!wsId) return false;
+    return !s.workspaceStates[wsId]?.sessionsLoaded;
   });
 
   const childSessionIds = useMemo(() => {
-    if (!activeSessionId) return new Set<string>()
-    const childrenOf = new Map<string, string[]>()
+    if (!activeSessionId) return new Set<string>();
+    const childrenOf = new Map<string, string[]>();
     for (const s of Object.values(sessions)) {
       if (s.parentID) {
-        const siblings = childrenOf.get(s.parentID) ?? []
-        siblings.push(s.id)
-        childrenOf.set(s.parentID, siblings)
+        const siblings = childrenOf.get(s.parentID) ?? [];
+        siblings.push(s.id);
+        childrenOf.set(s.parentID, siblings);
       }
     }
-    const descendants = new Set<string>()
-    const queue = [...(childrenOf.get(activeSessionId) ?? [])]
+    const descendants = new Set<string>();
+    const queue = [...(childrenOf.get(activeSessionId) ?? [])];
     while (queue.length > 0) {
-      const id = queue.shift()!
+      const id = queue.shift()!;
       if (!descendants.has(id)) {
-        descendants.add(id)
-        queue.push(...(childrenOf.get(id) ?? []))
+        descendants.add(id);
+        queue.push(...(childrenOf.get(id) ?? []));
       }
     }
-    return descendants
-  }, [sessions, activeSessionId])
+    return descendants;
+  }, [sessions, activeSessionId]);
 
   const activePermissions = useMemo(
-    () => allPermissions.filter((p) => p.sessionID === activeSessionId || childSessionIds.has(p.sessionID)),
+    () =>
+      allPermissions.filter(
+        (p) =>
+          p.sessionID === activeSessionId || childSessionIds.has(p.sessionID),
+      ),
     [allPermissions, activeSessionId, childSessionIds],
   );
   const activeQuestions = useMemo(
-    () => allQuestions.filter((q) => q.sessionID === activeSessionId || childSessionIds.has(q.sessionID)),
+    () =>
+      allQuestions.filter(
+        (q) =>
+          q.sessionID === activeSessionId || childSessionIds.has(q.sessionID),
+      ),
     [allQuestions, activeSessionId, childSessionIds],
   );
 
@@ -493,7 +584,14 @@ export function ChatInterface() {
         fetchCachedSessions(ws.id);
       }
     }
-  }, [isUnifiedMode, allWorkspaces, activeWorkspaceId, fetchSessions, fetchPinnedSessions, fetchCachedSessions]);
+  }, [
+    isUnifiedMode,
+    allWorkspaces,
+    activeWorkspaceId,
+    fetchSessions,
+    fetchPinnedSessions,
+    fetchCachedSessions,
+  ]);
 
   // Fetch messages when active session changes
   useEffect(() => {
@@ -528,8 +626,11 @@ export function ChatInterface() {
 
   const activeMessagesRaw = useChatStore(getActiveSessionMessages);
   const activeMessages = useMemo(
-    () => activeMessagesRaw.filter((m) => isMessageVisible(m, { showThinking, showToolCalls })),
-    [activeMessagesRaw, showThinking, showToolCalls]
+    () =>
+      activeMessagesRaw.filter((m) =>
+        isMessageVisible(m, { showThinking, showToolCalls }),
+      ),
+    [activeMessagesRaw, showThinking, showToolCalls],
   );
   const isMessagesLoaded = useChatStore((state) => {
     const {
@@ -624,8 +725,11 @@ export function ChatInterface() {
       if (command.source === "builtin") {
         switch (command.name) {
           case "compact": {
-            const compactionAgent = primaryAgents.find((a) => a.name.toLowerCase() === "compaction")
-            const compactModel = compactionAgent?.model ?? selectedModel ?? undefined
+            const compactionAgent = primaryAgents.find(
+              (a) => a.name.toLowerCase() === "compaction",
+            );
+            const compactModel =
+              compactionAgent?.model ?? selectedModel ?? undefined;
             summarizeSession(sessionId, activeWorkspaceId, compactModel);
             break;
           }
@@ -687,7 +791,11 @@ export function ChatInterface() {
   const handleRevert = useCallback(
     async (messageId: string) => {
       if (!activeSessionId || !activeWorkspaceId) return;
-      const text = await revertSession(activeSessionId, activeWorkspaceId, messageId);
+      const text = await revertSession(
+        activeSessionId,
+        activeWorkspaceId,
+        messageId,
+      );
       if (text) {
         promptInputRef.current?.setValue(text);
       }
@@ -709,7 +817,9 @@ export function ChatInterface() {
     [setActiveWorkspaceId, createSession],
   );
 
-  const pendingDeletions = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingDeletions = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   useEffect(() => {
     const ref = pendingDeletions.current;
@@ -796,7 +906,13 @@ export function ChatInterface() {
         fetchSessions(workspaceId);
       }
     },
-    [allWorkspaces, activeWorkspaceId, setActiveWorkspaceId, setActiveSession, fetchSessions],
+    [
+      allWorkspaces,
+      activeWorkspaceId,
+      setActiveWorkspaceId,
+      setActiveSession,
+      fetchSessions,
+    ],
   );
 
   const handleToggleUnifiedMode = useCallback(() => {
@@ -844,7 +960,10 @@ export function ChatInterface() {
   const handleToggleWorkspaceExpanded = useCallback((workspaceId: string) => {
     setExpandedWorkspaces((prev) => {
       const next = { ...prev, [workspaceId]: !prev[workspaceId] };
-      localStorage.setItem("dev-hub:chat-expanded-workspaces", JSON.stringify(next));
+      localStorage.setItem(
+        "dev-hub:chat-expanded-workspaces",
+        JSON.stringify(next),
+      );
       return next;
     });
   }, []);
@@ -925,78 +1044,88 @@ export function ChatInterface() {
   }, []);
 
   // Session list j/k navigation: build flat list of visible session IDs in render order
-  const COLLAPSED_SESSION_LIMIT = 3
+  const COLLAPSED_SESSION_LIMIT = 3;
   const visibleSessionIds = useMemo<string[]>(() => {
     if (isUnifiedMode && groupByWorkspace) {
       // Replicate groupedSessions logic from SessionList
-      const allWsIds = workspaceOptions.map((ws) => ws.id)
-      const groups = new Map<string, SessionWithWorkspace[]>()
-      for (const id of allWsIds) groups.set(id, [])
+      const allWsIds = workspaceOptions.map((ws) => ws.id);
+      const groups = new Map<string, SessionWithWorkspace[]>();
+      for (const id of allWsIds) groups.set(id, []);
       for (const session of unifiedSessions) {
-        const existing = groups.get(session.workspaceId)
+        const existing = groups.get(session.workspaceId);
         if (existing) {
-          existing.push(session)
+          existing.push(session);
         } else {
-          groups.set(session.workspaceId, [session])
+          groups.set(session.workspaceId, [session]);
         }
       }
-      const entries = [...groups.entries()]
+      const entries = [...groups.entries()];
       if (workspaceOrder.length > 0) {
-        const orderIndex = new Map(workspaceOrder.map((id, i) => [id, i]))
+        const orderIndex = new Map(workspaceOrder.map((id, i) => [id, i]));
         entries.sort((a, b) => {
-          const ai = orderIndex.get(a[0]) ?? Infinity
-          const bi = orderIndex.get(b[0]) ?? Infinity
-          if (ai !== Infinity || bi !== Infinity) return ai - bi
-          const aTime = a[1][0]?.time.updated ?? 0
-          const bTime = b[1][0]?.time.updated ?? 0
-          return bTime - aTime
-        })
+          const ai = orderIndex.get(a[0]) ?? Infinity;
+          const bi = orderIndex.get(b[0]) ?? Infinity;
+          if (ai !== Infinity || bi !== Infinity) return ai - bi;
+          const aTime = a[1][0]?.time.updated ?? 0;
+          const bTime = b[1][0]?.time.updated ?? 0;
+          return bTime - aTime;
+        });
       } else {
         entries.sort(([, a], [, b]) => {
-          const aTime = a[0]?.time.updated ?? 0
-          const bTime = b[0]?.time.updated ?? 0
-          return bTime - aTime
-        })
+          const aTime = a[0]?.time.updated ?? 0;
+          const bTime = b[0]?.time.updated ?? 0;
+          return bTime - aTime;
+        });
       }
-      const ids: string[] = []
+      const ids: string[] = [];
       for (const [wsId, wsSessions] of entries) {
-        const isExpanded = expandedWorkspaces[wsId] ?? false
-        const visible = isExpanded ? wsSessions : wsSessions.slice(0, COLLAPSED_SESSION_LIMIT)
-        for (const s of visible) ids.push(s.id)
+        const isExpanded = expandedWorkspaces[wsId] ?? false;
+        const visible = isExpanded
+          ? wsSessions
+          : wsSessions.slice(0, COLLAPSED_SESSION_LIMIT);
+        for (const s of visible) ids.push(s.id);
       }
-      return ids
+      return ids;
     }
     if (isUnifiedMode) {
-      return unifiedSessions.map((s) => s.id)
+      return unifiedSessions.map((s) => s.id);
     }
     // Workspace mode
     return Object.values(sessions)
       .filter((s) => !s.parentID)
       .sort((a, b) => b.time.updated - a.time.updated)
-      .map((s) => s.id)
-  }, [isUnifiedMode, groupByWorkspace, sessions, unifiedSessions, workspaceOptions, workspaceOrder, expandedWorkspaces])
+      .map((s) => s.id);
+  }, [
+    isUnifiedMode,
+    groupByWorkspace,
+    sessions,
+    unifiedSessions,
+    workspaceOptions,
+    workspaceOrder,
+    expandedWorkspaces,
+  ]);
 
-  const visibleSessionIdsRef = useRef(visibleSessionIds)
-  visibleSessionIdsRef.current = visibleSessionIds
-  const activeSessionIdForNavRef = useRef(activeSessionId)
-  activeSessionIdForNavRef.current = activeSessionId
+  const visibleSessionIdsRef = useRef(visibleSessionIds);
+  visibleSessionIdsRef.current = visibleSessionIds;
+  const activeSessionIdForNavRef = useRef(activeSessionId);
+  activeSessionIdForNavRef.current = activeSessionId;
 
   const selectSessionByIdRef = useRef((sessionId: string) => {
     if (isUnifiedMode) {
-      const session = unifiedSessions.find((s) => s.id === sessionId)
-      if (session) handleSelectUnifiedSession(sessionId, session.workspaceId)
+      const session = unifiedSessions.find((s) => s.id === sessionId);
+      if (session) handleSelectUnifiedSession(sessionId, session.workspaceId);
     } else {
-      handleSelectSession(sessionId)
+      handleSelectSession(sessionId);
     }
-  })
+  });
   selectSessionByIdRef.current = (sessionId: string) => {
     if (isUnifiedMode) {
-      const session = unifiedSessions.find((s) => s.id === sessionId)
-      if (session) handleSelectUnifiedSession(sessionId, session.workspaceId)
+      const session = unifiedSessions.find((s) => s.id === sessionId);
+      if (session) handleSelectUnifiedSession(sessionId, session.workspaceId);
     } else {
-      handleSelectSession(sessionId)
+      handleSelectSession(sessionId);
     }
-  }
+  };
 
   const chatCommands = useMemo(
     () => [
@@ -1019,11 +1148,12 @@ export function ChatInterface() {
         label: isTaskPanelOpen ? "Hide Side Panel" : "Show Side Panel",
         group: "Chat",
         icon: ListTodo,
-        onSelect: () => setIsTaskPanelOpenRef.current((prev) => {
-          const next = !prev;
-          localStorage.setItem("dev-hub:chat-task-panel", String(next));
-          return next;
-        }),
+        onSelect: () =>
+          setIsTaskPanelOpenRef.current((prev) => {
+            const next = !prev;
+            localStorage.setItem("dev-hub:chat-task-panel", String(next));
+            return next;
+          }),
       },
       {
         id: "chat:toggle-thinking",
@@ -1054,120 +1184,129 @@ export function ChatInterface() {
         onSelect: toggleTimestamps,
       },
     ],
-    [toggleThinking, toggleToolCalls, toggleTokens, toggleTimestamps, showThinking, showToolCalls, showTokens, showTimestamps, isPlanPanelOpen, isTaskPanelOpen],
+    [
+      toggleThinking,
+      toggleToolCalls,
+      toggleTokens,
+      toggleTimestamps,
+      showThinking,
+      showToolCalls,
+      showTokens,
+      showTimestamps,
+      isPlanPanelOpen,
+      isTaskPanelOpen,
+    ],
   );
 
   useCommand(chatCommands);
 
-  const chatLeaderActions = useMemo(
-    () => {
-      const actions = [
-        {
-          action: {
-            id: "chat:switch-model",
-            label: "Switch model",
-            page: "chat" as const,
-          },
-          handler: () => setIsModelSelectorOpenRef.current(true),
+  const chatLeaderActions = useMemo(() => {
+    const actions = [
+      {
+        action: {
+          id: "chat:switch-model",
+          label: "Switch model",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:switch-agent",
-            label: "Switch agent",
-            page: "chat" as const,
-          },
-          handler: () => setIsAgentSelectorOpenRef.current(true),
+        handler: () => setIsModelSelectorOpenRef.current(true),
+      },
+      {
+        action: {
+          id: "chat:switch-agent",
+          label: "Switch agent",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:new-session",
-            label: "New session",
-            page: "chat" as const,
-          },
-          handler: () => handleCreateSessionRef.current(),
+        handler: () => setIsAgentSelectorOpenRef.current(true),
+      },
+      {
+        action: {
+          id: "chat:new-session",
+          label: "New session",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:toggle-sessions",
-            label: "Toggle session list",
-            page: "chat" as const,
-          },
-          handler: () => setIsSessionListOpenRef.current((prev) => !prev),
+        handler: () => handleCreateSessionRef.current(),
+      },
+      {
+        action: {
+          id: "chat:toggle-sessions",
+          label: "Toggle session list",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:toggle-plan",
-            label: "Toggle plan panel",
-            page: "chat" as const,
-          },
-          handler: () => setIsPlanPanelOpenRef.current((prev) => !prev),
+        handler: () => setIsSessionListOpenRef.current((prev) => !prev),
+      },
+      {
+        action: {
+          id: "chat:toggle-plan",
+          label: "Toggle plan panel",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:toggle-tasks",
-            label: "Toggle side panel",
-            page: "chat" as const,
-          },
-          handler: () => setIsTaskPanelOpenRef.current((prev) => {
+        handler: () => setIsPlanPanelOpenRef.current((prev) => !prev),
+      },
+      {
+        action: {
+          id: "chat:toggle-tasks",
+          label: "Toggle side panel",
+          page: "chat" as const,
+        },
+        handler: () =>
+          setIsTaskPanelOpenRef.current((prev) => {
             const next = !prev;
             localStorage.setItem("dev-hub:chat-task-panel", String(next));
             return next;
           }),
+      },
+      {
+        action: {
+          id: "chat:toggle-thinking",
+          label: "Toggle thinking",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:toggle-thinking",
-            label: "Toggle thinking",
-            page: "chat" as const,
-          },
-          handler: toggleThinking,
+        handler: toggleThinking,
+      },
+      {
+        action: {
+          id: "chat:toggle-tool-calls",
+          label: "Toggle tool calls",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:toggle-tool-calls",
-            label: "Toggle tool calls",
-            page: "chat" as const,
-          },
-          handler: toggleToolCalls,
+        handler: toggleToolCalls,
+      },
+      {
+        action: {
+          id: "chat:toggle-tokens",
+          label: "Toggle token usage",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:toggle-tokens",
-            label: "Toggle token usage",
-            page: "chat" as const,
-          },
-          handler: toggleTokens,
+        handler: toggleTokens,
+      },
+      {
+        action: {
+          id: "chat:toggle-timestamps",
+          label: "Toggle timestamps",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:toggle-timestamps",
-            label: "Toggle timestamps",
-            page: "chat" as const,
-          },
-          handler: toggleTimestamps,
+        handler: toggleTimestamps,
+      },
+      {
+        action: {
+          id: "chat:focus-prompt",
+          label: "Focus prompt input",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:focus-prompt",
-            label: "Focus prompt input",
-            page: "chat" as const,
-          },
-          handler: () => promptInputRef.current?.focus(),
+        handler: () => promptInputRef.current?.focus(),
+      },
+      {
+        action: {
+          id: "chat:toggle-variant",
+          label: "Toggle variant selector",
+          page: "chat" as const,
         },
-        {
-          action: {
-            id: "chat:toggle-variant",
-            label: "Toggle variant selector",
-            page: "chat" as const,
-          },
-          handler: () => setIsVariantSelectorOpenRef.current((prev) => !prev),
-        },
-      ];
+        handler: () => setIsVariantSelectorOpenRef.current((prev) => !prev),
+      },
+    ];
 
-      return actions;
-    },
-    [toggleThinking, toggleToolCalls, toggleTokens, toggleTimestamps],
-  );
+    return actions;
+  }, [toggleThinking, toggleToolCalls, toggleTokens, toggleTimestamps]);
 
   useLeaderAction(chatLeaderActions);
 
@@ -1185,14 +1324,17 @@ export function ChatInterface() {
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
 
-  const handleModelChange = useCallback((model: SelectedModel) => {
-    setSelectedModel(model);
-    const sid = activeSessionIdRef.current;
-    const wid = activeWorkspaceIdRef.current;
-    if (sid && wid) {
-      setSessionModel(sid, wid, model);
-    }
-  }, [setSessionModel]);
+  const handleModelChange = useCallback(
+    (model: SelectedModel) => {
+      setSelectedModel(model);
+      const sid = activeSessionIdRef.current;
+      const wid = activeWorkspaceIdRef.current;
+      if (sid && wid) {
+        setSessionModel(sid, wid, model);
+      }
+    },
+    [setSessionModel],
+  );
 
   useEffect(() => {
     const handleTabCycle = (e: KeyboardEvent) => {
@@ -1230,9 +1372,9 @@ export function ChatInterface() {
   if (!activeWorkspaceId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-        <AlertCircle className="size-12 text-muted-foreground/50" />
+        <AlertCircle className="text-muted-foreground/50 size-12" />
         <h3 className="text-lg font-medium">No workspace selected</h3>
-        <p className="max-w-md text-sm text-muted-foreground">
+        <p className="text-muted-foreground max-w-md text-sm">
           Select a workspace from the sidebar to start chatting with OpenCode.
         </p>
       </div>
@@ -1240,7 +1382,7 @@ export function ChatInterface() {
   }
 
   return (
-    <div data-chat-interface className="flex h-full min-h-0 min-w-0 w-full">
+    <div data-chat-interface className="flex h-full min-h-0 w-full min-w-0">
       {/* Mobile session sheet */}
       <Sheet open={isMobileSessionsOpen} onOpenChange={setIsMobileSessionsOpen}>
         <SheetContent side="left" className="w-72 p-0" showCloseButton={false}>
@@ -1308,9 +1450,11 @@ export function ChatInterface() {
       {isSessionListOpen && (
         <>
           <div
-            ref={(el) => { sessionListFocusRef.current = el }}
+            ref={(el) => {
+              sessionListFocusRef.current = el;
+            }}
             tabIndex={-1}
-            className="hidden shrink-0 overflow-hidden md:block relative"
+            className="relative hidden shrink-0 overflow-hidden md:block"
             style={{ width: sessionListWidth }}
           >
             {isUnifiedMode ? (
@@ -1327,8 +1471,8 @@ export function ChatInterface() {
                 onCreateSessionInWorkspace={handleCreateSessionInWorkspace}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
-              questionSessionIds={questionSessionIds}
-              lastViewedAt={lastViewedAt}
+                questionSessionIds={questionSessionIds}
+                lastViewedAt={lastViewedAt}
                 isLoading={isSessionsLoading}
                 pinnedSessionIds={pinnedSessionIds}
                 onSelectSession={handleSelectUnifiedSession}
@@ -1354,7 +1498,7 @@ export function ChatInterface() {
                 workspaceColor={activeWorkspaceColor}
                 activeSessionId={activeSessionId}
                 sessionStatuses={sessionStatuses}
-              questionSessionIds={questionSessionIds}
+                questionSessionIds={questionSessionIds}
                 lastViewedAt={lastViewedAt}
                 pinnedSessionIds={pinnedSessionIds}
                 isLoading={isSessionsLoading}
@@ -1369,331 +1513,355 @@ export function ChatInterface() {
             )}
           </div>
           <div
-            className="hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors md:flex"
+            className="hover:bg-accent/50 active:bg-accent hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors md:flex"
             onMouseDown={handleSessionListDragStart}
           >
-            <GripVertical className="size-3.5 text-muted-foreground/30" />
+            <GripVertical className="text-muted-foreground/30 size-3.5" />
           </div>
         </>
       )}
 
       {/* Main chat area */}
       <ChatDisplayContext.Provider value={chatDisplaySettings}>
-      <div
-        ref={(el) => { messagesPanelFocusRef.current = el }}
-        tabIndex={-1}
-        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-      >
-        {/* Chat toolbar */}
-        <div className="sticky top-0 z-30 flex shrink-0 items-center gap-1.5 border-b bg-background px-3 py-2 md:gap-2 md:px-4">
-          {/* Mobile: open session sheet */}
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            onClick={() => setIsMobileSessionsOpen(true)}
-            className="mr-1 md:hidden"
-          >
-            <MessageSquare className="size-4" />
-          </Button>
-          {/* Desktop: toggle session sidebar */}
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            onClick={() => setIsSessionListOpen(!isSessionListOpen)}
-            className="hidden md:inline-flex"
-          >
-            <svg
-              className="size-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M3 12h18M3 6h18M3 18h18" />
-            </svg>
-          </Button>
-
-          <div className="md:flex-1" />
-
-          <Button
-            size="icon-sm"
-            variant={isPlanPanelOpen ? "secondary" : "outline"}
-            onClick={() => setIsPlanPanelOpen(!isPlanPanelOpen)}
-            title="Plan notes"
-          >
-            <ScrollText className="size-4" />
-          </Button>
-
-          <AgentSelector
-            agents={primaryAgents}
-            selectedAgent={selectedAgent}
-            onAgentChange={(agent) => {
-              setSelectedAgent(agent);
-              if (activeSessionId && activeWorkspaceId) {
-                setSessionAgent(activeSessionId, activeWorkspaceId, agent);
-                clearSessionModel(activeSessionId, activeWorkspaceId);
-              }
-            }}
-            open={isAgentSelectorOpen}
-            onOpenChange={setIsAgentSelectorOpen}
-          />
-
-          <ModelSelector
-            workspaceId={activeWorkspaceId}
-            selectedModel={selectedModel}
-            onModelChange={handleModelChange}
-            onVariantsChange={setAvailableVariants}
-            open={isModelSelectorOpen}
-            onOpenChange={setIsModelSelectorOpen}
-          />
-
-          <VariantSelector
-            variants={availableVariants}
-            selectedVariant={selectedVariant}
-            onVariantChange={setSelectedVariant}
-            open={isVariantSelectorOpen}
-            onOpenChange={setIsVariantSelectorOpen}
-          />
-        </div>
-
-        {/* Messages area or plan panel — mutually exclusive */}
-        <div className="chat-scroll-area relative min-h-0 min-w-0 flex-1 overflow-hidden [contain:strict]">
-          {isPlanPanelOpen && activeWorkspaceId ? (
-            <PlanPanel
-              workspaceId={activeWorkspaceId}
-              workspaceName={activeWorkspaceName}
-              sessionDirectory={activeSessionDirectory}
-              isOpen={isPlanPanelOpen}
-              onClose={() => setIsPlanPanelOpen(false)}
-              onPlanFilesChange={setHasPlanFiles}
-            />
-          ) : (
-            <div className="flex h-full flex-col">
-              {activeMessages.length === 0 ? (
-                showLoader ? (
-                  <div className="flex h-full items-center justify-center">
-                    <Loader2 className="size-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : !isMessagesLoaded ? (
-                  <div className="h-full" />
-                ) : (
-                  <EmptyChat onSend={handleSendMessage} />
-                )
-              ) : (
-                <Virtuoso
-                  key={activeSessionId}
-                  ref={virtuosoRef}
-                  data={activeMessages}
-                  initialTopMostItemIndex={Math.max(
-                    0,
-                    activeMessages.length - 1,
-                  )}
-                  itemContent={(index, msg) => {
-                    const prev = index > 0 ? activeMessages[index - 1] : null
-                    const showAvatar = !prev || prev.info.role !== msg.info.role
-                    const canRevert =
-                      streamingStatus !== "streaming" &&
-                      msg.info.role === "user" &&
-                      index > 0
-                    return (
-                      <ChatMessage
-                        key={msg.info.id}
-                        message={msg}
-                        showAvatar={showAvatar}
-                        onRevert={canRevert ? handleRevert : undefined}
-                      />
-                    )
-                  }}
-                  followOutput={handleFollowOutput}
-                  atBottomStateChange={handleAtBottomStateChange}
-                  atBottomThreshold={80}
-                  increaseViewportBy={{
-                    top: 200,
-                    bottom: isMobile ? 100 : 400,
-                  }}
-                  className="h-full"
-                  components={
-                    streamingStatus === "streaming"
-                      ? STREAMING_COMPONENTS
-                      : EMPTY_COMPONENTS
-                  }
-                />
-              )}
-            </div>
-          )}
-
-          {/* Jump-to-bottom pill — shown when user has scrolled up during streaming or after */}
-          {showJumpToBottom &&
-            activeMessages.length > 0 &&
-            !isPlanPanelOpen && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-                <button
-                  onClick={handleJumpToBottom}
-                  className="pointer-events-auto flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium shadow-md transition-opacity hover:bg-muted"
-                >
-                  <ArrowDown className="size-3" />
-                  Jump to bottom
-                </button>
-              </div>
-            )}
-        </div>
-
-        {/* Permission requests */}
-        {activePermissions.length > 0 && (
-          <div className="shrink-0 border-t bg-amber-500/10 px-4 py-2">
-            {activePermissions.map((permission) => (
-              <PermissionBanner
-                key={permission.id}
-                permission={permission}
-                onRespond={(response) => {
-                  if (!activeWorkspaceId) return;
-                  respondToPermission(
-                    permission.sessionID,
-                    permission.id,
-                    response,
-                    activeWorkspaceId,
-                  );
-                }}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Question requests */}
-        {activeQuestions.length > 0 && (
-          <div className={cn("shrink-0 border-t bg-indigo-500/10 px-4 py-2", !isQuestionsMinimized && "space-y-2")}>
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setIsQuestionsMinimized((prev) => !prev)}
-                className="flex items-center gap-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-indigo-100 transition-colors"
-              >
-                {isQuestionsMinimized ? (
-                  <ChevronRight className="size-3.5" />
-                ) : (
-                  <ChevronDown className="size-3.5" />
-                )}
-                <MessageCircleQuestion className="size-3.5" />
-                {activeQuestions.length} {activeQuestions.length === 1 ? "question" : "questions"} pending
-              </button>
-              {!isQuestionsMinimized && (
-                <div className="flex rounded-md border border-indigo-500/30 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuestionViewMode("list");
-                      localStorage.setItem("dev-hub:chat-question-view", "list");
-                    }}
-                    className={cn(
-                      "px-1.5 py-1 transition-colors",
-                      questionViewMode === "list"
-                        ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    )}
-                    title="List view"
-                  >
-                    <LayoutList className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuestionViewMode("tabs");
-                      localStorage.setItem("dev-hub:chat-question-view", "tabs");
-                    }}
-                    className={cn(
-                      "px-1.5 py-1 transition-colors",
-                      questionViewMode === "tabs"
-                        ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    )}
-                    title="Tab view"
-                  >
-                    <PanelTop className="size-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className={cn(
-              "grid transition-[grid-template-rows] duration-200 ease-in-out",
-              isQuestionsMinimized ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
-            )}>
-              <div className="overflow-hidden">
-                <QuestionErrorBoundary
-                  key={activeQuestions.map((q) => q.id).join(",")}
-                  onDismissAll={() => {
-                    if (!activeWorkspaceId) return;
-                    activeQuestions.forEach((q) =>
-                      rejectQuestion(q.id, activeWorkspaceId),
-                    );
-                  }}
-                >
-                  {activeQuestions.map((question) => (
-                    <QuestionBanner
-                      key={question.id}
-                      request={question}
-                      viewMode={questionViewMode}
-                      onReply={(answers) => {
-                        if (!activeWorkspaceId) return;
-                        replyToQuestion(question.id, answers, activeWorkspaceId);
-                      }}
-                      onReject={() => {
-                        if (!activeWorkspaceId) return;
-                        rejectQuestion(question.id, activeWorkspaceId);
-                      }}
-                    />
-                  ))}
-                </QuestionErrorBoundary>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Error banner */}
-        {streamingError && (
-          <div className="flex shrink-0 items-center gap-2 border-t bg-destructive/10 px-4 py-2 text-sm text-destructive">
-            <AlertCircle className="size-4 shrink-0" />
-            <span className="flex-1">{streamingError}</span>
+        <div
+          ref={(el) => {
+            messagesPanelFocusRef.current = el;
+          }}
+          tabIndex={-1}
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        >
+          {/* Chat toolbar */}
+          <div className="bg-background sticky top-0 z-30 flex shrink-0 items-center gap-1.5 border-b px-3 py-2 md:gap-2 md:px-4">
+            {/* Mobile: open session sheet */}
             <Button
               size="icon-xs"
               variant="ghost"
-              className="shrink-0 text-destructive hover:text-destructive"
-              onClick={() => useChatStore.setState({ streamingError: null })}
+              onClick={() => setIsMobileSessionsOpen(true)}
+              className="mr-1 md:hidden"
             >
-              <X className="size-3" />
+              <MessageSquare className="size-4" />
             </Button>
-          </div>
-        )}
+            {/* Desktop: toggle session sidebar */}
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              onClick={() => setIsSessionListOpen(!isSessionListOpen)}
+              className="hidden md:inline-flex"
+            >
+              <svg
+                className="size-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 12h18M3 6h18M3 18h18" />
+              </svg>
+            </Button>
 
-        <PromptInput
-          ref={promptInputRef}
-          onSubmit={handleSendMessage}
-          onCommandSelect={handleCommandDispatch}
-          onAbort={handleAbort}
-          isStreaming={streamingStatus === "streaming"}
-          disabled={!activeWorkspaceId}
-          workspaceId={activeWorkspaceId}
-          sessionId={activeSessionId}
-          commands={commands}
-        />
-      </div>
+            <div className="md:flex-1" />
+
+            <Button
+              size="icon-sm"
+              variant={isPlanPanelOpen ? "secondary" : "outline"}
+              onClick={() => setIsPlanPanelOpen(!isPlanPanelOpen)}
+              title="Plan notes"
+            >
+              <ScrollText className="size-4" />
+            </Button>
+
+            <AgentSelector
+              agents={primaryAgents}
+              selectedAgent={selectedAgent}
+              onAgentChange={(agent) => {
+                setSelectedAgent(agent);
+                if (activeSessionId && activeWorkspaceId) {
+                  setSessionAgent(activeSessionId, activeWorkspaceId, agent);
+                  clearSessionModel(activeSessionId, activeWorkspaceId);
+                }
+              }}
+              open={isAgentSelectorOpen}
+              onOpenChange={setIsAgentSelectorOpen}
+            />
+
+            <ModelSelector
+              workspaceId={activeWorkspaceId}
+              selectedModel={selectedModel}
+              onModelChange={handleModelChange}
+              onVariantsChange={setAvailableVariants}
+              open={isModelSelectorOpen}
+              onOpenChange={setIsModelSelectorOpen}
+            />
+
+            <VariantSelector
+              variants={availableVariants}
+              selectedVariant={selectedVariant}
+              onVariantChange={setSelectedVariant}
+              open={isVariantSelectorOpen}
+              onOpenChange={setIsVariantSelectorOpen}
+            />
+          </div>
+
+          {/* Messages area or plan panel — mutually exclusive */}
+          <div className="chat-scroll-area relative min-h-0 min-w-0 flex-1 overflow-hidden [contain:strict]">
+            {isPlanPanelOpen && activeWorkspaceId ? (
+              <PlanPanel
+                workspaceId={activeWorkspaceId}
+                workspaceName={activeWorkspaceName}
+                sessionDirectory={activeSessionDirectory}
+                isOpen={isPlanPanelOpen}
+                onClose={() => setIsPlanPanelOpen(false)}
+                onPlanFilesChange={setHasPlanFiles}
+              />
+            ) : (
+              <div className="flex h-full flex-col">
+                {activeMessages.length === 0 ? (
+                  showLoader ? (
+                    <div className="flex h-full items-center justify-center">
+                      <Loader2 className="text-muted-foreground size-5 animate-spin" />
+                    </div>
+                  ) : !isMessagesLoaded ? (
+                    <div className="h-full" />
+                  ) : (
+                    <EmptyChat onSend={handleSendMessage} />
+                  )
+                ) : (
+                  <Virtuoso
+                    key={activeSessionId}
+                    ref={virtuosoRef}
+                    data={activeMessages}
+                    initialTopMostItemIndex={Math.max(
+                      0,
+                      activeMessages.length - 1,
+                    )}
+                    itemContent={(index, msg) => {
+                      const prev = index > 0 ? activeMessages[index - 1] : null;
+                      const showAvatar =
+                        !prev || prev.info.role !== msg.info.role;
+                      const canRevert =
+                        streamingStatus !== "streaming" &&
+                        msg.info.role === "user" &&
+                        index > 0;
+                      return (
+                        <ChatMessage
+                          key={msg.info.id}
+                          message={msg}
+                          showAvatar={showAvatar}
+                          onRevert={canRevert ? handleRevert : undefined}
+                        />
+                      );
+                    }}
+                    followOutput={handleFollowOutput}
+                    atBottomStateChange={handleAtBottomStateChange}
+                    atBottomThreshold={80}
+                    increaseViewportBy={{
+                      top: 200,
+                      bottom: isMobile ? 100 : 400,
+                    }}
+                    className="h-full"
+                    components={
+                      streamingStatus === "streaming"
+                        ? STREAMING_COMPONENTS
+                        : EMPTY_COMPONENTS
+                    }
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Jump-to-bottom pill — shown when user has scrolled up during streaming or after */}
+            {showJumpToBottom &&
+              activeMessages.length > 0 &&
+              !isPlanPanelOpen && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+                  <button
+                    onClick={handleJumpToBottom}
+                    className="bg-background hover:bg-muted pointer-events-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-md transition-opacity"
+                  >
+                    <ArrowDown className="size-3" />
+                    Jump to bottom
+                  </button>
+                </div>
+              )}
+          </div>
+
+          {/* Permission requests */}
+          {activePermissions.length > 0 && (
+            <div className="shrink-0 border-t bg-amber-500/10 px-4 py-2">
+              {activePermissions.map((permission) => (
+                <PermissionBanner
+                  key={permission.id}
+                  permission={permission}
+                  onRespond={(response) => {
+                    if (!activeWorkspaceId) return;
+                    respondToPermission(
+                      permission.sessionID,
+                      permission.id,
+                      response,
+                      activeWorkspaceId,
+                    );
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Question requests */}
+          {activeQuestions.length > 0 && (
+            <div
+              className={cn(
+                "shrink-0 border-t bg-indigo-500/10 px-4 py-2",
+                !isQuestionsMinimized && "space-y-2",
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setIsQuestionsMinimized((prev) => !prev)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-indigo-700 transition-colors hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-indigo-100"
+                >
+                  {isQuestionsMinimized ? (
+                    <ChevronRight className="size-3.5" />
+                  ) : (
+                    <ChevronDown className="size-3.5" />
+                  )}
+                  <MessageCircleQuestion className="size-3.5" />
+                  {activeQuestions.length}{" "}
+                  {activeQuestions.length === 1 ? "question" : "questions"}{" "}
+                  pending
+                </button>
+                {!isQuestionsMinimized && (
+                  <div className="flex overflow-hidden rounded-md border border-indigo-500/30">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuestionViewMode("list");
+                        localStorage.setItem(
+                          "dev-hub:chat-question-view",
+                          "list",
+                        );
+                      }}
+                      className={cn(
+                        "px-1.5 py-1 transition-colors",
+                        questionViewMode === "list"
+                          ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                      )}
+                      title="List view"
+                    >
+                      <LayoutList className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuestionViewMode("tabs");
+                        localStorage.setItem(
+                          "dev-hub:chat-question-view",
+                          "tabs",
+                        );
+                      }}
+                      className={cn(
+                        "px-1.5 py-1 transition-colors",
+                        questionViewMode === "tabs"
+                          ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                      )}
+                      title="Tab view"
+                    >
+                      <PanelTop className="size-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div
+                className={cn(
+                  "grid transition-[grid-template-rows] duration-200 ease-in-out",
+                  isQuestionsMinimized ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+                )}
+              >
+                <div className="overflow-hidden">
+                  <QuestionErrorBoundary
+                    key={activeQuestions.map((q) => q.id).join(",")}
+                    onDismissAll={() => {
+                      if (!activeWorkspaceId) return;
+                      activeQuestions.forEach((q) =>
+                        rejectQuestion(q.id, activeWorkspaceId),
+                      );
+                    }}
+                  >
+                    {activeQuestions.map((question) => (
+                      <QuestionBanner
+                        key={question.id}
+                        request={question}
+                        viewMode={questionViewMode}
+                        onReply={(answers) => {
+                          if (!activeWorkspaceId) return;
+                          replyToQuestion(
+                            question.id,
+                            answers,
+                            activeWorkspaceId,
+                          );
+                        }}
+                        onReject={() => {
+                          if (!activeWorkspaceId) return;
+                          rejectQuestion(question.id, activeWorkspaceId);
+                        }}
+                      />
+                    ))}
+                  </QuestionErrorBoundary>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error banner */}
+          {streamingError && (
+            <div className="bg-destructive/10 text-destructive flex shrink-0 items-center gap-2 border-t px-4 py-2 text-sm">
+              <AlertCircle className="size-4 shrink-0" />
+              <span className="flex-1">{streamingError}</span>
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                className="text-destructive hover:text-destructive shrink-0"
+                onClick={() => useChatStore.setState({ streamingError: null })}
+              >
+                <X className="size-3" />
+              </Button>
+            </div>
+          )}
+
+          <PromptInput
+            ref={promptInputRef}
+            onSubmit={handleSendMessage}
+            onCommandSelect={handleCommandDispatch}
+            onAbort={handleAbort}
+            isStreaming={streamingStatus === "streaming"}
+            disabled={!activeWorkspaceId}
+            workspaceId={activeWorkspaceId}
+            sessionId={activeSessionId}
+            commands={commands}
+          />
+        </div>
       </ChatDisplayContext.Provider>
 
       {isTaskPanelOpen && (
         <>
           <div
-            className="hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center hover:bg-accent/50 active:bg-accent transition-colors md:flex"
+            className="hover:bg-accent/50 active:bg-accent hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors md:flex"
             onMouseDown={handleTaskPanelDragStart}
           >
-            <GripVertical className="size-3.5 text-muted-foreground/30" />
+            <GripVertical className="text-muted-foreground/30 size-3.5" />
           </div>
           <div
-            ref={(el) => { taskPanelFocusRef.current = el }}
+            ref={(el) => {
+              taskPanelFocusRef.current = el;
+            }}
             tabIndex={-1}
-            className="hidden shrink-0 overflow-y-auto border-l md:block relative"
+            className="relative hidden shrink-0 overflow-y-auto border-l md:block"
             style={{ width: taskPanelWidth }}
           >
             <div className="flex items-center justify-between border-b px-3 py-2">
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-muted-foreground text-xs font-medium">
                 {activeTodos.length > 0 ? "Task Progress" : "Side Panel"}
               </span>
               <Button
@@ -1712,8 +1880,14 @@ export function ChatInterface() {
                 <TaskProgressPanel todos={activeTodos} />
               </div>
             )}
-            <div className={activeTodos.length > 0 ? "border-t px-3 py-2" : "px-3 py-2"}>
-              <span className="text-xs font-medium text-muted-foreground">MCP Servers</span>
+            <div
+              className={
+                activeTodos.length > 0 ? "border-t px-3 py-2" : "px-3 py-2"
+              }
+            >
+              <span className="text-muted-foreground text-xs font-medium">
+                MCP Servers
+              </span>
             </div>
             <div className="px-3 pb-3">
               <McpStatusPanel />
@@ -1783,24 +1957,26 @@ const StreamingIndicator = memo(function StreamingIndicator({
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex gap-1">
-        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.3s]" />
-        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:-0.15s]" />
-        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/50" />
+        <span className="bg-muted-foreground/50 size-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
+        <span className="bg-muted-foreground/50 size-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
+        <span className="bg-muted-foreground/50 size-1.5 animate-bounce rounded-full" />
       </div>
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-muted-foreground text-xs">{label}</span>
     </div>
   );
-})
+});
 
 const VirtuosoFooter = memo(function VirtuosoFooter() {
-  const messages = useChatStore((s) => s.getActiveSessionMessages())
-  const sessionStatus = useChatStore((s) => s.getActiveSessionStatus())
-  return <StreamingIndicator messages={messages} sessionStatus={sessionStatus} />
-})
+  const messages = useChatStore((s) => s.getActiveSessionMessages());
+  const sessionStatus = useChatStore((s) => s.getActiveSessionStatus());
+  return (
+    <StreamingIndicator messages={messages} sessionStatus={sessionStatus} />
+  );
+});
 
-const VirtuosoSpacer = () => <div className="h-4" />
-const EMPTY_COMPONENTS = { Footer: VirtuosoSpacer } as const
-const STREAMING_COMPONENTS = { Footer: VirtuosoFooter } as const
+const VirtuosoSpacer = () => <div className="h-4" />;
+const EMPTY_COMPONENTS = { Footer: VirtuosoSpacer } as const;
+const STREAMING_COMPONENTS = { Footer: VirtuosoFooter } as const;
 
 function EmptyChat({ onSend }: { onSend: (text: string) => void }) {
   const suggestions = [
@@ -1814,7 +1990,7 @@ function EmptyChat({ onSend }: { onSend: (text: string) => void }) {
     <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
       <div className="text-center">
         <h2 className="text-xl font-semibold">Start a conversation</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Ask OpenCode anything about your project
         </p>
       </div>
@@ -1823,7 +1999,7 @@ function EmptyChat({ onSend }: { onSend: (text: string) => void }) {
           <Button
             key={suggestion}
             variant="outline"
-            className="h-auto whitespace-normal px-4 py-3 text-left text-sm"
+            className="h-auto px-4 py-3 text-left text-sm whitespace-normal"
             onClick={() => onSend(suggestion)}
           >
             {suggestion}
@@ -1848,17 +2024,17 @@ function PermissionBanner({
   return (
     <div className="flex items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-500/5 px-3 py-2">
       <ShieldAlert className="size-5 shrink-0 text-amber-600" />
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">
           {formatPermissionTitle(permission.permission)}
         </p>
         {permission.patterns.length > 0 && (
-          <p className="text-xs text-muted-foreground truncate">
+          <p className="text-muted-foreground truncate text-xs">
             {permission.patterns.join(", ")}
           </p>
         )}
       </div>
-      <div className="flex gap-1.5 shrink-0">
+      <div className="flex shrink-0 gap-1.5">
         <Button
           size="sm"
           variant="outline"
@@ -1952,10 +2128,10 @@ function QuestionBanner({
   const useTabs = viewMode === "tabs" && questionList.length > 1;
 
   return (
-    <div className="rounded-lg border border-indigo-500/50 bg-indigo-500/5 px-3 py-2 space-y-3">
+    <div className="space-y-3 rounded-lg border border-indigo-500/50 bg-indigo-500/5 px-3 py-2">
       {useTabs ? (
         <>
-          <div className="flex gap-1 overflow-x-auto border-b border-indigo-500/20 -mx-3 px-3">
+          <div className="-mx-3 flex gap-1 overflow-x-auto border-b border-indigo-500/20 px-3">
             {questionList.map((q, i) => {
               const hasSelection =
                 (selections[i]?.length ?? 0) > 0 ||
@@ -1966,10 +2142,10 @@ function QuestionBanner({
                   type="button"
                   onClick={() => setActiveTab(i)}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors",
+                    "-mb-px shrink-0 border-b-2 px-3 py-1.5 text-xs font-medium transition-colors",
                     activeTab === i
                       ? "border-indigo-500 text-indigo-700 dark:text-indigo-300"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground border-transparent",
                   )}
                 >
                   {q.header}
@@ -1985,7 +2161,11 @@ function QuestionBanner({
             selected={selections[activeTab]}
             customInput={customInputs[activeTab]}
             onToggleOption={(label) =>
-              toggleOption(activeTab, label, questionList[activeTab].multiple === true)
+              toggleOption(
+                activeTab,
+                label,
+                questionList[activeTab].multiple === true,
+              )
             }
             onCustomInputChange={(value) => {
               setCustomInputs((prev) => {
@@ -2063,10 +2243,10 @@ function QuestionItem({
   return (
     <div className="space-y-2">
       <div className="flex items-start gap-2">
-        <MessageCircleQuestion className="size-5 shrink-0 text-indigo-600 mt-0.5" />
+        <MessageCircleQuestion className="mt-0.5 size-5 shrink-0 text-indigo-600" />
         <div>
           <p className="text-sm font-medium">{question.header}</p>
-          <p className="text-xs text-muted-foreground">{question.question}</p>
+          <p className="text-muted-foreground text-xs">{question.question}</p>
         </div>
       </div>
 

@@ -209,7 +209,7 @@ function basenamePositions(
 
 function SectionHeader({ label, count }: { label: string; count: number }) {
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+    <div className="text-muted-foreground/60 flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium tracking-wider uppercase">
       <span>{label}</span>
       <span>({count})</span>
     </div>
@@ -493,7 +493,7 @@ function GitPickerDialogContent({ close }: { close: () => void }) {
             />
           </span>
           {dirname && (
-            <span className="truncate text-[11px] text-muted-foreground/60">
+            <span className="text-muted-foreground/60 truncate text-[11px]">
               {dirname}
             </span>
           )}
@@ -503,147 +503,147 @@ function GitPickerDialogContent({ close }: { close: () => void }) {
   };
 
   return (
-      <DialogContent
-        className="max-w-lg gap-0 overflow-hidden p-0"
-        showCloseButton={false}
-        onKeyDown={handleKeyDown}
-      >
-        <DialogHeader className="sr-only">
-          <DialogTitle>Git changed files</DialogTitle>
-          <DialogDescription>
-            Search and navigate to changed git files
-          </DialogDescription>
-        </DialogHeader>
+    <DialogContent
+      className="max-w-lg gap-0 overflow-hidden p-0"
+      showCloseButton={false}
+      onKeyDown={handleKeyDown}
+    >
+      <DialogHeader className="sr-only">
+        <DialogTitle>Git changed files</DialogTitle>
+        <DialogDescription>
+          Search and navigate to changed git files
+        </DialogDescription>
+      </DialogHeader>
 
-        {/* Search input + mode toggle */}
-        <div className="flex items-center gap-2 border-b px-3 py-2">
-          <Search className="size-4 shrink-0 text-muted-foreground" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelectedIndex(0);
-            }}
-            placeholder={
-              mode === "status"
-                ? "Search changed files..."
-                : "Search branch diff..."
-            }
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          {isLoading && (
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          )}
-          <button
-            type="button"
-            onClick={toggleMode}
-            className={cn(
-              "flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors",
-              "border border-border bg-muted/50 text-muted-foreground hover:bg-muted",
-            )}
-            tabIndex={-1}
-          >
-            {mode === "status" ? (
-              <>
-                <FileText className="size-3" />
-                <span>Status</span>
-              </>
-            ) : (
-              <>
-                <GitCompare className="size-3" />
-                <span>Branch</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Branch selector (only in branch mode) */}
-        {mode === "branch" && comparableBranches.length > 0 && (
-          <div className="flex items-center gap-2 border-b px-3 py-1.5 bg-muted/30">
-            <GitCompare className="size-3 text-muted-foreground" />
-            <span className="text-[11px] text-muted-foreground">vs</span>
-            <select
-              value={effectiveBaseRef ?? ""}
-              onChange={(e) => setCompareBaseRef(e.target.value || null)}
-              className="flex-1 truncate bg-transparent text-[11px] text-muted-foreground outline-none"
-            >
-              {comparableBranches.map((branch) => (
-                <option key={branch.name} value={branch.name}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Search input + mode toggle */}
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        <Search className="text-muted-foreground size-4 shrink-0" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSelectedIndex(0);
+          }}
+          placeholder={
+            mode === "status"
+              ? "Search changed files..."
+              : "Search branch diff..."
+          }
+          className="placeholder:text-muted-foreground flex-1 bg-transparent text-sm outline-none"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {isLoading && (
+          <Loader2 className="text-muted-foreground size-4 animate-spin" />
         )}
+        <button
+          type="button"
+          onClick={toggleMode}
+          className={cn(
+            "flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors",
+            "border-border bg-muted/50 text-muted-foreground hover:bg-muted border",
+          )}
+          tabIndex={-1}
+        >
+          {mode === "status" ? (
+            <>
+              <FileText className="size-3" />
+              <span>Status</span>
+            </>
+          ) : (
+            <>
+              <GitCompare className="size-3" />
+              <span>Branch</span>
+            </>
+          )}
+        </button>
+      </div>
 
-        {/* Results */}
-        <ScrollArea className="h-[min(400px,60vh)] [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block">
-          <div ref={listRef} className="p-1">
-            {!isLoading && totalItems === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                {mode === "status"
-                  ? "No uncommitted changes"
-                  : "No changes vs base branch"}
-              </p>
-            )}
-
-            {/* Status mode with sections (no search query) */}
-            {sections && (
-              <>
-                {sections.staged.length > 0 && (
-                  <>
-                    <SectionHeader
-                      label="Staged"
-                      count={sections.staged.length}
-                    />
-                    {sections.staged.map((r) =>
-                      renderFileRow(r.file, r.match, r.flatIndex),
-                    )}
-                  </>
-                )}
-                {sections.changes.length > 0 && (
-                  <>
-                    <SectionHeader
-                      label="Changes"
-                      count={sections.changes.length}
-                    />
-                    {sections.changes.map((r) =>
-                      renderFileRow(r.file, r.match, r.flatIndex),
-                    )}
-                  </>
-                )}
-                {sections.conflicts.length > 0 && (
-                  <>
-                    <SectionHeader
-                      label="Conflicts"
-                      count={sections.conflicts.length}
-                    />
-                    {sections.conflicts.map((r) =>
-                      renderFileRow(r.file, r.match, r.flatIndex),
-                    )}
-                  </>
-                )}
-              </>
-            )}
-
-            {/* Flat list (branch mode, or status mode with a search query) */}
-            {!sections &&
-              results.map((r, i) => renderFileRow(r.file, r.match, i))}
-          </div>
-        </ScrollArea>
-
-        {/* Footer hints */}
-        <div className="flex items-center gap-3 border-t px-3 py-1.5 text-[10px] text-muted-foreground/60">
-          <span>↑↓ navigate</span>
-          <span>↵ open diff</span>
-          <span>^↵ open editor</span>
-          <span>tab switch mode</span>
-          <span>esc close</span>
+      {/* Branch selector (only in branch mode) */}
+      {mode === "branch" && comparableBranches.length > 0 && (
+        <div className="bg-muted/30 flex items-center gap-2 border-b px-3 py-1.5">
+          <GitCompare className="text-muted-foreground size-3" />
+          <span className="text-muted-foreground text-[11px]">vs</span>
+          <select
+            value={effectiveBaseRef ?? ""}
+            onChange={(e) => setCompareBaseRef(e.target.value || null)}
+            className="text-muted-foreground flex-1 truncate bg-transparent text-[11px] outline-none"
+          >
+            {comparableBranches.map((branch) => (
+              <option key={branch.name} value={branch.name}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
         </div>
-      </DialogContent>
+      )}
+
+      {/* Results */}
+      <ScrollArea className="h-[min(400px,60vh)] [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block">
+        <div ref={listRef} className="p-1">
+          {!isLoading && totalItems === 0 && (
+            <p className="text-muted-foreground py-8 text-center text-sm">
+              {mode === "status"
+                ? "No uncommitted changes"
+                : "No changes vs base branch"}
+            </p>
+          )}
+
+          {/* Status mode with sections (no search query) */}
+          {sections && (
+            <>
+              {sections.staged.length > 0 && (
+                <>
+                  <SectionHeader
+                    label="Staged"
+                    count={sections.staged.length}
+                  />
+                  {sections.staged.map((r) =>
+                    renderFileRow(r.file, r.match, r.flatIndex),
+                  )}
+                </>
+              )}
+              {sections.changes.length > 0 && (
+                <>
+                  <SectionHeader
+                    label="Changes"
+                    count={sections.changes.length}
+                  />
+                  {sections.changes.map((r) =>
+                    renderFileRow(r.file, r.match, r.flatIndex),
+                  )}
+                </>
+              )}
+              {sections.conflicts.length > 0 && (
+                <>
+                  <SectionHeader
+                    label="Conflicts"
+                    count={sections.conflicts.length}
+                  />
+                  {sections.conflicts.map((r) =>
+                    renderFileRow(r.file, r.match, r.flatIndex),
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* Flat list (branch mode, or status mode with a search query) */}
+          {!sections &&
+            results.map((r, i) => renderFileRow(r.file, r.match, i))}
+        </div>
+      </ScrollArea>
+
+      {/* Footer hints */}
+      <div className="text-muted-foreground/60 flex items-center gap-3 border-t px-3 py-1.5 text-[10px]">
+        <span>↑↓ navigate</span>
+        <span>↵ open diff</span>
+        <span>^↵ open editor</span>
+        <span>tab switch mode</span>
+        <span>esc close</span>
+      </div>
+    </DialogContent>
   );
 }

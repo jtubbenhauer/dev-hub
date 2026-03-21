@@ -1,27 +1,31 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from "react"
-import { Send, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Send, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-const MAX_LENGTH = 2000
+const MAX_LENGTH = 2000;
 
 interface CommentInputProps {
-  startLine: number
-  endLine: number
-  filePath: string
-  onSubmit: (body: string) => void
-  onCancel: () => void
-  initialBody?: string
+  startLine: number;
+  endLine: number;
+  filePath: string;
+  onSubmit: (body: string) => void;
+  onCancel: () => void;
+  initialBody?: string;
 }
 
-function formatHeader(filePath: string, startLine: number, endLine: number): string {
-  const fileName = filePath.split("/").pop() ?? filePath
+function formatHeader(
+  filePath: string,
+  startLine: number,
+  endLine: number,
+): string {
+  const fileName = filePath.split("/").pop() ?? filePath;
   if (startLine === endLine) {
-    return `${fileName}:${startLine}`
+    return `${fileName}:${startLine}`;
   }
-  return `${fileName}:${startLine}-${endLine}`
+  return `${fileName}:${startLine}-${endLine}`;
 }
 
 export function CommentInput({
@@ -32,48 +36,51 @@ export function CommentInput({
   onCancel,
   initialBody = "",
 }: CommentInputProps) {
-  const [body, setBody] = useState(initialBody)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [body, setBody] = useState(initialBody);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    textareaRef.current?.focus()
-  }, [])
+    textareaRef.current?.focus();
+  }, []);
 
   const handleSubmit = useCallback(() => {
-    const trimmed = body.trim()
-    if (!trimmed || trimmed.length > MAX_LENGTH) return
-    onSubmit(trimmed)
-  }, [body, onSubmit])
+    const trimmed = body.trim();
+    if (!trimmed || trimmed.length > MAX_LENGTH) return;
+    onSubmit(trimmed);
+  }, [body, onSubmit]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
-    if (value.length <= MAX_LENGTH) {
-      setBody(value)
-    }
-  }, [])
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      if (value.length <= MAX_LENGTH) {
+        setBody(value);
+      }
+    },
+    [],
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Escape") {
-        e.preventDefault()
-        onCancel()
-        return
+        e.preventDefault();
+        onCancel();
+        return;
       }
       if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault()
-        handleSubmit()
+        e.preventDefault();
+        handleSubmit();
       }
     },
-    [handleSubmit, onCancel]
-  )
+    [handleSubmit, onCancel],
+  );
 
-  const trimmedBody = body.trim()
-  const isSubmitDisabled = !trimmedBody || body.length > MAX_LENGTH
+  const trimmedBody = body.trim();
+  const isSubmitDisabled = !trimmedBody || body.length > MAX_LENGTH;
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-3 text-sm shadow-sm">
+    <div className="border-border bg-card flex flex-col gap-2 rounded-md border p-3 text-sm shadow-sm">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-xs text-muted-foreground">
+        <span className="text-muted-foreground font-mono text-xs">
           {formatHeader(filePath, startLine, endLine)}
         </span>
       </div>
@@ -86,18 +93,18 @@ export function CommentInput({
         placeholder="Add a comment… (Enter to submit, Shift+Enter for newline)"
         rows={3}
         className={cn(
-          "w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm",
+          "border-input bg-background w-full resize-none rounded-md border px-3 py-2 text-sm",
           "placeholder:text-muted-foreground",
-          "outline-none focus-visible:ring-1 focus-visible:ring-ring",
-          "disabled:cursor-not-allowed disabled:opacity-50"
+          "focus-visible:ring-ring outline-none focus-visible:ring-1",
+          "disabled:cursor-not-allowed disabled:opacity-50",
         )}
       />
 
       <div className="flex items-center justify-between gap-2">
         <span
           className={cn(
-            "text-xs text-muted-foreground",
-            body.length > MAX_LENGTH && "text-destructive"
+            "text-muted-foreground text-xs",
+            body.length > MAX_LENGTH && "text-destructive",
           )}
         >
           {body.length}/{MAX_LENGTH}
@@ -125,5 +132,5 @@ export function CommentInput({
         </div>
       </div>
     </div>
-  )
+  );
 }

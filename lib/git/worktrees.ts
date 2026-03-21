@@ -1,10 +1,10 @@
-import simpleGit from "simple-git"
-import path from "node:path"
-import fs from "node:fs"
-import type { WorktreeInfo } from "@/types"
+import simpleGit from "simple-git";
+import path from "node:path";
+import fs from "node:fs";
+import type { WorktreeInfo } from "@/types";
 
 function createGit(workspacePath: string) {
-  return simpleGit(workspacePath)
+  return simpleGit(workspacePath);
 }
 
 /**
@@ -12,44 +12,50 @@ function createGit(workspacePath: string) {
  * Parses `git worktree list --porcelain` output.
  */
 export async function listWorktrees(repoPath: string): Promise<WorktreeInfo[]> {
-  const git = createGit(repoPath)
-  const output = await git.raw(["worktree", "list", "--porcelain"])
+  const git = createGit(repoPath);
+  const output = await git.raw(["worktree", "list", "--porcelain"]);
 
-  const worktrees: WorktreeInfo[] = []
-  let current: Partial<WorktreeInfo> = {}
+  const worktrees: WorktreeInfo[] = [];
+  let current: Partial<WorktreeInfo> = {};
 
   for (const line of output.split("\n")) {
     if (line.startsWith("worktree ")) {
       if (current.path) {
-        worktrees.push(finalizeWorktree(current, repoPath))
+        worktrees.push(finalizeWorktree(current, repoPath));
       }
-      current = { path: line.slice("worktree ".length).trim() }
+      current = { path: line.slice("worktree ".length).trim() };
     } else if (line.startsWith("HEAD ")) {
-      current.head = line.slice("HEAD ".length).trim()
+      current.head = line.slice("HEAD ".length).trim();
     } else if (line.startsWith("branch ")) {
       // branch refs/heads/main -> main
-      current.branch = line.slice("branch ".length).trim().replace("refs/heads/", "")
+      current.branch = line
+        .slice("branch ".length)
+        .trim()
+        .replace("refs/heads/", "");
     } else if (line === "bare") {
-      current.isBare = true
+      current.isBare = true;
     } else if (line === "detached") {
-      current.isDetached = true
+      current.isDetached = true;
     } else if (line === "" && current.path) {
-      worktrees.push(finalizeWorktree(current, repoPath))
-      current = {}
+      worktrees.push(finalizeWorktree(current, repoPath));
+      current = {};
     }
   }
 
   // Handle last entry if no trailing newline
   if (current.path) {
-    worktrees.push(finalizeWorktree(current, repoPath))
+    worktrees.push(finalizeWorktree(current, repoPath));
   }
 
-  return worktrees
+  return worktrees;
 }
 
-function finalizeWorktree(partial: Partial<WorktreeInfo>, repoPath: string): WorktreeInfo {
-  const resolvedRepo = path.resolve(repoPath)
-  const resolvedPath = path.resolve(partial.path ?? "")
+function finalizeWorktree(
+  partial: Partial<WorktreeInfo>,
+  repoPath: string,
+): WorktreeInfo {
+  const resolvedRepo = path.resolve(repoPath);
+  const resolvedPath = path.resolve(partial.path ?? "");
   return {
     path: partial.path ?? "",
     branch: partial.branch ?? "",
@@ -57,7 +63,7 @@ function finalizeWorktree(partial: Partial<WorktreeInfo>, repoPath: string): Wor
     isMain: resolvedPath === resolvedRepo,
     isBare: partial.isBare ?? false,
     isDetached: partial.isDetached ?? false,
-  }
+  };
 }
 
 /**
@@ -65,8 +71,8 @@ function finalizeWorktree(partial: Partial<WorktreeInfo>, repoPath: string): Wor
  * For a repo at `/home/user/dev/my-repo`, worktrees go in `/home/user/dev/my-repo-worktrees/`.
  */
 export function getWorktreeBaseDir(repoPath: string): string {
-  const resolved = path.resolve(repoPath)
-  return `${resolved}-worktrees`
+  const resolved = path.resolve(repoPath);
+  return `${resolved}-worktrees`;
 }
 
 /**
@@ -84,39 +90,39 @@ export async function addWorktree(
   branch: string,
   newBranch: boolean,
   basePath?: string,
-  startPoint?: string
+  startPoint?: string,
 ): Promise<string> {
-  const git = createGit(repoPath)
+  const git = createGit(repoPath);
 
   // Determine where to put the worktree
-  const baseDir = basePath ?? getWorktreeBaseDir(repoPath)
-  const worktreePath = path.join(baseDir, branch)
+  const baseDir = basePath ?? getWorktreeBaseDir(repoPath);
+  const worktreePath = path.join(baseDir, branch);
 
   // Ensure base directory exists
   if (!fs.existsSync(baseDir)) {
-    fs.mkdirSync(baseDir, { recursive: true })
+    fs.mkdirSync(baseDir, { recursive: true });
   }
 
   // Check if worktree path already exists
   if (fs.existsSync(worktreePath)) {
-    throw new Error(`Directory already exists: ${worktreePath}`)
+    throw new Error(`Directory already exists: ${worktreePath}`);
   }
 
   // Build git worktree add command
-  const args = ["worktree", "add"]
+  const args = ["worktree", "add"];
   if (newBranch) {
-    args.push("-b", branch)
-    args.push(worktreePath)
+    args.push("-b", branch);
+    args.push(worktreePath);
     if (startPoint) {
-      args.push(startPoint)
+      args.push(startPoint);
     }
   } else {
-    args.push(worktreePath, branch)
+    args.push(worktreePath, branch);
   }
 
-  await git.raw(args)
+  await git.raw(args);
 
-  return worktreePath
+  return worktreePath;
 }
 
 /**
@@ -129,51 +135,51 @@ export async function addWorktree(
 export async function removeWorktree(
   repoPath: string,
   worktreePath: string,
-  force: boolean = false
+  force: boolean = false,
 ): Promise<void> {
-  const git = createGit(repoPath)
+  const git = createGit(repoPath);
 
-  const args = ["worktree", "remove"]
-  if (force) args.push("--force")
-  args.push(worktreePath)
+  const args = ["worktree", "remove"];
+  if (force) args.push("--force");
+  args.push(worktreePath);
 
-  await git.raw(args)
+  await git.raw(args);
 }
 
 /**
  * Prune stale worktree references (e.g., after manually deleting a worktree directory).
  */
 export async function pruneWorktrees(repoPath: string): Promise<void> {
-  const git = createGit(repoPath)
-  await git.raw(["worktree", "prune"])
+  const git = createGit(repoPath);
+  await git.raw(["worktree", "prune"]);
 }
 
 export async function createSymlinks(
   parentRepoPath: string,
   worktreePath: string,
-  symlinkPaths: string[]
+  symlinkPaths: string[],
 ): Promise<{ created: string[]; skipped: string[] }> {
-  const created: string[] = []
-  const skipped: string[] = []
+  const created: string[] = [];
+  const skipped: string[] = [];
 
   for (const relPath of symlinkPaths) {
-    const sourcePath = path.join(parentRepoPath, relPath)
-    const targetPath = path.join(worktreePath, relPath)
+    const sourcePath = path.join(parentRepoPath, relPath);
+    const targetPath = path.join(worktreePath, relPath);
 
     if (!fs.existsSync(sourcePath)) {
-      skipped.push(relPath)
-      continue
+      skipped.push(relPath);
+      continue;
     }
 
     if (fs.existsSync(targetPath)) {
-      skipped.push(relPath)
-      continue
+      skipped.push(relPath);
+      continue;
     }
 
-    await fs.promises.mkdir(path.dirname(targetPath), { recursive: true })
-    await fs.promises.symlink(sourcePath, targetPath)
-    created.push(relPath)
+    await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.promises.symlink(sourcePath, targetPath);
+    created.push(relPath);
   }
 
-  return { created, skipped }
+  return { created, skipped };
 }

@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { useSoundSettings } from "@/hooks/use-settings"
-import { updateSoundSettings } from "@/lib/sounds"
+import { useEffect } from "react";
+import { useSoundSettings } from "@/hooks/use-settings";
+import { updateSoundSettings } from "@/lib/sounds";
 
 export function SoundSettingsSync() {
   const {
@@ -12,7 +12,7 @@ export function SoundSettingsSync() {
     permissionsSoundId,
     errorsEnabled,
     errorsSoundId,
-  } = useSoundSettings()
+  } = useSoundSettings();
 
   useEffect(() => {
     updateSoundSettings({
@@ -22,8 +22,15 @@ export function SoundSettingsSync() {
       permissionsSoundId,
       errorsEnabled,
       errorsSoundId,
-    })
-  }, [agentEnabled, agentSoundId, permissionsEnabled, permissionsSoundId, errorsEnabled, errorsSoundId])
+    });
+  }, [
+    agentEnabled,
+    agentSoundId,
+    permissionsEnabled,
+    permissionsSoundId,
+    errorsEnabled,
+    errorsSoundId,
+  ]);
 
-  return null
+  return null;
 }

@@ -1,39 +1,39 @@
-import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono, IBM_Plex_Mono } from "next/font/google"
-import "highlight.js/styles/github-dark-dimmed.css"
-import "highlight.js/styles/github.css"
-import "./globals.css"
-import { Providers } from "@/components/providers/providers"
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono, IBM_Plex_Mono } from "next/font/google";
+import "highlight.js/styles/github-dark-dimmed.css";
+import "highlight.js/styles/github.css";
+import "./globals.css";
+import { Providers } from "@/components/providers/providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-})
+});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-})
+});
 
 const ibmPlexMono = IBM_Plex_Mono({
   variable: "--font-ibm-plex-mono",
   subsets: ["latin"],
   weight: ["400", "500"],
-})
+});
 
 export const metadata: Metadata = {
   title: "Dev Hub",
   description: "Personal development command center",
-}
+};
 
 export const viewport: Viewport = {
   interactiveWidget: "resizes-content",
-}
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -50,5 +50,5 @@ export default function RootLayout({
         <Providers>{children}</Providers>
       </body>
     </html>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import type { LeaderAction, LeaderBindingsMap } from "@/types/leader-key"
+import type { LeaderAction, LeaderBindingsMap } from "@/types/leader-key";
 
 // All built-in actions. Handlers are registered at runtime by page components.
 export const BUILTIN_ACTIONS: LeaderAction[] = [
@@ -11,10 +11,18 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "nav:repos", label: "Go to Repos", page: "global" },
   { id: "nav:settings", label: "Go to Settings", page: "global" },
   { id: "nav:terminal", label: "Go to Terminal", page: "global" },
-  { id: "global:command-palette", label: "Open command palette", page: "global" },
+  {
+    id: "global:command-palette",
+    label: "Open command palette",
+    page: "global",
+  },
   { id: "global:file-picker", label: "Open file picker", page: "global" },
   { id: "global:session-picker", label: "Open session picker", page: "global" },
-  { id: "global:switch-workspace", label: "Open workspace switcher", page: "global" },
+  {
+    id: "global:switch-workspace",
+    label: "Open workspace switcher",
+    page: "global",
+  },
   { id: "global:task-picker", label: "Open task picker", page: "global" },
   { id: "global:git-picker", label: "Open git files picker", page: "global" },
 
@@ -50,7 +58,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "git:prev-unreviewed", label: "Jump to prev unreviewed", page: "git" },
   { id: "git:focus-editor", label: "Focus code pane", page: "git" },
   { id: "git:focus-files", label: "Focus files pane", page: "git" },
-]
+];
 
 export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   // Global navigation
@@ -101,4 +109,4 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "git:prev-unreviewed": "[",
   "git:focus-editor": "l",
   "git:focus-files": "h",
-}
+};

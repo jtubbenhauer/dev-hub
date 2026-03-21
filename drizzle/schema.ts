@@ -1,5 +1,10 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core"
-import { sql } from "drizzle-orm"
+import {
+  sqliteTable,
+  text,
+  integer,
+  primaryKey,
+} from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -8,7 +13,7 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
-})
+});
 
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),
@@ -16,7 +21,7 @@ export const sessions = sqliteTable("sessions", {
     .notNull()
     .references(() => users.id),
   expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
-})
+});
 
 export const workspaces = sqliteTable("workspaces", {
   id: text("id").primaryKey(),
@@ -31,13 +36,17 @@ export const workspaces = sqliteTable("workspaces", {
     enum: ["pnpm", "npm", "bun", "cargo", "go", "none"],
   }),
   quickCommands: text("quick_commands", { mode: "json" }),
-  backend: text("backend", { enum: ["local", "remote"] }).notNull().default("local"),
+  backend: text("backend", { enum: ["local", "remote"] })
+    .notNull()
+    .default("local"),
   provider: text("provider"),
   opencodeUrl: text("opencode_url"),
   agentUrl: text("agent_url"),
   providerMeta: text("provider_meta", { mode: "json" }),
   shellCommand: text("shell_command"),
-  worktreeSymlinks: text("worktree_symlinks", { mode: "json" }).$type<string[]>(),
+  worktreeSymlinks: text("worktree_symlinks", { mode: "json" }).$type<
+    string[]
+  >(),
   linkedTaskId: text("linked_task_id"),
   linkedTaskMeta: text("linked_task_meta", { mode: "json" }),
   color: text("color"),
@@ -47,7 +56,7 @@ export const workspaces = sqliteTable("workspaces", {
   lastAccessedAt: integer("last_accessed_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
-})
+});
 
 export const commandHistory = sqliteTable("command_history", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -59,17 +68,19 @@ export const commandHistory = sqliteTable("command_history", {
   executedAt: integer("executed_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
-})
+});
 
-export const settings = sqliteTable("settings", {
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id),
-  key: text("key").notNull(),
-  value: text("value", { mode: "json" }),
-}, (table) => [
-  primaryKey({ columns: [table.userId, table.key] }),
-])
+export const settings = sqliteTable(
+  "settings",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    key: text("key").notNull(),
+    value: text("value", { mode: "json" }),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.key] })],
+);
 
 export const auditLog = sqliteTable("audit_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -81,14 +92,16 @@ export const auditLog = sqliteTable("audit_log", {
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
-})
+});
 
 export const reviews = sqliteTable("reviews", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
-  mode: text("mode", { enum: ["branch", "uncommitted", "last-commit"] }).notNull(),
+  mode: text("mode", {
+    enum: ["branch", "uncommitted", "last-commit"],
+  }).notNull(),
   targetRef: text("target_ref"),
   baseRef: text("base_ref"),
   mergeBase: text("merge_base"),
@@ -100,7 +113,7 @@ export const reviews = sqliteTable("reviews", {
   updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
-})
+});
 
 export const reviewFiles = sqliteTable("review_files", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -109,25 +122,35 @@ export const reviewFiles = sqliteTable("review_files", {
     .references(() => reviews.id, { onDelete: "cascade" }),
   path: text("path").notNull(),
   status: text("status", {
-    enum: ["added", "modified", "deleted", "renamed", "copied", "type-changed", "untracked"],
+    enum: [
+      "added",
+      "modified",
+      "deleted",
+      "renamed",
+      "copied",
+      "type-changed",
+      "untracked",
+    ],
   }).notNull(),
   oldPath: text("old_path"),
   reviewed: integer("reviewed", { mode: "boolean" }).notNull().default(false),
   diffHash: text("diff_hash"),
   reviewedAt: integer("reviewed_at", { mode: "timestamp" }),
-})
+});
 
-export const pinnedSessions = sqliteTable("pinned_sessions", {
-  workspaceId: text("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  sessionId: text("session_id").notNull(),
-  pinnedAt: integer("pinned_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-}, (table) => [
-  primaryKey({ columns: [table.workspaceId, table.sessionId] }),
-])
+export const pinnedSessions = sqliteTable(
+  "pinned_sessions",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    pinnedAt: integer("pinned_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.sessionId] })],
+);
 
 export const fileComments = sqliteTable("file_comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -146,7 +169,7 @@ export const fileComments = sqliteTable("file_comments", {
   updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
-})
+});
 
 export const cachedSessions = sqliteTable("cached_sessions", {
   id: text("id").primaryKey(),
@@ -158,4 +181,4 @@ export const cachedSessions = sqliteTable("cached_sessions", {
   createdAt: integer("created_at"),
   updatedAt: integer("updated_at"),
   cachedAt: integer("cached_at").notNull(),
-})
+});

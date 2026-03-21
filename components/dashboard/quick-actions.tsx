@@ -1,24 +1,24 @@
-"use client"
+"use client";
 
-import { useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   GitPullRequest,
   GitBranch,
@@ -29,8 +29,8 @@ import {
   Trash2,
   Settings,
   Zap,
-} from "lucide-react"
-import type { QuickAction } from "@/types"
+} from "lucide-react";
+import type { QuickAction } from "@/types";
 
 const DEFAULT_ACTIONS: QuickAction[] = [
   {
@@ -61,7 +61,7 @@ const DEFAULT_ACTIONS: QuickAction[] = [
     type: "navigate",
     target: "/workspaces",
   },
-]
+];
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   MessageSquare,
@@ -70,17 +70,17 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   GitBranch,
   GitPullRequest,
   Zap,
-}
+};
 
-const ICON_OPTIONS = Object.keys(ICON_MAP)
+const ICON_OPTIONS = Object.keys(ICON_MAP);
 
 async function fetchQuickActions(): Promise<QuickAction[]> {
-  const res = await fetch("/api/settings")
-  if (!res.ok) throw new Error("Failed to fetch settings")
-  const data: Record<string, unknown> = await res.json()
-  const stored = data["quickActions"]
-  if (Array.isArray(stored)) return stored as QuickAction[]
-  return DEFAULT_ACTIONS
+  const res = await fetch("/api/settings");
+  if (!res.ok) throw new Error("Failed to fetch settings");
+  const data: Record<string, unknown> = await res.json();
+  const stored = data["quickActions"];
+  if (Array.isArray(stored)) return stored as QuickAction[];
+  return DEFAULT_ACTIONS;
 }
 
 async function saveQuickActions(actions: QuickAction[]): Promise<void> {
@@ -88,49 +88,55 @@ async function saveQuickActions(actions: QuickAction[]): Promise<void> {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ key: "quickActions", value: actions }),
-  })
-  if (!res.ok) throw new Error("Failed to save quick actions")
+  });
+  if (!res.ok) throw new Error("Failed to save quick actions");
 }
 
-function ActionIcon({ iconName, className }: { iconName: string; className?: string }) {
-  const IconComponent = ICON_MAP[iconName] ?? Zap
-  return <IconComponent className={className} />
+function ActionIcon({
+  iconName,
+  className,
+}: {
+  iconName: string;
+  className?: string;
+}) {
+  const IconComponent = ICON_MAP[iconName] ?? Zap;
+  return <IconComponent className={className} />;
 }
 
 export function QuickActions() {
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const [isEditing, setIsEditing] = useState(false)
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
 
   const { data: actions = DEFAULT_ACTIONS } = useQuery({
     queryKey: ["quick-actions"],
     queryFn: fetchQuickActions,
     staleTime: 60_000,
-  })
+  });
 
   const saveMutation = useMutation({
     mutationFn: saveQuickActions,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quick-actions"] })
-      toast.success("Quick actions saved")
-      setIsEditing(false)
+      queryClient.invalidateQueries({ queryKey: ["quick-actions"] });
+      toast.success("Quick actions saved");
+      setIsEditing(false);
     },
     onError: (err: Error) => {
-      toast.error(err.message)
+      toast.error(err.message);
     },
-  })
+  });
 
   const handleAction = useCallback(
     (action: QuickAction) => {
       if (action.type === "navigate") {
-        router.push(action.target)
+        router.push(action.target);
       }
     },
-    [router]
-  )
+    [router],
+  );
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex flex-wrap items-center gap-2">
       {actions.map((action) => (
         <Button
           key={action.id}
@@ -147,7 +153,7 @@ export function QuickActions() {
         variant="ghost"
         size="sm"
         onClick={() => setIsEditing(true)}
-        className="h-8 gap-1.5 text-muted-foreground"
+        className="text-muted-foreground h-8 gap-1.5"
       >
         <Settings className="size-3.5" />
         Edit
@@ -161,38 +167,49 @@ export function QuickActions() {
         isSaving={saveMutation.isPending}
       />
     </div>
-  )
+  );
 }
 
 interface EditorProps {
-  open: boolean
-  actions: QuickAction[]
-  onClose: () => void
-  onSave: (actions: QuickAction[]) => void
-  isSaving: boolean
+  open: boolean;
+  actions: QuickAction[];
+  onClose: () => void;
+  onSave: (actions: QuickAction[]) => void;
+  isSaving: boolean;
 }
 
-function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: EditorProps) {
-  const [draft, setDraft] = useState<QuickAction[]>([...actions])
+function QuickActionsEditor({
+  open,
+  actions,
+  onClose,
+  onSave,
+  isSaving,
+}: EditorProps) {
+  const [draft, setDraft] = useState<QuickAction[]>([...actions]);
 
   // Sync draft when actions prop changes (e.g. after save)
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      if (nextOpen) setDraft([...actions])
-      else onClose()
+      if (nextOpen) setDraft([...actions]);
+      else onClose();
     },
-    [actions, onClose]
-  )
+    [actions, onClose],
+  );
 
-  const updateAction = useCallback((id: string, updates: Partial<QuickAction>) => {
-    setDraft((prev) =>
-      prev.map((action) => (action.id === id ? { ...action, ...updates } : action))
-    )
-  }, [])
+  const updateAction = useCallback(
+    (id: string, updates: Partial<QuickAction>) => {
+      setDraft((prev) =>
+        prev.map((action) =>
+          action.id === id ? { ...action, ...updates } : action,
+        ),
+      );
+    },
+    [],
+  );
 
   const removeAction = useCallback((id: string) => {
-    setDraft((prev) => prev.filter((action) => action.id !== id))
-  }, [])
+    setDraft((prev) => prev.filter((action) => action.id !== id));
+  }, []);
 
   const addAction = useCallback(() => {
     const newAction: QuickAction = {
@@ -201,9 +218,9 @@ function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: Editor
       icon: "Zap",
       type: "navigate",
       target: "/",
-    }
-    setDraft((prev) => [...prev, newAction])
-  }, [])
+    };
+    setDraft((prev) => [...prev, newAction]);
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -211,20 +228,22 @@ function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: Editor
         <DialogHeader>
           <DialogTitle>Edit Quick Actions</DialogTitle>
         </DialogHeader>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground px-0.5">
+        <div className="text-muted-foreground flex items-center gap-2 px-0.5 text-xs">
           <span className="w-32 shrink-0">Icon</span>
           <span className="flex-1">Label</span>
           <span className="flex-1">Path</span>
           <span className="w-8 shrink-0" />
         </div>
-        <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+        <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
           {draft.map((action) => (
             <div key={action.id} className="flex items-center gap-2">
               <Select
                 value={action.icon}
-                onValueChange={(value) => updateAction(action.id, { icon: value })}
+                onValueChange={(value) =>
+                  updateAction(action.id, { icon: value })
+                }
               >
-                <SelectTrigger className="w-32 h-8 shrink-0">
+                <SelectTrigger className="h-8 w-32 shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -240,13 +259,17 @@ function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: Editor
               </Select>
               <Input
                 value={action.label}
-                onChange={(e) => updateAction(action.id, { label: e.target.value })}
+                onChange={(e) =>
+                  updateAction(action.id, { label: e.target.value })
+                }
                 placeholder="Label"
                 className="h-8 flex-1"
               />
               <Input
                 value={action.target}
-                onChange={(e) => updateAction(action.id, { target: e.target.value })}
+                onChange={(e) =>
+                  updateAction(action.id, { target: e.target.value })
+                }
                 placeholder="/path"
                 className="h-8 flex-1"
               />
@@ -254,7 +277,7 @@ function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: Editor
                 variant="ghost"
                 size="icon"
                 onClick={() => removeAction(action.id)}
-                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                className="text-muted-foreground hover:text-destructive h-8 w-8 shrink-0"
               >
                 <Trash2 className="size-3.5" />
               </Button>
@@ -262,7 +285,12 @@ function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: Editor
           ))}
         </div>
         <div className="flex justify-between pt-1">
-          <Button variant="ghost" size="sm" onClick={addAction} className="gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={addAction}
+            className="gap-1.5"
+          >
             <Plus className="size-3.5" />
             Add action
           </Button>
@@ -277,5 +305,5 @@ function QuickActionsEditor({ open, actions, onClose, onSave, isSaving }: Editor
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

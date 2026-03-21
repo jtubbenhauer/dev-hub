@@ -1,21 +1,32 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback } from "react"
-import { Loader2, ExternalLink, CheckCircle2, XCircle } from "lucide-react"
-import { toast } from "sonner"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
+import { useState, useEffect, useCallback } from "react";
+import { Loader2, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
-import { useClickUpSettings, useGitHubSettings, useSettingsMutation, SETTINGS_KEYS } from "@/hooks/use-settings"
-import type { ClickUpTeam, ClickUpUser } from "@/types"
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  useClickUpSettings,
+  useGitHubSettings,
+  useSettingsMutation,
+  SETTINGS_KEYS,
+} from "@/hooks/use-settings";
+import type { ClickUpTeam, ClickUpUser } from "@/types";
 
 export function IntegrationSettings() {
   return (
@@ -23,76 +34,88 @@ export function IntegrationSettings() {
       <GitHubSettingsCard />
       <ClickUpSettingsCard />
     </div>
-  )
+  );
 }
 
 function GitHubSettingsCard() {
-  const { apiToken, isLoading: isLoadingSettings } = useGitHubSettings()
-  const mutation = useSettingsMutation()
+  const { apiToken, isLoading: isLoadingSettings } = useGitHubSettings();
+  const mutation = useSettingsMutation();
 
-  const [localToken, setLocalToken] = useState("")
-  const [connectedLogin, setConnectedLogin] = useState<string | null>(null)
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [localToken, setLocalToken] = useState("");
+  const [connectedLogin, setConnectedLogin] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoadingSettings) {
-      setLocalToken(apiToken ?? "")
+      setLocalToken(apiToken ?? "");
     }
-  }, [apiToken, isLoadingSettings])
+  }, [apiToken, isLoadingSettings]);
 
   const handleConnect = useCallback(async () => {
-    const trimmedToken = localToken.trim()
+    const trimmedToken = localToken.trim();
     if (!trimmedToken) {
-      setConnectionError("Please enter a personal access token")
-      return
+      setConnectionError("Please enter a personal access token");
+      return;
     }
 
-    setIsConnecting(true)
-    setConnectionError(null)
-    setConnectedLogin(null)
+    setIsConnecting(true);
+    setConnectionError(null);
+    setConnectedLogin(null);
 
     try {
       await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: SETTINGS_KEYS.GITHUB_API_TOKEN, value: trimmedToken }),
-      })
+        body: JSON.stringify({
+          key: SETTINGS_KEYS.GITHUB_API_TOKEN,
+          value: trimmedToken,
+        }),
+      });
 
-      const res = await fetch("/api/github/user")
+      const res = await fetch("/api/github/user");
       if (!res.ok) {
-        setConnectionError("Invalid token or connection failed")
-        return
+        setConnectionError("Invalid token or connection failed");
+        return;
       }
 
-      const userData = (await res.json()) as { login: string; name: string | null }
-      setConnectedLogin(userData.name ?? userData.login)
-      toast.success(`Connected as ${userData.name ?? userData.login}`)
+      const userData = (await res.json()) as {
+        login: string;
+        name: string | null;
+      };
+      setConnectedLogin(userData.name ?? userData.login);
+      toast.success(`Connected as ${userData.name ?? userData.login}`);
     } catch {
-      setConnectionError("Failed to connect to GitHub")
+      setConnectionError("Failed to connect to GitHub");
     } finally {
-      setIsConnecting(false)
+      setIsConnecting(false);
     }
-  }, [localToken])
+  }, [localToken]);
 
   const handleDisconnect = useCallback(() => {
     mutation.mutate(
       { key: SETTINGS_KEYS.GITHUB_API_TOKEN, value: "" },
-      { onSuccess: () => { setLocalToken(""); setConnectedLogin(null); toast.success("GitHub disconnected") } }
-    )
-  }, [mutation])
+      {
+        onSuccess: () => {
+          setLocalToken("");
+          setConnectedLogin(null);
+          toast.success("GitHub disconnected");
+        },
+      },
+    );
+  }, [mutation]);
 
   if (isLoadingSettings) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  const isAlreadyConfigured = !!apiToken
+  const isAlreadyConfigured = !!apiToken;
 
   return (
     <Card>
@@ -104,7 +127,7 @@ function GitHubSettingsCard() {
             href="https://github.com/settings/tokens?type=beta"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-primary hover:underline"
+            className="text-primary inline-flex items-center gap-1 hover:underline"
           >
             Create a fine-grained token
             <ExternalLink className="size-3" />
@@ -128,8 +151,8 @@ function GitHubSettingsCard() {
               type="password"
               value={localToken}
               onChange={(e) => {
-                setLocalToken(e.target.value)
-                setConnectionError(null)
+                setLocalToken(e.target.value);
+                setConnectionError(null);
               }}
               placeholder="github_pat_••••••••"
               className="font-mono text-sm"
@@ -162,7 +185,7 @@ function GitHubSettingsCard() {
             )}
           </div>
           {connectionError && (
-            <p className="flex items-center gap-1.5 text-xs text-destructive">
+            <p className="text-destructive flex items-center gap-1.5 text-xs">
               <XCircle className="size-3" />
               {connectionError}
             </p>
@@ -176,78 +199,85 @@ function GitHubSettingsCard() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function ClickUpSettingsCard() {
-  const { apiToken, teamId, isLoading: isLoadingSettings } = useClickUpSettings()
-  const mutation = useSettingsMutation()
+  const {
+    apiToken,
+    teamId,
+    isLoading: isLoadingSettings,
+  } = useClickUpSettings();
+  const mutation = useSettingsMutation();
 
-  const [localToken, setLocalToken] = useState("")
-  const [selectedTeamId, setSelectedTeamId] = useState("")
-  const [teams, setTeams] = useState<ClickUpTeam[]>([])
-  const [connectedUser, setConnectedUser] = useState<ClickUpUser | null>(null)
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [localToken, setLocalToken] = useState("");
+  const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [teams, setTeams] = useState<ClickUpTeam[]>([]);
+  const [connectedUser, setConnectedUser] = useState<ClickUpUser | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoadingSettings) {
-      setLocalToken(apiToken ?? "")
-      setSelectedTeamId(teamId ?? "")
+      setLocalToken(apiToken ?? "");
+      setSelectedTeamId(teamId ?? "");
     }
-  }, [apiToken, teamId, isLoadingSettings])
+  }, [apiToken, teamId, isLoadingSettings]);
 
   const handleConnect = useCallback(async () => {
-    const trimmedToken = localToken.trim()
+    const trimmedToken = localToken.trim();
     if (!trimmedToken) {
-      setConnectionError("Please enter an API token")
-      return
+      setConnectionError("Please enter an API token");
+      return;
     }
 
-    setIsConnecting(true)
-    setConnectionError(null)
-    setConnectedUser(null)
-    setTeams([])
+    setIsConnecting(true);
+    setConnectionError(null);
+    setConnectedUser(null);
+    setTeams([]);
 
     try {
       await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: SETTINGS_KEYS.CLICKUP_API_TOKEN, value: trimmedToken }),
-      })
+        body: JSON.stringify({
+          key: SETTINGS_KEYS.CLICKUP_API_TOKEN,
+          value: trimmedToken,
+        }),
+      });
 
       const [userRes, teamsRes] = await Promise.all([
         fetch("/api/clickup/user"),
         fetch("/api/clickup/team"),
-      ])
+      ]);
 
       if (!userRes.ok || !teamsRes.ok) {
-        setConnectionError("Invalid API token or connection failed")
-        return
+        setConnectionError("Invalid API token or connection failed");
+        return;
       }
 
-      const userData = (await userRes.json()) as { user: ClickUpUser }
-      const teamsData = (await teamsRes.json()) as { teams: ClickUpTeam[] }
+      const userData = (await userRes.json()) as { user: ClickUpUser };
+      const teamsData = (await teamsRes.json()) as { teams: ClickUpTeam[] };
 
-      setConnectedUser(userData.user)
-      setTeams(teamsData.teams)
+      setConnectedUser(userData.user);
+      setTeams(teamsData.teams);
 
       if (teamsData.teams.length === 1 && teamsData.teams[0]) {
-        setSelectedTeamId(teamsData.teams[0].id)
+        setSelectedTeamId(teamsData.teams[0].id);
       }
 
-      toast.success(`Connected as ${userData.user.username}`)
+      toast.success(`Connected as ${userData.user.username}`);
     } catch {
-      setConnectionError("Failed to connect to ClickUp")
+      setConnectionError("Failed to connect to ClickUp");
     } finally {
-      setIsConnecting(false)
+      setIsConnecting(false);
     }
-  }, [localToken])
+  }, [localToken]);
 
   const handleSave = useCallback(() => {
     if (!selectedTeamId) {
-      toast.error("Please select a workspace")
-      return
+      toast.error("Please select a workspace");
+      return;
     }
     mutation.mutate(
       { key: SETTINGS_KEYS.CLICKUP_TEAM_ID, value: selectedTeamId },
@@ -255,28 +285,31 @@ function ClickUpSettingsCard() {
         onSuccess: () => {
           if (connectedUser) {
             mutation.mutate(
-              { key: SETTINGS_KEYS.CLICKUP_USER_ID, value: String(connectedUser.id) },
-              { onSuccess: () => toast.success("ClickUp settings saved") }
-            )
+              {
+                key: SETTINGS_KEYS.CLICKUP_USER_ID,
+                value: String(connectedUser.id),
+              },
+              { onSuccess: () => toast.success("ClickUp settings saved") },
+            );
           } else {
-            toast.success("ClickUp settings saved")
+            toast.success("ClickUp settings saved");
           }
         },
-      }
-    )
-  }, [selectedTeamId, connectedUser, mutation])
+      },
+    );
+  }, [selectedTeamId, connectedUser, mutation]);
 
   if (isLoadingSettings) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  const isAlreadyConfigured = !!(apiToken && teamId)
+  const isAlreadyConfigured = !!(apiToken && teamId);
 
   return (
     <Card>
@@ -288,7 +321,7 @@ function ClickUpSettingsCard() {
             href="https://app.clickup.com/settings/apps"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-primary hover:underline"
+            className="text-primary inline-flex items-center gap-1 hover:underline"
           >
             Get your API token
             <ExternalLink className="size-3" />
@@ -311,8 +344,8 @@ function ClickUpSettingsCard() {
               type="password"
               value={localToken}
               onChange={(e) => {
-                setLocalToken(e.target.value)
-                setConnectionError(null)
+                setLocalToken(e.target.value);
+                setConnectionError(null);
               }}
               placeholder="pk_••••••••"
               className="font-mono text-sm"
@@ -334,7 +367,7 @@ function ClickUpSettingsCard() {
             </Button>
           </div>
           {connectionError && (
-            <p className="flex items-center gap-1.5 text-xs text-destructive">
+            <p className="text-destructive flex items-center gap-1.5 text-xs">
               <XCircle className="size-3" />
               {connectionError}
             </p>
@@ -385,5 +418,5 @@ function ClickUpSettingsCard() {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

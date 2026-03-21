@@ -99,7 +99,7 @@ function AppearanceSettingsCard() {
         <CardDescription>Choose your color theme</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {APP_THEMES.map((t) => {
             const isActive = currentTheme === t.value;
             const swatch = THEME_SWATCHES[t.value];
@@ -108,22 +108,22 @@ function AppearanceSettingsCard() {
                 key={t.value}
                 data-testid={`theme-${t.value}`}
                 onClick={() => setTheme(t.value)}
-                className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs transition-colors hover:bg-accent/50 ${
+                className={`hover:bg-accent/50 flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs transition-colors ${
                   isActive
-                    ? "border-primary ring-2 ring-primary/30"
+                    ? "border-primary ring-primary/30 ring-2"
                     : "border-border"
                 }`}
               >
                 <div
-                  className="h-10 w-full rounded-md border border-border/50"
+                  className="border-border/50 h-10 w-full rounded-md border"
                   style={{ background: swatch.bg }}
                 >
                   <div
-                    className="ml-2 mt-2 h-3 w-3 rounded-full"
+                    className="mt-2 ml-2 h-3 w-3 rounded-full"
                     style={{ background: swatch.accent }}
                   />
                 </div>
-                <span className="font-medium truncate max-w-full">
+                <span className="max-w-full truncate font-medium">
                   {t.label}
                 </span>
               </button>
@@ -142,7 +142,8 @@ function EditorSettingsCard() {
   const { tabSize, isLoading: isLoadingTab } = useTabSizeSetting();
   const { editorType, isLoading: isLoadingEditorType } = useEditorTypeSetting();
   const { nvimAppName, isLoading: isLoadingNvim } = useNvimAppNameSetting();
-  const { isFileTabsDisabled, isLoading: isLoadingFileTabs } = useFileTabsSetting();
+  const { isFileTabsDisabled, isLoading: isLoadingFileTabs } =
+    useFileTabsSetting();
   const mutation = useSettingsMutation();
   const [customNvimAppName, setCustomNvimAppName] = useState("");
 
@@ -222,9 +223,7 @@ function EditorSettingsCard() {
       { key: SETTINGS_KEYS.DISABLE_FILE_TABS, value: checked },
       {
         onSuccess: () =>
-          toast.success(
-            checked ? "File tabs disabled" : "File tabs enabled",
-          ),
+          toast.success(checked ? "File tabs disabled" : "File tabs enabled"),
       },
     );
   };
@@ -244,7 +243,7 @@ function EditorSettingsCard() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
         </CardContent>
       </Card>
     );
@@ -262,7 +261,7 @@ function EditorSettingsCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="editor-type">Editor engine</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Monaco (VS Code) or Neovim (terminal PTY)
             </p>
           </div>
@@ -286,11 +285,11 @@ function EditorSettingsCard() {
         </div>
 
         {editorType === "neovim" && (
-          <div className="space-y-2 rounded-md border border-border/50 bg-muted/30 p-3">
+          <div className="border-border/50 bg-muted/30 space-y-2 rounded-md border p-3">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="nvim-appname">Neovim config</Label>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Which neovim config to use (sets NVIM_APPNAME)
                 </p>
               </div>
@@ -347,7 +346,7 @@ function EditorSettingsCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="font-size">Font size</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Editor font size in pixels
             </p>
           </div>
@@ -372,7 +371,7 @@ function EditorSettingsCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="mobile-font-size">Mobile font size</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Editor font size on mobile devices
             </p>
           </div>
@@ -398,7 +397,7 @@ function EditorSettingsCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="tab-size">Tab size</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Number of spaces per tab
             </p>
           </div>
@@ -423,7 +422,7 @@ function EditorSettingsCard() {
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-0.5">
             <Label htmlFor="disable-file-tabs">Disable file tabs</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Only show one file at a time with no tab bar
             </p>
           </div>
@@ -442,8 +441,7 @@ function EditorSettingsCard() {
 function TerminalSettingsCard() {
   const { scrollback, isLoading: isLoadingScrollback } =
     useTerminalScrollbackSetting();
-  const { terminalFont, isLoading: isLoadingFont } =
-    useTerminalFontSetting();
+  const { terminalFont, isLoading: isLoadingFont } = useTerminalFontSetting();
   const mutation = useSettingsMutation();
 
   const isLoading = isLoadingScrollback || isLoadingFont;
@@ -477,7 +475,7 @@ function TerminalSettingsCard() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
         </CardContent>
       </Card>
     );
@@ -493,7 +491,7 @@ function TerminalSettingsCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="terminal-font">Font</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Font family used in terminal and neovim editors
             </p>
           </div>
@@ -519,7 +517,7 @@ function TerminalSettingsCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="terminal-scrollback">Scrollback lines</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Number of lines to keep in the terminal buffer
             </p>
           </div>
@@ -569,7 +567,7 @@ function CommandSettingsCard() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
         </CardContent>
       </Card>
     );
@@ -586,7 +584,7 @@ function CommandSettingsCard() {
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="shell-rc-path">Shell RC file path</Label>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Path to your shell config file for alias parsing in command
             autocomplete
           </p>
@@ -698,7 +696,7 @@ export function SoundSettingsCard() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
         </CardContent>
       </Card>
     );
@@ -716,7 +714,7 @@ export function SoundSettingsCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="sound-agent">Agent</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Play sound when the agent completes or needs attention
             </p>
           </div>
@@ -749,7 +747,7 @@ export function SoundSettingsCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="sound-permissions">Permissions</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Play sound when a permission is required
             </p>
           </div>
@@ -782,7 +780,7 @@ export function SoundSettingsCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="sound-errors">Errors</Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Play sound when an error occurs
             </p>
           </div>

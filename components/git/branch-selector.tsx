@@ -1,31 +1,25 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import {
-  GitBranch,
-  Plus,
-  Trash2,
-  Check,
-  ArrowRightLeft,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useState } from "react";
+import { GitBranch, Plus, Trash2, Check, ArrowRightLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
-import type { GitBranch as GitBranchType } from "@/types"
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import type { GitBranch as GitBranchType } from "@/types";
 
 interface BranchSelectorProps {
-  branches: GitBranchType[]
-  currentBranch: string
-  onSwitch: (branchName: string) => void
-  onCreate: (branchName: string) => void
-  onDelete: (branchName: string) => void
-  isSwitching: boolean
+  branches: GitBranchType[];
+  currentBranch: string;
+  onSwitch: (branchName: string) => void;
+  onCreate: (branchName: string) => void;
+  onDelete: (branchName: string) => void;
+  isSwitching: boolean;
 }
 
 export function BranchSelector({
@@ -36,15 +30,15 @@ export function BranchSelector({
   onDelete,
   isSwitching,
 }: BranchSelectorProps) {
-  const [isCreating, setIsCreating] = useState(false)
-  const [newBranchName, setNewBranchName] = useState("")
+  const [isCreating, setIsCreating] = useState(false);
+  const [newBranchName, setNewBranchName] = useState("");
 
   function handleCreate() {
-    const trimmed = newBranchName.trim()
-    if (!trimmed) return
-    onCreate(trimmed)
-    setNewBranchName("")
-    setIsCreating(false)
+    const trimmed = newBranchName.trim();
+    if (!trimmed) return;
+    onCreate(trimmed);
+    setNewBranchName("");
+    setIsCreating(false);
   }
 
   return (
@@ -71,17 +65,21 @@ export function BranchSelector({
             value={newBranchName}
             onChange={(event) => setNewBranchName(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") handleCreate()
+              if (event.key === "Enter") handleCreate();
               if (event.key === "Escape") {
-                setIsCreating(false)
-                setNewBranchName("")
+                setIsCreating(false);
+                setNewBranchName("");
               }
             }}
             placeholder="New branch name..."
             className="h-7 text-xs"
             autoFocus
           />
-          <Button size="icon-xs" onClick={handleCreate} disabled={!newBranchName.trim()}>
+          <Button
+            size="icon-xs"
+            onClick={handleCreate}
+            disabled={!newBranchName.trim()}
+          >
             <Check className="size-3" />
           </Button>
         </div>
@@ -97,27 +95,32 @@ export function BranchSelector({
                 "group flex items-center gap-2 rounded-sm px-2 py-1 text-xs",
                 branch.current
                   ? "bg-primary/10 text-primary"
-                  : "hover:bg-accent/50 cursor-pointer"
+                  : "hover:bg-accent/50 cursor-pointer",
               )}
               onClick={() => {
-                if (!branch.current && !isSwitching) onSwitch(branch.name)
+                if (!branch.current && !isSwitching) onSwitch(branch.name);
               }}
             >
-              <GitBranch className={cn("size-3 shrink-0", branch.current && "text-primary")} />
+              <GitBranch
+                className={cn(
+                  "size-3 shrink-0",
+                  branch.current && "text-primary",
+                )}
+              />
               <span className="flex-1 truncate font-mono">{branch.name}</span>
               {branch.current && (
-                <span className="text-[10px] text-primary/60">current</span>
+                <span className="text-primary/60 text-[10px]">current</span>
               )}
               {!branch.current && (
-                <div className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon-xs"
                         onClick={(event) => {
-                          event.stopPropagation()
-                          onSwitch(branch.name)
+                          event.stopPropagation();
+                          onSwitch(branch.name);
                         }}
                         disabled={isSwitching}
                       >
@@ -133,8 +136,8 @@ export function BranchSelector({
                         size="icon-xs"
                         className="hover:text-destructive"
                         onClick={(event) => {
-                          event.stopPropagation()
-                          onDelete(branch.name)
+                          event.stopPropagation();
+                          onDelete(branch.name);
                         }}
                       >
                         <Trash2 className="size-3" />
@@ -149,5 +152,5 @@ export function BranchSelector({
         </div>
       </ScrollArea>
     </div>
-  )
+  );
 }

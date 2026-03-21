@@ -1,13 +1,17 @@
-"use client"
+"use client";
 
-import { Columns2, Rows3 } from "lucide-react"
-import { useEditorStore } from "@/stores/editor-store"
-import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Columns2, Rows3 } from "lucide-react";
+import { useEditorStore } from "@/stores/editor-store";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function DiffViewToggle() {
-  const { diffViewMode, toggleDiffViewMode } = useEditorStore()
-  const isSideBySide = diffViewMode === "side-by-side"
+  const { diffViewMode, toggleDiffViewMode } = useEditorStore();
+  const isSideBySide = diffViewMode === "side-by-side";
 
   return (
     <Tooltip>
@@ -26,8 +30,12 @@ export function DiffViewToggle() {
         </Button>
       </TooltipTrigger>
       <TooltipContent side="left">
-        <p>{isSideBySide ? "Switch to inline diff" : "Switch to side-by-side diff"}</p>
+        <p>
+          {isSideBySide
+            ? "Switch to inline diff"
+            : "Switch to side-by-side diff"}
+        </p>
       </TooltipContent>
     </Tooltip>
-  )
+  );
 }

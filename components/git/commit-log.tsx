@@ -1,42 +1,42 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   GitCommitHorizontal,
   ChevronDown,
   ChevronRight,
   Clock,
   User,
-} from "lucide-react"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { DiffViewer } from "@/components/git/diff-viewer"
-import { useGitCommitDiff } from "@/hooks/use-git"
-import { cn } from "@/lib/utils"
-import type { GitLogEntry } from "@/types"
+} from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { DiffViewer } from "@/components/git/diff-viewer";
+import { useGitCommitDiff } from "@/hooks/use-git";
+import { cn } from "@/lib/utils";
+import type { GitLogEntry } from "@/types";
 
 interface CommitLogProps {
-  entries: GitLogEntry[]
-  workspaceId: string
-  isLoading: boolean
+  entries: GitLogEntry[];
+  workspaceId: string;
+  isLoading: boolean;
 }
 
 export function CommitLog({ entries, workspaceId, isLoading }: CommitLogProps) {
-  const [expandedHash, setExpandedHash] = useState<string | null>(null)
+  const [expandedHash, setExpandedHash] = useState<string | null>(null);
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
         Loading commit history...
       </div>
-    )
+    );
   }
 
   if (entries.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
         No commits yet
       </div>
-    )
+    );
   }
 
   return (
@@ -55,7 +55,7 @@ export function CommitLog({ entries, workspaceId, isLoading }: CommitLogProps) {
         ))}
       </div>
     </ScrollArea>
-  )
+  );
 }
 
 function CommitEntry({
@@ -64,24 +64,24 @@ function CommitEntry({
   isExpanded,
   onToggle,
 }: {
-  entry: GitLogEntry
-  workspaceId: string
-  isExpanded: boolean
-  onToggle: () => void
+  entry: GitLogEntry;
+  workspaceId: string;
+  isExpanded: boolean;
+  onToggle: () => void;
 }) {
   const { data: diff, isLoading: isDiffLoading } = useGitCommitDiff(
     isExpanded ? workspaceId : null,
-    isExpanded ? entry.hash : null
-  )
+    isExpanded ? entry.hash : null,
+  );
 
-  const relativeDate = formatRelativeDate(entry.date)
+  const relativeDate = formatRelativeDate(entry.date);
 
   return (
     <div className="rounded-sm">
       <div
         className={cn(
-          "flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent/50",
-          isExpanded && "bg-accent/30"
+          "hover:bg-accent/50 flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1.5 text-xs",
+          isExpanded && "bg-accent/30",
         )}
         onClick={onToggle}
       >
@@ -92,13 +92,15 @@ function CommitEntry({
             <ChevronRight className="size-3" />
           )}
         </span>
-        <GitCommitHorizontal className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+        <GitCommitHorizontal className="text-muted-foreground mt-0.5 size-3 shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
-            <span className="font-mono text-primary/70">{entry.abbrevHash}</span>
-            <span className="truncate flex-1">{entry.message}</span>
+            <span className="text-primary/70 font-mono">
+              {entry.abbrevHash}
+            </span>
+            <span className="flex-1 truncate">{entry.message}</span>
           </div>
-          <div className="mt-0.5 flex items-center gap-3 text-muted-foreground">
+          <div className="text-muted-foreground mt-0.5 flex items-center gap-3">
             <span className="flex items-center gap-1">
               <User className="size-2.5" />
               {entry.author}
@@ -114,25 +116,29 @@ function CommitEntry({
         </div>
       </div>
       {isExpanded && (
-        <div className="ml-6 max-h-80 overflow-hidden border-l-2 border-border/50 pl-2">
-          <DiffViewer diff={diff ?? ""} isLoading={isDiffLoading} workspaceId={workspaceId} />
+        <div className="border-border/50 ml-6 max-h-80 overflow-hidden border-l-2 pl-2">
+          <DiffViewer
+            diff={diff ?? ""}
+            isLoading={isDiffLoading}
+            workspaceId={workspaceId}
+          />
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function formatRelativeDate(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMinutes = Math.floor(diffMs / 60_000)
-  const diffHours = Math.floor(diffMs / 3_600_000)
-  const diffDays = Math.floor(diffMs / 86_400_000)
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60_000);
+  const diffHours = Math.floor(diffMs / 3_600_000);
+  const diffDays = Math.floor(diffMs / 86_400_000);
 
-  if (diffMinutes < 1) return "just now"
-  if (diffMinutes < 60) return `${diffMinutes}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 30) return `${diffDays}d ago`
-  return date.toLocaleDateString()
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
 }

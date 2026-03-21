@@ -1,19 +1,19 @@
-"use client"
+"use client";
 
-import { useState, useMemo } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   GitBranch,
   GitFork,
@@ -24,87 +24,97 @@ import {
   Check,
   Link,
   X,
-} from "lucide-react"
-import { useCreateWorktree, useGitBranches, useWorktreeSymlinks } from "@/hooks/use-git"
-import { sanitizeBranchName } from "@/lib/utils"
-import type { Workspace, GitBranch as GitBranchType } from "@/types"
+} from "lucide-react";
+import {
+  useCreateWorktree,
+  useGitBranches,
+  useWorktreeSymlinks,
+} from "@/hooks/use-git";
+import { sanitizeBranchName } from "@/lib/utils";
+import type { Workspace, GitBranch as GitBranchType } from "@/types";
 
-const SYMLINK_SUGGESTIONS = [".npmrc", ".env", ".env.local", ".opencode/plans"]
+const SYMLINK_SUGGESTIONS = [".npmrc", ".env", ".env.local", ".opencode/plans"];
 
 interface CreateWorktreeDialogProps {
-  workspaces: Workspace[]
+  workspaces: Workspace[];
 }
 
-export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [step, setStep] = useState<"select-repo" | "configure">("select-repo")
-  const [selectedRepo, setSelectedRepo] = useState<Workspace | null>(null)
-  const [branchName, setBranchName] = useState("")
-  const [isNewBranch, setIsNewBranch] = useState(true)
-  const [startPoint, setStartPoint] = useState("")
-  const [customName, setCustomName] = useState("")
-  const [branchFilter, setBranchFilter] = useState("")
-  const [symlinkPaths, setSymlinkPaths] = useState<string[]>([])
+export function CreateWorktreeDialog({
+  workspaces,
+}: CreateWorktreeDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"select-repo" | "configure">("select-repo");
+  const [selectedRepo, setSelectedRepo] = useState<Workspace | null>(null);
+  const [branchName, setBranchName] = useState("");
+  const [isNewBranch, setIsNewBranch] = useState(true);
+  const [startPoint, setStartPoint] = useState("");
+  const [customName, setCustomName] = useState("");
+  const [branchFilter, setBranchFilter] = useState("");
+  const [symlinkPaths, setSymlinkPaths] = useState<string[]>([]);
 
-  const createWorktree = useCreateWorktree()
-  const { data: savedSymlinks } = useWorktreeSymlinks(selectedRepo?.id ?? null)
+  const createWorktree = useCreateWorktree();
+  const { data: savedSymlinks } = useWorktreeSymlinks(selectedRepo?.id ?? null);
 
   // Sync symlink paths from saved data (during render)
-  const [prevSavedSymlinks, setPrevSavedSymlinks] = useState(savedSymlinks)
-  if (prevSavedSymlinks !== savedSymlinks && savedSymlinks && savedSymlinks.length > 0) {
-    setPrevSavedSymlinks(savedSymlinks)
-    setSymlinkPaths(savedSymlinks)
+  const [prevSavedSymlinks, setPrevSavedSymlinks] = useState(savedSymlinks);
+  if (
+    prevSavedSymlinks !== savedSymlinks &&
+    savedSymlinks &&
+    savedSymlinks.length > 0
+  ) {
+    setPrevSavedSymlinks(savedSymlinks);
+    setSymlinkPaths(savedSymlinks);
   }
 
   // Filter to only repo-type workspaces (not worktrees)
   const repoWorkspaces = useMemo(
     () => workspaces.filter((w) => w.type === "repo"),
-    [workspaces]
-  )
+    [workspaces],
+  );
 
   // Fetch branches for the selected repo
   const { data: branches = [], isLoading: branchesLoading } = useGitBranches(
-    selectedRepo?.id ?? null
-  )
+    selectedRepo?.id ?? null,
+  );
 
   // Filter branches based on search
   const filteredBranches = useMemo(() => {
-    if (!branchFilter) return branches
-    const lower = branchFilter.toLowerCase()
-    return branches.filter((b) => b.name.toLowerCase().includes(lower))
-  }, [branches, branchFilter])
+    if (!branchFilter) return branches;
+    const lower = branchFilter.toLowerCase();
+    return branches.filter((b) => b.name.toLowerCase().includes(lower));
+  }, [branches, branchFilter]);
 
   // Compute the target path preview
   const targetPath = useMemo(() => {
-    if (!selectedRepo || !branchName) return ""
-    return `${selectedRepo.path}-worktrees/${branchName}`
-  }, [selectedRepo, branchName])
+    if (!selectedRepo || !branchName) return "";
+    return `${selectedRepo.path}-worktrees/${branchName}`;
+  }, [selectedRepo, branchName]);
 
   // Auto-generated workspace name preview
   const workspaceName = useMemo(() => {
-    if (customName) return customName
-    if (!selectedRepo || !branchName) return ""
+    if (customName) return customName;
+    if (!selectedRepo || !branchName) return "";
     const parentName =
-      selectedRepo.path.split("/").filter(Boolean).pop() ?? selectedRepo.name
-    return `${parentName}/${branchName}`
-  }, [selectedRepo, branchName, customName])
+      selectedRepo.path.split("/").filter(Boolean).pop() ?? selectedRepo.name;
+    return `${parentName}/${branchName}`;
+  }, [selectedRepo, branchName, customName]);
 
   function handleSelectRepo(workspace: Workspace) {
-    setSelectedRepo(workspace)
-    setBranchName("")
-    setStartPoint("")
-    setBranchFilter("")
-    setSymlinkPaths([])
-    setStep("configure")
+    setSelectedRepo(workspace);
+    setBranchName("");
+    setStartPoint("");
+    setBranchFilter("");
+    setSymlinkPaths([]);
+    setStep("configure");
   }
 
   function handleSelectExistingBranch(branch: GitBranchType) {
-    setBranchName(branch.name)
-    setIsNewBranch(false)
+    setBranchName(branch.name);
+    setIsNewBranch(false);
   }
 
   function handleCreate() {
-    if (!selectedRepo || !branchName) return
+    if (!selectedRepo || !branchName) return;
 
     createWorktree.mutate(
       {
@@ -117,34 +127,38 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
       },
       {
         onSuccess: () => {
-          setOpen(false)
-          resetState()
+          setOpen(false);
+          resetState();
         },
-      }
-    )
+      },
+    );
   }
 
   function resetState() {
-    setStep("select-repo")
-    setSelectedRepo(null)
-    setBranchName("")
-    setIsNewBranch(true)
-    setStartPoint("")
-    setCustomName("")
-    setBranchFilter("")
-    setSymlinkPaths([])
+    setStep("select-repo");
+    setSelectedRepo(null);
+    setBranchName("");
+    setIsNewBranch(true);
+    setStartPoint("");
+    setCustomName("");
+    setBranchFilter("");
+    setSymlinkPaths([]);
   }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(isOpen) => {
-        setOpen(isOpen)
-        if (!isOpen) resetState()
+        setOpen(isOpen);
+        if (!isOpen) resetState();
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon" className="sm:size-auto sm:px-3 sm:py-2">
+        <Button
+          variant="outline"
+          size="icon"
+          className="sm:size-auto sm:px-3 sm:py-2"
+        >
           <GitFork className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">Create Worktree</span>
         </Button>
@@ -152,15 +166,14 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <DialogTitle>
-            {step === "select-repo" ? "Select Parent Repository" : "Create Worktree"}
+            {step === "select-repo"
+              ? "Select Parent Repository"
+              : "Create Worktree"}
           </DialogTitle>
         </DialogHeader>
 
         {step === "select-repo" ? (
-          <RepoSelector
-            repos={repoWorkspaces}
-            onSelect={handleSelectRepo}
-          />
+          <RepoSelector repos={repoWorkspaces} onSelect={handleSelectRepo} />
         ) : (
           <WorktreeConfigForm
             selectedRepo={selectedRepo!}
@@ -188,7 +201,7 @@ export function CreateWorktreeDialog({ workspaces }: CreateWorktreeDialogProps) 
         )}
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 // --- Sub-components ---
@@ -197,18 +210,18 @@ function RepoSelector({
   repos,
   onSelect,
 }: {
-  repos: Workspace[]
-  onSelect: (w: Workspace) => void
+  repos: Workspace[];
+  onSelect: (w: Workspace) => void;
 }) {
   if (repos.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-8 text-center">
-        <FolderGit2 className="h-12 w-12 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
+        <FolderGit2 className="text-muted-foreground h-12 w-12" />
+        <p className="text-muted-foreground text-sm">
           No repositories registered. Add a repo workspace first.
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -218,17 +231,17 @@ function RepoSelector({
           <button
             key={repo.id}
             onClick={() => onSelect(repo)}
-            className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+            className="hover:bg-accent flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors"
           >
             <FolderGit2 className="h-5 w-5 shrink-0 text-orange-500" />
             <div className="min-w-0 flex-1">
               <div className="font-medium">{repo.name}</div>
-              <div className="truncate text-xs text-muted-foreground font-mono">
+              <div className="text-muted-foreground truncate font-mono text-xs">
                 {repo.path}
               </div>
             </div>
             {repo.packageManager && repo.packageManager !== "none" && (
-              <Badge variant="secondary" className="text-xs shrink-0">
+              <Badge variant="secondary" className="shrink-0 text-xs">
                 {repo.packageManager}
               </Badge>
             )}
@@ -236,7 +249,7 @@ function RepoSelector({
         ))}
       </div>
     </ScrollArea>
-  )
+  );
 }
 
 function WorktreeConfigForm({
@@ -262,41 +275,43 @@ function WorktreeConfigForm({
   onCreate,
   isCreating,
 }: {
-  selectedRepo: Workspace
-  branches: GitBranchType[]
-  branchesLoading: boolean
-  branchName: string
-  setBranchName: (v: string) => void
-  isNewBranch: boolean
-  setIsNewBranch: (v: boolean) => void
-  startPoint: string
-  setStartPoint: (v: string) => void
-  customName: string
-  setCustomName: (v: string) => void
-  branchFilter: string
-  setBranchFilter: (v: string) => void
-  symlinkPaths: string[]
-  setSymlinkPaths: (v: string[]) => void
-  targetPath: string
-  workspaceName: string
-  onBack: () => void
-  onSelectBranch: (b: GitBranchType) => void
-  onCreate: () => void
-  isCreating: boolean
+  selectedRepo: Workspace;
+  branches: GitBranchType[];
+  branchesLoading: boolean;
+  branchName: string;
+  setBranchName: (v: string) => void;
+  isNewBranch: boolean;
+  setIsNewBranch: (v: boolean) => void;
+  startPoint: string;
+  setStartPoint: (v: string) => void;
+  customName: string;
+  setCustomName: (v: string) => void;
+  branchFilter: string;
+  setBranchFilter: (v: string) => void;
+  symlinkPaths: string[];
+  setSymlinkPaths: (v: string[]) => void;
+  targetPath: string;
+  workspaceName: string;
+  onBack: () => void;
+  onSelectBranch: (b: GitBranchType) => void;
+  onCreate: () => void;
+  isCreating: boolean;
 }) {
-  const [symlinkInput, setSymlinkInput] = useState("")
+  const [symlinkInput, setSymlinkInput] = useState("");
   // Branches that aren't already checked out in a worktree
-  const availableBranches = branches.filter((b) => !b.linkedWorkTree && !b.current)
+  const availableBranches = branches.filter(
+    (b) => !b.linkedWorkTree && !b.current,
+  );
 
   return (
     <div className="space-y-4">
       {/* Parent repo indicator */}
-      <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
+      <div className="bg-muted/50 flex items-center gap-2 rounded-md px-3 py-2">
         <FolderGit2 className="h-4 w-4 text-orange-500" />
         <span className="text-sm font-medium">{selectedRepo.name}</span>
         <button
           onClick={onBack}
-          className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground ml-auto text-xs"
         >
           Change
         </button>
@@ -311,8 +326,8 @@ function WorktreeConfigForm({
           id="new-branch"
           checked={isNewBranch}
           onCheckedChange={(checked) => {
-            setIsNewBranch(checked)
-            if (checked) setBranchName("")
+            setIsNewBranch(checked);
+            if (checked) setBranchName("");
           }}
         />
       </div>
@@ -330,7 +345,10 @@ function WorktreeConfigForm({
             className="font-mono text-sm"
           />
           <div className="space-y-2">
-            <Label htmlFor="start-point" className="text-xs text-muted-foreground">
+            <Label
+              htmlFor="start-point"
+              className="text-muted-foreground text-xs"
+            >
               Start from (optional, defaults to HEAD)
             </Label>
             <Input
@@ -347,7 +365,7 @@ function WorktreeConfigForm({
         <div className="space-y-2">
           <Label>Select existing branch</Label>
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
             <Input
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
@@ -359,10 +377,10 @@ function WorktreeConfigForm({
             <div className="space-y-1 pr-4">
               {branchesLoading ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
                 </div>
               ) : availableBranches.length === 0 ? (
-                <p className="py-4 text-center text-xs text-muted-foreground">
+                <p className="text-muted-foreground py-4 text-center text-xs">
                   {branches.length === 0
                     ? "No branches found"
                     : "All branches are already checked out"}
@@ -372,14 +390,16 @@ function WorktreeConfigForm({
                   <button
                     key={branch.name}
                     onClick={() => onSelectBranch(branch)}
-                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent ${
+                    className={`hover:bg-accent flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
                       branchName === branch.name ? "bg-accent" : ""
                     }`}
                   >
-                    <GitBranch className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate font-mono text-xs">{branch.name}</span>
+                    <GitBranch className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate font-mono text-xs">
+                      {branch.name}
+                    </span>
                     {branchName === branch.name && (
-                      <Check className="ml-auto h-3.5 w-3.5 text-primary" />
+                      <Check className="text-primary ml-auto h-3.5 w-3.5" />
                     )}
                   </button>
                 ))
@@ -391,7 +411,7 @@ function WorktreeConfigForm({
 
       {/* Custom display name */}
       <div className="space-y-2">
-        <Label htmlFor="custom-name" className="text-xs text-muted-foreground">
+        <Label htmlFor="custom-name" className="text-muted-foreground text-xs">
           Display name (optional)
         </Label>
         <Input
@@ -409,18 +429,24 @@ function WorktreeConfigForm({
           <Link className="h-3.5 w-3.5" />
           Symlink files
         </Label>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Symlink gitignored files from the parent repo into the new worktree.
         </p>
         {symlinkPaths.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {symlinkPaths.map((p) => (
-              <Badge key={p} variant="secondary" className="gap-1 font-mono text-xs">
+              <Badge
+                key={p}
+                variant="secondary"
+                className="gap-1 font-mono text-xs"
+              >
                 {p}
                 <button
                   type="button"
-                  onClick={() => setSymlinkPaths(symlinkPaths.filter((s) => s !== p))}
-                  className="ml-0.5 hover:text-destructive"
+                  onClick={() =>
+                    setSymlinkPaths(symlinkPaths.filter((s) => s !== p))
+                  }
+                  className="hover:text-destructive ml-0.5"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -434,11 +460,11 @@ function WorktreeConfigForm({
             onChange={(e) => setSymlinkInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                e.preventDefault()
-                const trimmed = symlinkInput.trim()
+                e.preventDefault();
+                const trimmed = symlinkInput.trim();
                 if (trimmed && !symlinkPaths.includes(trimmed)) {
-                  setSymlinkPaths([...symlinkPaths, trimmed])
-                  setSymlinkInput("")
+                  setSymlinkPaths([...symlinkPaths, trimmed]);
+                  setSymlinkInput("");
                 }
               }
             }}
@@ -449,12 +475,14 @@ function WorktreeConfigForm({
             type="button"
             variant="outline"
             size="sm"
-            disabled={!symlinkInput.trim() || symlinkPaths.includes(symlinkInput.trim())}
+            disabled={
+              !symlinkInput.trim() || symlinkPaths.includes(symlinkInput.trim())
+            }
             onClick={() => {
-              const trimmed = symlinkInput.trim()
+              const trimmed = symlinkInput.trim();
               if (trimmed && !symlinkPaths.includes(trimmed)) {
-                setSymlinkPaths([...symlinkPaths, trimmed])
-                setSymlinkInput("")
+                setSymlinkPaths([...symlinkPaths, trimmed]);
+                setSymlinkInput("");
               }
             }}
           >
@@ -462,29 +490,32 @@ function WorktreeConfigForm({
           </Button>
         </div>
         <div className="flex flex-wrap gap-1">
-          {SYMLINK_SUGGESTIONS.filter((s) => !symlinkPaths.includes(s)).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSymlinkPaths([...symlinkPaths, s])}
-              className="rounded-md border px-2 py-0.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              + {s}
-            </button>
-          ))}
+          {SYMLINK_SUGGESTIONS.filter((s) => !symlinkPaths.includes(s)).map(
+            (s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSymlinkPaths([...symlinkPaths, s])}
+                className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md border px-2 py-0.5 font-mono text-xs transition-colors"
+              >
+                + {s}
+              </button>
+            ),
+          )}
         </div>
       </div>
 
       {/* Preview */}
       {branchName && (
-        <div className="space-y-1.5 rounded-md border bg-muted/30 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="bg-muted/30 space-y-1.5 rounded-md border px-3 py-2">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <GitFork className="h-3 w-3" />
             <span>Will create:</span>
           </div>
           <div className="font-mono text-xs break-all">{targetPath}</div>
-          <div className="text-xs text-muted-foreground">
-            as <span className="font-medium text-foreground">{workspaceName}</span>
+          <div className="text-muted-foreground text-xs">
+            as{" "}
+            <span className="text-foreground font-medium">{workspaceName}</span>
           </div>
         </div>
       )}
@@ -508,5 +539,5 @@ function WorktreeConfigForm({
         )}
       </Button>
     </div>
-  )
+  );
 }

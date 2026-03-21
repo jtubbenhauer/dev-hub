@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useCallback, useEffect, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react";
 import {
   Plus,
   Minus,
@@ -10,62 +10,68 @@ import {
   CirclePlus,
   CircleMinus,
   Check,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { cn, isEditorElement } from "@/lib/utils"
-import type { GitFileStatus } from "@/types"
+} from "@/components/ui/tooltip";
+import { cn, isEditorElement } from "@/lib/utils";
+import type { GitFileStatus } from "@/types";
 
-type SortMode = "name-asc" | "name-desc" | "status" | "path"
+type SortMode = "name-asc" | "name-desc" | "status" | "path";
 
-function sortByMode<T extends { path: string }>(items: T[], mode: SortMode, statusKey?: keyof T): T[] {
-  const sorted = [...items]
+function sortByMode<T extends { path: string }>(
+  items: T[],
+  mode: SortMode,
+  statusKey?: keyof T,
+): T[] {
+  const sorted = [...items];
   switch (mode) {
     case "name-asc":
       return sorted.sort((a, b) => {
-        const an = a.path.split("/").pop() ?? a.path
-        const bn = b.path.split("/").pop() ?? b.path
-        return an.localeCompare(bn)
-      })
+        const an = a.path.split("/").pop() ?? a.path;
+        const bn = b.path.split("/").pop() ?? b.path;
+        return an.localeCompare(bn);
+      });
     case "name-desc":
       return sorted.sort((a, b) => {
-        const an = a.path.split("/").pop() ?? a.path
-        const bn = b.path.split("/").pop() ?? b.path
-        return bn.localeCompare(an)
-      })
+        const an = a.path.split("/").pop() ?? a.path;
+        const bn = b.path.split("/").pop() ?? b.path;
+        return bn.localeCompare(an);
+      });
     case "status":
       if (statusKey) {
-        return sorted.sort((a, b) => String(a[statusKey]).localeCompare(String(b[statusKey])))
+        return sorted.sort((a, b) =>
+          String(a[statusKey]).localeCompare(String(b[statusKey])),
+        );
       }
-      return sorted
+      return sorted;
     case "path":
-      return sorted.sort((a, b) => a.path.localeCompare(b.path))
+      return sorted.sort((a, b) => a.path.localeCompare(b.path));
     default:
-      return sorted
+      return sorted;
   }
 }
 
 interface FileStatusListProps {
-  staged: GitFileStatus[]
-  unstaged: GitFileStatus[]
-  untracked: string[]
-  conflicted: string[]
-  selectedFile: string | null
-  selectedStaged: boolean
-  reviewedFiles: Set<string>
-  sortMode?: SortMode
-  onSelectFile: (file: string, staged: boolean) => void
-  onStageFiles: (files: string[]) => void
-  onUnstageFiles: (files: string[]) => void
-  onStageAll: () => void
-  onUnstageAll: () => void
-  onDiscardFiles: (files: string[]) => void
-  onToggleReviewed: (path: string) => void
+  staged: GitFileStatus[];
+  unstaged: GitFileStatus[];
+  untracked: string[];
+  conflicted: string[];
+  selectedFile: string | null;
+  selectedStaged: boolean;
+  reviewedFiles: Set<string>;
+  sortMode?: SortMode;
+  onSelectFile: (file: string, staged: boolean) => void;
+  onStageFiles: (files: string[]) => void;
+  onUnstageFiles: (files: string[]) => void;
+  onStageAll: () => void;
+  onUnstageAll: () => void;
+  onDiscardFiles: (files: string[]) => void;
+  onToggleReviewed: (path: string) => void;
 }
 
 export function FileStatusList({
@@ -85,32 +91,49 @@ export function FileStatusList({
   onDiscardFiles,
   onToggleReviewed,
 }: FileStatusListProps) {
-  const hasUnstaged = unstaged.length > 0 || untracked.length > 0
-  const hasStaged = staged.length > 0
+  const hasUnstaged = unstaged.length > 0 || untracked.length > 0;
+  const hasStaged = staged.length > 0;
 
   // Apply sorting within each section
-  const sortedStaged = useMemo(() => sortByMode(staged, sortMode, "index"), [staged, sortMode])
-  const sortedUnstaged = useMemo(() => sortByMode(unstaged, sortMode, "workingDir"), [unstaged, sortMode])
+  const sortedStaged = useMemo(
+    () => sortByMode(staged, sortMode, "index"),
+    [staged, sortMode],
+  );
+  const sortedUnstaged = useMemo(
+    () => sortByMode(unstaged, sortMode, "workingDir"),
+    [unstaged, sortMode],
+  );
   const sortedUntracked = useMemo(
-    () => sortByMode(untracked.map((p) => ({ path: p })), sortMode).map((f) => f.path),
-    [untracked, sortMode]
-  )
+    () =>
+      sortByMode(
+        untracked.map((p) => ({ path: p })),
+        sortMode,
+      ).map((f) => f.path),
+    [untracked, sortMode],
+  );
   const sortedConflicted = useMemo(
-    () => sortByMode(conflicted.map((p) => ({ path: p })), sortMode).map((f) => f.path),
-    [conflicted, sortMode]
-  )
+    () =>
+      sortByMode(
+        conflicted.map((p) => ({ path: p })),
+        sortMode,
+      ).map((f) => f.path),
+    [conflicted, sortMode],
+  );
 
   // Flat ordered list for keyboard navigation — matches display order
-  const flatFiles = useMemo(() => [
-    ...sortedStaged.map((f) => ({ path: f.path, isStaged: true })),
-    ...sortedUnstaged.map((f) => ({ path: f.path, isStaged: false })),
-    ...sortedUntracked.map((path) => ({ path, isStaged: false })),
-    ...sortedConflicted.map((path) => ({ path, isStaged: false })),
-  ], [sortedStaged, sortedUnstaged, sortedUntracked, sortedConflicted])
+  const flatFiles = useMemo(
+    () => [
+      ...sortedStaged.map((f) => ({ path: f.path, isStaged: true })),
+      ...sortedUnstaged.map((f) => ({ path: f.path, isStaged: false })),
+      ...sortedUntracked.map((path) => ({ path, isStaged: false })),
+      ...sortedConflicted.map((path) => ({ path, isStaged: false })),
+    ],
+    [sortedStaged, sortedUnstaged, sortedUntracked, sortedConflicted],
+  );
 
   const selectedIndex = flatFiles.findIndex(
-    (f) => f.path === selectedFile && f.isStaged === selectedStaged
-  )
+    (f) => f.path === selectedFile && f.isStaged === selectedStaged,
+  );
 
   const handleKeyboard = useCallback(
     (e: KeyboardEvent) => {
@@ -119,45 +142,52 @@ export function FileStatusList({
         e.target instanceof HTMLTextAreaElement ||
         (e.target instanceof HTMLElement && isEditorElement(e.target))
       ) {
-        return
+        return;
       }
 
       switch (e.key) {
         case "j": {
-          e.preventDefault()
-          const nextIdx = Math.min(selectedIndex + 1, flatFiles.length - 1)
-          const next = flatFiles[nextIdx]
-          if (next) onSelectFile(next.path, next.isStaged)
-          break
+          e.preventDefault();
+          const nextIdx = Math.min(selectedIndex + 1, flatFiles.length - 1);
+          const next = flatFiles[nextIdx];
+          if (next) onSelectFile(next.path, next.isStaged);
+          break;
         }
         case "k": {
-          e.preventDefault()
-          const prevIdx = Math.max(selectedIndex - 1, 0)
-          const prev = flatFiles[prevIdx]
-          if (prev) onSelectFile(prev.path, prev.isStaged)
-          break
+          e.preventDefault();
+          const prevIdx = Math.max(selectedIndex - 1, 0);
+          const prev = flatFiles[prevIdx];
+          if (prev) onSelectFile(prev.path, prev.isStaged);
+          break;
         }
         case "s": {
-          e.preventDefault()
-          if (selectedFile === null) break
-          const current = flatFiles[selectedIndex]
-          if (!current) break
+          e.preventDefault();
+          if (selectedFile === null) break;
+          const current = flatFiles[selectedIndex];
+          if (!current) break;
           if (current.isStaged) {
-            onUnstageFiles([current.path])
+            onUnstageFiles([current.path]);
           } else {
-            onStageFiles([current.path])
+            onStageFiles([current.path]);
           }
-          break
+          break;
         }
       }
     },
-    [selectedIndex, flatFiles, selectedFile, onSelectFile, onStageFiles, onUnstageFiles]
-  )
+    [
+      selectedIndex,
+      flatFiles,
+      selectedFile,
+      onSelectFile,
+      onStageFiles,
+      onUnstageFiles,
+    ],
+  );
 
   useEffect(() => {
-    window.addEventListener("keydown", handleKeyboard)
-    return () => window.removeEventListener("keydown", handleKeyboard)
-  }, [handleKeyboard])
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, [handleKeyboard]);
 
   return (
     <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
@@ -170,11 +200,7 @@ export function FileStatusList({
             hasStaged ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={onUnstageAll}
-                  >
+                  <Button variant="ghost" size="icon-xs" onClick={onUnstageAll}>
                     <Minus className="size-3.5" />
                   </Button>
                 </TooltipTrigger>
@@ -200,8 +226,8 @@ export function FileStatusList({
                       variant="ghost"
                       size="icon-xs"
                       onClick={(event) => {
-                        event.stopPropagation()
-                        onUnstageFiles([file.path])
+                        event.stopPropagation();
+                        onUnstageFiles([file.path]);
                       }}
                     >
                       <CircleMinus className="size-3.5" />
@@ -223,11 +249,7 @@ export function FileStatusList({
               <div className="flex gap-0.5">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={onStageAll}
-                    >
+                    <Button variant="ghost" size="icon-xs" onClick={onStageAll}>
                       <Plus className="size-3.5" />
                     </Button>
                   </TooltipTrigger>
@@ -255,8 +277,8 @@ export function FileStatusList({
                         variant="ghost"
                         size="icon-xs"
                         onClick={(event) => {
-                          event.stopPropagation()
-                          onDiscardFiles([file.path])
+                          event.stopPropagation();
+                          onDiscardFiles([file.path]);
                         }}
                       >
                         <Undo2 className="size-3.5" />
@@ -270,8 +292,8 @@ export function FileStatusList({
                         variant="ghost"
                         size="icon-xs"
                         onClick={(event) => {
-                          event.stopPropagation()
-                          onStageFiles([file.path])
+                          event.stopPropagation();
+                          onStageFiles([file.path]);
                         }}
                       >
                         <CirclePlus className="size-3.5" />
@@ -300,8 +322,8 @@ export function FileStatusList({
                       variant="ghost"
                       size="icon-xs"
                       onClick={(event) => {
-                        event.stopPropagation()
-                        onStageFiles([path])
+                        event.stopPropagation();
+                        onStageFiles([path]);
                       }}
                     >
                       <CirclePlus className="size-3.5" />
@@ -333,7 +355,7 @@ export function FileStatusList({
         )}
       </div>
     </ScrollArea>
-  )
+  );
 }
 
 function FileSection({
@@ -342,17 +364,17 @@ function FileSection({
   headerAction,
   children,
 }: {
-  title: string
-  count: number
-  headerAction?: React.ReactNode
-  children: React.ReactNode
+  title: string;
+  count: number;
+  headerAction?: React.ReactNode;
+  children: React.ReactNode;
 }) {
-  if (count === 0) return null
+  if (count === 0) return null;
 
   return (
     <div>
       <div className="flex items-center justify-between px-1 py-1">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
           <ChevronRight className="size-3.5" />
           <span>{title}</span>
           <span className="text-muted-foreground/60">({count})</span>
@@ -361,7 +383,7 @@ function FileSection({
       </div>
       <div className="space-y-px">{children}</div>
     </div>
-  )
+  );
 }
 
 function FileRow({
@@ -374,32 +396,39 @@ function FileRow({
   onToggleReviewed,
   actions,
 }: {
-  path: string
-  statusChar: string
-  statusColor: string
-  isSelected: boolean
-  isReviewed: boolean
-  onClick: () => void
-  onToggleReviewed: () => void
-  actions?: React.ReactNode
+  path: string;
+  statusChar: string;
+  statusColor: string;
+  isSelected: boolean;
+  isReviewed: boolean;
+  onClick: () => void;
+  onToggleReviewed: () => void;
+  actions?: React.ReactNode;
 }) {
-  const fileName = path.split("/").pop() ?? path
-  const dirPath = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""
+  const fileName = path.split("/").pop() ?? path;
+  const dirPath = path.includes("/")
+    ? path.slice(0, path.lastIndexOf("/"))
+    : "";
 
   return (
     <div
       className={cn(
-        "group flex min-w-0 items-center gap-1.5 rounded-sm px-2 py-1 text-xs cursor-pointer hover:bg-accent/50",
+        "group hover:bg-accent/50 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-xs",
         isSelected && "bg-accent",
-        isReviewed && "opacity-60"
+        isReviewed && "opacity-60",
       )}
       onClick={onClick}
     >
-      <span className={cn("w-4 shrink-0 text-center font-mono font-bold", statusColor)}>
+      <span
+        className={cn(
+          "w-4 shrink-0 text-center font-mono font-bold",
+          statusColor,
+        )}
+      >
         {statusChar}
       </span>
-      <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="truncate flex-1">
+      <FileIcon className="text-muted-foreground size-3.5 shrink-0" />
+      <span className="flex-1 truncate">
         {fileName}
         {dirPath && (
           <span className="text-muted-foreground/60 ml-1">{dirPath}</span>
@@ -413,21 +442,25 @@ function FileRow({
               variant="ghost"
               size="icon-xs"
               className={cn(
-                isReviewed ? "text-green-500 hover:text-green-400" : "text-muted-foreground/40 hover:text-muted-foreground"
+                isReviewed
+                  ? "text-green-500 hover:text-green-400"
+                  : "text-muted-foreground/40 hover:text-muted-foreground",
               )}
               onClick={(e) => {
-                e.stopPropagation()
-                onToggleReviewed()
+                e.stopPropagation();
+                onToggleReviewed();
               }}
             >
               <Check className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{isReviewed ? "Unmark reviewed" : "Mark as reviewed"}</TooltipContent>
+          <TooltipContent>
+            {isReviewed ? "Unmark reviewed" : "Mark as reviewed"}
+          </TooltipContent>
         </Tooltip>
       </div>
     </div>
-  )
+  );
 }
 
 const statusLabels: Record<string, string> = {
@@ -439,8 +472,8 @@ const statusLabels: Record<string, string> = {
   U: "Updated",
   "?": "Untracked",
   "!": "Conflict",
-}
+};
 
 export function getStatusLabel(char: string): string {
-  return statusLabels[char] ?? char
+  return statusLabels[char] ?? char;
 }

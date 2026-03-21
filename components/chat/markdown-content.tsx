@@ -1,16 +1,20 @@
-"use client"
+"use client";
 
-import { memo, useState, useCallback } from "react"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import remarkBreaks from "remark-breaks"
-import rehypeHighlight from "rehype-highlight"
-import { Copy, Check } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { isCodePath, FilePathCode } from "@/components/chat/file-path-code"
+import { memo, useState, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
+import rehypeHighlight from "rehype-highlight";
+import { Copy, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { isCodePath, FilePathCode } from "@/components/chat/file-path-code";
 
-export const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
+export const MarkdownContent = memo(function MarkdownContent({
+  content,
+}: {
+  content: string;
+}) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkBreaks]}
@@ -19,67 +23,71 @@ export const MarkdownContent = memo(function MarkdownContent({ content }: { cont
         pre({ children, ...props }) {
           return (
             <div className="overflow-x-auto">
-              <pre {...props} className={cn(props.className, "relative group/code")}>
+              <pre
+                {...props}
+                className={cn(props.className, "group/code relative")}
+              >
                 <CopyButton
                   content={extractCodeFromPre(children)}
-                  className="absolute right-2 top-2 z-10"
+                  className="absolute top-2 right-2 z-10"
                 />
                 {children}
               </pre>
             </div>
-          )
+          );
         },
         table({ children, ...props }) {
           return (
             <div className="overflow-x-auto">
               <table {...props}>{children}</table>
             </div>
-          )
+          );
         },
         code({ children, className, ...props }) {
-          const isInline = !className
+          const isInline = !className;
           if (isInline) {
-            const text = typeof children === "string" ? children : String(children ?? "")
+            const text =
+              typeof children === "string" ? children : String(children ?? "");
             if (isCodePath(text)) {
-              return <FilePathCode text={text}>{children}</FilePathCode>
+              return <FilePathCode text={text}>{children}</FilePathCode>;
             }
             return (
               <code
-                className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono"
+                className="bg-muted rounded px-1.5 py-0.5 font-mono text-sm"
                 {...props}
               >
                 {children}
               </code>
-            )
+            );
           }
           return (
             <code className={className} {...props}>
               {children}
             </code>
-          )
+          );
         },
       }}
     >
       {content}
     </ReactMarkdown>
-  )
-})
+  );
+});
 
 function CopyButton({
   content,
   className,
 }: {
-  content: string
-  className?: string
+  content: string;
+  className?: string;
 }) {
-  const [isCopied, setIsCopied] = useState(false)
+  const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(content).then(() => {
-      setIsCopied(true)
-      setTimeout(() => setIsCopied(false), 2000)
-    })
-  }, [content])
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+  }, [content]);
 
   return (
     <Button
@@ -88,21 +96,17 @@ function CopyButton({
       onClick={handleCopy}
       className={cn(
         "opacity-0 transition-opacity group-hover/code:opacity-100",
-        className
+        className,
       )}
     >
-      {isCopied ? (
-        <Check className="size-3" />
-      ) : (
-        <Copy className="size-3" />
-      )}
+      {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
     </Button>
-  )
+  );
 }
 
 function extractCodeFromPre(children: React.ReactNode): string {
-  if (typeof children === "string") return children
-  if (Array.isArray(children)) return children.map(extractCodeFromPre).join("")
+  if (typeof children === "string") return children;
+  if (Array.isArray(children)) return children.map(extractCodeFromPre).join("");
   if (
     children &&
     typeof children === "object" &&
@@ -110,8 +114,8 @@ function extractCodeFromPre(children: React.ReactNode): string {
     children.props
   ) {
     return extractCodeFromPre(
-      (children.props as { children?: React.ReactNode }).children
-    )
+      (children.props as { children?: React.ReactNode }).children,
+    );
   }
-  return ""
+  return "";
 }

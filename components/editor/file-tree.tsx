@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { useWorkspaceStore } from "@/stores/workspace-store"
-import { useEditorStore } from "@/stores/editor-store"
-import { useWorkspaceFiles } from "@/components/file-picker/file-picker"
-import { useFileTabsSetting } from "@/hooks/use-settings"
-import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Input } from "@/components/ui/input"
-import { cn, isEditorElement } from "@/lib/utils"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useEditorStore } from "@/stores/editor-store";
+import { useWorkspaceFiles } from "@/components/file-picker/file-picker";
+import { useFileTabsSetting } from "@/hooks/use-settings";
+import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { cn, isEditorElement } from "@/lib/utils";
 import {
   ChevronRight,
   ChevronDown,
@@ -17,8 +17,8 @@ import {
   Folder,
   FolderOpen,
   Search,
-} from "lucide-react"
-import type { FileTreeEntry, FileGitStatus } from "@/types"
+} from "lucide-react";
+import type { FileTreeEntry, FileGitStatus } from "@/types";
 
 const GIT_STATUS_COLORS: Record<FileGitStatus, string> = {
   modified: "text-yellow-500",
@@ -29,15 +29,15 @@ const GIT_STATUS_COLORS: Record<FileGitStatus, string> = {
   conflicted: "text-red-600",
   added: "text-green-400",
   committed: "text-cyan-500",
-}
+};
 
 interface FileTreeNodeProps {
-  entry: FileTreeEntry
-  depth: number
-  expandedPaths: Set<string>
-  selectedPath: string | null
-  onToggleExpand: (path: string) => void
-  onFileClick: (entry: FileTreeEntry) => void
+  entry: FileTreeEntry;
+  depth: number;
+  expandedPaths: Set<string>;
+  selectedPath: string | null;
+  onToggleExpand: (path: string) => void;
+  onFileClick: (entry: FileTreeEntry) => void;
 }
 
 function FileTreeNode({
@@ -48,32 +48,32 @@ function FileTreeNode({
   onToggleExpand,
   onFileClick,
 }: FileTreeNodeProps) {
-  const isExpanded = expandedPaths.has(entry.path)
-  const activeFilePath = useEditorStore((s) => s.activeFilePath)
-  const isActive = entry.type === "file" && entry.path === activeFilePath
-  const isSelected = entry.path === selectedPath
+  const isExpanded = expandedPaths.has(entry.path);
+  const activeFilePath = useEditorStore((s) => s.activeFilePath);
+  const isActive = entry.type === "file" && entry.path === activeFilePath;
+  const isSelected = entry.path === selectedPath;
   const gitColorClass = entry.gitStatus
     ? GIT_STATUS_COLORS[entry.gitStatus]
-    : undefined
+    : undefined;
 
   const handleClick = () => {
     if (entry.type === "directory") {
-      onToggleExpand(entry.path)
+      onToggleExpand(entry.path);
     } else {
-      onFileClick(entry)
+      onFileClick(entry);
     }
-  }
+  };
 
   return (
     <>
       <button
         data-tree-path={entry.path}
         className={cn(
-          "flex w-full items-center gap-1 rounded-sm px-1 py-0.5 text-sm hover:bg-accent",
+          "hover:bg-accent flex w-full items-center gap-1 rounded-sm px-1 py-0.5 text-sm",
           isActive && "bg-accent text-accent-foreground",
-          isSelected && !isActive && "ring-1 ring-ring",
-          isSelected && isActive && "ring-1 ring-ring",
-          gitColorClass
+          isSelected && !isActive && "ring-ring ring-1",
+          isSelected && isActive && "ring-ring ring-1",
+          gitColorClass,
         )}
         style={{ paddingLeft: `${depth * 12 + 4}px` }}
         onClick={handleClick}
@@ -81,9 +81,9 @@ function FileTreeNode({
         {entry.type === "directory" ? (
           <>
             {isExpanded ? (
-              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <ChevronDown className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
             ) : (
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <ChevronRight className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
             )}
             {isExpanded ? (
               <FolderOpen className="h-3.5 w-3.5 shrink-0 text-blue-400" />
@@ -94,7 +94,7 @@ function FileTreeNode({
         ) : (
           <>
             <span className="h-3.5 w-3.5 shrink-0" />
-            <File className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <File className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
           </>
         )}
         <span className="truncate">{entry.name}</span>
@@ -116,53 +116,63 @@ function FileTreeNode({
         </>
       )}
     </>
-  )
+  );
 }
 
 function flattenVisibleEntries(
   entries: FileTreeEntry[],
   expandedPaths: Set<string>,
 ): FileTreeEntry[] {
-  const result: FileTreeEntry[] = []
+  const result: FileTreeEntry[] = [];
   for (const entry of entries) {
-    result.push(entry)
-    if (entry.type === "directory" && expandedPaths.has(entry.path) && entry.children) {
-      result.push(...flattenVisibleEntries(entry.children, expandedPaths))
+    result.push(entry);
+    if (
+      entry.type === "directory" &&
+      expandedPaths.has(entry.path) &&
+      entry.children
+    ) {
+      result.push(...flattenVisibleEntries(entry.children, expandedPaths));
     }
   }
-  return result
+  return result;
 }
 
 // ---------------------------------------------------------------------------
 // Highlighted path for fzf search results
 // ---------------------------------------------------------------------------
 
-function HighlightedPath({ path, positions }: { path: string; positions: Set<number> }) {
+function HighlightedPath({
+  path,
+  positions,
+}: {
+  path: string;
+  positions: Set<number>;
+}) {
   if (positions.size === 0) {
-    return <span className="truncate">{path}</span>
+    return <span className="truncate">{path}</span>;
   }
 
-  const parts: React.ReactNode[] = []
-  let i = 0
+  const parts: React.ReactNode[] = [];
+  let i = 0;
   while (i < path.length) {
     if (positions.has(i)) {
-      let end = i
-      while (end < path.length && positions.has(end)) end++
+      let end = i;
+      while (end < path.length && positions.has(end)) end++;
       parts.push(
         <span key={i} className="text-primary font-semibold">
           {path.slice(i, end)}
-        </span>
-      )
-      i = end
+        </span>,
+      );
+      i = end;
     } else {
-      let end = i
-      while (end < path.length && !positions.has(end)) end++
-      parts.push(<span key={i}>{path.slice(i, end)}</span>)
-      i = end
+      let end = i;
+      while (end < path.length && !positions.has(end)) end++;
+      parts.push(<span key={i}>{path.slice(i, end)}</span>);
+      i = end;
     }
   }
 
-  return <span className="truncate">{parts}</span>
+  return <span className="truncate">{parts}</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,43 +180,48 @@ function HighlightedPath({ path, positions }: { path: string; positions: Set<num
 // ---------------------------------------------------------------------------
 
 function basenamePositions(match: FuzzyMatch): Set<number> {
-  const lastSlash = match.path.lastIndexOf("/")
-  if (lastSlash === -1) return match.positions
+  const lastSlash = match.path.lastIndexOf("/");
+  if (lastSlash === -1) return match.positions;
 
-  const offset = lastSlash + 1
-  const result = new Set<number>()
+  const offset = lastSlash + 1;
+  const result = new Set<number>();
   for (const pos of match.positions) {
     if (pos >= offset) {
-      result.add(pos - offset)
+      result.add(pos - offset);
     }
   }
-  return result
+  return result;
 }
 
 interface FuzzyResultListProps {
-  results: FuzzyMatch[]
-  selectedIndex: number
-  onSelect: (path: string) => void
-  onHover: (index: number) => void
+  results: FuzzyMatch[];
+  selectedIndex: number;
+  onSelect: (path: string) => void;
+  onHover: (index: number) => void;
 }
 
-function FuzzyResultList({ results, selectedIndex, onSelect, onHover }: FuzzyResultListProps) {
+function FuzzyResultList({
+  results,
+  selectedIndex,
+  onSelect,
+  onHover,
+}: FuzzyResultListProps) {
   if (results.length === 0) {
     return (
-      <p className="py-4 text-center text-xs text-muted-foreground">
+      <p className="text-muted-foreground py-4 text-center text-xs">
         No files match
       </p>
-    )
+    );
   }
 
   return (
     <>
       {results.map((match, index) => {
-        const isSelected = index === selectedIndex
-        const basename = match.path.split("/").pop() ?? match.path
+        const isSelected = index === selectedIndex;
+        const basename = match.path.split("/").pop() ?? match.path;
         const dirname = match.path.includes("/")
           ? match.path.slice(0, match.path.lastIndexOf("/"))
-          : ""
+          : "";
 
         return (
           <button
@@ -216,134 +231,141 @@ function FuzzyResultList({ results, selectedIndex, onSelect, onHover }: FuzzyRes
               "flex w-full items-center gap-1.5 rounded-sm px-2 py-1 text-sm",
               isSelected
                 ? "bg-accent text-accent-foreground"
-                : "hover:bg-accent/50"
+                : "hover:bg-accent/50",
             )}
             onClick={() => onSelect(match.path)}
             onMouseEnter={() => onHover(index)}
           >
-            <File className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <File className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
             <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
               <span className="shrink-0 font-mono text-xs">
-                <HighlightedPath path={basename} positions={basenamePositions(match)} />
+                <HighlightedPath
+                  path={basename}
+                  positions={basenamePositions(match)}
+                />
               </span>
               {dirname && (
-                <span className="truncate text-[11px] text-muted-foreground">
+                <span className="text-muted-foreground truncate text-[11px]">
                   {dirname}
                 </span>
               )}
             </div>
           </button>
-        )
+        );
       })}
     </>
-  )
+  );
 }
 
-export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<HTMLInputElement | null> }) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
-  const openFile = useEditorStore((s) => s.openFile)
-  const closeAllFiles = useEditorStore((s) => s.closeAllFiles)
-  const toggleExpandedPath = useEditorStore((s) => s.toggleExpandedPath)
-  const expandPathToFile = useEditorStore((s) => s.expandPathToFile)
-  const workspaceFileStates = useEditorStore((s) => s.workspaceFileStates)
+export function FileTree({
+  searchInputRef,
+}: {
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const openFile = useEditorStore((s) => s.openFile);
+  const closeAllFiles = useEditorStore((s) => s.closeAllFiles);
+  const toggleExpandedPath = useEditorStore((s) => s.toggleExpandedPath);
+  const expandPathToFile = useEditorStore((s) => s.expandPathToFile);
+  const workspaceFileStates = useEditorStore((s) => s.workspaceFileStates);
 
-  const { isFileTabsDisabled } = useFileTabsSetting()
+  const { isFileTabsDisabled } = useFileTabsSetting();
 
   const expandedPaths = useMemo(() => {
-    if (!activeWorkspaceId) return new Set<string>()
-    const ws = workspaceFileStates[activeWorkspaceId]
-    return new Set(ws?.expandedPaths ?? [])
-  }, [activeWorkspaceId, workspaceFileStates])
+    if (!activeWorkspaceId) return new Set<string>();
+    const ws = workspaceFileStates[activeWorkspaceId];
+    return new Set(ws?.expandedPaths ?? []);
+  }, [activeWorkspaceId, workspaceFileStates]);
 
   const { data: rootEntries, isLoading } = useQuery<FileTreeEntry[]>({
     queryKey: ["file-tree", activeWorkspaceId, "root"],
     queryFn: async () => {
       const response = await fetch(
-        `/api/files/tree?workspaceId=${activeWorkspaceId}&path=.&depth=1`
-      )
-      if (!response.ok) throw new Error("Failed to load file tree")
-      return response.json()
+        `/api/files/tree?workspaceId=${activeWorkspaceId}&path=.&depth=1`,
+      );
+      if (!response.ok) throw new Error("Failed to load file tree");
+      return response.json();
     },
     enabled: !!activeWorkspaceId,
-  })
+  });
 
   const fetchChildren = useCallback(
     async (dirPath: string): Promise<FileTreeEntry[]> => {
       const response = await fetch(
-        `/api/files/tree?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(dirPath)}&depth=1`
-      )
-      if (!response.ok) throw new Error("Failed to load directory")
-      return response.json()
+        `/api/files/tree?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(dirPath)}&depth=1`,
+      );
+      if (!response.ok) throw new Error("Failed to load directory");
+      return response.json();
     },
-    [activeWorkspaceId]
-  )
+    [activeWorkspaceId],
+  );
 
-  const [lazyEntries, setLazyEntries] = useState<
-    Map<string, FileTreeEntry[]>
-  >(new Map())
+  const [lazyEntries, setLazyEntries] = useState<Map<string, FileTreeEntry[]>>(
+    new Map(),
+  );
 
   const onToggleExpand = useCallback(
     async (dirPath: string) => {
       if (activeWorkspaceId) {
-        toggleExpandedPath(activeWorkspaceId, dirPath)
+        toggleExpandedPath(activeWorkspaceId, dirPath);
       }
 
       if (!lazyEntries.has(dirPath)) {
-        const children = await fetchChildren(dirPath)
-        setLazyEntries((prev) => new Map(prev).set(dirPath, children))
+        const children = await fetchChildren(dirPath);
+        setLazyEntries((prev) => new Map(prev).set(dirPath, children));
       }
     },
-    [activeWorkspaceId, toggleExpandedPath, fetchChildren, lazyEntries]
-  )
+    [activeWorkspaceId, toggleExpandedPath, fetchChildren, lazyEntries],
+  );
 
-  const fetchingRef = useRef(new Set<string>())
+  const fetchingRef = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!activeWorkspaceId) return
-    const missing: string[] = []
+    if (!activeWorkspaceId) return;
+    const missing: string[] = [];
     for (const p of expandedPaths) {
       if (!lazyEntries.has(p) && !fetchingRef.current.has(p)) {
-        missing.push(p)
+        missing.push(p);
       }
     }
-    if (missing.length === 0) return
+    if (missing.length === 0) return;
 
-    for (const p of missing) fetchingRef.current.add(p)
+    for (const p of missing) fetchingRef.current.add(p);
 
     Promise.all(
       missing.map((dirPath) =>
-        fetchChildren(dirPath).then((children) => [dirPath, children] as const)
-      )
+        fetchChildren(dirPath).then((children) => [dirPath, children] as const),
+      ),
     ).then((results) => {
       setLazyEntries((prev) => {
-        const next = new Map(prev)
+        const next = new Map(prev);
         for (const [dirPath, children] of results) {
-          next.set(dirPath, children)
-          fetchingRef.current.delete(dirPath)
+          next.set(dirPath, children);
+          fetchingRef.current.delete(dirPath);
         }
-        return next
-      })
-    })
-  }, [activeWorkspaceId, expandedPaths, lazyEntries, fetchChildren])
+        return next;
+      });
+    });
+  }, [activeWorkspaceId, expandedPaths, lazyEntries, fetchChildren]);
 
   const onFileClick = useCallback(
     async (entry: FileTreeEntry) => {
       if (activeWorkspaceId) {
-        expandPathToFile(activeWorkspaceId, entry.path)
+        expandPathToFile(activeWorkspaceId, entry.path);
       }
 
       const response = await fetch(
-        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(entry.path)}`
-      )
+        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(entry.path)}`,
+      );
 
       if (!response.ok) {
-        return
+        return;
       }
 
-      const data = await response.json()
+      const data = await response.json();
 
-      if (isFileTabsDisabled) closeAllFiles()
+      if (isFileTabsDisabled) closeAllFiles();
       openFile({
         path: entry.path,
         name: entry.name,
@@ -351,167 +373,182 @@ export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<
         language: data.language,
         isDirty: false,
         originalContent: data.content,
-      })
+      });
     },
-    [activeWorkspaceId, openFile, closeAllFiles, isFileTabsDisabled, expandPathToFile]
-  )
+    [
+      activeWorkspaceId,
+      openFile,
+      closeAllFiles,
+      isFileTabsDisabled,
+      expandPathToFile,
+    ],
+  );
 
   // Merge lazy-loaded children into root entries
   const mergedEntries = useMemo(() => {
-    if (!rootEntries) return []
+    if (!rootEntries) return [];
 
     function mergeChildren(entries: FileTreeEntry[]): FileTreeEntry[] {
       return entries.map((entry) => {
-        if (entry.type !== "directory") return entry
+        if (entry.type !== "directory") return entry;
 
-        const loadedChildren = lazyEntries.get(entry.path)
+        const loadedChildren = lazyEntries.get(entry.path);
         const children = loadedChildren
           ? mergeChildren(loadedChildren)
           : entry.children
             ? mergeChildren(entry.children)
-            : undefined
+            : undefined;
 
-        return { ...entry, children }
-      })
+        return { ...entry, children };
+      });
     }
 
-    return mergeChildren(rootEntries)
-  }, [rootEntries, lazyEntries])
+    return mergeChildren(rootEntries);
+  }, [rootEntries, lazyEntries]);
 
   // Fzf-powered search across ALL workspace files
-  const { data: allFiles } = useWorkspaceFiles(activeWorkspaceId)
-  const isSearching = searchQuery.length > 0
+  const { data: allFiles } = useWorkspaceFiles(activeWorkspaceId);
+  const isSearching = searchQuery.length > 0;
 
   // Flat list of visible tree entries for j/k keyboard navigation
   const flatVisible = useMemo(
     () => flattenVisibleEntries(mergedEntries, expandedPaths),
     [mergedEntries, expandedPaths],
-  )
+  );
 
-  const [selectedPath, setSelectedPath] = useState<string | null>(null)
-  const treeListRef = useRef<HTMLDivElement>(null)
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const treeListRef = useRef<HTMLDivElement>(null);
 
   // Clamp selectedPath when the visible list changes
-  const clampedSelectedPath = selectedPath !== null && !flatVisible.some((e) => e.path === selectedPath)
-    ? flatVisible[0]?.path ?? null
-    : selectedPath
+  const clampedSelectedPath =
+    selectedPath !== null && !flatVisible.some((e) => e.path === selectedPath)
+      ? (flatVisible[0]?.path ?? null)
+      : selectedPath;
   if (clampedSelectedPath !== selectedPath) {
-    setSelectedPath(clampedSelectedPath)
+    setSelectedPath(clampedSelectedPath);
   }
 
   // Scroll keyboard-selected tree entry into view
   useEffect(() => {
-    if (!selectedPath || isSearching) return
-    const el = treeListRef.current?.querySelector(`[data-tree-path="${CSS.escape(selectedPath)}"]`)
-    if (el) el.scrollIntoView({ block: "nearest" })
-  }, [selectedPath, isSearching])
+    if (!selectedPath || isSearching) return;
+    const el = treeListRef.current?.querySelector(
+      `[data-tree-path="${CSS.escape(selectedPath)}"]`,
+    );
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [selectedPath, isSearching]);
 
   // Stable refs for the keyboard handler
-  const flatVisibleRef = useRef(flatVisible)
-  const selectedPathRef = useRef(selectedPath)
-  const onFileClickRef = useRef(onFileClick)
-  const onToggleExpandRef = useRef(onToggleExpand)
-  const isSearchingRef = useRef(isSearching)
+  const flatVisibleRef = useRef(flatVisible);
+  const selectedPathRef = useRef(selectedPath);
+  const onFileClickRef = useRef(onFileClick);
+  const onToggleExpandRef = useRef(onToggleExpand);
+  const isSearchingRef = useRef(isSearching);
   useEffect(() => {
-    flatVisibleRef.current = flatVisible
-    selectedPathRef.current = selectedPath
-    onFileClickRef.current = onFileClick
-    onToggleExpandRef.current = onToggleExpand
-    isSearchingRef.current = isSearching
-  })
+    flatVisibleRef.current = flatVisible;
+    selectedPathRef.current = selectedPath;
+    onFileClickRef.current = onFileClick;
+    onToggleExpandRef.current = onToggleExpand;
+    isSearchingRef.current = isSearching;
+  });
 
   useEffect(() => {
     function handleTreeKeyboard(e: KeyboardEvent) {
-      if (isSearchingRef.current) return
+      if (isSearchingRef.current) return;
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
         (e.target instanceof HTMLElement && isEditorElement(e.target))
       ) {
-        return
+        return;
       }
 
-      const flat = flatVisibleRef.current
-      if (flat.length === 0) return
+      const flat = flatVisibleRef.current;
+      if (flat.length === 0) return;
 
-      const currentIdx = flat.findIndex((entry) => entry.path === selectedPathRef.current)
+      const currentIdx = flat.findIndex(
+        (entry) => entry.path === selectedPathRef.current,
+      );
 
       switch (e.key) {
         case "j": {
-          e.preventDefault()
-          const nextIdx = currentIdx === -1 ? 0 : Math.min(currentIdx + 1, flat.length - 1)
-          setSelectedPath(flat[nextIdx].path)
-          break
+          e.preventDefault();
+          const nextIdx =
+            currentIdx === -1 ? 0 : Math.min(currentIdx + 1, flat.length - 1);
+          setSelectedPath(flat[nextIdx].path);
+          break;
         }
         case "k": {
-          e.preventDefault()
-          const prevIdx = currentIdx === -1 ? 0 : Math.max(currentIdx - 1, 0)
-          setSelectedPath(flat[prevIdx].path)
-          break
+          e.preventDefault();
+          const prevIdx = currentIdx === -1 ? 0 : Math.max(currentIdx - 1, 0);
+          setSelectedPath(flat[prevIdx].path);
+          break;
         }
         case "Enter": {
-          if (currentIdx === -1) break
-          e.preventDefault()
-          const entry = flat[currentIdx]
+          if (currentIdx === -1) break;
+          e.preventDefault();
+          const entry = flat[currentIdx];
           if (entry.type === "directory") {
-            onToggleExpandRef.current(entry.path)
+            onToggleExpandRef.current(entry.path);
           } else {
-            onFileClickRef.current(entry)
+            onFileClickRef.current(entry);
           }
-          break
+          break;
         }
       }
     }
 
-    window.addEventListener("keydown", handleTreeKeyboard)
-    return () => window.removeEventListener("keydown", handleTreeKeyboard)
-  }, [])
+    window.addEventListener("keydown", handleTreeKeyboard);
+    return () => window.removeEventListener("keydown", handleTreeKeyboard);
+  }, []);
 
   const searchResults = useMemo(() => {
-    if (!isSearching || !allFiles) return []
-    return fuzzySearch(searchQuery, allFiles, 100)
-  }, [searchQuery, allFiles, isSearching])
+    if (!isSearching || !allFiles) return [];
+    return fuzzySearch(searchQuery, allFiles, 100);
+  }, [searchQuery, allFiles, isSearching]);
 
   // Keyboard navigation state for search results
-  const [selectedIndex, setSelectedIndex] = useState(0)
-  const searchListRef = useRef<HTMLDivElement>(null)
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const searchListRef = useRef<HTMLDivElement>(null);
 
   // Reset selectedIndex when query changes and clamp to results length
-  const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery)
+  const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery);
   if (prevSearchQuery !== searchQuery) {
-    setPrevSearchQuery(searchQuery)
-    setSelectedIndex(0)
-  } else if (selectedIndex >= searchResults.length && searchResults.length > 0) {
-    setSelectedIndex(Math.max(0, searchResults.length - 1))
+    setPrevSearchQuery(searchQuery);
+    setSelectedIndex(0);
+  } else if (
+    selectedIndex >= searchResults.length &&
+    searchResults.length > 0
+  ) {
+    setSelectedIndex(Math.max(0, searchResults.length - 1));
   }
 
   // Scroll selected search result into view
   useEffect(() => {
-    if (!isSearching) return
-    const list = searchListRef.current
-    if (!list) return
-    const selected = list.querySelector(`[data-index="${selectedIndex}"]`)
+    if (!isSearching) return;
+    const list = searchListRef.current;
+    if (!list) return;
+    const selected = list.querySelector(`[data-index="${selectedIndex}"]`);
     if (selected) {
-      selected.scrollIntoView({ block: "nearest" })
+      selected.scrollIntoView({ block: "nearest" });
     }
-  }, [selectedIndex, isSearching])
+  }, [selectedIndex, isSearching]);
 
   // Open a file by path (used by fzf search results)
   const onSearchResultClick = useCallback(
     async (filePath: string) => {
-      const name = filePath.split("/").pop() ?? filePath
+      const name = filePath.split("/").pop() ?? filePath;
 
       if (activeWorkspaceId) {
-        expandPathToFile(activeWorkspaceId, filePath)
+        expandPathToFile(activeWorkspaceId, filePath);
       }
 
       const response = await fetch(
-        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(filePath)}`
-      )
-      if (!response.ok) return
+        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(filePath)}`,
+      );
+      if (!response.ok) return;
 
-      const data = await response.json()
-      if (isFileTabsDisabled) closeAllFiles()
+      const data = await response.json();
+      if (isFileTabsDisabled) closeAllFiles();
       openFile({
         path: filePath,
         name,
@@ -519,47 +556,53 @@ export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<
         language: data.language,
         isDirty: false,
         originalContent: data.content,
-      })
+      });
     },
-    [activeWorkspaceId, openFile, closeAllFiles, isFileTabsDisabled, expandPathToFile]
-  )
+    [
+      activeWorkspaceId,
+      openFile,
+      closeAllFiles,
+      isFileTabsDisabled,
+      expandPathToFile,
+    ],
+  );
 
   const handleSearchKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!isSearching) return
+      if (!isSearching) return;
 
-      const isDown = e.key === "ArrowDown" || (e.ctrlKey && e.key === "j")
-      const isUp = e.key === "ArrowUp" || (e.ctrlKey && e.key === "k")
+      const isDown = e.key === "ArrowDown" || (e.ctrlKey && e.key === "j");
+      const isUp = e.key === "ArrowUp" || (e.ctrlKey && e.key === "k");
 
       if (isDown) {
-        e.preventDefault()
-        setSelectedIndex((i) => Math.min(i + 1, searchResults.length - 1))
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, searchResults.length - 1));
       } else if (isUp) {
-        e.preventDefault()
-        setSelectedIndex((i) => Math.max(i - 1, 0))
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, 0));
       } else if (e.key === "Enter") {
-        e.preventDefault()
+        e.preventDefault();
         if (searchResults[selectedIndex]) {
-          onSearchResultClick(searchResults[selectedIndex].path)
+          onSearchResultClick(searchResults[selectedIndex].path);
         }
       }
     },
-    [isSearching, searchResults, selectedIndex, onSearchResultClick]
-  )
+    [isSearching, searchResults, selectedIndex, onSearchResultClick],
+  );
 
   if (!activeWorkspaceId) {
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <p className="text-sm text-muted-foreground">Select a workspace</p>
+        <p className="text-muted-foreground text-sm">Select a workspace</p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b p-2">
         <div className="relative">
-          <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="text-muted-foreground absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2" />
           <Input
             ref={searchInputRef}
             placeholder="Search files..."
@@ -584,10 +627,10 @@ export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<
             </div>
           ) : isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
             </div>
           ) : mergedEntries.length === 0 ? (
-            <p className="py-4 text-center text-xs text-muted-foreground">
+            <p className="text-muted-foreground py-4 text-center text-xs">
               Empty directory
             </p>
           ) : (
@@ -608,5 +651,5 @@ export function FileTree({ searchInputRef }: { searchInputRef?: React.RefObject<
         </div>
       </ScrollArea>
     </div>
-  )
+  );
 }

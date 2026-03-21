@@ -1,27 +1,34 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth/config"
-import { db } from "@/lib/db"
-import { workspaces } from "@/drizzle/schema"
-import { eq, and } from "drizzle-orm"
-import { getBackend, LocalBackend, toWorkspace } from "@/lib/workspaces/backend"
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth/config";
+import { db } from "@/lib/db";
+import { workspaces } from "@/drizzle/schema";
+import { eq, and } from "drizzle-orm";
+import {
+  getBackend,
+  LocalBackend,
+  toWorkspace,
+} from "@/lib/workspaces/backend";
 
-const PLAN_DIRECTORIES = [".opencode/plans", ".sisyphus/plans"]
+const PLAN_DIRECTORIES = [".opencode/plans", ".sisyphus/plans"];
 
 export interface PlanFile {
-  name: string
-  path: string
-  lastModified: string
+  name: string;
+  path: string;
+  lastModified: string;
 }
 
 export async function GET(request: NextRequest) {
-  const session = await auth()
+  const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const workspaceId = request.nextUrl.searchParams.get("workspaceId")
+  const workspaceId = request.nextUrl.searchParams.get("workspaceId");
   if (!workspaceId) {
-    return NextResponse.json({ error: "workspaceId is required" }, { status: 400 })
+    return NextResponse.json(
+      { error: "workspaceId is required" },
+      { status: 400 },
+    );
   }
 
   const [row] = await db
@@ -30,43 +37,43 @@ export async function GET(request: NextRequest) {
     .where(
       and(
         eq(workspaces.id, workspaceId),
-        eq(workspaces.userId, session.user.id)
-      )
-    )
+        eq(workspaces.userId, session.user.id),
+      ),
+    );
 
   if (!row) {
-    return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
+    return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
-  const workspace = toWorkspace(row)
+  const workspace = toWorkspace(row);
 
-  const directory = request.nextUrl.searchParams.get("directory")
+  const directory = request.nextUrl.searchParams.get("directory");
   const backend =
     directory && workspace.backend !== "remote"
       ? new LocalBackend(directory)
-      : getBackend(workspace)
+      : getBackend(workspace);
 
-  const seen = new Set<string>()
-  const allFiles: PlanFile[] = []
+  const seen = new Set<string>();
+  const allFiles: PlanFile[] = [];
 
   for (const dir of PLAN_DIRECTORIES) {
     try {
-      const entries = await backend.listDirectory(dir, 1)
+      const entries = await backend.listDirectory(dir, 1);
       for (const entry of entries) {
-        if (entry.type !== "file" || !entry.name.endsWith(".md")) continue
-        if (seen.has(entry.name)) continue
-        seen.add(entry.name)
+        if (entry.type !== "file" || !entry.name.endsWith(".md")) continue;
+        if (seen.has(entry.name)) continue;
+        seen.add(entry.name);
         allFiles.push({
           name: entry.name,
           path: `${dir}/${entry.name}`,
           lastModified: new Date().toISOString(),
-        })
+        });
       }
     } catch {
       // Directory doesn't exist, skip
     }
   }
 
-  allFiles.sort((a, b) => a.name.localeCompare(b.name))
-  return NextResponse.json({ files: allFiles })
+  allFiles.sort((a, b) => a.name.localeCompare(b.name));
+  return NextResponse.json({ files: allFiles });
 }

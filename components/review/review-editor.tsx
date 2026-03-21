@@ -12,7 +12,7 @@ const MonacoReviewEditor = dynamic(
     ),
   {
     ssr: false,
-    loading: () => <div className="h-full w-full animate-pulse bg-muted" />,
+    loading: () => <div className="bg-muted h-full w-full animate-pulse" />,
   },
 );
 
@@ -23,7 +23,7 @@ const NeovimReviewEditor = dynamic(
     ),
   {
     ssr: false,
-    loading: () => <div className="h-full w-full animate-pulse bg-muted" />,
+    loading: () => <div className="bg-muted h-full w-full animate-pulse" />,
   },
 );
 

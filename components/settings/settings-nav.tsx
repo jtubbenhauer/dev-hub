@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 
 export type SettingsTab =
   | "general"
@@ -17,7 +17,7 @@ export type SettingsTab =
   | "workspace"
   | "integrations"
   | "providers"
-  | "about"
+  | "about";
 
 export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "general", label: "General" },
@@ -27,16 +27,16 @@ export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "integrations", label: "Integrations" },
   { id: "providers", label: "Providers" },
   { id: "about", label: "About" },
-]
+];
 
 interface SettingsNavProps {
-  activeTab: SettingsTab
-  onTabChange: (tab: SettingsTab) => void
+  activeTab: SettingsTab;
+  onTabChange: (tab: SettingsTab) => void;
 }
 
 export function SettingsSidebar({ activeTab, onTabChange }: SettingsNavProps) {
   return (
-    <nav className="flex flex-col gap-1 w-44 shrink-0">
+    <nav className="flex w-44 shrink-0 flex-col gap-1">
       {SETTINGS_TABS.map((tab) => (
         <Button
           key={tab.id}
@@ -44,7 +44,7 @@ export function SettingsSidebar({ activeTab, onTabChange }: SettingsNavProps) {
           size="sm"
           className={cn(
             "justify-start font-normal",
-            activeTab === tab.id && "bg-muted font-medium"
+            activeTab === tab.id && "bg-muted font-medium",
           )}
           onClick={() => onTabChange(tab.id)}
         >
@@ -52,12 +52,18 @@ export function SettingsSidebar({ activeTab, onTabChange }: SettingsNavProps) {
         </Button>
       ))}
     </nav>
-  )
+  );
 }
 
-export function SettingsMobileNav({ activeTab, onTabChange }: SettingsNavProps) {
+export function SettingsMobileNav({
+  activeTab,
+  onTabChange,
+}: SettingsNavProps) {
   return (
-    <Select value={activeTab} onValueChange={(v) => onTabChange(v as SettingsTab)}>
+    <Select
+      value={activeTab}
+      onValueChange={(v) => onTabChange(v as SettingsTab)}
+    >
       <SelectTrigger className="w-full md:hidden">
         <SelectValue />
       </SelectTrigger>
@@ -69,5 +75,5 @@ export function SettingsMobileNav({ activeTab, onTabChange }: SettingsNavProps) 
         ))}
       </SelectContent>
     </Select>
-  )
+  );
 }

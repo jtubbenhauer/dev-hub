@@ -1,68 +1,68 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react"
-import { ChevronsUpDown, Check } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { ChevronsUpDown, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command"
-import { cn } from "@/lib/utils"
-import type { Agent } from "@/lib/opencode/types"
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import type { Agent } from "@/lib/opencode/types";
 
 interface UseAgentsResult {
-  agents: Agent[]
-  primaryAgents: Agent[]
-  isLoading: boolean
+  agents: Agent[];
+  primaryAgents: Agent[];
+  isLoading: boolean;
 }
 
 export function useAgents(workspaceId: string | null): UseAgentsResult {
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const fetchAgents = useCallback(async () => {
-    if (!workspaceId) return
-    setIsLoading(true)
+    if (!workspaceId) return;
+    setIsLoading(true);
     try {
-      const params = new URLSearchParams({ workspaceId })
-      const response = await fetch(`/api/opencode/agent?${params.toString()}`)
-      if (!response.ok) return
+      const params = new URLSearchParams({ workspaceId });
+      const response = await fetch(`/api/opencode/agent?${params.toString()}`);
+      if (!response.ok) return;
 
-      const data: Record<string, Agent> = await response.json()
-      setAgents(Object.values(data))
+      const data: Record<string, Agent> = await response.json();
+      setAgents(Object.values(data));
     } catch {
       // Silently fail
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [workspaceId])
+  }, [workspaceId]);
 
   useEffect(() => {
-    fetchAgents()
-  }, [fetchAgents])
+    fetchAgents();
+  }, [fetchAgents]);
 
   const primaryAgents = useMemo(
     () => agents.filter((a) => a.mode === "primary" || a.mode === "all"),
     [agents],
-  )
+  );
 
-  return { agents, primaryAgents, isLoading }
+  return { agents, primaryAgents, isLoading };
 }
 
 interface AgentSelectorProps {
-  agents: Agent[]
-  selectedAgent: string | null
-  onAgentChange: (agent: string) => void
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
+  agents: Agent[];
+  selectedAgent: string | null;
+  onAgentChange: (agent: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function AgentSelector({
@@ -72,15 +72,16 @@ export function AgentSelector({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: AgentSelectorProps) {
-  const [internalOpen, setInternalOpen] = useState(false)
-  const activeAgent = agents.find((a) => a.name === selectedAgent)
+  const [internalOpen, setInternalOpen] = useState(false);
+  const activeAgent = agents.find((a) => a.name === selectedAgent);
 
-  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen
-  const setIsOpen = controlledOnOpenChange !== undefined
-    ? controlledOnOpenChange
-    : setInternalOpen
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setIsOpen =
+    controlledOnOpenChange !== undefined
+      ? controlledOnOpenChange
+      : setInternalOpen;
 
-  if (agents.length === 0) return null
+  if (agents.length === 0) return null;
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -90,7 +91,7 @@ export function AgentSelector({
           size="sm"
           role="combobox"
           aria-expanded={isOpen}
-          className="min-w-0 shrink max-w-[120px] gap-1.5 overflow-hidden text-xs md:max-w-[160px]"
+          className="max-w-[120px] min-w-0 shrink gap-1.5 overflow-hidden text-xs md:max-w-[160px]"
         >
           <span className="flex items-center gap-1.5 truncate">
             {activeAgent?.color && (
@@ -112,17 +113,22 @@ export function AgentSelector({
           <CommandList>
             <CommandEmpty>No agents found.</CommandEmpty>
             {agents.map((agent) => {
-              const isSelected = agent.name === selectedAgent
+              const isSelected = agent.name === selectedAgent;
               return (
                 <CommandItem
                   key={agent.name}
                   value={agent.name}
                   onSelect={() => {
-                    onAgentChange(agent.name)
-                    setIsOpen(false)
+                    onAgentChange(agent.name);
+                    setIsOpen(false);
                   }}
                 >
-                  <Check className={cn("size-3", isSelected ? "opacity-100" : "opacity-0")} />
+                  <Check
+                    className={cn(
+                      "size-3",
+                      isSelected ? "opacity-100" : "opacity-0",
+                    )}
+                  />
                   {agent.color && (
                     <span
                       className="inline-block size-2 shrink-0 rounded-full"
@@ -131,11 +137,11 @@ export function AgentSelector({
                   )}
                   <span className="truncate capitalize">{agent.name}</span>
                 </CommandItem>
-              )
+              );
             })}
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
-  )
+  );
 }

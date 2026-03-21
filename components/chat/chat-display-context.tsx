@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { createContext, useContext } from "react"
+import { createContext, useContext } from "react";
 
 export interface ChatDisplaySettings {
-  showThinking: boolean
-  showToolCalls: boolean
-  showTokens: boolean
-  showTimestamps: boolean
+  showThinking: boolean;
+  showToolCalls: boolean;
+  showTokens: boolean;
+  showTimestamps: boolean;
 }
 
 const defaultSettings: ChatDisplaySettings = {
@@ -14,10 +14,11 @@ const defaultSettings: ChatDisplaySettings = {
   showToolCalls: true,
   showTokens: true,
   showTimestamps: false,
-}
+};
 
-export const ChatDisplayContext = createContext<ChatDisplaySettings>(defaultSettings)
+export const ChatDisplayContext =
+  createContext<ChatDisplaySettings>(defaultSettings);
 
 export function useChatDisplay() {
-  return useContext(ChatDisplayContext)
+  return useContext(ChatDisplayContext);
 }

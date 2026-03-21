@@ -1,25 +1,32 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { ExternalLink, GitFork, AlertTriangle, Loader2, ChevronDown } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog"
-import type { ClickUpTask, ClickUpCustomField } from "@/types"
+import { useState } from "react";
+import {
+  ExternalLink,
+  GitFork,
+  AlertTriangle,
+  Loader2,
+  ChevronDown,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog";
+import type { ClickUpTask, ClickUpCustomField } from "@/types";
 
 /** Find a "score" custom field on a task — supports number and formula types */
 function getScoreField(task: ClickUpTask): ClickUpCustomField | undefined {
   return task.custom_fields?.find(
-    (f) => (f.type === "number" || f.type === "formula") && /score/i.test(f.name)
-  )
+    (f) =>
+      (f.type === "number" || f.type === "formula") && /score/i.test(f.name),
+  );
 }
 
 function getScoreValue(task: ClickUpTask): number | null {
-  const field = getScoreField(task)
-  if (!field || field.value == null) return null
-  const n = Number(field.value)
-  return isNaN(n) ? null : n
+  const field = getScoreField(task);
+  if (!field || field.value == null) return null;
+  const n = Number(field.value);
+  return isNaN(n) ? null : n;
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -27,19 +34,19 @@ const PRIORITY_COLORS: Record<string, string> = {
   high: "bg-orange-500",
   normal: "bg-blue-500",
   low: "bg-gray-400",
-}
+};
 
 function formatRelativeTime(unixMs: string): string {
-  const diffMs = Date.now() - Number(unixMs)
-  const diffMinutes = Math.floor(diffMs / 60_000)
-  const diffHours = Math.floor(diffMs / 3_600_000)
-  const diffDays = Math.floor(diffMs / 86_400_000)
+  const diffMs = Date.now() - Number(unixMs);
+  const diffMinutes = Math.floor(diffMs / 60_000);
+  const diffHours = Math.floor(diffMs / 3_600_000);
+  const diffDays = Math.floor(diffMs / 86_400_000);
 
-  if (diffMinutes < 1) return "just now"
-  if (diffMinutes < 60) return `${diffMinutes}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 30) return `${diffDays}d ago`
-  return new Date(Number(unixMs)).toLocaleDateString()
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return new Date(Number(unixMs)).toLocaleDateString();
 }
 
 /**
@@ -56,29 +63,35 @@ function getGridTemplate(showScore: boolean): string {
     "4.5rem",
     "1.5rem",
     "1.5rem",
-  ]
-  return cols.join(" ")
+  ];
+  return cols.join(" ");
 }
 
 interface TaskRowProps {
-  task: ClickUpTask
-  isSelected: boolean
-  onSelect: (task: ClickUpTask) => void
-  showScore: boolean
-  gridTemplate: string
+  task: ClickUpTask;
+  isSelected: boolean;
+  onSelect: (task: ClickUpTask) => void;
+  showScore: boolean;
+  gridTemplate: string;
 }
 
-function TaskRow({ task, isSelected, onSelect, showScore, gridTemplate }: TaskRowProps) {
-  const [worktreeOpen, setWorktreeOpen] = useState(false)
+function TaskRow({
+  task,
+  isSelected,
+  onSelect,
+  showScore,
+  gridTemplate,
+}: TaskRowProps) {
+  const [worktreeOpen, setWorktreeOpen] = useState(false);
   const priorityColor = task.priority
     ? (PRIORITY_COLORS[task.priority.priority] ?? "bg-gray-400")
-    : "bg-gray-300"
-  const score = showScore ? getScoreValue(task) : null
+    : "bg-gray-300";
+  const score = showScore ? getScoreValue(task) : null;
 
   return (
     <>
       <div
-        className={`grid items-center gap-x-2.5 py-2 px-2 rounded-md cursor-pointer transition-colors group ${
+        className={`group grid cursor-pointer items-center gap-x-2.5 rounded-md px-2 py-2 transition-colors ${
           isSelected ? "bg-accent" : "hover:bg-muted/50"
         }`}
         style={{ gridTemplateColumns: gridTemplate }}
@@ -88,38 +101,44 @@ function TaskRow({ task, isSelected, onSelect, showScore, gridTemplate }: TaskRo
         <span className={`size-2 rounded-full ${priorityColor}`} />
 
         {/* Task name */}
-        <span className="text-sm truncate min-w-0">{task.name}</span>
+        <span className="min-w-0 truncate text-sm">{task.name}</span>
 
         {/* Score — conditional column */}
         {showScore && (
-          <span className="text-right text-xs font-mono font-semibold text-foreground tabular-nums" title="Score">
+          <span
+            className="text-foreground text-right font-mono text-xs font-semibold tabular-nums"
+            title="Score"
+          >
             {score ?? ""}
           </span>
         )}
 
         {/* List name — hidden below sm */}
-        <span className="hidden sm:block text-xs text-muted-foreground truncate">
+        <span className="text-muted-foreground hidden truncate text-xs sm:block">
           {task.list.name}
         </span>
 
         {/* Status badge */}
         <Badge
           variant="secondary"
-          className="text-xs py-0 px-1.5 font-normal w-fit"
+          className="w-fit px-1.5 py-0 text-xs font-normal"
           style={{ color: task.status.color }}
         >
           {task.status.status}
         </Badge>
 
         {/* Updated time — hidden below md */}
-        <span className="text-xs text-muted-foreground tabular-nums hidden md:block">
+        <span className="text-muted-foreground hidden text-xs tabular-nums md:block">
           {formatRelativeTime(task.date_updated)}
         </span>
 
         {/* Worktree button */}
         <button
-          onClick={(e) => { e.stopPropagation(); setWorktreeOpen(true) }}
-          className="size-6 flex items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground hover:bg-muted"
+          onClick={(e) => {
+            e.stopPropagation();
+            setWorktreeOpen(true);
+          }}
+          className="text-muted-foreground hover:text-foreground hover:bg-muted flex size-6 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100"
           title="Create worktree from task"
         >
           <GitFork className="size-3" />
@@ -131,41 +150,45 @@ function TaskRow({ task, isSelected, onSelect, showScore, gridTemplate }: TaskRo
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="size-6 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground flex size-6 items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
         >
           <ExternalLink className="size-3" />
         </a>
       </div>
-      <TaskWorktreeDialog task={task} open={worktreeOpen} onOpenChange={setWorktreeOpen} />
+      <TaskWorktreeDialog
+        task={task}
+        open={worktreeOpen}
+        onOpenChange={setWorktreeOpen}
+      />
     </>
-  )
+  );
 }
 
 export function TaskListSkeleton() {
   return (
     <div className="space-y-1">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-2.5 py-2 px-2">
-          <Skeleton className="size-2 rounded-full shrink-0" />
+        <div key={i} className="flex items-center gap-2.5 px-2 py-2">
+          <Skeleton className="size-2 shrink-0 rounded-full" />
           <Skeleton className="h-4 flex-1" />
           <Skeleton className="h-4 w-20 shrink-0" />
           <Skeleton className="h-4 w-14 shrink-0" />
         </div>
       ))}
     </div>
-  )
+  );
 }
 
 interface TaskListProps {
-  tasks: ClickUpTask[] | undefined
-  isLoading: boolean
-  error: Error | null
-  contextLabel?: string
-  selectedTaskId: string | null
-  onSelectTask: (task: ClickUpTask) => void
-  onLoadMore?: () => void
-  hasMore?: boolean
-  isLoadingMore?: boolean
+  tasks: ClickUpTask[] | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  contextLabel?: string;
+  selectedTaskId: string | null;
+  onSelectTask: (task: ClickUpTask) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 export function TaskList({
@@ -181,54 +204,57 @@ export function TaskList({
 }: TaskListProps) {
   if (isLoading) {
     return (
-      <div className="flex-1 min-w-0 overflow-auto p-2">
+      <div className="min-w-0 flex-1 overflow-auto p-2">
         {contextLabel && (
-          <div className="px-2 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <div className="text-muted-foreground px-2 pb-2 text-xs font-medium tracking-wide uppercase">
             {contextLabel}
           </div>
         )}
         <TaskListSkeleton />
       </div>
-    )
+    );
   }
 
   if (error) {
     return (
-      <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-3 p-8 text-center">
-        <AlertTriangle className="size-8 text-destructive" />
-        <p className="text-sm text-muted-foreground">{error.message}</p>
+      <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+        <AlertTriangle className="text-destructive size-8" />
+        <p className="text-muted-foreground text-sm">{error.message}</p>
       </div>
-    )
+    );
   }
 
   if (!tasks || tasks.length === 0) {
     return (
-      <div className="flex-1 min-w-0 flex items-center justify-center p-8 text-center">
-        <p className="text-sm text-muted-foreground">No tasks found.</p>
+      <div className="flex min-w-0 flex-1 items-center justify-center p-8 text-center">
+        <p className="text-muted-foreground text-sm">No tasks found.</p>
       </div>
-    )
+    );
   }
 
   // Check if any task has a score custom field
-  const hasScores = tasks.some((t) => getScoreValue(t) != null)
+  const hasScores = tasks.some((t) => getScoreValue(t) != null);
 
   // Sort by score (highest first) when scores are present
   const sortedTasks = hasScores
-    ? [...tasks].sort((a, b) => (getScoreValue(b) ?? -Infinity) - (getScoreValue(a) ?? -Infinity))
-    : tasks
+    ? [...tasks].sort(
+        (a, b) =>
+          (getScoreValue(b) ?? -Infinity) - (getScoreValue(a) ?? -Infinity),
+      )
+    : tasks;
 
-  const gridTemplate = getGridTemplate(hasScores)
+  const gridTemplate = getGridTemplate(hasScores);
 
   return (
-    <div className="flex-1 min-w-0 overflow-auto p-2">
+    <div className="min-w-0 flex-1 overflow-auto p-2">
       {contextLabel && (
-        <div className="px-2 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="text-muted-foreground px-2 pb-2 text-xs font-medium tracking-wide uppercase">
           {contextLabel}
         </div>
       )}
       {hasScores && (
         <div
-          className="grid items-center gap-x-2.5 px-2 pb-1 text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide"
+          className="text-muted-foreground/60 grid items-center gap-x-2.5 px-2 pb-1 text-[11px] font-medium tracking-wide uppercase"
           style={{ gridTemplateColumns: gridTemplate }}
         >
           {/* Priority dot spacer */}
@@ -262,7 +288,7 @@ export function TaskList({
         ))}
       </div>
       {hasMore && (
-        <div className="pt-3 flex justify-center">
+        <div className="flex justify-center pt-3">
           <Button
             variant="ghost"
             size="sm"
@@ -280,5 +306,5 @@ export function TaskList({
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -1,10 +1,10 @@
-import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface TerminalState {
-  isOpen: boolean
-  setOpen: (open: boolean) => void
-  toggle: () => void
+  isOpen: boolean;
+  setOpen: (open: boolean) => void;
+  toggle: () => void;
 }
 
 export const useTerminalStore = create<TerminalState>()(
@@ -14,6 +14,6 @@ export const useTerminalStore = create<TerminalState>()(
       setOpen: (open) => set({ isOpen: open }),
       toggle: () => set((s) => ({ isOpen: !s.isOpen })),
     }),
-    { name: "dev-hub-terminal" }
-  )
-)
+    { name: "dev-hub-terminal" },
+  ),
+);

@@ -12,7 +12,7 @@ const MonacoEditor = dynamic(
   () => import("@/components/editor/monaco-editor").then((m) => m.MonacoEditor),
   {
     ssr: false,
-    loading: () => <div className="h-full w-full animate-pulse bg-muted" />,
+    loading: () => <div className="bg-muted h-full w-full animate-pulse" />,
   },
 );
 
@@ -20,7 +20,7 @@ const NeovimEditor = dynamic(
   () => import("@/components/editor/neovim-editor").then((m) => m.NeovimEditor),
   {
     ssr: false,
-    loading: () => <div className="h-full w-full animate-pulse bg-muted" />,
+    loading: () => <div className="bg-muted h-full w-full animate-pulse" />,
   },
 );
 
@@ -35,12 +35,13 @@ interface EditorSwitcherProps {
 }
 
 export const EditorSwitcher = forwardRef<EditorHandle, EditorSwitcherProps>(
-function EditorSwitcher(props, ref) {
-  const { editorType } = useEditorTypeSetting();
+  function EditorSwitcher(props, ref) {
+    const { editorType } = useEditorTypeSetting();
 
-  if (editorType === "neovim") {
-    return <NeovimEditor ref={ref} {...props} />;
-  }
+    if (editorType === "neovim") {
+      return <NeovimEditor ref={ref} {...props} />;
+    }
 
-  return <MonacoEditor ref={ref} {...props} />;
-});
+    return <MonacoEditor ref={ref} {...props} />;
+  },
+);

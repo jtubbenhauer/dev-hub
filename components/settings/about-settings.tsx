@@ -1,34 +1,38 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { ExternalLink } from "lucide-react"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { useState, useEffect } from "react";
+import { ExternalLink } from "lucide-react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 
 interface SystemInfo {
-  os: string
-  nodeVersion: string
-  gitVersion: string
+  os: string;
+  nodeVersion: string;
+  gitVersion: string;
 }
 
 export function AboutSettings() {
-  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
   useEffect(() => {
     fetch("/api/settings/about")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: SystemInfo | null) => {
-        if (data) setSystemInfo(data)
+        if (data) setSystemInfo(data);
       })
-      .catch(() => {})
-  }, [])
+      .catch(() => {});
+  }, []);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>About</CardTitle>
-        <CardDescription>
-          Application and system information.
-        </CardDescription>
+        <CardDescription>Application and system information.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between text-sm">
@@ -56,7 +60,7 @@ export function AboutSettings() {
             href="https://github.com/jtubbenhauer/dev-hub"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
           >
             <ExternalLink className="size-3.5" />
             View on GitHub
@@ -64,5 +68,5 @@ export function AboutSettings() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -1,0 +1,103 @@
+components/chat/chat-interface.tsx
+  067ae7f686d5dacd 278-281,1735-1743,1749,1781
+components/terminal/terminal-panel.tsx
+  067ae7f686d5dacd 101-106
+components/editor/neovim-editor.tsx
+  067ae7f686d5dacd 72,75-78,101,103-104,107-111,113,128-131,134-137,139-141,152,156,158-159,161,164
+tests/stores/chat-store.test.ts
+  067ae7f686d5dacd 16,111
+tests/lib/git-panel-logic.test.ts
+  067ae7f686d5dacd 423
+components/chat/message.tsx
+  067ae7f686d5dacd 36,40,42-43,47,49,57
+components/git/file-status.tsx
+  067ae7f686d5dacd 104,109
+components/terminal/terminal-drawer.tsx
+  067ae7f686d5dacd 3,32-40,44-51,53,62-65,68-71,74-75,89
+components/settings/model-settings.tsx
+  067ae7f686d5dacd 146,151,334-337,339
+.github/workflows/ci.yml
+  067ae7f686d5dacd 26-27
+components/command-runner/command-input.tsx
+  067ae7f686d5dacd 63-71
+components/ui/sidebar.tsx
+  067ae7f686d5dacd 610
+app/terminal/page.tsx
+  067ae7f686d5dacd 26-30,32-33,36-43,54-57,60-63,65-67
+app/api/commands/autocomplete/route.ts
+  067ae7f686d5dacd 72
+components/chat/file-picker.tsx
+  067ae7f686d5dacd 56-59,61
+components/chat/command-picker.tsx
+  067ae7f686d5dacd 58-60,62
+components/settings/workspace-settings.tsx
+  067ae7f686d5dacd 3,41-46,48-52
+components/chat/prompt-input.tsx
+  067ae7f686d5dacd 64,66-68,74,76,81-87,113-125
+components/layout/workspace-switcher.tsx
+  067ae7f686d5dacd 3,137-140
+components/editor/monaco-editor.tsx
+  067ae7f686d5dacd 3,113-119,122-123
+components/settings/general-settings.tsx
+  067ae7f686d5dacd 3,157,161,164,554-559
+components/session-picker/session-picker.tsx
+  067ae7f686d5dacd 20,199-209,211,214-217
+components/git/branch-selector.tsx
+  067ae7f686d5dacd 33
+components/git/git-panel.tsx
+  067ae7f686d5dacd 48,74,131-133,240-244,252,262,391,393,395,397,399,401,403,405,407,409,411,413,415,417,419,421,423-428,430-446,448,450-464,466-482,484-505,507-519,521-530,532-541,543-552,554-555,557-559,561-566,742
+components/review/monaco-review-editor.tsx
+  067ae7f686d5dacd 300-301,307-308,310
+components/git/monaco-pr-diff-editor.tsx
+  067ae7f686d5dacd 14,265,345-346,352-353,355
+AGENTS.md
+  067ae7f686d5dacd 9
+components/editor/file-tree.tsx
+  067ae7f686d5dacd 415-421,479-482,484-486
+components/chat/session-list.tsx
+  067ae7f686d5dacd 3-4
+components/task-picker/task-picker.tsx
+  067ae7f686d5dacd 168-179,181,184-187
+tests/components/session-picker.test.tsx
+  067ae7f686d5dacd 2
+eslint.config.mjs
+  067ae7f686d5dacd 8-19
+components/workspace/create-provider-workspace-dialog.tsx
+  067ae7f686d5dacd 111-114,118,173
+components/workspace/create-worktree-dialog.tsx
+  067ae7f686d5dacd 3,52-57
+components/chat/sub-agent-dialog.tsx
+  067ae7f686d5dacd 75-85
+app/api/providers/create-workspace/route.ts
+  067ae7f686d5dacd 256
+components/file-picker/file-picker.tsx
+  067ae7f686d5dacd 150-159,161,163-164,166-169
+components/settings/keybindings-settings.tsx
+  067ae7f686d5dacd 60-65
+components/dashboard/task-worktree-dialog.tsx
+  067ae7f686d5dacd 3,79-84
+components/git/pr-panel.tsx
+  067ae7f686d5dacd 3,116,130-131,134-151,153-154
+components/review/neovim-review-editor.tsx
+  067ae7f686d5dacd 104,110-117,150,152,167-170,173-176,178-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "7edf86512e51281197d993c8ca7dea2c2a8e4493",
+  "prompts": {
+    "067ae7f686d5dacd": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2f1238873ffes39NxwM7ZDfRDX",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 699,
+      "total_deletions": 588,
+      "accepted_lines": 585,
+      "overriden_lines": 3
+    }
+  }
+}

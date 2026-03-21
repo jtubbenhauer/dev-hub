@@ -28,22 +28,20 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-const mockUseMyClickUpTasks =
-  vi.fn<
-    () => {
-      data: ClickUpTask[] | undefined;
-      isLoading: boolean;
-      error: Error | null;
-    }
-  >();
-const mockUseClickUpSearch =
-  vi.fn<
-    () => {
-      data: ClickUpTask[] | undefined;
-      isLoading: boolean;
-      error: Error | null;
-    }
-  >();
+const mockUseMyClickUpTasks = vi.fn<
+  () => {
+    data: ClickUpTask[] | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  }
+>();
+const mockUseClickUpSearch = vi.fn<
+  () => {
+    data: ClickUpTask[] | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  }
+>();
 vi.mock("@/hooks/use-clickup", () => ({
   useMyClickUpTasks: () => mockUseMyClickUpTasks(),
   useClickUpSearch: () => mockUseClickUpSearch(),

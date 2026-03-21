@@ -686,15 +686,13 @@ describe("SSE event handling — session lifecycle", () => {
       optimisticStreamingSessionId: "sess-1",
     });
 
-    useChatStore
-      .getState()
-      .handleEvent(
-        {
-          type: "session.status",
-          properties: { sessionID: "sess-1", status: { type: "idle" } },
-        },
-        "ws-a",
-      );
+    useChatStore.getState().handleEvent(
+      {
+        type: "session.status",
+        properties: { sessionID: "sess-1", status: { type: "idle" } },
+      },
+      "ws-a",
+    );
 
     expect(useChatStore.getState().getStreamingStatus()).toBe("idle");
     expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull();
@@ -856,15 +854,13 @@ describe("cross-workspace SSE routing", () => {
       activeSessionId: "sess-b",
     });
 
-    useChatStore
-      .getState()
-      .handleEvent(
-        {
-          type: "session.status",
-          properties: { sessionID: "sess-a", status: { type: "idle" } },
-        },
-        "ws-a",
-      );
+    useChatStore.getState().handleEvent(
+      {
+        type: "session.status",
+        properties: { sessionID: "sess-a", status: { type: "idle" } },
+      },
+      "ws-a",
+    );
 
     expect(
       useChatStore.getState().workspaceStates["ws-a"].sessionStatuses["sess-a"],
@@ -984,15 +980,13 @@ describe("cross-workspace SSE routing", () => {
       optimisticStreamingSessionId: "sess-a",
     });
 
-    useChatStore
-      .getState()
-      .handleEvent(
-        {
-          type: "session.status",
-          properties: { sessionID: "sess-a", status: { type: "idle" } },
-        },
-        "ws-a",
-      );
+    useChatStore.getState().handleEvent(
+      {
+        type: "session.status",
+        properties: { sessionID: "sess-a", status: { type: "idle" } },
+      },
+      "ws-a",
+    );
 
     expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull();
   });
@@ -1377,24 +1371,20 @@ describe("permission lifecycle", () => {
   beforeEach(resetStore);
 
   it("permission.asked adds permission to the owning workspace", () => {
-    useChatStore
-      .getState()
-      .handleEvent(
-        {
-          type: "session.created",
-          properties: { info: makeSession("sess-a") },
-        },
-        "ws-a",
-      );
-    useChatStore
-      .getState()
-      .handleEvent(
-        {
-          type: "permission.asked",
-          properties: makePermission("perm-1", "sess-a"),
-        },
-        "ws-a",
-      );
+    useChatStore.getState().handleEvent(
+      {
+        type: "session.created",
+        properties: { info: makeSession("sess-a") },
+      },
+      "ws-a",
+    );
+    useChatStore.getState().handleEvent(
+      {
+        type: "permission.asked",
+        properties: makePermission("perm-1", "sess-a"),
+      },
+      "ws-a",
+    );
 
     expect(
       useChatStore.getState().workspaceStates["ws-a"].permissions,

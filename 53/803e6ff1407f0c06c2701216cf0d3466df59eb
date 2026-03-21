@@ -1,0 +1,43 @@
+components/editor/neovim-editor.tsx
+  de81f519c51d9a80 3,16-20,60-66,147-150,161-164,223
+hooks/use-git.ts
+  de81f519c51d9a80 3,96,118
+components/editor/monaco-editor.tsx
+  de81f519c51d9a80 3,60-64,74,82,84-93,316
+tests/components/editor/neovim-editor.test.tsx
+  de81f519c51d9a80 135,207,219,247,299
+app/files/page.tsx
+  de81f519c51d9a80 10,273-276,284,293,331,361,441
+components/editor/editor-switcher.tsx
+  de81f519c51d9a80 3,6-7,9,37-38,42,45-46
+components/editor/file-tree.tsx
+  de81f519c51d9a80 12,38,47,54,70,74-75,111,122-133,385-467,596-597,603,607-608
+tests/components/review/neovim-review-editor.test.tsx
+  de81f519c51d9a80 124,168,182,210,258
+components/terminal/terminal-panel.tsx
+  de81f519c51d9a80 57-58,106-123,178-179,246,283
+components/review/neovim-review-editor.tsx
+  de81f519c51d9a80 113-114,184-186,197-199,287
+components/git/git-panel.tsx
+  de81f519c51d9a80 526-529,839
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.2",
+  "base_commit_sha": "53803e6ff1407f0c06c2701216cf0d3466df59eb",
+  "prompts": {
+    "de81f519c51d9a80": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2f2314d1affeP3eA5192bOJb73",
+        "model": "unknown"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 241,
+      "total_deletions": 61,
+      "accepted_lines": 223,
+      "overriden_lines": 0
+    }
+  }
+}

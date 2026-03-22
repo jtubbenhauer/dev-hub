@@ -90,6 +90,7 @@ export function TerminalPanel({
   const termRef = useRef<XTerm | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const shellCommandRef = useRef(shellCommand);
   const envOverridesRef = useRef(envOverrides);
   const onReadyRef = useRef(onReady);
@@ -105,141 +106,149 @@ export function TerminalPanel({
     onReadyRef.current = onReady;
   });
 
-  const connect = useCallback(async () => {
-    if (!containerRef.current) return;
+  const connect = useCallback(
+    async (signal: AbortSignal) => {
+      if (!containerRef.current) return;
 
-    // Wait for the requested font to actually finish loading before creating
-    // the xterm instance. document.fonts.ready alone is insufficient because
-    // @font-face with font-display:swap resolves immediately with a fallback,
-    // causing xterm to measure character cells with wrong metrics on first load.
-    // We explicitly trigger a load of the specific font family (14px matches our
-    // fontSize so the browser fetches the correct weight/style).
-    try {
-      await document.fonts.load(`14px ${fontFamily}`);
-    } catch {
-      // Font load can reject for CSS variable fonts or missing families —
-      // fall back to basic ready gate so the terminal still renders.
-      await document.fonts.ready;
-    }
+      // Wait for the requested font to actually finish loading before creating
+      // the xterm instance. document.fonts.ready alone is insufficient because
+      // @font-face with font-display:swap resolves immediately with a fallback,
+      // causing xterm to measure character cells with wrong metrics on first load.
+      // We explicitly trigger a load of the specific font family (14px matches our
+      // fontSize so the browser fetches the correct weight/style).
+      try {
+        await document.fonts.load(`14px ${fontFamily}`);
+      } catch {
+        // Font load can reject for CSS variable fonts or missing families —
+        // fall back to basic ready gate so the terminal still renders.
+        await document.fonts.ready;
+      }
 
-    // Container may have unmounted while waiting for fonts
-    if (!containerRef.current) return;
+      // The effect cleanup may have fired while we were awaiting fonts (e.g.
+      // React Strict Mode double-invoke). Bail out to avoid creating a second
+      // xterm instance that appends to the same container.
+      if (signal.aborted || !containerRef.current) return;
 
-    const term = new XTerm({
-      cursorBlink: true,
-      fontFamily,
-      fontSize: 14,
-      lineHeight: 1.2,
-      scrollback,
-      theme: buildTheme(),
-    });
-
-    const fitAddon = new FitAddon();
-    const webLinksAddon = new WebLinksAddon();
-    term.loadAddon(fitAddon);
-    term.loadAddon(webLinksAddon);
-    term.open(containerRef.current);
-
-    try {
-      fitAddon.fit();
-    } catch {
-      void 0;
-    }
-
-    termRef.current = term;
-    fitAddonRef.current = fitAddon;
-
-    const cols = term.cols;
-    const rows = term.rows;
-    const params = new URLSearchParams({
-      workspaceId,
-      cols: String(cols),
-      rows: String(rows),
-      cwd,
-      scrollback: String(scrollback),
-    });
-    if (shellCommandRef.current)
-      params.set("shellCommand", shellCommandRef.current);
-    if (sessionId) params.set("sessionId", sessionId);
-    const env = envOverridesRef.current;
-    if (env && Object.keys(env).length > 0) {
-      params.set("env", JSON.stringify(env));
-    }
-
-    const ws = new WebSocket(`${wsUrl}?${params.toString()}`);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setConnectionState("connected");
-      if (autoFocusRef.current) term.focus();
-      onReadyRef.current?.({
-        write: (data: string) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(data);
-          }
-        },
-        focus: () => term.focus(),
-        blur: () => term.blur(),
+      const term = new XTerm({
+        cursorBlink: true,
+        fontFamily,
+        fontSize: 14,
+        lineHeight: 1.2,
+        scrollback,
+        theme: buildTheme(),
       });
-    };
 
-    ws.onmessage = (event) => {
-      const data = typeof event.data === "string" ? event.data : "";
-      if (data.startsWith("{")) {
-        try {
-          const msg = JSON.parse(data) as {
-            type: string;
-            exitCode?: number;
-            data?: string;
-          };
-          if (msg.type === "exit") {
-            term.writeln(
-              `\r\n[Process exited with code ${msg.exitCode ?? "unknown"}]`,
-            );
-            setConnectionState("disconnected");
-            return;
+      const fitAddon = new FitAddon();
+      const webLinksAddon = new WebLinksAddon();
+      term.loadAddon(fitAddon);
+      term.loadAddon(webLinksAddon);
+      term.open(containerRef.current);
+
+      try {
+        fitAddon.fit();
+      } catch {
+        void 0;
+      }
+
+      termRef.current = term;
+      fitAddonRef.current = fitAddon;
+
+      const cols = term.cols;
+      const rows = term.rows;
+      const params = new URLSearchParams({
+        workspaceId,
+        cols: String(cols),
+        rows: String(rows),
+        cwd,
+        scrollback: String(scrollback),
+      });
+      if (shellCommandRef.current)
+        params.set("shellCommand", shellCommandRef.current);
+      if (sessionId) params.set("sessionId", sessionId);
+      const env = envOverridesRef.current;
+      if (env && Object.keys(env).length > 0) {
+        params.set("env", JSON.stringify(env));
+      }
+
+      const ws = new WebSocket(`${wsUrl}?${params.toString()}`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setConnectionState("connected");
+        if (autoFocusRef.current) term.focus();
+        onReadyRef.current?.({
+          write: (data: string) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(data);
+            }
+          },
+          focus: () => term.focus(),
+          blur: () => term.blur(),
+        });
+      };
+
+      ws.onmessage = (event) => {
+        const data = typeof event.data === "string" ? event.data : "";
+        if (data.startsWith("{")) {
+          try {
+            const msg = JSON.parse(data) as {
+              type: string;
+              exitCode?: number;
+              data?: string;
+            };
+            if (msg.type === "exit") {
+              term.writeln(
+                `\r\n[Process exited with code ${msg.exitCode ?? "unknown"}]`,
+              );
+              setConnectionState("disconnected");
+              return;
+            }
+            if (msg.type === "error") {
+              term.writeln(`\r\n[Error: ${msg.data}]`);
+              setConnectionState("error");
+              return;
+            }
+          } catch {
+            void 0;
           }
-          if (msg.type === "error") {
-            term.writeln(`\r\n[Error: ${msg.data}]`);
-            setConnectionState("error");
-            return;
-          }
-        } catch {
-          void 0;
         }
-      }
-      term.write(data);
-    };
+        term.write(data);
+      };
 
-    ws.onclose = () => {
-      setConnectionState("disconnected");
-    };
+      ws.onclose = () => {
+        setConnectionState("disconnected");
+      };
 
-    ws.onerror = () => {
-      setConnectionState("error");
-    };
+      ws.onerror = () => {
+        setConnectionState("error");
+      };
 
-    term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
+      term.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        }
+      });
 
-    term.onBinary((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(Uint8Array.from(data, (c) => c.charCodeAt(0)));
-      }
-    });
+      term.onBinary((data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(Uint8Array.from(data, (c) => c.charCodeAt(0)));
+        }
+      });
 
-    term.onResize(({ cols, rows }) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "resize", cols, rows }));
-      }
-    });
-  }, [wsUrl, workspaceId, cwd, scrollback, sessionId, fontFamily]);
+      term.onResize(({ cols, rows }) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "resize", cols, rows }));
+        }
+      });
+    },
+    [wsUrl, workspaceId, cwd, scrollback, sessionId, fontFamily],
+  );
 
   useEffect(() => {
-    void connect();
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    void connect(ac.signal);
 
     const handleResize = () => {
       try {
@@ -259,6 +268,7 @@ export function TerminalPanel({
     }
 
     return () => {
+      ac.abort();
       window.removeEventListener("resize", handleResize);
       resizeObserver.disconnect();
       wsRef.current?.close();
@@ -270,13 +280,16 @@ export function TerminalPanel({
   }, [connect]);
 
   const handleReconnect = useCallback(() => {
+    abortRef.current?.abort();
     wsRef.current?.close();
     termRef.current?.dispose();
     wsRef.current = null;
     termRef.current = null;
     fitAddonRef.current = null;
     setConnectionState("connecting");
-    void connect();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    void connect(ac.signal);
   }, [connect]);
 
   return (

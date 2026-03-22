@@ -179,7 +179,7 @@ export function TerminalDrawer() {
             </div>
           )}
 
-          {activeWorkspaceId && config && !isLoading && !error && (
+          {isOpen && activeWorkspaceId && config && !isLoading && !error && (
             <div className="min-h-0 flex-1">
               <TerminalPanel
                 key={resolvedWorkspaceId}

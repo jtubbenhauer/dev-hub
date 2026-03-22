@@ -13,6 +13,9 @@ export interface UseFirebasePreviewResult {
   previews: FirebasePreview[];
   pr: GitHubPullRequest | null;
   isLoading: boolean;
+  owner: string | null;
+  repo: string | null;
+  branch: string | null;
 }
 
 export function useFirebasePreview(
@@ -50,5 +53,8 @@ export function useFirebasePreview(
     previews,
     pr: prQuery.data ?? null,
     isLoading,
+    owner,
+    repo,
+    branch,
   };
 }

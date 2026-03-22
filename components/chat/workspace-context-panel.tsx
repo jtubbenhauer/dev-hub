@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { GitPullRequest, CheckSquare, Globe } from "lucide-react";
+import { GitPullRequest, CheckSquare, Globe, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -9,11 +9,86 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useFirebasePreview } from "@/hooks/use-firebase-preview";
+import { useGitHubWorkflowRuns, useRerunWorkflow } from "@/hooks/use-github";
+import { cn } from "@/lib/utils";
 import type { Workspace, LinkedTaskMeta } from "@/types";
 
 interface WorkspaceContextPanelProps {
   workspaceId: string;
   workspace: Workspace;
+}
+
+interface PreviewRowProps {
+  preview: import("@/lib/firebase-preview").FirebasePreview;
+  owner: string | null;
+  repo: string | null;
+  branch: string | null;
+}
+
+function PreviewRow({ preview, owner, repo, branch }: PreviewRowProps) {
+  const { data: workflowData } = useGitHubWorkflowRuns(owner, repo, branch);
+  const rerunMutation = useRerunWorkflow(owner, repo);
+
+  return (
+    <Tooltip delayDuration={500} disableHoverableContent>
+      <TooltipTrigger asChild>
+        <div className="flex items-center gap-2 text-xs">
+          <Globe className="text-muted-foreground size-3.5 shrink-0" />
+          <a
+            href={preview.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-foreground min-w-0 flex-1 truncate hover:underline"
+            title={preview.url}
+          >
+            {preview.url}
+          </a>
+          {preview.isExpired ? (
+            <>
+              <Badge
+                variant="outline"
+                className="text-muted-foreground shrink-0 px-1 py-0 text-[10px] line-through"
+              >
+                Expired
+              </Badge>
+              {owner && repo && branch && (
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground shrink-0"
+                  title="Re-run deployment"
+                  onClick={() => {
+                    const runs = workflowData?.workflow_runs;
+                    if (runs && runs.length > 0) {
+                      rerunMutation.mutate({ runId: runs[0].id });
+                    }
+                  }}
+                  disabled={rerunMutation.isPending}
+                >
+                  <RefreshCw
+                    className={cn(
+                      "size-3",
+                      rerunMutation.isPending && "animate-spin",
+                    )}
+                  />
+                </button>
+              )}
+            </>
+          ) : (
+            <span className="text-muted-foreground shrink-0">
+              {formatRelativeTime(preview.deployedAt)}
+            </span>
+          )}
+          <Badge
+            variant="outline"
+            className="shrink-0 px-1 py-0 font-mono text-[10px]"
+          >
+            {preview.commitSha.substring(0, 7)}
+          </Badge>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="left">Firebase preview</TooltipContent>
+    </Tooltip>
+  );
 }
 
 function formatRelativeTime(date: Date): string {
@@ -33,11 +108,7 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
   workspaceId,
   workspace,
 }: WorkspaceContextPanelProps) {
-  const {
-    previews,
-    pr,
-    isLoading: isPreviewLoading,
-  } = useFirebasePreview(workspaceId);
+  const { previews, pr, owner, repo, branch } = useFirebasePreview(workspaceId);
 
   const linkedTaskMeta = workspace.linkedTaskMeta as LinkedTaskMeta | null;
 
@@ -112,45 +183,13 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
         )}
 
         {previews.map((preview) => (
-          <Tooltip
+          <PreviewRow
             key={preview.url}
-            delayDuration={500}
-            disableHoverableContent
-          >
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 text-xs">
-                <Globe className="text-muted-foreground size-3.5 shrink-0" />
-                <a
-                  href={preview.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-foreground min-w-0 flex-1 truncate hover:underline"
-                  title={preview.url}
-                >
-                  {preview.url}
-                </a>
-                {preview.isExpired ? (
-                  <Badge
-                    variant="outline"
-                    className="text-muted-foreground shrink-0 px-1 py-0 text-[10px] line-through"
-                  >
-                    Expired
-                  </Badge>
-                ) : (
-                  <span className="text-muted-foreground shrink-0">
-                    {formatRelativeTime(preview.deployedAt)}
-                  </span>
-                )}
-                <Badge
-                  variant="outline"
-                  className="shrink-0 px-1 py-0 font-mono text-[10px]"
-                >
-                  {preview.commitSha.substring(0, 7)}
-                </Badge>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="left">Firebase preview</TooltipContent>
-          </Tooltip>
+            preview={preview}
+            owner={owner}
+            repo={repo}
+            branch={branch}
+          />
         ))}
       </div>
     </div>

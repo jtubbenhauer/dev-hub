@@ -40,6 +40,9 @@ describe("WorkspaceContextPanel", () => {
       previews: [],
       pr: null,
       isLoading: false,
+      owner: null,
+      repo: null,
+      branch: null,
     });
 
     render(
@@ -55,6 +58,9 @@ describe("WorkspaceContextPanel", () => {
       previews: [],
       pr: null,
       isLoading: false,
+      owner: null,
+      repo: null,
+      branch: null,
     });
 
     const workspaceWithTask: Workspace = {

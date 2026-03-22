@@ -617,6 +617,59 @@ export function useGitHubIssueComments(
   });
 }
 
+interface WorkflowRun {
+  id: number;
+  name: string;
+  conclusion: string;
+  created_at: string;
+}
+
+interface WorkflowRunsResponse {
+  workflow_runs: WorkflowRun[];
+}
+
+export function useGitHubWorkflowRuns(
+  owner: string | null,
+  repo: string | null,
+  branch: string | null,
+) {
+  return useQuery<WorkflowRunsResponse>({
+    queryKey: ["github", "workflow-runs", owner, repo, branch],
+    queryFn: () =>
+      githubFetch<WorkflowRunsResponse>(
+        `repos/${owner}/${repo}/actions/runs?branch=${branch}&event=pull_request&per_page=5&status=completed`,
+      ),
+    enabled: !!(owner && repo && branch),
+    staleTime: 300_000,
+  });
+}
+
+interface RerunWorkflowInput {
+  runId: number;
+}
+
+export function useRerunWorkflow(owner: string | null, repo: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: RerunWorkflowInput) =>
+      githubFetch<void>(
+        `repos/${owner}/${repo}/actions/runs/${input.runId}/rerun`,
+        {
+          method: "POST",
+        },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["github", "issue-comments", owner, repo],
+      });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
+}
+
 export function useGitHubToggleFileViewed(
   owner: string | null,
   repo: string | null,

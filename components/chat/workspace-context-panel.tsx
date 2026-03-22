@@ -120,12 +120,10 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
                   href={preview.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-foreground max-w-[150px] truncate hover:underline"
+                  className="text-foreground min-w-0 flex-1 truncate hover:underline"
                   title={preview.url}
                 >
-                  {preview.url.length > 30
-                    ? preview.url.substring(0, 30) + "..."
-                    : preview.url}
+                  {preview.url}
                 </a>
                 {preview.isExpired ? (
                   <Badge
@@ -136,7 +134,7 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
                   </Badge>
                 ) : (
                   <span className="text-muted-foreground shrink-0">
-                    deployed {formatRelativeTime(preview.deployedAt)}
+                    {formatRelativeTime(preview.deployedAt)}
                   </span>
                 )}
                 <Badge

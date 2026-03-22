@@ -30,10 +30,12 @@ import {
   useDeleteFileComment,
   useUpdateFileComment,
 } from "@/hooks/use-file-comments";
-import { CommentThread } from "@/components/editor/comment-thread";
+import { CommentsSidebar } from "@/components/editor/comments-sidebar";
 import { CommentInput } from "@/components/editor/comment-input";
 import { attachCommentToChat } from "@/lib/comment-chat-bridge";
 import { useChatStore } from "@/stores/chat-store";
+import type { FileComment } from "@/types";
+import { MessageCircle } from "lucide-react";
 
 const Editor = dynamic(
   () => import("@monaco-editor/react").then((mod) => mod.default),
@@ -124,6 +126,7 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     const { data: commentsData } = useFileComments(
       workspaceId ?? null,
       filePath,
+      true,
     );
     const { mutate: createComment } = useCreateFileComment();
     const { mutate: resolveComment } = useResolveFileComment();
@@ -133,10 +136,14 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     const [commentInput, setCommentInput] = useState<{
       startLine: number;
       endLine: number;
+      topOffset: number;
     } | null>(null);
-    const [activeCommentLine, setActiveCommentLine] = useState<number | null>(
-      null,
-    );
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const commentInputRef = useRef<{
+      startLine: number;
+      endLine: number;
+      topOffset: number;
+    } | null>(null);
 
     const commentedLines = useMemo(() => {
       const lines = new Set<number>();
@@ -149,15 +156,6 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       }
       return lines;
     }, [isCommentMode, commentsData]);
-
-    const lineComments =
-      isCommentMode && commentsData && activeCommentLine !== null
-        ? commentsData.filter(
-            (c) =>
-              c.startLine <= activeCommentLine &&
-              c.endLine >= activeCommentLine,
-          )
-        : [];
 
     const onSaveRef = useRef(onSave);
     useEffect(() => {
@@ -173,6 +171,10 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     useEffect(() => {
       commentedLinesRef.current = commentedLines;
     });
+
+    useEffect(() => {
+      commentInputRef.current = commentInput;
+    }, [commentInput]);
 
     const [isEditorReady, setIsEditorReady] = useState(false);
 
@@ -203,20 +205,47 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
 
           editorInstance.onMouseDown((e) => {
             if (
-              e.target.type ===
+              e.target.type !==
               monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN
             ) {
-              const lineNumber = e.target.position?.lineNumber;
-              if (lineNumber == null) return;
-
-              if (commentedLinesRef.current.has(lineNumber)) {
-                setActiveCommentLine(lineNumber);
+              if (commentInputRef.current !== null) {
                 setCommentInput(null);
-              } else {
-                setCommentInput({ startLine: lineNumber, endLine: lineNumber });
-                setActiveCommentLine(null);
               }
+              return;
             }
+
+            const lineNumber = e.target.position?.lineNumber;
+            if (lineNumber == null) return;
+
+            if (commentedLinesRef.current.has(lineNumber)) {
+              setIsSidebarOpen(true);
+              setCommentInput(null);
+            } else {
+              const position = editorRef.current?.getScrolledVisiblePosition({
+                lineNumber,
+                column: 1,
+              });
+              if (!position) return;
+
+              const containerHeight =
+                editorRef.current?.getDomNode()?.getBoundingClientRect()
+                  .height ?? Infinity;
+              let topOffset = position.top + position.height;
+              if (topOffset + 200 > containerHeight) {
+                topOffset = position.top - 200;
+              }
+
+              setCommentInput({
+                startLine: lineNumber,
+                endLine: lineNumber,
+                topOffset,
+              });
+              setIsSidebarOpen(false);
+            }
+          });
+
+          editorInstance.onDidScrollChange(() => {
+            setCommentInput(null);
           });
         }
 
@@ -308,79 +337,129 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       setCommentInput(null);
     }
 
+    const handleScrollToLine = useCallback((line: number) => {
+      const editorInstance = editorRef.current;
+      if (!editorInstance) return;
+
+      editorInstance.revealLineInCenter(line);
+      const highlightDecoration = editorInstance.createDecorationsCollection([
+        {
+          range: {
+            startLineNumber: line,
+            startColumn: 1,
+            endLineNumber: line,
+            endColumn: 1,
+          },
+          options: {
+            isWholeLine: true,
+            className: "monaco-comment-highlight",
+          },
+        },
+      ]);
+
+      setTimeout(() => {
+        highlightDecoration.clear();
+      }, 1500);
+    }, []);
+
+    function handleAttachToChat(comment: FileComment) {
+      attachCommentToChat({
+        id: comment.id,
+        filePath: comment.filePath,
+        startLine: comment.startLine,
+        endLine: comment.endLine,
+        body: comment.body,
+        workspaceId: workspaceId!,
+        sessionId: activeSessionId,
+      });
+    }
+
     const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
+    const commentCount = commentsData?.length ?? 0;
 
     return (
-      <div className="relative h-full w-full overflow-hidden">
-        <Editor
-          height="100%"
-          language={getMonacoLanguage(language)}
-          theme={getMonacoThemeName(theme, resolvedMode)}
-          value={content}
-          onChange={handleChange}
-          beforeMount={handleBeforeMount}
-          onMount={handleEditorDidMount}
-          options={{
-            fontSize: effectiveFontSize,
-            lineHeight: Math.round(effectiveFontSize * 1.5),
-            fontFamily: MONACO_FONT_FAMILY,
-            fontLigatures: false,
-            tabSize,
-            minimap: { enabled: !isMobile },
-            scrollBeyondLastLine: false,
-            wordWrap: "on",
-            lineNumbers: "on",
-            renderLineHighlight: "line",
-            automaticLayout: true,
-            bracketPairColorization: { enabled: true },
-            cursorBlinking: "smooth",
-            cursorSmoothCaretAnimation: "on",
-            smoothScrolling: true,
-            padding: { top: 8 },
-            folding: true,
-            foldingStrategy: "indentation",
-            glyphMargin: isCommentMode,
-            suggestOnTriggerCharacters: true,
-            quickSuggestions: { other: true, comments: false, strings: false },
-          }}
-        />
+      <div className="flex h-full w-full overflow-hidden">
+        <div className="relative flex-1 overflow-hidden">
+          <Editor
+            height="100%"
+            language={getMonacoLanguage(language)}
+            theme={getMonacoThemeName(theme, resolvedMode)}
+            value={content}
+            onChange={handleChange}
+            beforeMount={handleBeforeMount}
+            onMount={handleEditorDidMount}
+            options={{
+              fontSize: effectiveFontSize,
+              lineHeight: Math.round(effectiveFontSize * 1.5),
+              fontFamily: MONACO_FONT_FAMILY,
+              fontLigatures: false,
+              tabSize,
+              minimap: { enabled: !isMobile },
+              scrollBeyondLastLine: false,
+              wordWrap: "on",
+              lineNumbers: "on",
+              renderLineHighlight: "line",
+              automaticLayout: true,
+              bracketPairColorization: { enabled: true },
+              cursorBlinking: "smooth",
+              cursorSmoothCaretAnimation: "on",
+              smoothScrolling: true,
+              padding: { top: 8 },
+              folding: true,
+              foldingStrategy: "indentation",
+              glyphMargin: isCommentMode,
+              suggestOnTriggerCharacters: true,
+              quickSuggestions: {
+                other: true,
+                comments: false,
+                strings: false,
+              },
+            }}
+          />
 
-        {isCommentMode && commentInput && filePath && (
-          <div className="absolute bottom-4 left-1/2 z-20 w-96 -translate-x-1/2">
-            <CommentInput
-              startLine={commentInput.startLine}
-              endLine={commentInput.endLine}
-              filePath={filePath}
-              onSubmit={handleCommentSubmit}
-              onCancel={() => setCommentInput(null)}
-            />
-          </div>
-        )}
-
-        {isCommentMode &&
-          activeCommentLine !== null &&
-          lineComments.length > 0 && (
-            <div className="absolute top-2 right-2 z-20 w-80">
-              <CommentThread
-                comments={lineComments}
-                onResolve={(id) => resolveComment({ id, resolved: true })}
-                onDelete={(id) => deleteComment(id)}
-                onUpdate={(id, body) => updateComment({ id, body })}
-                onAttachToChat={(comment) => {
-                  attachCommentToChat({
-                    id: comment.id,
-                    filePath: comment.filePath,
-                    startLine: comment.startLine,
-                    endLine: comment.endLine,
-                    body: comment.body,
-                    workspaceId: workspaceId!,
-                    sessionId: activeSessionId,
-                  });
-                  setActiveCommentLine(null);
-                }}
+          {isCommentMode && commentInput && filePath && (
+            <div
+              className="absolute left-1/2 z-20 w-96 -translate-x-1/2"
+              style={{ top: commentInput.topOffset }}
+            >
+              <CommentInput
+                startLine={commentInput.startLine}
+                endLine={commentInput.endLine}
+                filePath={filePath}
+                onSubmit={handleCommentSubmit}
+                onCancel={() => setCommentInput(null)}
               />
             </div>
           )}
+
+          {isCommentMode && commentsData && commentsData.length > 0 && (
+            <button
+              type="button"
+              className="bg-background/90 hover:bg-background absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs shadow-sm"
+              onClick={() => setIsSidebarOpen((open) => !open)}
+              aria-label="Toggle comments"
+            >
+              <MessageCircle className="size-3.5" />
+              <span className="bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-[10px] leading-none">
+                {commentCount}
+              </span>
+            </button>
+          )}
+        </div>
+
+        {isCommentMode && isSidebarOpen && commentsData && (
+          <div className="w-80 border-l">
+            <CommentsSidebar
+              comments={commentsData}
+              onScrollToLine={handleScrollToLine}
+              onResolve={(id) => resolveComment({ id, resolved: true })}
+              onDelete={(id) => deleteComment(id)}
+              onUpdate={(id, body) => updateComment({ id, body })}
+              onAttachToChat={handleAttachToChat}
+              onClose={() => setIsSidebarOpen(false)}
+            />
+          </div>
+        )}
       </div>
     );
   },

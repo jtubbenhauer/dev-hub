@@ -16,6 +16,7 @@ import {
   ChevronRight,
   FileCode2,
   Loader2,
+  MessageCircle,
   Save,
   PanelLeft,
 } from "lucide-react";
@@ -42,11 +43,11 @@ import {
   useDeleteFileComment,
   useUpdateFileComment,
 } from "@/hooks/use-file-comments";
-import { CommentThread } from "@/components/editor/comment-thread";
+import { CommentsSidebar } from "@/components/editor/comments-sidebar";
 import { CommentInput } from "@/components/editor/comment-input";
 import { attachCommentToChat } from "@/lib/comment-chat-bridge";
 import { useChatStore } from "@/stores/chat-store";
-import type { ReviewFile } from "@/types";
+import type { FileComment, ReviewFile } from "@/types";
 
 const DiffEditor = dynamic(
   () => import("@monaco-editor/react").then((mod) => mod.DiffEditor),
@@ -145,16 +146,21 @@ export const MonacoReviewEditor = forwardRef<
   const [commentInput, setCommentInput] = useState<{
     startLine: number;
     endLine: number;
+    topOffset: number;
   } | null>(null);
-  const [activeCommentLine, setActiveCommentLine] = useState<number | null>(
-    null,
-  );
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isEditorReady, setIsEditorReady] = useState(false);
+  const commentInputRef = useRef<{
+    startLine: number;
+    endLine: number;
+    topOffset: number;
+  } | null>(null);
 
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const { data: fileCommentsData } = useFileComments(
     workspaceId,
     fileContent.path,
+    true,
   );
   const createCommentMutation = useCreateFileComment();
   const resolveCommentMutation = useResolveFileComment();
@@ -182,6 +188,10 @@ export const MonacoReviewEditor = forwardRef<
   currentContentRef.current = fileContent.current;
   workspaceIdRef.current = workspaceId;
   filePathRef.current = fileContent.path;
+
+  useEffect(() => {
+    commentInputRef.current = commentInput;
+  }, [commentInput]);
 
   const getModifiedEditor =
     useCallback((): editor.IStandaloneCodeEditor | null => {
@@ -254,20 +264,56 @@ export const MonacoReviewEditor = forwardRef<
 
       modifiedEditor.onMouseDown((e) => {
         if (
-          e.target.type ===
+          e.target.type !==
           monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN
         ) {
-          const lineNumber = e.target.position?.lineNumber;
-          if (lineNumber == null) return;
-
-          if (commentedLinesRef.current.has(lineNumber)) {
-            setActiveCommentLine(lineNumber);
+          if (commentInputRef.current !== null) {
             setCommentInput(null);
-          } else {
-            setCommentInput({ startLine: lineNumber, endLine: lineNumber });
-            setActiveCommentLine(null);
           }
+          return;
         }
+
+        const lineNumber = e.target.position?.lineNumber;
+        if (lineNumber == null) return;
+
+        if (commentedLinesRef.current.has(lineNumber)) {
+          setIsSidebarOpen(true);
+          setCommentInput(null);
+        } else {
+          const position = modifiedEditor.getScrolledVisiblePosition({
+            lineNumber,
+            column: 1,
+          });
+
+          if (!position) {
+            setCommentInput({
+              startLine: lineNumber,
+              endLine: lineNumber,
+              topOffset: 200,
+            });
+            setIsSidebarOpen(false);
+            return;
+          }
+
+          const containerHeight =
+            modifiedEditor.getDomNode()?.getBoundingClientRect().height ??
+            Infinity;
+          let topOffset = position.top + position.height;
+          if (topOffset + 200 > containerHeight) {
+            topOffset = position.top - 200;
+          }
+
+          setCommentInput({
+            startLine: lineNumber,
+            endLine: lineNumber,
+            topOffset,
+          });
+          setIsSidebarOpen(false);
+        }
+      });
+
+      modifiedEditor.onDidScrollChange(() => {
+        setCommentInput(null);
       });
 
       setIsEditorReady(true);
@@ -407,15 +453,13 @@ export const MonacoReviewEditor = forwardRef<
   );
 
   const handleAttachToChat = useCallback(
-    (comment: {
-      id: number;
-      filePath: string;
-      startLine: number;
-      endLine: number;
-      body: string;
-    }) => {
+    (comment: FileComment) => {
       attachCommentToChat({
-        ...comment,
+        id: comment.id,
+        filePath: comment.filePath,
+        startLine: comment.startLine,
+        endLine: comment.endLine,
+        body: comment.body,
         workspaceId,
         sessionId: activeSessionId,
       });
@@ -423,12 +467,33 @@ export const MonacoReviewEditor = forwardRef<
     [workspaceId, activeSessionId],
   );
 
-  const activeComments = useMemo(() => {
-    if (activeCommentLine === null || !fileCommentsData) return [];
-    return fileCommentsData.filter(
-      (c) => c.startLine <= activeCommentLine && c.endLine >= activeCommentLine,
-    );
-  }, [activeCommentLine, fileCommentsData]);
+  const handleScrollToLine = useCallback(
+    (line: number) => {
+      const modifiedEditor = getModifiedEditor();
+      if (!modifiedEditor) return;
+
+      modifiedEditor.revealLineInCenter(line);
+      const highlightDecoration = modifiedEditor.createDecorationsCollection([
+        {
+          range: {
+            startLineNumber: line,
+            startColumn: 1,
+            endLineNumber: line,
+            endColumn: 1,
+          },
+          options: {
+            isWholeLine: true,
+            className: "monaco-comment-highlight",
+          },
+        },
+      ]);
+
+      setTimeout(() => {
+        highlightDecoration.clear();
+      }, 1500);
+    },
+    [getModifiedEditor],
+  );
 
   if (isLoading) {
     return (
@@ -440,6 +505,7 @@ export const MonacoReviewEditor = forwardRef<
 
   const fileName = fileContent.path.split("/").pop() ?? fileContent.path;
   const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
+  const commentCount = fileCommentsData?.length ?? 0;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
@@ -513,63 +579,86 @@ export const MonacoReviewEditor = forwardRef<
             <span className="hidden md:inline">Next</span>
           </Button>
         )}
+
+        {fileCommentsData && fileCommentsData.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
+            onClick={() => setIsSidebarOpen((open) => !open)}
+            aria-label="Toggle comments"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            <span className="bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-[10px] leading-none">
+              {commentCount}
+            </span>
+          </Button>
+        )}
       </div>
 
-      {commentInput && (
-        <div className="shrink-0 border-t p-2">
-          <CommentInput
-            startLine={commentInput.startLine}
-            endLine={commentInput.endLine}
-            filePath={fileContent.path}
-            onSubmit={handleCommentSubmit}
-            onCancel={() => setCommentInput(null)}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <DiffEditor
+            original={fileContent.original}
+            modified={fileContent.current}
+            language={getMonacoLanguage(fileContent.language)}
+            theme={getMonacoThemeName(theme, resolvedMode)}
+            beforeMount={handleBeforeMount}
+            onMount={handleMount}
+            options={{
+              fontSize: effectiveFontSize,
+              lineHeight: Math.round(effectiveFontSize * 1.5),
+              fontFamily: MONACO_FONT_FAMILY,
+              fontLigatures: false,
+              wordWrap: "on",
+              renderSideBySide: diffViewMode === "side-by-side",
+              hideUnchangedRegions: { enabled: true },
+              renderIndicators: true,
+              renderMarginRevertIcon: true,
+              originalEditable: false,
+              readOnly: false,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              lineNumbers: "on",
+              renderLineHighlight: "line",
+              automaticLayout: true,
+              glyphMargin: true,
+              folding: true,
+              smoothScrolling: true,
+              padding: { top: 8 },
+            }}
           />
         </div>
-      )}
 
-      {activeCommentLine !== null && activeComments.length > 0 && (
-        <div className="shrink-0 border-t p-2">
-          <CommentThread
-            comments={activeComments}
-            onResolve={handleCommentResolve}
-            onDelete={handleCommentDelete}
-            onUpdate={handleCommentUpdate}
-            onAttachToChat={handleAttachToChat}
-          />
-        </div>
-      )}
+        {isSidebarOpen && fileCommentsData && (
+          <div className="w-80 border-l">
+            <CommentsSidebar
+              comments={fileCommentsData}
+              onScrollToLine={handleScrollToLine}
+              onResolve={handleCommentResolve}
+              onDelete={handleCommentDelete}
+              onUpdate={handleCommentUpdate}
+              onAttachToChat={handleAttachToChat}
+              onClose={() => setIsSidebarOpen(false)}
+            />
+          </div>
+        )}
 
-      <div className="min-h-0 flex-1 overflow-hidden">
-        <DiffEditor
-          original={fileContent.original}
-          modified={fileContent.current}
-          language={getMonacoLanguage(fileContent.language)}
-          theme={getMonacoThemeName(theme, resolvedMode)}
-          beforeMount={handleBeforeMount}
-          onMount={handleMount}
-          options={{
-            fontSize: effectiveFontSize,
-            lineHeight: Math.round(effectiveFontSize * 1.5),
-            fontFamily: MONACO_FONT_FAMILY,
-            fontLigatures: false,
-            wordWrap: "on",
-            renderSideBySide: diffViewMode === "side-by-side",
-            hideUnchangedRegions: { enabled: true },
-            renderIndicators: true,
-            renderMarginRevertIcon: true,
-            originalEditable: false,
-            readOnly: false,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            lineNumbers: "on",
-            renderLineHighlight: "line",
-            automaticLayout: true,
-            glyphMargin: true,
-            folding: true,
-            smoothScrolling: true,
-            padding: { top: 8 },
-          }}
-        />
+        {commentInput && (
+          <div
+            className="absolute left-1/2 z-20 w-96 -translate-x-1/2"
+            style={{ top: commentInput.topOffset }}
+          >
+            <CommentInput
+              startLine={commentInput.startLine}
+              endLine={commentInput.endLine}
+              filePath={fileContent.path}
+              onSubmit={handleCommentSubmit}
+              onCancel={() => setCommentInput(null)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

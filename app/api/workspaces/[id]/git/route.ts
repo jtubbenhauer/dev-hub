@@ -58,6 +58,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json(branches);
       }
 
+      case "remotes": {
+        const remotes = await backend.getRemotes();
+        return NextResponse.json(remotes);
+      }
+
       case "diff": {
         const file = url.searchParams.get("file");
         const staged = url.searchParams.get("staged") === "true";

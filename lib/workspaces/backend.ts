@@ -14,6 +14,7 @@ import type {
   WorktreeInfo,
 } from "@/types";
 import type { workspaces } from "@/drizzle/schema";
+import simpleGit from "simple-git";
 
 type WorkspaceRow = typeof workspaces.$inferSelect;
 
@@ -84,6 +85,7 @@ export interface WorkspaceBackend {
   getCommitDiff(hash: string): Promise<string>;
   getBranches(): Promise<GitBranch[]>;
   getAllBranches(): Promise<AllBranch[]>;
+  getRemotes(): Promise<{ name: string; fetchUrl: string; pushUrl: string }[]>;
 
   // Git staging
   stageFiles(files: string[]): Promise<void>;
@@ -187,6 +189,16 @@ export class LocalBackend implements WorkspaceBackend {
 
   getAllBranches() {
     return getAllBranches(this.workspacePath);
+  }
+
+  async getRemotes() {
+    const git = simpleGit(this.workspacePath);
+    const remotes = await git.getRemotes(true);
+    return remotes.map((r) => ({
+      name: r.name,
+      fetchUrl: r.refs.fetch,
+      pushUrl: r.refs.push,
+    }));
   }
 
   stageFiles(files: string[]) {
@@ -436,6 +448,12 @@ export class RemoteBackend implements WorkspaceBackend {
 
   async getAllBranches() {
     return this.agentGet<AllBranch[]>("/git/all-branches");
+  }
+
+  async getRemotes() {
+    return this.agentGet<{ name: string; fetchUrl: string; pushUrl: string }[]>(
+      "/git/remotes",
+    );
   }
 
   async stageFiles(files: string[]) {

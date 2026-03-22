@@ -285,6 +285,19 @@ export function gitRoutes(workspacePath: string): Hono {
     return c.json(branches);
   });
 
+  // GET /git/remotes
+  app.get("/remotes", async (c) => {
+    const git = createGit(workspacePath);
+    const remotes = await git.getRemotes(true);
+    return c.json(
+      remotes.map((r) => ({
+        name: r.name,
+        fetchUrl: r.refs.fetch,
+        pushUrl: r.refs.push,
+      })),
+    );
+  });
+
   // --- Staging ---
 
   // POST /git/stage { files: string[] }

@@ -15,6 +15,7 @@ import { SessionList } from "@/components/chat/session-list";
 import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
+import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
 import { VariantSelector } from "@/components/chat/variant-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -235,6 +236,7 @@ export function ChatInterface() {
   const activeWorkspacePath = useWorkspaceStore(
     (state) => state.activeWorkspace?.path ?? "",
   );
+  const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const allWorkspaces = useWorkspaceStore((state) => state.workspaces);
 
   const activeWorkspaceColor = useMemo(() => {
@@ -1879,6 +1881,21 @@ export function ChatInterface() {
                 <X className="size-3" />
               </Button>
             </div>
+            {activeWorkspaceId && activeWorkspace && (
+              <>
+                <div className="border-b px-3 py-2">
+                  <span className="text-muted-foreground text-xs font-medium">
+                    Workspace Context
+                  </span>
+                </div>
+                <div className="px-3 pt-2 pb-3">
+                  <WorkspaceContextPanel
+                    workspaceId={activeWorkspaceId}
+                    workspace={activeWorkspace}
+                  />
+                </div>
+              </>
+            )}
             {activeTodos.length > 0 && (
               <div className="p-3">
                 <TaskProgressPanel todos={activeTodos} />

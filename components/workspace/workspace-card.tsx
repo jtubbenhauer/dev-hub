@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useCommandStore } from "@/stores/command-store";
 import { useGitStatus, useAgentHealth } from "@/hooks/use-git";
+import { useWorkspaceResume } from "@/hooks/use-workspace-resume";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ import {
   Pencil,
   CheckSquare,
   TerminalSquare,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils";
@@ -69,6 +71,9 @@ export function WorkspaceCard({
   const { data: healthStatus } = useAgentHealth(
     workspace.id,
     workspace.backend === "remote",
+  );
+  const { isResuming, resume } = useWorkspaceResume(
+    workspace.backend === "remote" ? workspace.id : null,
   );
   const runCommand = useCommandStore((s) => s.runCommand);
   const setDrawerOpen = useCommandStore((s) => s.setDrawerOpen);
@@ -112,21 +117,38 @@ export function WorkspaceCard({
                     variant="outline"
                     className="gap-1 border-blue-500/50 text-xs text-blue-500"
                   >
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full",
-                        healthStatus === "healthy" && "bg-emerald-500",
-                        healthStatus === "unreachable" && "bg-red-500",
-                        !healthStatus && "bg-muted-foreground/50",
-                      )}
-                    />
-                    remote
+                    {isResuming ? (
+                      <Loader2 className="size-3 animate-spin text-blue-500" />
+                    ) : (
+                      <span
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          healthStatus === "healthy" && "bg-emerald-500",
+                          healthStatus === "suspended" && "bg-amber-500",
+                          healthStatus === "unreachable" && "bg-red-500",
+                          !healthStatus && "bg-muted-foreground/50",
+                        )}
+                      />
+                    )}
+                    {isResuming
+                      ? "resuming"
+                      : healthStatus === "suspended"
+                        ? "suspended"
+                        : "remote"}
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {healthStatus === "healthy" && "Agent is reachable"}
-                  {healthStatus === "unreachable" && "Agent is unreachable"}
-                  {!healthStatus && "Checking agent status..."}
+                  {isResuming && "Workspace is starting up..."}
+                  {!isResuming &&
+                    healthStatus === "suspended" &&
+                    "Workspace is suspended. Click Chat/Git/Terminal to resume."}
+                  {!isResuming &&
+                    healthStatus === "healthy" &&
+                    "Agent is reachable"}
+                  {!isResuming &&
+                    healthStatus === "unreachable" &&
+                    "Agent is unreachable"}
+                  {!isResuming && !healthStatus && "Checking agent status..."}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -274,6 +296,9 @@ export function WorkspaceCard({
               href="/chat"
               onClick={(event) => {
                 event.stopPropagation();
+                if (healthStatus === "suspended" && !isResuming) {
+                  resume();
+                }
                 setActiveWorkspaceId(workspace.id);
               }}
               className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
@@ -285,6 +310,9 @@ export function WorkspaceCard({
               href="/git"
               onClick={(event) => {
                 event.stopPropagation();
+                if (healthStatus === "suspended" && !isResuming) {
+                  resume();
+                }
                 setActiveWorkspaceId(workspace.id);
               }}
               className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
@@ -296,6 +324,9 @@ export function WorkspaceCard({
               href={`/terminal?workspace=${workspace.id}`}
               onClick={(event) => {
                 event.stopPropagation();
+                if (healthStatus === "suspended" && !isResuming) {
+                  resume();
+                }
                 setActiveWorkspaceId(workspace.id);
               }}
               className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"

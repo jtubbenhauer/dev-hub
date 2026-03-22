@@ -2,7 +2,7 @@
 
 import { memo, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { FileCode2, ChevronRight, ChevronDown } from "lucide-react";
+import { FileCode2, ChevronRight, ChevronDown, GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   extractSessionFiles,
@@ -33,24 +33,46 @@ const FileRow = memo(function FileRow({
     router.push(`/files?open=${encodeURIComponent(relativePath)}`);
   }, [router, relativePath]);
 
+  const handleOpenGitDiff = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      localStorage.setItem("dev-hub:git-picker-selected-file", relativePath);
+      localStorage.setItem("dev-hub:git-view-mode", "working");
+      router.push("/git");
+      window.dispatchEvent(
+        new CustomEvent("devhub:git-select-file", {
+          detail: { path: relativePath, staged: false },
+        }),
+      );
+    },
+    [router, relativePath],
+  );
+
   return (
     <button
       type="button"
       onClick={handleClick}
       className={cn(
-        "flex w-full items-center gap-2 rounded px-1.5 py-1 text-xs",
+        "group flex w-full items-center gap-2 rounded px-1.5 py-1 text-xs",
         "hover:bg-accent cursor-pointer text-left transition-colors",
       )}
     >
       <FileCode2 className="text-muted-foreground size-3.5 shrink-0" />
       <span className="flex-1 truncate">{relativePath}</span>
+      <span
+        onClick={handleOpenGitDiff}
+        title="Open in git diff"
+        className="text-muted-foreground hover:text-foreground hidden shrink-0 rounded p-0.5 transition-colors group-hover:block"
+      >
+        <GitCompare className="size-3" />
+      </span>
       {file.action === "created" && (
-        <span className="ml-auto shrink-0 rounded bg-emerald-500/15 px-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+        <span className="shrink-0 rounded bg-emerald-500/15 px-1 text-[10px] text-emerald-600 dark:text-emerald-400">
           new
         </span>
       )}
       {file.action === "modified" && (
-        <span className="ml-auto shrink-0 rounded bg-blue-500/15 px-1 text-[10px] text-blue-600 dark:text-blue-400">
+        <span className="shrink-0 rounded bg-blue-500/15 px-1 text-[10px] text-blue-600 dark:text-blue-400">
           mod
         </span>
       )}

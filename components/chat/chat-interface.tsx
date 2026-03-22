@@ -1872,7 +1872,7 @@ export function ChatInterface() {
           >
             <div className="flex items-center justify-between border-b px-3 py-2">
               <span className="text-muted-foreground text-xs font-medium">
-                {activeTodos.length > 0 ? "Task Progress" : "Side Panel"}
+                Side Panel
               </span>
               <Button
                 size="icon-xs"
@@ -1892,9 +1892,16 @@ export function ChatInterface() {
               />
             )}
             {activeTodos.length > 0 && (
-              <div className="p-3">
-                <TaskProgressPanel todos={activeTodos} />
-              </div>
+              <>
+                <div className="border-t px-3 py-2">
+                  <span className="text-muted-foreground text-xs font-medium">
+                    Task Progress
+                  </span>
+                </div>
+                <div className="px-3 pb-3">
+                  <TaskProgressPanel todos={activeTodos} />
+                </div>
+              </>
             )}
             <div className="border-t px-3 py-2">
               <span className="text-muted-foreground text-xs font-medium">

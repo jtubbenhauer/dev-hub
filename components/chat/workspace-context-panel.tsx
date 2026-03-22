@@ -46,7 +46,7 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
 
   return (
     <div className="space-y-2">
-      <Tooltip>
+      <Tooltip delayDuration={500} disableHoverableContent>
         <TooltipTrigger asChild>
           <div className="flex items-center gap-2 text-xs">
             <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
@@ -65,7 +65,7 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
       </Tooltip>
 
       {pr && (
-        <Tooltip>
+        <Tooltip delayDuration={500} disableHoverableContent>
           <TooltipTrigger asChild>
             <div className="flex items-center gap-2 text-xs">
               <GitPullRequest className="text-muted-foreground size-3.5 shrink-0" />
@@ -96,7 +96,7 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
       )}
 
       {linkedTaskMeta && (
-        <Tooltip>
+        <Tooltip delayDuration={500} disableHoverableContent>
           <TooltipTrigger asChild>
             <div className="flex items-center gap-2 text-xs">
               <CheckSquare className="text-muted-foreground size-3.5 shrink-0" />
@@ -122,7 +122,7 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
       )}
 
       {preview && (
-        <Tooltip>
+        <Tooltip delayDuration={500} disableHoverableContent>
           <TooltipTrigger asChild>
             <div className="flex items-center gap-2 text-xs">
               <Globe className="text-muted-foreground size-3.5 shrink-0" />

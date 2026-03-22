@@ -45,6 +45,7 @@ interface ReviewEditorProps {
   onToggleReviewed?: (file: ReviewFile) => void;
   onMarkAndNext?: (file: ReviewFile) => void;
   onOpenFileList?: () => void;
+  onOpenInEditor?: () => void;
 }
 
 export const ReviewEditor = forwardRef<ReviewEditorHandle, ReviewEditorProps>(

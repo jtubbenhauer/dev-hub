@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useGitReviewStore } from "@/stores/git-review-store";
 import { Button } from "@/components/ui/button";
 import {
@@ -114,6 +115,7 @@ interface GitPanelProps {
 }
 
 export function GitPanel({ workspace, onClose }: GitPanelProps) {
+  const router = useRouter();
   const [selectedFile, setSelectedFile] = useState<string | null>(() => {
     try {
       const pickerFile = localStorage.getItem(
@@ -1143,6 +1145,13 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
                 fileContent={fileContent}
                 workspaceId={workspace.id}
                 isLoading={isFileContentLoading}
+                onOpenInEditor={() => {
+                  if (selectedFile) {
+                    router.push(
+                      `/files?open=${encodeURIComponent(selectedFile)}`,
+                    );
+                  }
+                }}
               />
             ) : (
               <div className="text-muted-foreground flex h-full items-center justify-center text-xs">

@@ -11,7 +11,14 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import type { editor } from "monaco-editor";
-import { Check, ChevronRight, Loader2, Save, PanelLeft } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  FileCode2,
+  Loader2,
+  Save,
+  PanelLeft,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DiffViewToggle } from "@/components/editor/diff-view-toggle";
 import { useEditorStore } from "@/stores/editor-store";
@@ -103,6 +110,7 @@ interface ReviewEditorProps {
   onToggleReviewed?: (file: ReviewFile) => void;
   onMarkAndNext?: (file: ReviewFile) => void;
   onOpenFileList?: () => void;
+  onOpenInEditor?: () => void;
 }
 
 export const MonacoReviewEditor = forwardRef<
@@ -117,6 +125,7 @@ export const MonacoReviewEditor = forwardRef<
     onToggleReviewed,
     onMarkAndNext,
     onOpenFileList,
+    onOpenInEditor,
   },
   ref,
 ) {
@@ -449,6 +458,18 @@ export const MonacoReviewEditor = forwardRef<
         <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
           {fileName}
         </span>
+
+        {onOpenInEditor && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            title="Open file in editor"
+            onClick={onOpenInEditor}
+          >
+            <FileCode2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
 
         <DiffViewToggle />
 

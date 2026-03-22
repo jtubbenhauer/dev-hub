@@ -30,9 +30,12 @@ import {
   Loader2,
   FolderOpen,
   FileCode2,
+  GitCompare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useGitStatus } from "@/hooks/use-git";
 
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = 500;
@@ -71,8 +74,15 @@ function FilesContent() {
 
   const { isFileTabsDisabled } = useFileTabsSetting();
 
+  const router = useRouter();
   const searchParams = useSearchParams();
   const isMobile = useIsMobile();
+
+  const { data: gitStatus } = useGitStatus(activeWorkspaceId);
+  const isActiveFileUnstaged = useMemo(() => {
+    if (!gitStatus || !activeFilePath) return false;
+    return gitStatus.unstaged.some((f) => f.path === activeFilePath);
+  }, [gitStatus, activeFilePath]);
   const [isMobileTreeOpen, setIsMobileTreeOpen] = useState(false);
   const [savingPath, setSavingPath] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -412,7 +422,30 @@ function FilesContent() {
               {activeFile?.path ?? "No file open"}
             </span>
 
-            {/* Save button */}
+            {activeFile && isActiveFileUnstaged && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                title="Open in git diff"
+                onClick={() => {
+                  localStorage.setItem(
+                    "dev-hub:git-picker-selected-file",
+                    activeFile.path,
+                  );
+                  localStorage.setItem("dev-hub:git-view-mode", "working");
+                  router.push("/git");
+                  window.dispatchEvent(
+                    new CustomEvent("devhub:git-select-file", {
+                      detail: { path: activeFile.path, staged: false },
+                    }),
+                  );
+                }}
+              >
+                <GitCompare className="h-3.5 w-3.5" />
+              </Button>
+            )}
+
             {activeFile && (
               <Button
                 variant="ghost"

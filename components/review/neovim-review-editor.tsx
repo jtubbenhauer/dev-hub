@@ -21,6 +21,7 @@ import {
 import {
   Check,
   ChevronRight,
+  FileCode2,
   Loader2,
   PanelLeft,
   AlertCircle,
@@ -46,6 +47,7 @@ interface NeovimReviewEditorProps {
   onToggleReviewed?: (file: ReviewFile) => void;
   onMarkAndNext?: (file: ReviewFile) => void;
   onOpenFileList?: () => void;
+  onOpenInEditor?: () => void;
 }
 
 interface TerminalConfig {
@@ -89,6 +91,7 @@ export const NeovimReviewEditor = forwardRef<
     onToggleReviewed,
     onMarkAndNext,
     onOpenFileList,
+    onOpenInEditor,
   },
   ref,
 ) {
@@ -262,6 +265,18 @@ export const NeovimReviewEditor = forwardRef<
         <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
           {fileName}
         </span>
+
+        {onOpenInEditor && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            title="Open file in editor"
+            onClick={onOpenInEditor}
+          >
+            <FileCode2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
 
         {file && onToggleReviewed && (
           <Button

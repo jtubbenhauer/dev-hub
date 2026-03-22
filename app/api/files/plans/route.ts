@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import nodePath from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db";
@@ -15,6 +17,16 @@ export interface PlanFile {
   name: string;
   path: string;
   lastModified: string;
+}
+
+function getFileMtime(workspacePath: string, relativePath: string): Date {
+  try {
+    const fullPath = nodePath.resolve(workspacePath, relativePath);
+    const stat = fs.statSync(fullPath);
+    return stat.mtime;
+  } catch {
+    return new Date(0);
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -48,10 +60,10 @@ export async function GET(request: NextRequest) {
   const workspace = toWorkspace(row);
 
   const directory = request.nextUrl.searchParams.get("directory");
+  const isLocal = workspace.backend !== "remote";
+  const resolvedPath = directory && isLocal ? directory : workspace.path;
   const backend =
-    directory && workspace.backend !== "remote"
-      ? new LocalBackend(directory)
-      : getBackend(workspace);
+    directory && isLocal ? new LocalBackend(directory) : getBackend(workspace);
 
   const seen = new Set<string>();
   const allFiles: PlanFile[] = [];
@@ -63,10 +75,15 @@ export async function GET(request: NextRequest) {
         if (entry.type !== "file" || !entry.name.endsWith(".md")) continue;
         if (seen.has(entry.name)) continue;
         seen.add(entry.name);
+        const relativePath = `${dir}/${entry.name}`;
+        const mtime =
+          isLocal && resolvedPath
+            ? getFileMtime(resolvedPath, relativePath)
+            : new Date();
         allFiles.push({
           name: entry.name,
-          path: `${dir}/${entry.name}`,
-          lastModified: new Date().toISOString(),
+          path: relativePath,
+          lastModified: mtime.toISOString(),
         });
       }
     } catch {
@@ -74,6 +91,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  allFiles.sort((a, b) => a.name.localeCompare(b.name));
+  // Most recently modified first
+  allFiles.sort(
+    (a, b) =>
+      new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime(),
+  );
   return NextResponse.json({ files: allFiles });
 }

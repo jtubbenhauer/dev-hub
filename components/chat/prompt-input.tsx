@@ -15,6 +15,7 @@ import {
   CommandPicker,
   type SlashCommand,
 } from "@/components/chat/command-picker";
+import { PlanArgPicker } from "@/components/chat/plan-arg-picker";
 import { cn } from "@/lib/utils";
 import type { Command } from "@/lib/opencode/types";
 import {
@@ -81,6 +82,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     );
     const [pickerQuery, setPickerQuery] = useState<string | null>(null);
     const [commandQuery, setCommandQuery] = useState<string | null>(null);
+    const [planArgQuery, setPlanArgQuery] = useState<string | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [prevSessionId, setPrevSessionId] = useState(sessionId);
 
@@ -245,6 +247,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           setSelectedComments([]);
           setPickerQuery(null);
           setCommandQuery(null);
+          setPlanArgQuery(null);
           if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
           }
@@ -290,6 +293,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       setSelectedComments([]);
       setPickerQuery(null);
       setCommandQuery(null);
+      setPlanArgQuery(null);
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
       }
@@ -334,11 +338,23 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
               firstSpace === -1 ? cursor : Math.min(cursor, firstSpace);
             const queryAfterSlash = newValue.slice(1, queryEnd);
             setCommandQuery(queryAfterSlash);
+            setPlanArgQuery(null);
             return;
+          }
+
+          if (newValue.startsWith("/start-work ")) {
+            const prefixLen = "/start-work ".length;
+            if (cursor >= prefixLen) {
+              const queryAfterPrefix = newValue.slice(prefixLen, cursor);
+              setPlanArgQuery(queryAfterPrefix);
+              setCommandQuery(null);
+              return;
+            }
           }
         }
 
         setCommandQuery(null);
+        setPlanArgQuery(null);
       },
       [autoResize],
     );
@@ -347,11 +363,14 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (
           event.key === "Escape" &&
-          (pickerQuery !== null || commandQuery !== null)
+          (pickerQuery !== null ||
+            commandQuery !== null ||
+            planArgQuery !== null)
         ) {
           event.preventDefault();
           setPickerQuery(null);
           setCommandQuery(null);
+          setPlanArgQuery(null);
           return;
         }
         // Let FilePicker intercept ArrowUp/ArrowDown/Enter when picker is open
@@ -373,12 +392,21 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           event.preventDefault();
           return;
         }
+        if (
+          planArgQuery !== null &&
+          (event.key === "ArrowUp" ||
+            event.key === "ArrowDown" ||
+            event.key === "Enter")
+        ) {
+          event.preventDefault();
+          return;
+        }
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
           handleSubmit();
         }
       },
-      [handleSubmit, pickerQuery, commandQuery],
+      [handleSubmit, pickerQuery, commandQuery, planArgQuery],
     );
 
     const handleFileSelect = useCallback(
@@ -416,6 +444,15 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     const handleCommandSelect = useCallback((cmd: SlashCommand) => {
       setValue(`/${cmd.name} `);
       setCommandQuery(null);
+      if (cmd.name === "start-work") {
+        setPlanArgQuery("");
+      }
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }, []);
+
+    const handlePlanArgSelect = useCallback((fileName: string) => {
+      setValue(`/start-work ${fileName}`);
+      setPlanArgQuery(null);
       requestAnimationFrame(() => textareaRef.current?.focus());
     }, []);
 
@@ -431,6 +468,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
 
     const isPickerOpen = pickerQuery !== null && !!workspaceId;
     const isCommandPickerOpen = commandQuery !== null;
+    const isPlanArgPickerOpen = planArgQuery !== null && !!workspaceId;
 
     return (
       <div className="bg-background shrink-0 border-t p-4">
@@ -505,6 +543,15 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
               query={commandQuery ?? ""}
               onSelect={handleCommandSelect}
               onClose={() => setCommandQuery(null)}
+            />
+          )}
+
+          {isPlanArgPickerOpen && (
+            <PlanArgPicker
+              workspaceId={workspaceId}
+              query={planArgQuery ?? ""}
+              onSelect={handlePlanArgSelect}
+              onClose={() => setPlanArgQuery(null)}
             />
           )}
 

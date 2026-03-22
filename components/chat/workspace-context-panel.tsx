@@ -1,14 +1,13 @@
 "use client";
 
 import { memo } from "react";
-import { GitBranch, GitPullRequest, CheckSquare, Globe } from "lucide-react";
+import { GitPullRequest, CheckSquare, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useGitStatus } from "@/hooks/use-git";
 import { useFirebasePreview } from "@/hooks/use-firebase-preview";
 import type { Workspace, LinkedTaskMeta } from "@/types";
 
@@ -34,8 +33,6 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
   workspaceId,
   workspace,
 }: WorkspaceContextPanelProps) {
-  const { data: gitStatus, isLoading: isGitLoading } =
-    useGitStatus(workspaceId);
   const {
     preview,
     pr,
@@ -46,24 +43,6 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
 
   return (
     <div className="space-y-2">
-      <Tooltip delayDuration={500} disableHoverableContent>
-        <TooltipTrigger asChild>
-          <div className="flex items-center gap-2 text-xs">
-            <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
-            {isGitLoading ? (
-              <span className="text-muted-foreground">Loading branch...</span>
-            ) : gitStatus?.branch ? (
-              <span className="text-foreground truncate">
-                {gitStatus.branch}
-              </span>
-            ) : (
-              <span className="text-muted-foreground">No branch</span>
-            )}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="left">Current branch</TooltipContent>
-      </Tooltip>
-
       {pr && (
         <Tooltip delayDuration={500} disableHoverableContent>
           <TooltipTrigger asChild>

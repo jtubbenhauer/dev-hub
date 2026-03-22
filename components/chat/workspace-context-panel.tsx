@@ -1,7 +1,8 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { GitPullRequest, CheckSquare, Globe, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -28,6 +29,21 @@ interface PreviewRowProps {
 function PreviewRow({ preview, owner, repo, branch }: PreviewRowProps) {
   const { data: workflowData } = useGitHubWorkflowRuns(owner, repo, branch);
   const rerunMutation = useRerunWorkflow(owner, repo);
+  const [isDeploying, setIsDeploying] = useState(false);
+
+  const handleRerun = () => {
+    const runs = workflowData?.workflow_runs;
+    if (!runs || runs.length === 0) return;
+    rerunMutation.mutate(
+      { runId: runs[0].id },
+      {
+        onSuccess: () => {
+          setIsDeploying(true);
+          toast.success("Deployment re-triggered");
+        },
+      },
+    );
+  };
 
   return (
     <Tooltip delayDuration={500} disableHoverableContent>
@@ -43,7 +59,14 @@ function PreviewRow({ preview, owner, repo, branch }: PreviewRowProps) {
           >
             {preview.url}
           </a>
-          {preview.isExpired ? (
+          {isDeploying ? (
+            <Badge
+              variant="outline"
+              className="shrink-0 animate-pulse px-1 py-0 text-[10px] text-orange-500"
+            >
+              Deploying…
+            </Badge>
+          ) : preview.isExpired ? (
             <>
               <Badge
                 variant="outline"
@@ -56,12 +79,7 @@ function PreviewRow({ preview, owner, repo, branch }: PreviewRowProps) {
                   type="button"
                   className="text-muted-foreground hover:text-foreground shrink-0"
                   title="Re-run deployment"
-                  onClick={() => {
-                    const runs = workflowData?.workflow_runs;
-                    if (runs && runs.length > 0) {
-                      rerunMutation.mutate({ runId: runs[0].id });
-                    }
-                  }}
+                  onClick={handleRerun}
                   disabled={rerunMutation.isPending}
                 >
                   <RefreshCw

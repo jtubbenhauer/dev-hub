@@ -1,0 +1,36 @@
+app/api/workspaces/[id]/start/route.ts
+  f36fc9d5f9ee62da 1-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "b57e9d014c5d59337b16c8279ed4f0fcca9449ae",
+  "prompts": {
+    "e48a6532b398b94a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2ea7cec56ffeL8XWYrjIF7mgqL-054e4db0-d73f-4d36-8c63-7d097ff7b47a",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "f36fc9d5f9ee62da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2ea7cec56ffeL8XWYrjIF7mgqL-5a74ff88-44e2-48e4-9ed7-9cd233ba9a58",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 180,
+      "total_deletions": 0,
+      "accepted_lines": 176,
+      "overriden_lines": 0
+    }
+  }
+}

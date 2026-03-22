@@ -60,6 +60,7 @@ function pageFromPathname(pathname: string): string {
   if (pathname.startsWith("/workspaces")) return "repos";
   if (pathname.startsWith("/settings")) return "settings";
   if (pathname.startsWith("/files")) return "files";
+  if (pathname.startsWith("/tasks")) return "tasks";
   return "unknown";
 }
 

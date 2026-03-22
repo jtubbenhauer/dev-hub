@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   ExternalLink,
   GitFork,
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog";
+import { isEditorElement } from "@/lib/utils";
 import type { ClickUpTask, ClickUpCustomField } from "@/types";
 
 /** Find a "score" custom field on a task — supports number and formula types */
@@ -189,6 +190,7 @@ interface TaskListProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  focusContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function TaskList({
@@ -201,7 +203,77 @@ export function TaskList({
   onLoadMore,
   hasMore,
   isLoadingMore,
+  focusContainerRef,
 }: TaskListProps) {
+  // Check if any task has a score custom field
+  const hasScores = useMemo(
+    () => (tasks ?? []).some((t) => getScoreValue(t) != null),
+    [tasks],
+  );
+
+  // Sort by score (highest first) when scores are present
+  const sortedTasks = useMemo(
+    () =>
+      hasScores
+        ? [...(tasks ?? [])].sort(
+            (a, b) =>
+              (getScoreValue(b) ?? -Infinity) - (getScoreValue(a) ?? -Infinity),
+          )
+        : (tasks ?? []),
+    [tasks, hasScores],
+  );
+
+  const selectedIndex = sortedTasks.findIndex((t) => t.id === selectedTaskId);
+
+  const handleKeyboard = useCallback(
+    (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && isEditorElement(e.target))
+      ) {
+        return;
+      }
+
+      // Only handle when the task list container has focus, or when
+      // nothing specific is focused (default pane)
+      if (focusContainerRef?.current) {
+        const active = document.activeElement;
+        const containerHasFocus = focusContainerRef.current.contains(active);
+        const nothingFocused = active === document.body || active === null;
+        if (!containerHasFocus && !nothingFocused) return;
+      }
+
+      if (sortedTasks.length === 0) return;
+
+      switch (e.key) {
+        case "j":
+        case "ArrowDown": {
+          if (e.key === "j" && (e.ctrlKey || e.metaKey || e.altKey)) return;
+          e.preventDefault();
+          const next =
+            sortedTasks[Math.min(selectedIndex + 1, sortedTasks.length - 1)];
+          if (next) onSelectTask(next);
+          break;
+        }
+        case "k":
+        case "ArrowUp": {
+          if (e.key === "k" && (e.ctrlKey || e.metaKey || e.altKey)) return;
+          e.preventDefault();
+          const prev = sortedTasks[Math.max(selectedIndex - 1, 0)];
+          if (prev) onSelectTask(prev);
+          break;
+        }
+      }
+    },
+    [selectedIndex, sortedTasks, onSelectTask, focusContainerRef],
+  );
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, [handleKeyboard]);
+
   if (isLoading) {
     return (
       <div className="min-w-0 flex-1 overflow-auto p-2">
@@ -231,17 +303,6 @@ export function TaskList({
       </div>
     );
   }
-
-  // Check if any task has a score custom field
-  const hasScores = tasks.some((t) => getScoreValue(t) != null);
-
-  // Sort by score (highest first) when scores are present
-  const sortedTasks = hasScores
-    ? [...tasks].sort(
-        (a, b) =>
-          (getScoreValue(b) ?? -Infinity) - (getScoreValue(a) ?? -Infinity),
-      )
-    : tasks;
 
   const gridTemplate = getGridTemplate(hasScores);
 

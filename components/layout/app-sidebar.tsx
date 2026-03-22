@@ -22,6 +22,7 @@ import { useFilePicker } from "@/components/file-picker/file-picker";
 import { useSessionPicker } from "@/components/session-picker/session-picker";
 import { useTaskPicker } from "@/components/task-picker/task-picker";
 import { useGitPicker } from "@/components/git-picker/git-picker";
+import { useWorkspacePicker } from "@/components/workspace-picker/workspace-picker";
 
 const navItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
@@ -42,6 +43,7 @@ export function AppSidebar() {
   const { open: openSessionPicker } = useSessionPicker();
   const { open: openTaskPicker } = useTaskPicker();
   const { open: openGitPicker } = useGitPicker();
+  const { open: openWorkspacePicker } = useWorkspacePicker();
 
   const navCommands = useMemo(
     () =>
@@ -90,6 +92,8 @@ export function AppSidebar() {
   openTaskPickerRef.current = openTaskPicker;
   const openGitPickerRef = useRef(openGitPicker);
   openGitPickerRef.current = openGitPicker;
+  const openWorkspacePickerRef = useRef(openWorkspacePicker);
+  openWorkspacePickerRef.current = openWorkspacePicker;
 
   const globalLeaderActions = useMemo(
     () => [
@@ -184,6 +188,14 @@ export function AppSidebar() {
           page: "global" as const,
         },
         handler: () => openGitPickerRef.current(),
+      },
+      {
+        action: {
+          id: "global:switch-workspace",
+          label: "Switch workspace",
+          page: "global" as const,
+        },
+        handler: () => openWorkspacePickerRef.current(),
       },
       {
         action: {

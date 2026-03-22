@@ -9,6 +9,7 @@ interface TaskSearchProps {
   onChange: (query: string) => void;
   placeholder?: string;
   className?: string;
+  searchInputRef?: React.Ref<HTMLInputElement>;
 }
 
 export function TaskSearch({
@@ -16,6 +17,7 @@ export function TaskSearch({
   onChange,
   placeholder = "Search tasks...",
   className,
+  searchInputRef,
 }: TaskSearchProps) {
   const [localValue, setLocalValue] = useState(value);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,6 +44,7 @@ export function TaskSearch({
     <div className={`relative ${className ?? ""}`}>
       <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
       <Input
+        ref={searchInputRef}
         value={localValue}
         onChange={handleChange}
         placeholder={placeholder}

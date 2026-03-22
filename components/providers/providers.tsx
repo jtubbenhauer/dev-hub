@@ -24,6 +24,10 @@ import {
   GitPickerProvider,
   GitPickerDialog,
 } from "@/components/git-picker/git-picker";
+import {
+  WorkspacePickerProvider,
+  WorkspacePickerDialog,
+} from "@/components/workspace-picker/workspace-picker";
 import { LeaderKeyProvider } from "@/components/providers/leader-key-provider";
 import { WhichKeyPanel } from "@/components/leader-key/which-key-panel";
 import {
@@ -77,15 +81,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 <SessionPickerProvider>
                   <TaskPickerProvider>
                     <GitPickerProvider>
-                      <LeaderKeySetup>
-                        {children}
-                        <CommandPalette />
-                        <FilePickerDialog />
-                        <SessionPickerDialog />
-                        <TaskPickerDialog />
-                        <GitPickerDialog />
-                        <Toaster />
-                      </LeaderKeySetup>
+                      <WorkspacePickerProvider>
+                        <LeaderKeySetup>
+                          {children}
+                          <CommandPalette />
+                          <FilePickerDialog />
+                          <SessionPickerDialog />
+                          <TaskPickerDialog />
+                          <GitPickerDialog />
+                          <WorkspacePickerDialog />
+                          <Toaster />
+                        </LeaderKeySetup>
+                      </WorkspacePickerProvider>
                     </GitPickerProvider>
                   </TaskPickerProvider>
                 </SessionPickerProvider>

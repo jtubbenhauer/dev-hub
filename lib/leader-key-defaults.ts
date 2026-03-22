@@ -34,6 +34,19 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "chat:toggle-plan", label: "Toggle plan panel", page: "chat" },
   { id: "chat:focus-prompt", label: "Focus prompt input", page: "chat" },
   { id: "chat:toggle-variant", label: "Toggle variant selector", page: "chat" },
+  { id: "chat:toggle-tasks", label: "Toggle side panel", page: "chat" },
+  { id: "chat:toggle-thinking", label: "Toggle thinking", page: "chat" },
+  {
+    id: "chat:toggle-tool-calls",
+    label: "Toggle tool calls",
+    page: "chat",
+  },
+  { id: "chat:toggle-tokens", label: "Toggle token usage", page: "chat" },
+  {
+    id: "chat:toggle-timestamps",
+    label: "Toggle timestamps",
+    page: "chat",
+  },
 
   // Files page
   { id: "files:save", label: "Save file", page: "files" },
@@ -58,6 +71,25 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "git:prev-unreviewed", label: "Jump to prev unreviewed", page: "git" },
   { id: "git:focus-editor", label: "Focus code pane", page: "git" },
   { id: "git:focus-files", label: "Focus files pane", page: "git" },
+
+  // Tasks page
+  { id: "tasks:focus-sidebar", label: "Focus sidebar", page: "tasks" },
+  { id: "tasks:focus-list", label: "Focus task list", page: "tasks" },
+  { id: "tasks:focus-detail", label: "Focus detail panel", page: "tasks" },
+  { id: "tasks:focus-search", label: "Focus search", page: "tasks" },
+  { id: "tasks:next-task", label: "Select next task", page: "tasks" },
+  { id: "tasks:prev-task", label: "Select previous task", page: "tasks" },
+  { id: "tasks:close-detail", label: "Close detail panel", page: "tasks" },
+  {
+    id: "tasks:open-in-clickup",
+    label: "Open in ClickUp",
+    page: "tasks",
+  },
+  {
+    id: "tasks:create-worktree",
+    label: "Create worktree",
+    page: "tasks",
+  },
 ];
 
 export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
@@ -91,6 +123,11 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "chat:toggle-plan": "p",
   "chat:focus-prompt": "i",
   "chat:toggle-variant": "v",
+  "chat:toggle-tasks": "b",
+  "chat:toggle-thinking": "T",
+  "chat:toggle-tool-calls": "x",
+  "chat:toggle-tokens": "$",
+  "chat:toggle-timestamps": "z",
 
   // Git page
   "git:toggle-reviewed": "r",
@@ -109,4 +146,15 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "git:prev-unreviewed": "[",
   "git:focus-editor": "l",
   "git:focus-files": "h",
+
+  // Tasks page
+  "tasks:focus-sidebar": "h",
+  "tasks:focus-list": "l",
+  "tasks:focus-detail": "o",
+  "tasks:focus-search": "i",
+  "tasks:next-task": "j",
+  "tasks:prev-task": "k",
+  "tasks:close-detail": "q",
+  "tasks:open-in-clickup": "x",
+  "tasks:create-worktree": "w",
 };

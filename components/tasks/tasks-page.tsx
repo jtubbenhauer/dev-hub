@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { CheckSquare, GripVertical, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,12 @@ import {
 import { TaskSidebar } from "@/components/tasks/task-sidebar";
 import { TaskList } from "@/components/tasks/task-list";
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
+import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog";
 import { useClickUpSearch, useClickUpViewTasks } from "@/hooks/use-clickup";
 import { useClickUpSettings } from "@/hooks/use-settings";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useLeaderAction } from "@/hooks/use-leader-action";
 import type { ClickUpTask, ClickUpPinnedView } from "@/types";
 
 const MIN_SIDEBAR_WIDTH = 180;
@@ -95,6 +97,9 @@ export function TasksPage() {
   const sidebarFocusRef = useRef<HTMLDivElement>(null);
   const taskListFocusRef = useRef<HTMLDivElement>(null);
   const detailFocusRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [worktreeOpen, setWorktreeOpen] = useState(false);
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
@@ -140,6 +145,12 @@ export function TasksPage() {
     error = searchResults.error;
     contextLabel = "Search results";
   }
+
+  // Refs for stable leader key handlers
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+  const selectedTaskRef = useRef(selectedTask);
+  selectedTaskRef.current = selectedTask;
 
   useEffect(() => {
     try {
@@ -276,6 +287,108 @@ export function TasksPage() {
     } catch {}
   }
 
+  const tasksLeaderActions = useMemo(
+    () => [
+      {
+        action: {
+          id: "tasks:focus-sidebar",
+          label: "Focus sidebar",
+          page: "tasks" as const,
+        },
+        handler: () => sidebarFocusRef.current?.focus(),
+      },
+      {
+        action: {
+          id: "tasks:focus-list",
+          label: "Focus task list",
+          page: "tasks" as const,
+        },
+        handler: () => taskListFocusRef.current?.focus(),
+      },
+      {
+        action: {
+          id: "tasks:focus-detail",
+          label: "Focus detail panel",
+          page: "tasks" as const,
+        },
+        handler: () => detailFocusRef.current?.focus(),
+      },
+      {
+        action: {
+          id: "tasks:focus-search",
+          label: "Focus search",
+          page: "tasks" as const,
+        },
+        handler: () => searchInputRef.current?.focus(),
+      },
+      {
+        action: {
+          id: "tasks:next-task",
+          label: "Select next task",
+          page: "tasks" as const,
+        },
+        handler: () => {
+          const currentTasks = tasksRef.current;
+          if (!currentTasks?.length) return;
+          const idx = currentTasks.findIndex(
+            (t) => t.id === selectedTaskRef.current?.id,
+          );
+          const next = currentTasks[idx + 1] ?? currentTasks[0];
+          if (next) handleSelectTask(next);
+        },
+      },
+      {
+        action: {
+          id: "tasks:prev-task",
+          label: "Select previous task",
+          page: "tasks" as const,
+        },
+        handler: () => {
+          const currentTasks = tasksRef.current;
+          if (!currentTasks?.length) return;
+          const idx = currentTasks.findIndex(
+            (t) => t.id === selectedTaskRef.current?.id,
+          );
+          const prev =
+            currentTasks[idx - 1] ?? currentTasks[currentTasks.length - 1];
+          if (prev) handleSelectTask(prev);
+        },
+      },
+      {
+        action: {
+          id: "tasks:close-detail",
+          label: "Close detail panel",
+          page: "tasks" as const,
+        },
+        handler: () => handleCloseTask(),
+      },
+      {
+        action: {
+          id: "tasks:open-in-clickup",
+          label: "Open in ClickUp",
+          page: "tasks" as const,
+        },
+        handler: () => {
+          if (selectedTaskRef.current?.url)
+            window.open(selectedTaskRef.current.url, "_blank");
+        },
+      },
+      {
+        action: {
+          id: "tasks:create-worktree",
+          label: "Create worktree",
+          page: "tasks" as const,
+        },
+        handler: () => {
+          if (selectedTaskRef.current) setWorktreeOpen(true);
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  useLeaderAction(tasksLeaderActions);
+
   if (!isLoadingSettings && !isConfigured) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
@@ -300,150 +413,165 @@ export function TasksPage() {
       onSelect={isMobile ? handleMobileSelect : setSelection}
       searchQuery={searchQuery}
       onSearchChange={isMobile ? handleMobileSearchChange : handleSearchChange}
+      searchInputRef={searchInputRef}
+      focusContainerRef={sidebarFocusRef}
     />
   );
 
   const hasSelection = selection != null || isSearch;
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Mobile: sidebar Sheet */}
-      {isMobile && (
-        <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
-          <SheetContent
-            side="left"
-            className="w-[280px] p-0"
-            showCloseButton={false}
-          >
-            <SheetHeader className="sr-only">
-              <SheetTitle>Task browser</SheetTitle>
-            </SheetHeader>
-            {sidebarContent}
-          </SheetContent>
-        </Sheet>
-      )}
-
-      {/* Desktop: inline sidebar */}
-      {!isMobile && (
-        <>
-          <div
-            ref={(el) => {
-              sidebarFocusRef.current = el;
-            }}
-            tabIndex={-1}
-            style={{ width: sidebarWidth }}
-            className="relative shrink-0"
-          >
-            {sidebarContent}
-          </div>
-          <div
-            className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
-            onMouseDown={handleSidebarDragStart}
-          >
-            <GripVertical className="text-muted-foreground/30 size-3.5" />
-          </div>
-        </>
-      )}
-
-      <div
-        ref={(el) => {
-          taskListFocusRef.current = el;
-        }}
-        tabIndex={-1}
-        className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
-      >
-        {/* Mobile toolbar */}
+    <>
+      <div className="flex h-full overflow-hidden">
+        {/* Mobile: sidebar Sheet */}
         {isMobile && (
-          <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setIsMobileSidebarOpen(true)}
+          <Sheet
+            open={isMobileSidebarOpen}
+            onOpenChange={setIsMobileSidebarOpen}
+          >
+            <SheetContent
+              side="left"
+              className="w-[280px] p-0"
+              showCloseButton={false}
             >
-              <PanelLeft className="size-3.5" />
-            </Button>
-            {contextLabel && (
-              <span className="text-muted-foreground truncate text-xs font-medium">
-                {contextLabel}
-              </span>
-            )}
-          </div>
+              <SheetHeader className="sr-only">
+                <SheetTitle>Task browser</SheetTitle>
+              </SheetHeader>
+              {sidebarContent}
+            </SheetContent>
+          </Sheet>
         )}
 
-        <div className="flex flex-1 overflow-hidden">
-          {!hasSelection ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-              <CheckSquare className="text-muted-foreground size-10" />
-              <p className="text-muted-foreground text-sm">
-                {isMobile
-                  ? "Tap the sidebar button to browse views and lists, or search for tasks."
-                  : "Select a view or list from the sidebar, or search for tasks."}
-              </p>
-            </div>
-          ) : (
-            <TaskList
-              tasks={tasks}
-              isLoading={isLoading}
-              error={error}
-              contextLabel={isMobile ? undefined : contextLabel}
-              selectedTaskId={selectedTask?.id ?? null}
-              onSelectTask={handleSelectTask}
-            />
-          )}
-
-          {/* Mobile: detail Sheet */}
-          {isMobile && selectedTask && (
-            <Sheet
-              open={isMobileDetailOpen}
-              onOpenChange={(open) => {
-                setIsMobileDetailOpen(open);
-                if (!open) handleCloseTask();
+        {/* Desktop: inline sidebar */}
+        {!isMobile && (
+          <>
+            <div
+              ref={(el) => {
+                sidebarFocusRef.current = el;
               }}
+              tabIndex={-1}
+              style={{ width: sidebarWidth }}
+              className="relative shrink-0"
             >
-              <SheetContent
-                side="right"
-                className="w-full p-0 sm:w-[380px]"
-                showCloseButton={false}
+              {sidebarContent}
+            </div>
+            <div
+              className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
+              onMouseDown={handleSidebarDragStart}
+            >
+              <GripVertical className="text-muted-foreground/30 size-3.5" />
+            </div>
+          </>
+        )}
+
+        <div
+          ref={(el) => {
+            taskListFocusRef.current = el;
+          }}
+          tabIndex={-1}
+          className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
+        >
+          {/* Mobile toolbar */}
+          {isMobile && (
+            <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setIsMobileSidebarOpen(true)}
               >
-                <SheetHeader className="sr-only">
-                  <SheetTitle>Task detail</SheetTitle>
-                </SheetHeader>
-                <TaskDetailPanel
-                  task={selectedTask}
-                  onClose={handleCloseTask}
-                  className="border-l-0"
-                />
-              </SheetContent>
-            </Sheet>
+                <PanelLeft className="size-3.5" />
+              </Button>
+              {contextLabel && (
+                <span className="text-muted-foreground truncate text-xs font-medium">
+                  {contextLabel}
+                </span>
+              )}
+            </div>
           )}
 
-          {/* Desktop: inline detail panel */}
-          {!isMobile && selectedTask && (
-            <>
-              <div
-                className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
-                onMouseDown={handleDetailDragStart}
-              >
-                <GripVertical className="text-muted-foreground/30 size-3.5" />
+          <div className="flex flex-1 overflow-hidden">
+            {!hasSelection ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+                <CheckSquare className="text-muted-foreground size-10" />
+                <p className="text-muted-foreground text-sm">
+                  {isMobile
+                    ? "Tap the sidebar button to browse views and lists, or search for tasks."
+                    : "Select a view or list from the sidebar, or search for tasks."}
+                </p>
               </div>
-              <div
-                ref={(el) => {
-                  detailFocusRef.current = el;
+            ) : (
+              <TaskList
+                tasks={tasks}
+                isLoading={isLoading}
+                error={error}
+                contextLabel={isMobile ? undefined : contextLabel}
+                selectedTaskId={selectedTask?.id ?? null}
+                onSelectTask={handleSelectTask}
+                focusContainerRef={taskListFocusRef}
+              />
+            )}
+
+            {/* Mobile: detail Sheet */}
+            {isMobile && selectedTask && (
+              <Sheet
+                open={isMobileDetailOpen}
+                onOpenChange={(open) => {
+                  setIsMobileDetailOpen(open);
+                  if (!open) handleCloseTask();
                 }}
-                tabIndex={-1}
-                style={{ width: detailWidth }}
-                className="relative min-w-0 shrink-0"
               >
-                <TaskDetailPanel
-                  task={selectedTask}
-                  onClose={handleCloseTask}
-                  className="border-l-0"
-                />
-              </div>
-            </>
-          )}
+                <SheetContent
+                  side="right"
+                  className="w-full p-0 sm:w-[380px]"
+                  showCloseButton={false}
+                >
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Task detail</SheetTitle>
+                  </SheetHeader>
+                  <TaskDetailPanel
+                    task={selectedTask}
+                    onClose={handleCloseTask}
+                    className="border-l-0"
+                  />
+                </SheetContent>
+              </Sheet>
+            )}
+
+            {/* Desktop: inline detail panel */}
+            {!isMobile && selectedTask && (
+              <>
+                <div
+                  className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
+                  onMouseDown={handleDetailDragStart}
+                >
+                  <GripVertical className="text-muted-foreground/30 size-3.5" />
+                </div>
+                <div
+                  ref={(el) => {
+                    detailFocusRef.current = el;
+                  }}
+                  tabIndex={-1}
+                  style={{ width: detailWidth }}
+                  className="relative min-w-0 shrink-0"
+                >
+                  <TaskDetailPanel
+                    task={selectedTask}
+                    onClose={handleCloseTask}
+                    className="border-l-0"
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+      {selectedTask && (
+        <TaskWorktreeDialog
+          task={selectedTask}
+          open={worktreeOpen}
+          onOpenChange={setWorktreeOpen}
+        />
+      )}
+    </>
   );
 }

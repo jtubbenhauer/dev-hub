@@ -14,7 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   Select,
   SelectContent,
@@ -54,9 +59,10 @@ const PAGE_LABELS: Record<string, string> = {
   chat: "Chat",
   files: "Files",
   git: "Git",
+  tasks: "Tasks",
 };
 
-const PAGE_ORDER = ["global", "chat", "files", "git"];
+const PAGE_ORDER = ["global", "chat", "files", "git", "tasks"];
 
 export function KeybindingsSettings() {
   const { bindings, isLoading: isLoadingBindings } = useLeaderKeyBindings();
@@ -335,35 +341,49 @@ export function KeybindingsSettings() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {PAGE_ORDER.map((page, pageIndex) => (
-            <div key={page}>
-              {pageIndex > 0 && <Separator className="mb-6" />}
-              <div className="space-y-1">
-                <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
-                  {PAGE_LABELS[page] ?? page}
-                </p>
-                {groupedActions[page]?.map((action) => (
-                  <BindingRow
-                    key={action.id}
-                    action={action}
-                    keys={localBindings[action.id] ?? ""}
-                    defaultKeys={DEFAULT_LEADER_BINDINGS[action.id] ?? ""}
-                    isEditing={editingActionId === action.id}
-                    capturedKeys={capturedKeys}
-                    conflictActionId={conflictActionId}
-                    onStartEdit={() => startEditing(action.id)}
-                    onCancelEdit={cancelEditing}
-                    onSave={(keys) => saveBinding(action.id, keys)}
-                    onReset={() => resetBinding(action.id)}
-                    onKeyCapture={setCapturedKeys}
-                    onConflictClear={() => setConflictActionId(null)}
-                    isSaving={mutation.isPending}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+        <CardContent>
+          <Accordion type="multiple" defaultValue={[]}>
+            {PAGE_ORDER.map((page) => {
+              const actions = groupedActions[page] ?? [];
+              const customizedCount = actions.filter(
+                (a) => localBindings[a.id] !== DEFAULT_LEADER_BINDINGS[a.id],
+              ).length;
+              return (
+                <AccordionItem key={page} value={page}>
+                  <AccordionTrigger className="px-2">
+                    <span className="flex items-center gap-2">
+                      {PAGE_LABELS[page] ?? page}
+                      <span className="text-muted-foreground text-xs font-normal">
+                        {actions.length} bindings
+                        {customizedCount > 0 &&
+                          ` · ${customizedCount} customized`}
+                      </span>
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {actions.map((action) => (
+                      <BindingRow
+                        key={action.id}
+                        action={action}
+                        keys={localBindings[action.id] ?? ""}
+                        defaultKeys={DEFAULT_LEADER_BINDINGS[action.id] ?? ""}
+                        isEditing={editingActionId === action.id}
+                        capturedKeys={capturedKeys}
+                        conflictActionId={conflictActionId}
+                        onStartEdit={() => startEditing(action.id)}
+                        onCancelEdit={cancelEditing}
+                        onSave={(keys) => saveBinding(action.id, keys)}
+                        onReset={() => resetBinding(action.id)}
+                        onKeyCapture={setCapturedKeys}
+                        onConflictClear={() => setConflictActionId(null)}
+                        isSaving={mutation.isPending}
+                      />
+                    ))}
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
         </CardContent>
       </Card>
     </div>
@@ -629,7 +649,15 @@ function BindingRow({
 
   return (
     <div className="group hover:bg-muted/50 flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors">
-      <span className="flex-1 text-sm">{action.label}</span>
+      <span className="flex flex-1 items-center gap-2 text-sm">
+        {isModified && (
+          <span
+            className="bg-primary inline-block size-1.5 shrink-0 rounded-full"
+            title="Customized"
+          />
+        )}
+        {action.label}
+      </span>
 
       {isEditing ? (
         <div className="flex items-center gap-2">

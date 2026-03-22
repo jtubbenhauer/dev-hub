@@ -1,0 +1,65 @@
+tests/integration/auto-resume.test.ts
+  d727798b8c5a7e94 1-126,128-139,141-151,153-170
+  cfd249b1ab868a70 127
+  b9e04a4ef89d3eec 140
+  95daf68961b36cbf 152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "25ca4016b8514e1ceba72cfd5bb2b0af36ec6d81",
+  "prompts": {
+    "95daf68961b36cbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2ea68d79effe8qPN0pUoRXQ818-dca49c7c-a38d-40ed-92ba-e6db0cad8ff3",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "b9e04a4ef89d3eec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2ea690445ffeouqDPbbEXZs0Ps-3c6a8bf4-e5de-4f01-b381-c3a790f66433",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "cfd249b1ab868a70": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2ea68d79effe8qPN0pUoRXQ818-a375f5fa-bb1e-4caf-a946-3c6a9a5c1538",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "d727798b8c5a7e94": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2ea68d79effe8qPN0pUoRXQ818-fdb99c52-79e4-4791-af04-2c849296a29f",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 167,
+      "overriden_lines": 0
+    }
+  }
+}

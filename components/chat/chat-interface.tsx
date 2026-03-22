@@ -236,8 +236,12 @@ export function ChatInterface() {
   const activeWorkspacePath = useWorkspaceStore(
     (state) => state.activeWorkspace?.path ?? "",
   );
-  const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const allWorkspaces = useWorkspaceStore((state) => state.workspaces);
+
+  const activeWorkspace = useMemo(
+    () => allWorkspaces.find((w) => w.id === activeWorkspaceId) ?? null,
+    [allWorkspaces, activeWorkspaceId],
+  );
 
   const activeWorkspaceColor = useMemo(() => {
     if (!activeWorkspaceId) return undefined;

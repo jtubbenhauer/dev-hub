@@ -1,0 +1,23 @@
+components/chat/chat-interface.tsx
+  549de68b0cdaef5f 241-244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "f75b8117a23c2c54379d972709a2969286a9b91b",
+  "prompts": {
+    "549de68b0cdaef5f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2eaedb3eaffe1B7AgTLgp8kc4z-701261ee-521b-4cfa-a5ba-4894d118b68f",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 1,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

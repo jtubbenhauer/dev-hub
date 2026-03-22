@@ -135,6 +135,8 @@ export const MonacoReviewEditor = forwardRef<
   const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(
     null,
   );
+  const commentHighlightRef =
+    useRef<editor.IEditorDecorationsCollection | null>(null);
 
   const diffViewMode = useEditorStore((s) => s.diffViewMode);
   const { theme, resolvedMode } = useTheme();
@@ -191,6 +193,34 @@ export const MonacoReviewEditor = forwardRef<
 
   useEffect(() => {
     commentInputRef.current = commentInput;
+  }, [commentInput]);
+
+  useEffect(() => {
+    const modifiedEditor = diffEditorRef.current?.getModifiedEditor();
+    if (!modifiedEditor) return;
+    if (!commentHighlightRef.current) {
+      commentHighlightRef.current = modifiedEditor.createDecorationsCollection(
+        [],
+      );
+    }
+    if (commentInput) {
+      commentHighlightRef.current.set([
+        {
+          range: {
+            startLineNumber: commentInput.startLine,
+            startColumn: 1,
+            endLineNumber: commentInput.endLine,
+            endColumn: 1,
+          },
+          options: {
+            isWholeLine: true,
+            className: "monaco-comment-highlight",
+          },
+        },
+      ]);
+    } else {
+      commentHighlightRef.current.clear();
+    }
   }, [commentInput]);
 
   const getModifiedEditor =
@@ -647,7 +677,7 @@ export const MonacoReviewEditor = forwardRef<
 
         {commentInput && (
           <div
-            className="absolute left-1/2 z-20 w-96 -translate-x-1/2"
+            className="absolute right-4 left-4 z-20"
             style={{ top: commentInput.topOffset }}
           >
             <CommentInput

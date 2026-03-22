@@ -488,6 +488,10 @@ pre code.hljs {
   opacity: 1 !important;
 }
 
+.monaco-comment-highlight {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
 .dark .hljs {
   background: var(--card);
   color: var(--foreground);

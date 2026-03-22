@@ -115,6 +115,8 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(
       null,
     );
+    const commentHighlightRef =
+      useRef<editor.IEditorDecorationsCollection | null>(null);
     const { theme, resolvedMode } = useTheme();
     const { fontSize } = useFontSizeSetting();
     const { mobileFontSize } = useMobileFontSizeSetting();
@@ -174,6 +176,32 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
 
     useEffect(() => {
       commentInputRef.current = commentInput;
+    }, [commentInput]);
+
+    useEffect(() => {
+      if (!editorRef.current) return;
+      if (!commentHighlightRef.current) {
+        commentHighlightRef.current =
+          editorRef.current.createDecorationsCollection([]);
+      }
+      if (commentInput) {
+        commentHighlightRef.current.set([
+          {
+            range: {
+              startLineNumber: commentInput.startLine,
+              startColumn: 1,
+              endLineNumber: commentInput.endLine,
+              endColumn: 1,
+            },
+            options: {
+              isWholeLine: true,
+              className: "monaco-comment-highlight",
+            },
+          },
+        ]);
+      } else {
+        commentHighlightRef.current.clear();
+      }
     }, [commentInput]);
 
     const [isEditorReady, setIsEditorReady] = useState(false);
@@ -419,7 +447,7 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
 
           {isCommentMode && commentInput && filePath && (
             <div
-              className="absolute left-1/2 z-20 w-96 -translate-x-1/2"
+              className="absolute right-4 left-4 z-20"
               style={{ top: commentInput.topOffset }}
             >
               <CommentInput

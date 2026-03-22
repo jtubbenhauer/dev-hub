@@ -151,6 +151,49 @@ export function useGitHubPrsCreatedByMe() {
   });
 }
 
+export function useWorkspacePr(
+  owner: string | null,
+  repo: string | null,
+  branch: string | null,
+) {
+  return useQuery<GitHubPullRequest | null>({
+    queryKey: ["github", "workspace-pr", owner, repo, branch],
+    queryFn: async () => {
+      const searchQuery = `head:${branch} repo:${owner}/${repo} is:open is:pr`;
+      const data = await githubFetch<{ items: GitHubPullRequest[] }>(
+        `search/issues?q=${encodeURIComponent(searchQuery)}&per_page=10`,
+      );
+
+      // Filter out results with deleted fork repos (head.repo === null)
+      const validItems = data.items.filter(
+        (item) =>
+          (item as unknown as { pull_request: { url: string } }).pull_request
+            ?.url,
+      );
+
+      if (validItems.length === 0) return null;
+
+      // Fetch the full PR object for the first valid result
+      const firstItem = validItems[0];
+      const url =
+        (firstItem as unknown as { pull_request: { url: string } }).pull_request
+          ?.url ?? "";
+      const path = url.replace("https://api.github.com/", "");
+
+      if (!path) return null;
+
+      const pr = await githubFetch<GitHubPullRequest>(path);
+
+      // Guard against deleted fork repos
+      if (pr.head.repo === null) return null;
+
+      return pr;
+    },
+    enabled: !!(owner && repo && branch),
+    staleTime: 60_000,
+  });
+}
+
 export function useGitHubPrFiles(
   owner: string | null,
   repo: string | null,
@@ -548,6 +591,30 @@ interface ToggleFileViewedInput {
   pullRequestId: string;
   path: string;
   viewed: boolean;
+}
+
+export interface GitHubIssueComment {
+  id: number;
+  body: string;
+  user: { login: string };
+  created_at: string;
+  updated_at: string;
+}
+
+export function useGitHubIssueComments(
+  owner: string | null,
+  repo: string | null,
+  issueNumber: number | null,
+) {
+  return useQuery<GitHubIssueComment[]>({
+    queryKey: ["github", "issue-comments", owner, repo, issueNumber],
+    queryFn: () =>
+      githubFetch<GitHubIssueComment[]>(
+        `repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100&sort=updated&direction=desc`,
+      ),
+    enabled: !!(owner && repo && issueNumber),
+    staleTime: 120_000,
+  });
 }
 
 export function useGitHubToggleFileViewed(

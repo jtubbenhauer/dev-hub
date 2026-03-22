@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   useQuery,
   useMutation,
@@ -17,6 +18,7 @@ import type {
   WorktreeInfo,
   LinkedTaskMeta,
 } from "@/types";
+import { extractOwnerRepo } from "@/lib/git/utils";
 
 async function gitGet<T>(
   workspaceId: string,
@@ -563,4 +565,37 @@ export function useAgentHealth(workspaceId: string | null, isRemote: boolean) {
     staleTime: 25_000,
     retry: false,
   });
+}
+
+export function useGitRemotes(workspaceId: string | null) {
+  return useQuery<{ name: string; fetchUrl: string; pushUrl: string }[]>({
+    queryKey: ["git-remotes", workspaceId],
+    queryFn: () =>
+      gitGet<{ name: string; fetchUrl: string; pushUrl: string }[]>(
+        workspaceId!,
+        "remotes",
+      ),
+    enabled: !!workspaceId,
+    staleTime: 300_000,
+  });
+}
+
+export function useWorkspaceGitHub(workspaceId: string | null) {
+  const remotesQuery = useGitRemotes(workspaceId);
+
+  return useMemo(() => {
+    if (!remotesQuery.data) {
+      return null;
+    }
+
+    const originRemote =
+      remotesQuery.data.find((r) => r.name === "origin") ||
+      remotesQuery.data[0];
+
+    if (!originRemote) {
+      return null;
+    }
+
+    return extractOwnerRepo(originRemote.fetchUrl);
+  }, [remotesQuery.data]);
 }

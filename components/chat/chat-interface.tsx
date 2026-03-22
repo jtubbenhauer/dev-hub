@@ -1886,19 +1886,10 @@ export function ChatInterface() {
               </Button>
             </div>
             {activeWorkspaceId && activeWorkspace && (
-              <>
-                <div className="px-3 py-2">
-                  <span className="text-muted-foreground text-xs font-medium">
-                    Workspace Context
-                  </span>
-                </div>
-                <div className="px-3 pt-2 pb-3">
-                  <WorkspaceContextPanel
-                    workspaceId={activeWorkspaceId}
-                    workspace={activeWorkspace}
-                  />
-                </div>
-              </>
+              <WorkspaceContextPanel
+                workspaceId={activeWorkspaceId}
+                workspace={activeWorkspace}
+              />
             )}
             {activeTodos.length > 0 && (
               <div className="p-3">

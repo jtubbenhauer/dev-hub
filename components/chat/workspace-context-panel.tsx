@@ -3,6 +3,11 @@
 import { memo } from "react";
 import { GitBranch, GitPullRequest, CheckSquare, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useGitStatus } from "@/hooks/use-git";
 import { useFirebasePreview } from "@/hooks/use-firebase-preview";
 import type { Workspace, LinkedTaskMeta } from "@/types";
@@ -41,108 +46,120 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 text-xs">
-        <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
-        {isGitLoading ? (
-          <span className="text-muted-foreground">Loading branch...</span>
-        ) : gitStatus?.branch ? (
-          <span className="text-foreground truncate">{gitStatus.branch}</span>
-        ) : (
-          <span className="text-muted-foreground">No branch</span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2 text-xs">
-        <GitPullRequest className="text-muted-foreground size-3.5 shrink-0" />
-        {isPreviewLoading ? (
-          <span className="text-muted-foreground">Loading PR...</span>
-        ) : pr ? (
-          <>
-            <a
-              href={pr.html_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-foreground truncate hover:underline"
-            >
-              {pr.title} #{pr.number}
-            </a>
-            <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
-              <span
-                className={
-                  pr.draft ? "text-muted-foreground" : "text-green-500"
-                }
-              >
-                {pr.draft ? "draft" : "open"}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-2 text-xs">
+            <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
+            {isGitLoading ? (
+              <span className="text-muted-foreground">Loading branch...</span>
+            ) : gitStatus?.branch ? (
+              <span className="text-foreground truncate">
+                {gitStatus.branch}
               </span>
-            </Badge>
-          </>
-        ) : (
-          <span className="text-muted-foreground">No open PR</span>
-        )}
-      </div>
+            ) : (
+              <span className="text-muted-foreground">No branch</span>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="left">Current branch</TooltipContent>
+      </Tooltip>
 
-      <div className="flex items-center gap-2 text-xs">
-        <CheckSquare className="text-muted-foreground size-3.5 shrink-0" />
-        {linkedTaskMeta ? (
-          <>
-            <a
-              href={linkedTaskMeta.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-foreground truncate hover:underline"
-            >
-              {linkedTaskMeta.customId ? `${linkedTaskMeta.customId} · ` : ""}
-              {linkedTaskMeta.name}
-            </a>
-            <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
-              {linkedTaskMeta.status}
-            </Badge>
-          </>
-        ) : (
-          <span className="text-muted-foreground">No linked task</span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2 text-xs">
-        <Globe className="text-muted-foreground size-3.5 shrink-0" />
-        {isPreviewLoading ? (
-          <span className="text-muted-foreground">Loading preview...</span>
-        ) : preview ? (
-          <>
-            <a
-              href={preview.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-foreground max-w-[150px] truncate hover:underline"
-              title={preview.url}
-            >
-              {preview.url.length > 30
-                ? preview.url.substring(0, 30) + "..."
-                : preview.url}
-            </a>
-            {preview.isExpired ? (
+      {pr && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-2 text-xs">
+              <GitPullRequest className="text-muted-foreground size-3.5 shrink-0" />
+              <a
+                href={pr.html_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground truncate hover:underline"
+              >
+                {pr.title} #{pr.number}
+              </a>
               <Badge
                 variant="outline"
-                className="text-muted-foreground shrink-0 px-1 py-0 text-[10px] line-through"
+                className="shrink-0 px-1 py-0 text-[10px]"
               >
-                Expired
+                <span
+                  className={
+                    pr.draft ? "text-muted-foreground" : "text-green-500"
+                  }
+                >
+                  {pr.draft ? "draft" : "open"}
+                </span>
               </Badge>
-            ) : (
-              <span className="text-muted-foreground shrink-0">
-                deployed {formatRelativeTime(preview.deployedAt)}
-              </span>
-            )}
-            <Badge
-              variant="outline"
-              className="shrink-0 px-1 py-0 font-mono text-[10px]"
-            >
-              {preview.commitSha.substring(0, 7)}
-            </Badge>
-          </>
-        ) : (
-          <span className="text-muted-foreground">No preview URL</span>
-        )}
-      </div>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left">Pull request</TooltipContent>
+        </Tooltip>
+      )}
+
+      {linkedTaskMeta && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-2 text-xs">
+              <CheckSquare className="text-muted-foreground size-3.5 shrink-0" />
+              <a
+                href={linkedTaskMeta.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground truncate hover:underline"
+              >
+                {linkedTaskMeta.customId ? `${linkedTaskMeta.customId} · ` : ""}
+                {linkedTaskMeta.name}
+              </a>
+              <Badge
+                variant="outline"
+                className="shrink-0 px-1 py-0 text-[10px]"
+              >
+                {linkedTaskMeta.status}
+              </Badge>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left">ClickUp task</TooltipContent>
+        </Tooltip>
+      )}
+
+      {preview && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-2 text-xs">
+              <Globe className="text-muted-foreground size-3.5 shrink-0" />
+              <a
+                href={preview.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground max-w-[150px] truncate hover:underline"
+                title={preview.url}
+              >
+                {preview.url.length > 30
+                  ? preview.url.substring(0, 30) + "..."
+                  : preview.url}
+              </a>
+              {preview.isExpired ? (
+                <Badge
+                  variant="outline"
+                  className="text-muted-foreground shrink-0 px-1 py-0 text-[10px] line-through"
+                >
+                  Expired
+                </Badge>
+              ) : (
+                <span className="text-muted-foreground shrink-0">
+                  deployed {formatRelativeTime(preview.deployedAt)}
+                </span>
+              )}
+              <Badge
+                variant="outline"
+                className="shrink-0 px-1 py-0 font-mono text-[10px]"
+              >
+                {preview.commitSha.substring(0, 7)}
+              </Badge>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left">Firebase preview</TooltipContent>
+        </Tooltip>
+      )}
     </div>
   );
 });

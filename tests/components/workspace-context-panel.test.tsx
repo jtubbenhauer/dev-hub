@@ -1,9 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
 import { useFirebasePreview } from "@/hooks/use-firebase-preview";
 import { useGitStatus } from "@/hooks/use-git";
 import type { Workspace } from "@/types";
+
+function Wrapper({ children }: { children: React.ReactNode }) {
+  return <TooltipProvider>{children}</TooltipProvider>;
+}
 
 vi.mock("@/hooks/use-firebase-preview");
 vi.mock("@/hooks/use-git");
@@ -32,7 +37,7 @@ const mockWorkspace: Workspace = {
 };
 
 describe("WorkspaceContextPanel", () => {
-  it("shows loading state when data is loading", () => {
+  it("shows loading state for branch when data is loading", () => {
     vi.mocked(useGitStatus).mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -45,11 +50,10 @@ describe("WorkspaceContextPanel", () => {
 
     render(
       <WorkspaceContextPanel workspaceId="ws-1" workspace={mockWorkspace} />,
+      { wrapper: Wrapper },
     );
 
     expect(screen.getByText("Loading branch...")).toBeInTheDocument();
-    expect(screen.getByText("Loading PR...")).toBeInTheDocument();
-    expect(screen.getByText("Loading preview...")).toBeInTheDocument();
   });
 
   it("renders branch name from git status", () => {
@@ -65,12 +69,13 @@ describe("WorkspaceContextPanel", () => {
 
     render(
       <WorkspaceContextPanel workspaceId="ws-1" workspace={mockWorkspace} />,
+      { wrapper: Wrapper },
     );
 
     expect(screen.getByText("feature/test-branch")).toBeInTheDocument();
   });
 
-  it("shows 'No linked task' when linkedTaskMeta is null", () => {
+  it("hides task row when linkedTaskMeta is null", () => {
     vi.mocked(useGitStatus).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -83,9 +88,10 @@ describe("WorkspaceContextPanel", () => {
 
     render(
       <WorkspaceContextPanel workspaceId="ws-1" workspace={mockWorkspace} />,
+      { wrapper: Wrapper },
     );
 
-    expect(screen.getByText("No linked task")).toBeInTheDocument();
+    expect(screen.queryByText("No linked task")).not.toBeInTheDocument();
   });
 
   it("renders ClickUp link when linkedTaskMeta is present", () => {
@@ -115,6 +121,7 @@ describe("WorkspaceContextPanel", () => {
         workspaceId="ws-1"
         workspace={workspaceWithTask}
       />,
+      { wrapper: Wrapper },
     );
 
     const link = screen.getByRole("link", { name: "DEV-123 · Test Task" });

@@ -1887,7 +1887,7 @@ export function ChatInterface() {
             </div>
             {activeWorkspaceId && activeWorkspace && (
               <>
-                <div className="border-b px-3 py-2">
+                <div className="px-3 py-2">
                   <span className="text-muted-foreground text-xs font-medium">
                     Workspace Context
                   </span>
@@ -1905,11 +1905,7 @@ export function ChatInterface() {
                 <TaskProgressPanel todos={activeTodos} />
               </div>
             )}
-            <div
-              className={
-                activeTodos.length > 0 ? "border-t px-3 py-2" : "px-3 py-2"
-              }
-            >
+            <div className="border-t px-3 py-2">
               <span className="text-muted-foreground text-xs font-medium">
                 MCP Servers
               </span>

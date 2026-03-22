@@ -506,6 +506,7 @@ export interface WorkspaceProvider {
     destroy: string;
     status: string;
     shell?: string;
+    start?: string;
   };
   behaviour?: ProviderBehaviour;
 }

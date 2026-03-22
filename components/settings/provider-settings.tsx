@@ -101,6 +101,7 @@ interface ProviderFormState {
   destroyCommand: string;
   statusCommand: string;
   shellCommand: string;
+  startCommand: string;
   providerType: ProviderTypePreset;
   behaviour: ProviderBehaviour;
 }
@@ -112,6 +113,7 @@ const EMPTY_FORM: ProviderFormState = {
   destroyCommand: "{binary} destroy --id {id}",
   statusCommand: "{binary} status --id {id}",
   shellCommand: "",
+  startCommand: "{binary} start {name} --provider fly --json",
   providerType: "always-on",
   behaviour: DEFAULT_PROVIDER_BEHAVIOUR,
 };
@@ -145,6 +147,7 @@ export function ProviderSettings() {
       destroyCommand: provider.commands.destroy,
       statusCommand: provider.commands.status,
       shellCommand: provider.commands.shell ?? "",
+      startCommand: provider.commands.start ?? "",
       providerType,
       behaviour: provider.behaviour ?? DEFAULT_PROVIDER_BEHAVIOUR,
     });
@@ -186,6 +189,9 @@ export function ProviderSettings() {
         destroy: form.destroyCommand.trim() || EMPTY_FORM.destroyCommand,
         status: form.statusCommand.trim() || EMPTY_FORM.statusCommand,
         ...(shellCmd ? { shell: shellCmd } : {}),
+        ...(form.startCommand.trim()
+          ? { start: form.startCommand.trim() }
+          : {}),
       },
       behaviour:
         form.providerType === "always-on"
@@ -479,6 +485,23 @@ export function ProviderSettings() {
                 <p className="text-muted-foreground text-xs">
                   Command to open a terminal session. Leave blank to disable
                   terminal access.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="cmd-start" className="text-xs">
+                  Start (optional)
+                </Label>
+                <Input
+                  id="cmd-start"
+                  value={form.startCommand}
+                  onChange={(e) => updateField("startCommand", e.target.value)}
+                  placeholder="{binary} start {name} --provider fly --json"
+                  className="h-8 font-mono text-xs"
+                />
+                <p className="text-muted-foreground text-xs">
+                  Command to resume a suspended workspace. Leave blank to
+                  disable auto-resume.
                 </p>
               </div>
             </div>

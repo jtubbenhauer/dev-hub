@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db";
-import { workspaces } from "@/drizzle/schema";
+import { settings, workspaces } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { toWorkspace } from "@/lib/workspaces/backend";
+import { spawn } from "node:child_process";
+import { interpolateProviderCommand } from "@/lib/workspaces/resume";
+import type { Workspace, WorkspaceProvider } from "@/types";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -65,9 +68,96 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       reason: "Agent returned unexpected status",
     });
   } catch {
+    const isSuspended = await checkSuspendedStatus(workspace, session.user.id);
+    if (isSuspended) {
+      return NextResponse.json({ status: "suspended" });
+    }
     return NextResponse.json({
       status: "unreachable",
       reason: "Cannot reach agent",
     });
+  }
+}
+
+function spawnWithTimeout(command: string, timeoutMs: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("sh", ["-c", command], { timeout: timeoutMs });
+    let stdout = "";
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+
+    child.on("error", (err) => reject(err));
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`Status command exited with code ${code}`));
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
+}
+
+async function checkSuspendedStatus(
+  workspace: Workspace,
+  userId: string,
+): Promise<boolean> {
+  if (!workspace.providerMeta) return false;
+
+  const providerMeta = workspace.providerMeta as Record<string, unknown>;
+  const providerId = providerMeta.providerId as string | undefined;
+  if (!providerId) return false;
+
+  const [settingRow] = await db
+    .select()
+    .from(settings)
+    .where(
+      and(eq(settings.userId, userId), eq(settings.key, "workspace-providers")),
+    );
+  if (!settingRow) return false;
+
+  const providers = Array.isArray(settingRow.value)
+    ? (settingRow.value as unknown[])
+    : [];
+
+  const provider = providers.find(
+    (p) =>
+      p &&
+      typeof p === "object" &&
+      (p as Record<string, unknown>).id === providerId,
+  ) as WorkspaceProvider | undefined;
+
+  if (!provider) return false;
+  if (!provider.behaviour?.supportsAutoSuspend) return false;
+  if (!provider.commands.status) return false;
+
+  const command = interpolateProviderCommand(
+    provider.commands.status,
+    workspace,
+    provider,
+  );
+
+  try {
+    const output = await spawnWithTimeout(command, 10_000);
+    const parsed: unknown = JSON.parse(output);
+
+    if (!Array.isArray(parsed)) return false;
+
+    const match = parsed.find((item: unknown) => {
+      if (!item || typeof item !== "object") return false;
+      const obj = item as Record<string, unknown>;
+      return (
+        obj.name === workspace.name ||
+        obj.name === providerMeta.providerWorkspaceId
+      );
+    }) as Record<string, unknown> | undefined;
+
+    if (!match) return false;
+
+    const status = match.status;
+    return status === "stopped" || status === "suspended";
+  } catch {
+    return false;
   }
 }

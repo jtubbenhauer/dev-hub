@@ -37,7 +37,7 @@ const mockWorkspace: Workspace = {
 describe("WorkspaceContextPanel", () => {
   it("renders nothing when no data is available", () => {
     vi.mocked(useFirebasePreview).mockReturnValue({
-      preview: null,
+      previews: [],
       pr: null,
       isLoading: false,
     });
@@ -52,7 +52,7 @@ describe("WorkspaceContextPanel", () => {
 
   it("renders ClickUp link when linkedTaskMeta is present", () => {
     vi.mocked(useFirebasePreview).mockReturnValue({
-      preview: null,
+      previews: [],
       pr: null,
       isLoading: false,
     });

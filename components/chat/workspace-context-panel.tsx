@@ -34,14 +34,14 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
   workspace,
 }: WorkspaceContextPanelProps) {
   const {
-    preview,
+    previews,
     pr,
     isLoading: isPreviewLoading,
   } = useFirebasePreview(workspaceId);
 
   const linkedTaskMeta = workspace.linkedTaskMeta as LinkedTaskMeta | null;
 
-  const hasContent = !!(pr || linkedTaskMeta || preview);
+  const hasContent = !!(pr || linkedTaskMeta || previews.length > 0);
   if (!hasContent) return null;
 
   return (
@@ -111,8 +111,12 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
           </Tooltip>
         )}
 
-        {preview && (
-          <Tooltip delayDuration={500} disableHoverableContent>
+        {previews.map((preview) => (
+          <Tooltip
+            key={preview.url}
+            delayDuration={500}
+            disableHoverableContent
+          >
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2 text-xs">
                 <Globe className="text-muted-foreground size-3.5 shrink-0" />
@@ -147,7 +151,7 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
             </TooltipTrigger>
             <TooltipContent side="left">Firebase preview</TooltipContent>
           </Tooltip>
-        )}
+        ))}
       </div>
     </div>
   );

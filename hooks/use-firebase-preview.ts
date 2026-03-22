@@ -10,7 +10,7 @@ import {
 import type { GitHubPullRequest } from "@/types";
 
 export interface UseFirebasePreviewResult {
-  preview: FirebasePreview | null;
+  previews: FirebasePreview[];
   pr: GitHubPullRequest | null;
   isLoading: boolean;
 }
@@ -30,23 +30,24 @@ export function useFirebasePreview(
 
   const commentsQuery = useGitHubIssueComments(owner, repo, prNumber);
 
-  const preview = useMemo(() => {
-    if (!commentsQuery.data) return null;
+  const previews = useMemo(() => {
+    if (!commentsQuery.data) return [];
+    const results: FirebasePreview[] = [];
     for (const comment of commentsQuery.data) {
       const parsed = parseFirebasePreviewComment(
         comment.body,
         comment.updated_at,
       );
-      if (parsed) return parsed;
+      if (parsed) results.push(parsed);
     }
-    return null;
+    return results;
   }, [commentsQuery.data]);
 
   const isLoading =
     gitStatusQuery.isLoading || prQuery.isLoading || commentsQuery.isLoading;
 
   return {
-    preview,
+    previews,
     pr: prQuery.data ?? null,
     isLoading,
   };

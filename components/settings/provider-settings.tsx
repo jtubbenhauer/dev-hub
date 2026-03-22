@@ -488,22 +488,26 @@ export function ProviderSettings() {
                 </p>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="cmd-start" className="text-xs">
-                  Start (optional)
-                </Label>
-                <Input
-                  id="cmd-start"
-                  value={form.startCommand}
-                  onChange={(e) => updateField("startCommand", e.target.value)}
-                  placeholder="{binary} start {name} --provider fly --json"
-                  className="h-8 font-mono text-xs"
-                />
-                <p className="text-muted-foreground text-xs">
-                  Command to resume a suspended workspace. Leave blank to
-                  disable auto-resume.
-                </p>
-              </div>
+              {form.providerType !== "always-on" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="cmd-start" className="text-xs">
+                    Start (optional)
+                  </Label>
+                  <Input
+                    id="cmd-start"
+                    value={form.startCommand}
+                    onChange={(e) =>
+                      updateField("startCommand", e.target.value)
+                    }
+                    placeholder="{binary} start {name} --provider fly --json"
+                    className="h-8 font-mono text-xs"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Command to resume a suspended workspace. Leave blank to
+                    disable auto-resume.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="bg-muted/30 space-y-3 rounded-md border p-3">

@@ -545,7 +545,7 @@ export type AgentHealthStatus =
   | "suspended";
 
 interface AgentHealthResponse {
-  status: "ok" | "unreachable";
+  status: "ok" | "unreachable" | "suspended";
   backend?: "local" | "remote";
   reason?: string;
   workspacePath?: string;
@@ -558,7 +558,9 @@ export function useAgentHealth(workspaceId: string | null, isRemote: boolean) {
       const res = await fetch(`/api/workspaces/${workspaceId}/health`);
       if (!res.ok) return "unreachable";
       const data = (await res.json()) as AgentHealthResponse;
-      return data.status === "ok" ? "healthy" : "unreachable";
+      if (data.status === "ok") return "healthy";
+      if (data.status === "suspended") return "suspended";
+      return "unreachable";
     },
     enabled: !!workspaceId && isRemote,
     refetchInterval: 30_000,

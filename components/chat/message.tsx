@@ -162,24 +162,59 @@ export const ChatMessage = memo(
 
       const extracted: ReasoningPart[] = [];
       const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
+      const masked = maskCodeContent(raw);
       let idx = 0;
-      for (const match of raw.matchAll(thinkingRegex)) {
-        const content = match[1].trim();
+
+      const thinkingSpans: {
+        start: number;
+        end: number;
+        keepFrom: number | null;
+      }[] = [];
+      for (const match of masked.matchAll(thinkingRegex)) {
+        const spanStart = match.index!;
+        const spanEnd = spanStart + match[0].length;
+        let content = raw
+          .substring(spanStart, spanEnd)
+          .replace(/^<thinking>\s?/, "")
+          .replace(/\s?<\/thinking>$/, "")
+          .trim();
+
+        let keepFrom: number | null = null;
         if (content) {
-          extracted.push({
-            id: `inline-thinking-${info.id}-${idx++}`,
-            sessionID: info.sessionID,
-            messageID: info.id,
-            type: "reasoning",
-            text: content,
-            time: { start: info.time.created, end: info.time.created },
-          });
+          const fenceIdx = content.indexOf("```");
+          if (fenceIdx >= 0) {
+            keepFrom = fenceIdx;
+            content = content.substring(0, fenceIdx).trim();
+          }
+          if (content) {
+            extracted.push({
+              id: `inline-thinking-${info.id}-${idx++}`,
+              sessionID: info.sessionID,
+              messageID: info.id,
+              type: "reasoning",
+              text: content,
+              time: { start: info.time.created, end: info.time.created },
+            });
+          }
         }
+        thinkingSpans.push({ start: spanStart, end: spanEnd, keepFrom });
       }
 
-      const cleaned = raw
-        .replace(/<thinking>[\s\S]*?<\/thinking>\s*/g, "")
-        .trim();
+      let cleaned = raw;
+      for (let i = thinkingSpans.length - 1; i >= 0; i--) {
+        const span = thinkingSpans[i];
+        const inner = raw
+          .substring(span.start, span.end)
+          .replace(/^<thinking>\s?/, "")
+          .replace(/\s?<\/thinking>$/, "");
+        const replacement =
+          span.keepFrom != null ? inner.substring(span.keepFrom) : "";
+        cleaned =
+          cleaned.substring(0, span.start) +
+          replacement +
+          cleaned.substring(span.end);
+      }
+      cleaned = cleaned.trim();
       return {
         textContent: stripSoleCodeFence(cleaned),
         inlineThinkingParts: extracted,
@@ -191,13 +226,32 @@ export const ChatMessage = memo(
       [parts],
     );
 
-    const reasoningParts = useMemo(
-      () => [
+    const { reasoningParts, reasoningOverflow } = useMemo(() => {
+      const allReasoning = [
         ...parts.filter((p): p is ReasoningPart => p.type === "reasoning"),
         ...inlineThinkingParts,
-      ],
-      [parts, inlineThinkingParts],
-    );
+      ].filter((p) => p.text || p.time.end == null);
+
+      const trimmed: ReasoningPart[] = [];
+      const overflow: string[] = [];
+      for (const p of allReasoning) {
+        const fenceIdx = p.text.indexOf("```");
+        if (fenceIdx >= 0) {
+          const before = p.text.substring(0, fenceIdx).trim();
+          const after = p.text.substring(fenceIdx);
+          if (before) {
+            trimmed.push({ ...p, text: before });
+          }
+          overflow.push(after);
+        } else {
+          trimmed.push(p);
+        }
+      }
+      return {
+        reasoningParts: trimmed,
+        reasoningOverflow: overflow.join("\n\n"),
+      };
+    }, [parts, inlineThinkingParts]);
 
     const compactionTextContent = useMemo(() => {
       if (!isCompaction) return "";
@@ -210,8 +264,14 @@ export const ChatMessage = memo(
         .trim();
     }, [parts, isCompaction]);
 
-    // Throttle markdown re-parses during streaming (~200ms intervals)
-    const throttledTextContent = useThrottledValue(textContent, THROTTLE_MS);
+    const fullTextContent = reasoningOverflow
+      ? reasoningOverflow + (textContent ? "\n\n" + textContent : "")
+      : textContent;
+
+    const throttledTextContent = useThrottledValue(
+      fullTextContent,
+      THROTTLE_MS,
+    );
     const hasError = isAssistant && "error" in info && info.error;
 
     return (
@@ -296,7 +356,7 @@ export const ChatMessage = memo(
                 <CompactionDivider />
               ) : throttledTextContent ? (
                 <div className="group/markdown relative">
-                  <CopyMarkdownButton content={textContent} />
+                  <CopyMarkdownButton content={fullTextContent} />
                   <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
                     <MarkdownContent content={throttledTextContent} />
                   </div>
@@ -495,6 +555,12 @@ function looksLikeCode(text: string): boolean {
   ];
   const matches = codeSignals.filter((re) => re.test(text)).length;
   return matches >= 2;
+}
+
+export function maskCodeContent(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, (m) => "\0".repeat(m.length))
+    .replace(/`[^`\n]+`/g, (m) => "\0".repeat(m.length));
 }
 
 function getErrorMessage(error: unknown): string {

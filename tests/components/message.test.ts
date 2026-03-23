@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripSoleCodeFence } from "@/components/chat/message";
+import { stripSoleCodeFence, maskCodeContent } from "@/components/chat/message";
 
 describe("stripSoleCodeFence", () => {
   it("unwraps the actual orchestration message from the DB", () => {
@@ -105,5 +105,41 @@ describe("stripSoleCodeFence", () => {
     expect(stripSoleCodeFence(input)).toBe(
       "Run the deploy:\nnpm run build\nDone.",
     );
+  });
+});
+
+describe("maskCodeContent", () => {
+  it("masks inline code spans", () => {
+    const input = "text `<thinking>` more";
+    const result = maskCodeContent(input);
+    expect(result).not.toContain("<thinking>");
+    expect(result.length).toBe(input.length);
+  });
+
+  it("masks fenced code blocks", () => {
+    const input = "before\n```\n<thinking>inside</thinking>\n```\nafter";
+    const result = maskCodeContent(input);
+    expect(result).not.toContain("<thinking>");
+    expect(result.length).toBe(input.length);
+  });
+
+  it("leaves real thinking tags outside code untouched", () => {
+    const input = "<thinking>real thought</thinking>\n`<thinking>` in code";
+    const result = maskCodeContent(input);
+    expect(result).toContain("<thinking>real thought</thinking>");
+    expect(result.indexOf("<thinking>")).toBe(0);
+  });
+
+  it("handles mixed code spans and fenced blocks", () => {
+    const input = [
+      "<thinking>legit</thinking>",
+      "See `</thinking>` for details",
+      "```\n<thinking>fenced</thinking>\n```",
+    ].join("\n");
+    const result = maskCodeContent(input);
+    const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
+    const matches = [...result.matchAll(thinkingRegex)];
+    expect(matches).toHaveLength(1);
+    expect(matches[0][1]).toBe("legit");
   });
 });

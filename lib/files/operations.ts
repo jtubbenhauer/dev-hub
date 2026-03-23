@@ -8,9 +8,11 @@ const IGNORED_NAMES = new Set([
   ".next",
   ".turbo",
   ".cache",
+  ".nx",
   "__pycache__",
   ".DS_Store",
   "dist",
+  "coverage",
   ".pnpm-store",
   "target", // Rust/Cargo
   ".angular",

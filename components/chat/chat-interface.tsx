@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useCommand } from "@/hooks/use-command";
+import { useAgentHealth } from "@/hooks/use-git";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
@@ -399,6 +400,8 @@ export function ChatInterface() {
     summarizeSession,
     revertSession,
     sendMessage,
+    flushQueuedMessages,
+    hasQueuedMessages,
     executeCommand,
     abortSession,
     respondToPermission,
@@ -461,6 +464,14 @@ export function ChatInterface() {
   // useSyncExternalStore to see a "new snapshot" every tick → infinite re-render loop.
   const streamingStatus = useChatStore(getStreamingStatus);
   const isMobile = useIsMobile();
+  const isActiveWorkspaceRemote = activeWorkspace?.backend === "remote";
+  const { data: healthStatus } = useAgentHealth(
+    activeWorkspaceId,
+    isActiveWorkspaceRemote,
+  );
+  const previousHealthStatusRef = useRef<Record<string, string | undefined>>(
+    {},
+  );
 
   const sessions = useChatStore(getActiveWorkspaceSessions);
   const activeSessionDirectory = activeSessionId
@@ -608,6 +619,28 @@ export function ChatInterface() {
     if (!activeSessionId || !activeWorkspaceId) return;
     fetchMessages(activeSessionId, activeWorkspaceId);
   }, [activeSessionId, activeWorkspaceId, fetchMessages]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId || !isActiveWorkspaceRemote) return;
+
+    const previous = previousHealthStatusRef.current[activeWorkspaceId];
+    previousHealthStatusRef.current[activeWorkspaceId] = healthStatus;
+
+    if (healthStatus !== "healthy") return;
+
+    if (
+      (previous && previous !== "healthy") ||
+      hasQueuedMessages(activeWorkspaceId)
+    ) {
+      flushQueuedMessages(activeWorkspaceId);
+    }
+  }, [
+    activeWorkspaceId,
+    healthStatus,
+    isActiveWorkspaceRemote,
+    hasQueuedMessages,
+    flushQueuedMessages,
+  ]);
 
   // Consume pending chat (e.g. from "Create Worktree" → auto-start plan)
   const pendingChat = usePendingChatStore((s) => s.pending);

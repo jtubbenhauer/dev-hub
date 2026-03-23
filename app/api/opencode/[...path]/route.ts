@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db";
-import { workspaces } from "@/drizzle/schema";
+import { settings, workspaces } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend";
+import type { Workspace, WorkspaceProvider } from "@/types";
 
 interface RouteParams {
   params: Promise<{ path: string[] }>;
@@ -26,6 +27,7 @@ async function proxyToOpenCode(
 
   let serverUrl: string;
   let directory: string | undefined;
+  let workspace: Workspace | null = null;
 
   if (workspaceId) {
     const [row] = await db
@@ -44,7 +46,7 @@ async function proxyToOpenCode(
       );
     }
 
-    const workspace = toWorkspace(row);
+    workspace = toWorkspace(row);
     const backend = getBackend(workspace);
 
     try {
@@ -124,35 +126,31 @@ async function proxyToOpenCode(
 
   try {
     const upstream = await fetch(targetUrl.toString(), fetchOptions);
-
-    if (isSSE && upstream.body) {
-      return new Response(upstream.body, {
-        status: upstream.status,
-        headers: {
-          "content-type": "text/event-stream",
-          "cache-control": "no-cache",
-          connection: "keep-alive",
-        },
-      });
-    }
-
-    // 204/304 are null-body statuses — Response constructor throws if given a body
-    if (upstream.status === 204 || upstream.status === 304) {
-      return new Response(null, { status: upstream.status });
-    }
-
-    const responseHeaders = new Headers();
-    const upstreamContentType = upstream.headers.get("content-type");
-    if (upstreamContentType) {
-      responseHeaders.set("content-type", upstreamContentType);
-    }
-
-    const body = await upstream.arrayBuffer();
-    return new Response(body, {
-      status: upstream.status,
-      headers: responseHeaders,
-    });
+    return proxyResponse(upstream, isSSE);
   } catch (error) {
+    if (workspaceId && workspace?.backend === "remote" && !isSSE) {
+      const supportsAutoSuspend = await workspaceSupportsAutoSuspend(
+        workspace,
+        session.user.id,
+      );
+
+      if (supportsAutoSuspend) {
+        const delays = [2000, 4000, 8000, 8000, 8000];
+        for (const delayMs of delays) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          try {
+            const retryResponse = await fetch(targetUrl.toString(), {
+              ...fetchOptions,
+              signal: AbortSignal.timeout(10_000),
+            });
+            return proxyResponse(retryResponse, false);
+          } catch {
+            continue;
+          }
+        }
+      }
+    }
+
     const isTimeout =
       error instanceof DOMException && error.name === "TimeoutError";
     const message =
@@ -175,3 +173,66 @@ export const PATCH = proxyToOpenCode;
 
 // SSE connections can be long-lived
 export const maxDuration = 300;
+
+async function proxyResponse(upstream: Response, isSSE: boolean) {
+  if (isSSE && upstream.body) {
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+      },
+    });
+  }
+
+  // 204/304 are null-body statuses — Response constructor throws if given a body
+  if (upstream.status === 204 || upstream.status === 304) {
+    return new Response(null, { status: upstream.status });
+  }
+
+  const responseHeaders = new Headers();
+  const upstreamContentType = upstream.headers.get("content-type");
+  if (upstreamContentType) {
+    responseHeaders.set("content-type", upstreamContentType);
+  }
+
+  const body = await upstream.arrayBuffer();
+  return new Response(body, {
+    status: upstream.status,
+    headers: responseHeaders,
+  });
+}
+
+async function workspaceSupportsAutoSuspend(
+  workspace: Workspace,
+  userId: string,
+): Promise<boolean> {
+  const providerMeta = workspace.providerMeta as Record<string, unknown> | null;
+  const providerId =
+    providerMeta && typeof providerMeta.providerId === "string"
+      ? providerMeta.providerId
+      : null;
+  if (!providerId) return false;
+
+  const [settingRow] = await db
+    .select()
+    .from(settings)
+    .where(
+      and(eq(settings.userId, userId), eq(settings.key, "workspace-providers")),
+    );
+  if (!settingRow) return false;
+
+  const providers = Array.isArray(settingRow.value)
+    ? (settingRow.value as unknown[])
+    : [];
+
+  const provider = providers.find(
+    (candidate) =>
+      candidate &&
+      typeof candidate === "object" &&
+      (candidate as Record<string, unknown>).id === providerId,
+  ) as WorkspaceProvider | undefined;
+
+  return provider?.behaviour?.supportsAutoSuspend === true;
+}

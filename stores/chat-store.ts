@@ -14,6 +14,7 @@ import type {
   Command,
 } from "@/lib/opencode/types";
 import { playSoundForEvent } from "@/lib/sounds";
+import { toast } from "sonner";
 
 export type StreamingStatus =
   | "idle"
@@ -27,6 +28,16 @@ const MAX_CACHED_SESSIONS = 5;
 interface LruEntry {
   sessionId: string;
   workspaceId: string;
+}
+
+interface QueuedMessage {
+  sessionId: string;
+  text: string;
+  workspaceId: string;
+  model?: { providerID: string; modelID: string };
+  agent?: string;
+  variant?: string;
+  optimisticMessageId: string;
 }
 
 export interface SessionWithWorkspace extends Session {
@@ -134,6 +145,7 @@ let messageFlushHandle: number | null = null;
 
 // Fallback for routing events for child sessions not yet in ws.sessions
 const sessionSourceWorkspace = new Map<string, string>();
+const flushingQueuedWorkspaces = new Set<string>();
 
 function flushPendingPartUpdates(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void,
@@ -347,6 +359,8 @@ interface ChatState {
   workspaceStates: Record<string, WorkspaceState>;
   commands: Command[];
   messageAccessOrder: LruEntry[];
+  queuedMessages: Map<string, QueuedMessage[]>;
+  queuedWorkspaceIds: Set<string>;
 
   // UI focus
   activeWorkspaceId: string | null;
@@ -393,6 +407,8 @@ interface ChatState {
     agent?: string,
     variant?: string,
   ) => Promise<void>;
+  flushQueuedMessages: (workspaceId: string) => Promise<void>;
+  hasQueuedMessages: (workspaceId: string) => boolean;
   executeCommand: (
     sessionId: string,
     workspaceId: string,
@@ -562,6 +578,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   workspaceStates: {},
   commands: [],
   messageAccessOrder: [],
+  queuedMessages: new Map(),
+  queuedWorkspaceIds: new Set(),
   activeWorkspaceId: null,
   activeSessionId: null,
   streamingError: null,
@@ -1042,6 +1060,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     set({ streamingError: null });
 
     const optimisticId = `optimistic-${Date.now()}`;
+    const queuedMessage: QueuedMessage = {
+      sessionId,
+      text,
+      workspaceId,
+      model,
+      agent,
+      variant,
+      optimisticMessageId: optimisticId,
+    };
     const optimisticMessage: MessageWithParts = {
       info: {
         id: optimisticId,
@@ -1093,6 +1120,31 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       );
 
       if (!response.ok) {
+        if (response.status === 502) {
+          set((state) => {
+            const nextQueuedMessages = new Map(state.queuedMessages);
+            const existingForWorkspace =
+              nextQueuedMessages.get(workspaceId) ?? [];
+            nextQueuedMessages.set(workspaceId, [
+              ...existingForWorkspace,
+              queuedMessage,
+            ]);
+            const nextQueuedWorkspaceIds = new Set(state.queuedWorkspaceIds);
+            nextQueuedWorkspaceIds.add(workspaceId);
+            return {
+              queuedMessages: nextQueuedMessages,
+              queuedWorkspaceIds: nextQueuedWorkspaceIds,
+            };
+          });
+          set({
+            optimisticStreamingSessionId: isAlreadyStreaming
+              ? get().optimisticStreamingSessionId
+              : null,
+          });
+          toast("Message queued - workspace is starting...");
+          return;
+        }
+
         const error = await response
           .json()
           .catch(() => ({ error: "Failed to send message" }));
@@ -1145,6 +1197,73 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         streamingError: message,
       });
     }
+  },
+
+  flushQueuedMessages: async (workspaceId) => {
+    if (flushingQueuedWorkspaces.has(workspaceId)) return;
+
+    const queued = get().queuedMessages.get(workspaceId) ?? [];
+    if (queued.length === 0) {
+      set((state) => {
+        if (!state.queuedWorkspaceIds.has(workspaceId)) return state;
+        const nextQueuedWorkspaceIds = new Set(state.queuedWorkspaceIds);
+        nextQueuedWorkspaceIds.delete(workspaceId);
+        return { queuedWorkspaceIds: nextQueuedWorkspaceIds };
+      });
+      return;
+    }
+
+    flushingQueuedWorkspaces.add(workspaceId);
+    set((state) => {
+      const nextQueuedMessages = new Map(state.queuedMessages);
+      nextQueuedMessages.delete(workspaceId);
+      const nextQueuedWorkspaceIds = new Set(state.queuedWorkspaceIds);
+      nextQueuedWorkspaceIds.delete(workspaceId);
+      return {
+        queuedMessages: nextQueuedMessages,
+        queuedWorkspaceIds: nextQueuedWorkspaceIds,
+      };
+    });
+
+    try {
+      for (const message of queued) {
+        set((state) =>
+          updateWorkspace(state, workspaceId, (ws) => {
+            const { [message.sessionId]: optimisticForSession, ...remaining } =
+              ws.optimisticMessageIds;
+            return {
+              optimisticMessageIds:
+                optimisticForSession === message.optimisticMessageId
+                  ? remaining
+                  : ws.optimisticMessageIds,
+              messages: {
+                ...ws.messages,
+                [message.sessionId]: (
+                  ws.messages[message.sessionId] ?? []
+                ).filter(
+                  (entry) => entry.info.id !== message.optimisticMessageId,
+                ),
+              },
+            };
+          }),
+        );
+
+        await get().sendMessage(
+          message.sessionId,
+          message.text,
+          message.workspaceId,
+          message.model,
+          message.agent,
+          message.variant,
+        );
+      }
+    } finally {
+      flushingQueuedWorkspaces.delete(workspaceId);
+    }
+  },
+
+  hasQueuedMessages: (workspaceId) => {
+    return (get().queuedMessages.get(workspaceId)?.length ?? 0) > 0;
   },
 
   executeCommand: async (

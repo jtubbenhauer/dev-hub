@@ -1,0 +1,23 @@
+components/chat/chat-interface.tsx
+  d4faef1a02f449cc 27,55,500-503,1691-1711
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "8958c799db77cd79da15668d90445666f6d8e2bf",
+  "prompts": {
+    "d4faef1a02f449cc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2e587f44cffepKSlzPzUD2C2vM",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 27,
+      "total_deletions": 2,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    }
+  }
+}

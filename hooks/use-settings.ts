@@ -56,6 +56,8 @@ export const SETTINGS_KEYS = {
   TERMINAL_SCROLLBACK: "terminal-scrollback",
   TERMINAL_FONT: "terminal-font",
   DISABLE_FILE_TABS: "disable-file-tabs",
+  NOTIFICATIONS_SOUND_ENABLED: "notifications-sound-enabled",
+  NOTIFICATIONS_PUSH_ENABLED: "notifications-push-enabled",
 } as const;
 
 export type EditorType = "monaco" | "neovim";
@@ -587,4 +589,17 @@ export function useFileTabsSetting(): {
   const { data, isLoading } = useSettings();
   const raw = data?.[SETTINGS_KEYS.DISABLE_FILE_TABS];
   return { isFileTabsDisabled: raw === true, isLoading };
+}
+
+export function useNotificationSettings(): {
+  isSoundEnabled: boolean;
+  isPushEnabled: boolean;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  const isSoundEnabled =
+    data?.[SETTINGS_KEYS.NOTIFICATIONS_SOUND_ENABLED] !== false;
+  const isPushEnabled =
+    data?.[SETTINGS_KEYS.NOTIFICATIONS_PUSH_ENABLED] !== false;
+  return { isSoundEnabled, isPushEnabled, isLoading };
 }

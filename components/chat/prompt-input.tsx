@@ -8,7 +8,7 @@ import {
   useImperativeHandle,
   useEffect,
 } from "react";
-import { Send, Square, X, MessageSquare } from "lucide-react";
+import { Send, Square, X, MessageSquare, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FilePicker } from "@/components/chat/file-picker";
 import {
@@ -17,7 +17,17 @@ import {
 } from "@/components/chat/command-picker";
 import { PlanArgPicker } from "@/components/chat/plan-arg-picker";
 import { cn } from "@/lib/utils";
-import type { Command } from "@/lib/opencode/types";
+import type { Agent, Command } from "@/lib/opencode/types";
+import { AgentSelector } from "@/components/chat/agent-selector";
+import { ModelSelector } from "@/components/chat/model-selector";
+import { VariantSelector } from "@/components/chat/variant-selector";
+import type { Attachment } from "@/lib/attachment-utils";
+import {
+  MAX_ATTACHMENTS,
+  validateAttachment,
+  fileToDataUrl,
+  generateAttachmentId,
+} from "@/lib/attachment-utils";
 import {
   getPendingCommentChips,
   clearPendingCommentChips,
@@ -36,12 +46,24 @@ type SessionDraft = {
   text: string;
   commentChips: CommentChip[];
   files: string[];
+  attachments: Attachment[];
 };
 
 const sessionDrafts = new Map<string, SessionDraft>();
 
+interface SelectedModel {
+  providerID: string;
+  modelID: string;
+}
+
+interface SubmitAttachment {
+  mime: string;
+  dataUrl: string;
+  filename: string;
+}
+
 interface PromptInputProps {
-  onSubmit: (text: string) => void;
+  onSubmit: (text: string, attachments?: SubmitAttachment[]) => void;
   onAbort: () => void;
   isStreaming: boolean;
   disabled?: boolean;
@@ -49,6 +71,24 @@ interface PromptInputProps {
   sessionId: string | null;
   commands: Command[];
   onCommandSelect: (command: SlashCommand, args: string) => void;
+
+  agents: Agent[];
+  selectedAgent: string | null;
+  onAgentChange: (agent: string) => void;
+  isAgentSelectorOpen?: boolean;
+  onAgentSelectorOpenChange?: (open: boolean) => void;
+
+  selectedModel: SelectedModel | null;
+  onModelChange: (model: SelectedModel) => void;
+  onVariantsChange?: (variants: string[]) => void;
+  isModelSelectorOpen?: boolean;
+  onModelSelectorOpenChange?: (open: boolean) => void;
+
+  availableVariants: string[];
+  selectedVariant: string | null;
+  onVariantChange: (variant: string | null) => void;
+  isVariantSelectorOpen?: boolean;
+  onVariantSelectorOpenChange?: (open: boolean) => void;
 }
 
 export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
@@ -62,6 +102,21 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       sessionId,
       commands,
       onCommandSelect,
+      agents,
+      selectedAgent,
+      onAgentChange,
+      isAgentSelectorOpen,
+      onAgentSelectorOpenChange,
+      selectedModel,
+      onModelChange,
+      onVariantsChange,
+      isModelSelectorOpen,
+      onModelSelectorOpenChange,
+      availableVariants,
+      selectedVariant,
+      onVariantChange,
+      isVariantSelectorOpen,
+      onVariantSelectorOpenChange,
     },
     ref,
   ) {
@@ -80,10 +135,16 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         return draft?.commentChips ?? [];
       },
     );
+    const [attachments, setAttachments] = useState<Attachment[]>(() => {
+      const draft = sessionId ? sessionDrafts.get(sessionId) : undefined;
+      return draft?.attachments ?? [];
+    });
+    const [isDragging, setIsDragging] = useState(false);
     const [pickerQuery, setPickerQuery] = useState<string | null>(null);
     const [commandQuery, setCommandQuery] = useState<string | null>(null);
     const [planArgQuery, setPlanArgQuery] = useState<string | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [prevSessionId, setPrevSessionId] = useState(sessionId);
 
     if (prevSessionId !== sessionId) {
@@ -92,6 +153,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           text: value,
           commentChips: selectedComments,
           files: selectedFiles,
+          attachments,
         });
       }
       setPrevSessionId(sessionId);
@@ -99,6 +161,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       setValue(draft?.text ?? "");
       setSelectedComments(draft?.commentChips ?? []);
       setSelectedFiles(draft?.files ?? []);
+      setAttachments(draft?.attachments ?? []);
     }
 
     useEffect(() => {
@@ -112,17 +175,21 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     useEffect(() => {
       if (!sessionId) return;
       const hasContent =
-        value || selectedComments.length > 0 || selectedFiles.length > 0;
+        value ||
+        selectedComments.length > 0 ||
+        selectedFiles.length > 0 ||
+        attachments.length > 0;
       if (hasContent) {
         sessionDrafts.set(sessionId, {
           text: value,
           commentChips: selectedComments,
           files: selectedFiles,
+          attachments,
         });
       } else {
         sessionDrafts.delete(sessionId);
       }
-    }, [sessionId, value, selectedComments, selectedFiles]);
+    }, [sessionId, value, selectedComments, selectedFiles, attachments]);
 
     useImperativeHandle(
       ref,
@@ -245,6 +312,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           setValue("");
           setSelectedFiles([]);
           setSelectedComments([]);
+          setAttachments([]);
           setPickerQuery(null);
           setCommandQuery(null);
           setPlanArgQuery(null);
@@ -287,10 +355,19 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         selectedFiles.length > 0
           ? `Context files: ${selectedFiles.join(", ")}\n\n`
           : "";
-      onSubmit(commentContext + fileContext + trimmed);
+      const submitAttachments =
+        attachments.length > 0
+          ? attachments.map((a) => ({
+              mime: a.mime,
+              dataUrl: a.dataUrl,
+              filename: a.filename,
+            }))
+          : undefined;
+      onSubmit(commentContext + fileContext + trimmed, submitAttachments);
       setValue("");
       setSelectedFiles([]);
       setSelectedComments([]);
+      setAttachments([]);
       setPickerQuery(null);
       setCommandQuery(null);
       setPlanArgQuery(null);
@@ -302,6 +379,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       disabled,
       selectedFiles,
       selectedComments,
+      attachments,
       onSubmit,
       availableCommands,
       onCommandSelect,
@@ -441,6 +519,97 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       setSelectedComments((prev) => prev.filter((c) => c.id !== id));
     }, []);
 
+    const handleRemoveAttachment = useCallback((id: string) => {
+      setAttachments((prev) => prev.filter((a) => a.id !== id));
+    }, []);
+
+    const addFiles = useCallback(
+      async (files: File[]) => {
+        for (const file of files) {
+          const result = validateAttachment(file);
+          if (!result.valid) {
+            toast.error(result.error);
+            continue;
+          }
+          if (attachments.length >= MAX_ATTACHMENTS) {
+            toast.error(`Maximum ${MAX_ATTACHMENTS} attachments reached`);
+            break;
+          }
+          try {
+            const dataUrl = await fileToDataUrl(file);
+            setAttachments((prev) => {
+              if (prev.length >= MAX_ATTACHMENTS) return prev;
+              return [
+                ...prev,
+                {
+                  id: generateAttachmentId(),
+                  file,
+                  dataUrl,
+                  mime: file.type,
+                  filename: file.name,
+                },
+              ];
+            });
+          } catch {
+            toast.error(`Failed to read file "${file.name}"`);
+          }
+        }
+      },
+      [attachments.length],
+    );
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(true);
+    }, []);
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+      // Only set false when leaving the container, not child elements
+      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+      setIsDragging(false);
+    }, []);
+
+    const handleDrop = useCallback(
+      (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 0) addFiles(files);
+      },
+      [addFiles],
+    );
+
+    const handlePaste = useCallback(
+      (e: React.ClipboardEvent) => {
+        const items = Array.from(e.clipboardData.items);
+        const imageFiles = items
+          .filter(
+            (item) => item.kind === "file" && item.type.startsWith("image/"),
+          )
+          .map((item) => item.getAsFile())
+          .filter((f): f is File => f !== null);
+        if (imageFiles.length > 0) {
+          e.preventDefault();
+          addFiles(imageFiles);
+        }
+      },
+      [addFiles],
+    );
+
+    const handlePaperclipClick = useCallback(() => {
+      fileInputRef.current?.click();
+    }, []);
+
+    const handleFileInputChange = useCallback(
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? []);
+        if (files.length > 0) addFiles(files);
+        // Reset input so same file can be selected again
+        if (e.target) e.target.value = "";
+      },
+      [addFiles],
+    );
+
     const handleCommandSelect = useCallback((cmd: SlashCommand) => {
       setValue(`/${cmd.name} `);
       setCommandQuery(null);
@@ -471,126 +640,246 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     const isPlanArgPickerOpen = planArgQuery !== null && !!workspaceId;
 
     return (
-      <div className="bg-background shrink-0 border-t p-4">
-        {/* Selected file chips */}
-        {selectedFiles.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {selectedFiles.map((path) => {
-              const fileName = path.split("/").pop() ?? path;
-              return (
-                <span
-                  key={path}
-                  className="bg-muted flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs"
-                >
-                  <span className="text-muted-foreground">@</span>
-                  {fileName}
-                  <button
-                    onClick={() => handleRemoveFile(path)}
-                    className="text-muted-foreground hover:text-foreground ml-0.5"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </span>
-              );
-            })}
+      <div className="shrink-0 px-4 pt-2 pb-4">
+        <div
+          className={cn(
+            "bg-muted/50 relative rounded-lg border",
+            "focus-within:ring-ring focus-within:ring-2",
+            isDragging && "ring-primary ring-2",
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDragging && (
+            <div className="bg-primary/10 border-primary absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed">
+              <span className="text-primary text-sm font-medium">
+                Drop files here
+              </span>
+            </div>
+          )}
+          {/* Picker popovers — positioned relative to this wrapper */}
+          <div className="relative">
+            {isPickerOpen && (
+              <FilePicker
+                workspaceId={workspaceId}
+                query={pickerQuery}
+                onSelect={handleFileSelect}
+                onClose={() => setPickerQuery(null)}
+              />
+            )}
+
+            {isCommandPickerOpen && (
+              <CommandPicker
+                commands={commands}
+                query={commandQuery ?? ""}
+                onSelect={handleCommandSelect}
+                onClose={() => setCommandQuery(null)}
+              />
+            )}
+
+            {isPlanArgPickerOpen && (
+              <PlanArgPicker
+                workspaceId={workspaceId}
+                query={planArgQuery ?? ""}
+                onSelect={handlePlanArgSelect}
+                onClose={() => setPlanArgQuery(null)}
+              />
+            )}
           </div>
-        )}
 
-        {/* Comment context chips */}
-        {selectedComments.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {selectedComments.map((comment) => {
-              const fileName =
-                comment.filePath.split("/").pop() ?? comment.filePath;
-              const lineLabel =
-                comment.startLine === comment.endLine
-                  ? `${fileName}:${comment.startLine}`
-                  : `${fileName}:${comment.startLine}-${comment.endLine}`;
-              return (
-                <span
-                  key={comment.id}
-                  className="bg-primary/10 flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs"
-                >
-                  <MessageSquare className="text-primary size-3" />
-                  {lineLabel}
-                  <button
-                    onClick={() => handleRemoveComment(comment.id)}
-                    aria-label={`Remove comment ${fileName}:${comment.startLine}`}
-                    className="text-muted-foreground hover:text-foreground ml-0.5"
+          {/* Selected file chips */}
+          {selectedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-3 pt-2">
+              {selectedFiles.map((path) => {
+                const fileName = path.split("/").pop() ?? path;
+                return (
+                  <span
+                    key={path}
+                    className="bg-muted flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs"
                   >
-                    <X className="size-3" />
-                  </button>
+                    <span className="text-muted-foreground">@</span>
+                    {fileName}
+                    <button
+                      onClick={() => handleRemoveFile(path)}
+                      className="text-muted-foreground hover:text-foreground ml-0.5"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Comment context chips */}
+          {selectedComments.length > 0 && (
+            <div
+              className={cn(
+                "flex flex-wrap gap-1.5 px-3",
+                selectedFiles.length > 0 ? "pt-1" : "pt-2",
+              )}
+            >
+              {selectedComments.map((comment) => {
+                const fileName =
+                  comment.filePath.split("/").pop() ?? comment.filePath;
+                const lineLabel =
+                  comment.startLine === comment.endLine
+                    ? `${fileName}:${comment.startLine}`
+                    : `${fileName}:${comment.startLine}-${comment.endLine}`;
+                return (
+                  <span
+                    key={comment.id}
+                    className="bg-primary/10 flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs"
+                  >
+                    <MessageSquare className="text-primary size-3" />
+                    {lineLabel}
+                    <button
+                      onClick={() => handleRemoveComment(comment.id)}
+                      aria-label={`Remove comment ${fileName}:${comment.startLine}`}
+                      className="text-muted-foreground hover:text-foreground ml-0.5"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Attachment chips */}
+          {attachments.length > 0 && (
+            <div
+              className={cn(
+                "flex flex-wrap gap-1.5 px-3",
+                selectedFiles.length > 0 || selectedComments.length > 0
+                  ? "pt-1"
+                  : "pt-2",
+              )}
+            >
+              {attachments.map((attachment) => {
+                const truncatedName =
+                  attachment.filename.length > 20
+                    ? attachment.filename.slice(0, 17) + "..."
+                    : attachment.filename;
+                return (
+                  <span
+                    key={attachment.id}
+                    className="bg-muted flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs"
+                  >
+                    <img
+                      src={attachment.dataUrl}
+                      alt={attachment.filename}
+                      className="size-6 shrink-0 rounded object-cover"
+                    />
+                    <span className="truncate">{truncatedName}</span>
+                    <button
+                      onClick={() => handleRemoveAttachment(attachment.id)}
+                      aria-label={`Remove ${attachment.filename}`}
+                      className="text-muted-foreground hover:text-foreground ml-0.5"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                );
+              })}
+              {attachments.length >= MAX_ATTACHMENTS && (
+                <span className="text-muted-foreground py-0.5 text-xs">
+                  Max {MAX_ATTACHMENTS} files
                 </span>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="relative flex items-end gap-2">
-          {/* File picker popover */}
-          {isPickerOpen && (
-            <FilePicker
-              workspaceId={workspaceId}
-              query={pickerQuery}
-              onSelect={handleFileSelect}
-              onClose={() => setPickerQuery(null)}
-            />
+              )}
+            </div>
           )}
 
-          {isCommandPickerOpen && (
-            <CommandPicker
-              commands={commands}
-              query={commandQuery ?? ""}
-              onSelect={handleCommandSelect}
-              onClose={() => setCommandQuery(null)}
-            />
-          )}
-
-          {isPlanArgPickerOpen && (
-            <PlanArgPicker
-              workspaceId={workspaceId}
-              query={planArgQuery ?? ""}
-              onSelect={handlePlanArgSelect}
-              onClose={() => setPlanArgQuery(null)}
-            />
-          )}
-
+          {/* Textarea */}
           <textarea
             ref={textareaRef}
             value={value}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onFocus={handleFocus}
+            onPaste={handlePaste}
             placeholder="Send a message... (type @ to reference files)"
             disabled={disabled}
             rows={1}
-            className={cn(
-              "bg-muted/50 flex-1 resize-none rounded-lg border px-4 py-3 text-sm",
-              "placeholder:text-muted-foreground",
-              "focus:ring-ring focus:ring-2 focus:outline-none",
-              "disabled:cursor-not-allowed disabled:opacity-50",
-              "max-h-[200px]",
-            )}
+            className="placeholder:text-muted-foreground max-h-[200px] w-full resize-none bg-transparent px-3 py-2 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
-          {isStreaming && (
+
+          {/* Footer bar */}
+          <div className="flex items-center gap-1 border-t px-2 py-1.5">
+            {/* Paperclip placeholder button (left side) */}
             <Button
-              size={null}
-              variant="destructive"
-              onClick={onAbort}
-              className="h-auto w-[46px] shrink-0 rounded-lg border border-transparent px-0 py-3.5"
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7 shrink-0"
+              disabled={disabled || attachments.length >= MAX_ATTACHMENTS}
+              onClick={handlePaperclipClick}
+              aria-label="Attach files"
             >
-              <Square className="size-4" />
+              <Paperclip className="size-3.5" />
             </Button>
-          )}
-          <Button
-            size={null}
-            onClick={handleSubmit}
-            disabled={!value.trim() || disabled}
-            className="h-auto w-[46px] shrink-0 rounded-lg border border-transparent px-0 py-3.5"
-          >
-            <Send className="size-4" />
-          </Button>
+
+            {/* Selectors */}
+            <AgentSelector
+              agents={agents}
+              selectedAgent={selectedAgent}
+              onAgentChange={onAgentChange}
+              open={isAgentSelectorOpen}
+              onOpenChange={onAgentSelectorOpenChange}
+            />
+            <ModelSelector
+              workspaceId={workspaceId}
+              selectedModel={selectedModel}
+              onModelChange={onModelChange}
+              onVariantsChange={onVariantsChange}
+              open={isModelSelectorOpen}
+              onOpenChange={onModelSelectorOpenChange}
+            />
+            <VariantSelector
+              variants={availableVariants}
+              selectedVariant={selectedVariant}
+              onVariantChange={onVariantChange}
+              open={isVariantSelectorOpen}
+              onOpenChange={onVariantSelectorOpenChange}
+            />
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Stop button (when streaming) */}
+            {isStreaming && (
+              <Button
+                type="button"
+                size="icon"
+                variant="destructive"
+                onClick={onAbort}
+                className="size-7 shrink-0"
+              >
+                <Square className="size-3.5" />
+              </Button>
+            )}
+
+            {/* Send button */}
+            <Button
+              type="button"
+              size="icon"
+              onClick={handleSubmit}
+              disabled={!value.trim() || disabled}
+              className="size-7 shrink-0"
+            >
+              <Send className="size-3.5" />
+            </Button>
+          </div>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          className="hidden"
+          onChange={handleFileInputChange}
+        />
       </div>
     );
   },

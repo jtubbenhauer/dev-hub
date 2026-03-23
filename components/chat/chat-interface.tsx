@@ -1,13 +1,10 @@
 "use client";
 
-import { AgentSelector, useAgents } from "@/components/chat/agent-selector";
+import { useAgents } from "@/components/chat/agent-selector";
 import type { SlashCommand } from "@/components/chat/command-picker";
 import { ChatDisplayContext } from "@/components/chat/chat-display-context";
 import { ChatMessage, isMessageVisible } from "@/components/chat/message";
-import {
-  ModelSelector,
-  loadPersistedModel,
-} from "@/components/chat/model-selector";
+import { loadPersistedModel } from "@/components/chat/model-selector";
 import { PlanPanel } from "@/components/chat/plan-panel";
 import type { PromptInputHandle } from "@/components/chat/prompt-input";
 import { PromptInput } from "@/components/chat/prompt-input";
@@ -16,7 +13,6 @@ import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
-import { VariantSelector } from "@/components/chat/variant-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -762,7 +758,14 @@ export function ChatInterface() {
   }, []);
 
   const handleSendMessage = useCallback(
-    async (text: string) => {
+    async (
+      text: string,
+      attachments?: Array<{
+        mime: string;
+        dataUrl: string;
+        filename: string;
+      }>,
+    ) => {
       if (!activeWorkspaceId) return;
 
       // Always scroll to bottom when the user sends a message
@@ -785,6 +788,7 @@ export function ChatInterface() {
         selectedModel ?? undefined,
         selectedAgent ?? undefined,
         selectedVariant ?? undefined,
+        attachments,
       );
     },
     [
@@ -1690,36 +1694,19 @@ export function ChatInterface() {
               <ScrollText className="size-4" />
             </Button>
 
-            <AgentSelector
-              agents={primaryAgents}
-              selectedAgent={selectedAgent}
-              onAgentChange={(agent) => {
-                setSelectedAgent(agent);
-                if (activeSessionId && activeWorkspaceId) {
-                  setSessionAgent(activeSessionId, activeWorkspaceId, agent);
-                  clearSessionModel(activeSessionId, activeWorkspaceId);
+            <Button
+              size="icon-sm"
+              variant="outline"
+              onClick={async () => {
+                if (activeWorkspaceId) {
+                  await createSession(activeWorkspaceId);
                 }
               }}
-              open={isAgentSelectorOpen}
-              onOpenChange={setIsAgentSelectorOpen}
-            />
-
-            <ModelSelector
-              workspaceId={activeWorkspaceId}
-              selectedModel={selectedModel}
-              onModelChange={handleModelChange}
-              onVariantsChange={setAvailableVariants}
-              open={isModelSelectorOpen}
-              onOpenChange={setIsModelSelectorOpen}
-            />
-
-            <VariantSelector
-              variants={availableVariants}
-              selectedVariant={selectedVariant}
-              onVariantChange={setSelectedVariant}
-              open={isVariantSelectorOpen}
-              onOpenChange={setIsVariantSelectorOpen}
-            />
+              disabled={!activeWorkspaceId}
+              title="New session"
+            >
+              <Plus className="size-4" />
+            </Button>
           </div>
 
           {/* Messages area or plan panel — mutually exclusive */}
@@ -1960,6 +1947,27 @@ export function ChatInterface() {
             workspaceId={activeWorkspaceId}
             sessionId={activeSessionId}
             commands={commands}
+            agents={primaryAgents}
+            selectedAgent={selectedAgent}
+            onAgentChange={(agent) => {
+              setSelectedAgent(agent);
+              if (activeSessionId && activeWorkspaceId) {
+                setSessionAgent(activeSessionId, activeWorkspaceId, agent);
+                clearSessionModel(activeSessionId, activeWorkspaceId);
+              }
+            }}
+            isAgentSelectorOpen={isAgentSelectorOpen}
+            onAgentSelectorOpenChange={setIsAgentSelectorOpen}
+            selectedModel={selectedModel}
+            onModelChange={handleModelChange}
+            onVariantsChange={setAvailableVariants}
+            isModelSelectorOpen={isModelSelectorOpen}
+            onModelSelectorOpenChange={setIsModelSelectorOpen}
+            availableVariants={availableVariants}
+            selectedVariant={selectedVariant}
+            onVariantChange={setSelectedVariant}
+            isVariantSelectorOpen={isVariantSelectorOpen}
+            onVariantSelectorOpenChange={setIsVariantSelectorOpen}
           />
         </div>
       </ChatDisplayContext.Provider>

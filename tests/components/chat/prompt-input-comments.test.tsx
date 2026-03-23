@@ -32,6 +32,21 @@ vi.mock("@/components/chat/file-picker", () => ({
 vi.mock("@/components/chat/command-picker", () => ({
   CommandPicker: () => null,
 }));
+vi.mock("@/components/chat/plan-arg-picker", () => ({
+  PlanArgPicker: () => null,
+}));
+vi.mock("@/components/chat/agent-selector", () => ({
+  AgentSelector: () => null,
+}));
+vi.mock("@/components/chat/model-selector", () => ({
+  ModelSelector: () => null,
+}));
+vi.mock("@/components/chat/variant-selector", () => ({
+  VariantSelector: () => null,
+}));
+vi.mock("@/hooks/use-settings", () => ({
+  useModelAllowlist: () => ({ allowlist: [], setAllowlist: vi.fn() }),
+}));
 
 import {
   getPendingCommentChips,
@@ -60,6 +75,14 @@ const baseProps = {
   sessionId: "session-1",
   commands: [],
   onCommandSelect: vi.fn(),
+  agents: [],
+  selectedAgent: null,
+  onAgentChange: vi.fn(),
+  selectedModel: null,
+  onModelChange: vi.fn(),
+  availableVariants: [],
+  selectedVariant: null,
+  onVariantChange: vi.fn(),
 };
 
 const singleLineChip: CommentChip = {

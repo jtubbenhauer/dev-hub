@@ -1,0 +1,23 @@
+app/globals.css
+  8d18e22bc3542dc7 470
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "532c5389b61d6fffb9fe2e4e3d3d06dd5162d959",
+  "prompts": {
+    "8d18e22bc3542dc7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e5724585ffeNVum86vwsXpBZG-01873ab6-a768-45d5-b926-8d0d0b82825d",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -35,6 +35,7 @@ import {
   useSettingsMutation,
   useSoundSettings,
   useFileTabsSetting,
+  useNotificationSettings,
   SETTINGS_KEYS,
   FONT_SIZE_OPTIONS,
   MOBILE_FONT_SIZE_OPTIONS,
@@ -69,6 +70,7 @@ export function GeneralSettings() {
       <EditorSettingsCard />
       <TerminalSettingsCard />
       <CommandSettingsCard />
+      <NotificationSettingsCard />
       <SoundSettingsCard />
     </div>
   );
@@ -604,6 +606,92 @@ function CommandSettingsCard() {
               Save
             </Button>
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function NotificationSettingsCard() {
+  const { isSoundEnabled, isPushEnabled, isLoading } =
+    useNotificationSettings();
+  const mutation = useSettingsMutation();
+
+  const handleSoundToggle = (checked: boolean) => {
+    mutation.mutate(
+      { key: SETTINGS_KEYS.NOTIFICATIONS_SOUND_ENABLED, value: checked },
+      {
+        onSuccess: () =>
+          toast.success(
+            checked
+              ? "Notification sounds enabled"
+              : "Notification sounds disabled",
+          ),
+      },
+    );
+  };
+
+  const handlePushToggle = (checked: boolean) => {
+    mutation.mutate(
+      { key: SETTINGS_KEYS.NOTIFICATIONS_PUSH_ENABLED, value: checked },
+      {
+        onSuccess: () =>
+          toast.success(
+            checked
+              ? "Push notifications enabled"
+              : "Push notifications disabled",
+          ),
+      },
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Notifications</CardTitle>
+        <CardDescription>
+          Control notification sounds and browser push notifications.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="notifications-sound">Notification sounds</Label>
+            <p className="text-muted-foreground text-xs">
+              Play sound effects for agent events, permissions, and errors
+            </p>
+          </div>
+          <Switch
+            id="notifications-sound"
+            checked={isSoundEnabled}
+            onCheckedChange={handleSoundToggle}
+            disabled={mutation.isPending}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="notifications-push">Push notifications</Label>
+            <p className="text-muted-foreground text-xs">
+              Show browser notifications when the tab is not focused
+            </p>
+          </div>
+          <Switch
+            id="notifications-push"
+            checked={isPushEnabled}
+            onCheckedChange={handlePushToggle}
+            disabled={mutation.isPending}
+          />
         </div>
       </CardContent>
     </Card>

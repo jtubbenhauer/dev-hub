@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSoundSettings } from "@/hooks/use-settings";
+import {
+  useSoundSettings,
+  useNotificationSettings,
+} from "@/hooks/use-settings";
 import { updateSoundSettings } from "@/lib/sounds";
+import { updatePushNotificationEnabled } from "@/lib/notifications";
 
 export function SoundSettingsSync() {
   const {
@@ -13,9 +17,11 @@ export function SoundSettingsSync() {
     errorsEnabled,
     errorsSoundId,
   } = useSoundSettings();
+  const { isSoundEnabled, isPushEnabled } = useNotificationSettings();
 
   useEffect(() => {
     updateSoundSettings({
+      globalSoundEnabled: isSoundEnabled,
       agentEnabled,
       agentSoundId,
       permissionsEnabled,
@@ -24,6 +30,7 @@ export function SoundSettingsSync() {
       errorsSoundId,
     });
   }, [
+    isSoundEnabled,
     agentEnabled,
     agentSoundId,
     permissionsEnabled,
@@ -31,6 +38,10 @@ export function SoundSettingsSync() {
     errorsEnabled,
     errorsSoundId,
   ]);
+
+  useEffect(() => {
+    updatePushNotificationEnabled(isPushEnabled);
+  }, [isPushEnabled]);
 
   return null;
 }

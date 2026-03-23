@@ -802,7 +802,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
             placeholder="Send a message... (type @ to reference files)"
             disabled={disabled}
             rows={1}
-            className="placeholder:text-muted-foreground max-h-[200px] w-full resize-none bg-transparent px-3 py-2 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            className="placeholder:text-muted-foreground max-h-[200px] w-full resize-none bg-transparent px-3 py-2 text-base focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
           />
 
           {/* Footer bar */}

@@ -283,6 +283,7 @@ export type SoundID = (typeof SOUND_OPTIONS)[number]["id"];
 export type SoundEventType = "agent" | "permissions" | "errors";
 
 export interface SoundSettings {
+  globalSoundEnabled: boolean;
   agentEnabled: boolean;
   agentSoundId: string;
   permissionsEnabled: boolean;
@@ -292,6 +293,7 @@ export interface SoundSettings {
 }
 
 export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
+  globalSoundEnabled: true,
   agentEnabled: false,
   agentSoundId: "staplebops-01",
   permissionsEnabled: false,
@@ -329,6 +331,7 @@ export function playSound(src: string | undefined): (() => void) | undefined {
 
 export function playSoundForEvent(event: SoundEventType): void {
   const settings = cachedSettings;
+  if (!settings.globalSoundEnabled) return;
   if (event === "agent" && settings.agentEnabled) {
     playSound(soundSrc(settings.agentSoundId));
   } else if (event === "permissions" && settings.permissionsEnabled) {

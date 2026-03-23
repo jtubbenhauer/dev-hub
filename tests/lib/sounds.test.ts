@@ -152,6 +152,7 @@ describe("sounds", () => {
 
     it("roundtrips settings through update and get", () => {
       const settings: SoundSettings = {
+        globalSoundEnabled: true,
         agentEnabled: true,
         agentSoundId: "alert-01",
         permissionsEnabled: true,
@@ -206,6 +207,7 @@ describe("sounds", () => {
 
     it("plays agent sound when agentEnabled is true", () => {
       updateSoundSettings({
+        globalSoundEnabled: true,
         agentEnabled: true,
         agentSoundId: "alert-01",
         permissionsEnabled: false,
@@ -222,6 +224,7 @@ describe("sounds", () => {
 
     it("does not play agent sound when agentEnabled is false", () => {
       updateSoundSettings({
+        globalSoundEnabled: true,
         agentEnabled: false,
         agentSoundId: "alert-01",
         permissionsEnabled: false,
@@ -235,6 +238,7 @@ describe("sounds", () => {
 
     it("plays permissions sound when permissionsEnabled is true", () => {
       updateSoundSettings({
+        globalSoundEnabled: true,
         agentEnabled: false,
         agentSoundId: "alert-01",
         permissionsEnabled: true,
@@ -251,6 +255,7 @@ describe("sounds", () => {
 
     it("does not play permissions sound when permissionsEnabled is false", () => {
       updateSoundSettings({
+        globalSoundEnabled: true,
         agentEnabled: false,
         agentSoundId: "alert-01",
         permissionsEnabled: false,
@@ -264,6 +269,7 @@ describe("sounds", () => {
 
     it("plays errors sound when errorsEnabled is true", () => {
       updateSoundSettings({
+        globalSoundEnabled: true,
         agentEnabled: false,
         agentSoundId: "alert-01",
         permissionsEnabled: false,
@@ -280,6 +286,7 @@ describe("sounds", () => {
 
     it("does not play errors sound when errorsEnabled is false", () => {
       updateSoundSettings({
+        globalSoundEnabled: true,
         agentEnabled: false,
         agentSoundId: "alert-01",
         permissionsEnabled: false,

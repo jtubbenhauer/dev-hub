@@ -1,7 +1,14 @@
 "use client";
 
-import { memo, useState } from "react";
-import { GitPullRequest, CheckSquare, Globe, RefreshCw } from "lucide-react";
+import { memo, useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  GitPullRequest,
+  CheckSquare,
+  Globe,
+  RefreshCw,
+  ExternalLink,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -126,7 +133,20 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
   workspaceId,
   workspace,
 }: WorkspaceContextPanelProps) {
+  const router = useRouter();
   const { previews, pr, owner, repo, branch } = useFirebasePreview(workspaceId);
+
+  const handleOpenPrReview = useCallback(() => {
+    if (!pr) return;
+    try {
+      localStorage.setItem("dev-hub:git-view-mode", "pr");
+      localStorage.setItem(
+        "dev-hub:git-selected-pr",
+        `${pr.base.repo.full_name}/${pr.number}`,
+      );
+    } catch {}
+    router.push("/git");
+  }, [pr, router]);
 
   const linkedTaskMeta = workspace.linkedTaskMeta as LinkedTaskMeta | null;
 
@@ -142,34 +162,38 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
       </div>
       <div className="space-y-2 px-3 pt-2 pb-3">
         {pr && (
-          <Tooltip delayDuration={500} disableHoverableContent>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 text-xs">
-                <GitPullRequest className="text-muted-foreground size-3.5 shrink-0" />
+          <div className="flex items-center gap-2 text-xs">
+            <GitPullRequest className="text-muted-foreground size-3.5 shrink-0" />
+            <button
+              type="button"
+              className="text-foreground min-w-0 flex-1 truncate text-left hover:underline"
+              onClick={handleOpenPrReview}
+            >
+              {pr.title} #{pr.number}
+            </button>
+            <Tooltip delayDuration={500} disableHoverableContent>
+              <TooltipTrigger asChild>
                 <a
                   href={pr.html_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-foreground truncate hover:underline"
+                  className="text-muted-foreground hover:text-foreground shrink-0"
                 >
-                  {pr.title} #{pr.number}
+                  <ExternalLink className="size-3" />
                 </a>
-                <Badge
-                  variant="outline"
-                  className="shrink-0 px-1 py-0 text-[10px]"
-                >
-                  <span
-                    className={
-                      pr.draft ? "text-muted-foreground" : "text-green-500"
-                    }
-                  >
-                    {pr.draft ? "draft" : "open"}
-                  </span>
-                </Badge>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="left">Pull request</TooltipContent>
-          </Tooltip>
+              </TooltipTrigger>
+              <TooltipContent side="left">Open on GitHub</TooltipContent>
+            </Tooltip>
+            <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
+              <span
+                className={
+                  pr.draft ? "text-muted-foreground" : "text-green-500"
+                }
+              >
+                {pr.draft ? "draft" : "open"}
+              </span>
+            </Badge>
+          </div>
         )}
 
         {linkedTaskMeta && (

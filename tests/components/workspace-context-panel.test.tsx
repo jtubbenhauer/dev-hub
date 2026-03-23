@@ -6,6 +6,9 @@ import { useFirebasePreview } from "@/hooks/use-firebase-preview";
 import type { Workspace } from "@/types";
 
 vi.mock("@/hooks/use-firebase-preview");
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return <TooltipProvider>{children}</TooltipProvider>;

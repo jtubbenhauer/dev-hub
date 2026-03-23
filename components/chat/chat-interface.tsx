@@ -472,6 +472,29 @@ export function ChatInterface() {
   const previousHealthStatusRef = useRef<Record<string, string | undefined>>(
     {},
   );
+  const [
+    pendingSessionCreationWorkspaceId,
+    setPendingSessionCreationWorkspaceId,
+  ] = useState<string | null>(null);
+
+  const resumeWorkspace = useCallback(async (workspaceId: string) => {
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/start`, {
+        method: "POST",
+      });
+      if (!res.ok && res.status !== 409) {
+        const err = await res
+          .json()
+          .catch(() => ({ error: "Failed to resume workspace" }));
+        throw new Error(err.error || "Failed to resume workspace");
+      }
+      toast.success("Starting workspace...");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to resume workspace",
+      );
+    }
+  }, []);
 
   const sessions = useChatStore(getActiveWorkspaceSessions);
   const activeSessionDirectory = activeSessionId
@@ -640,6 +663,32 @@ export function ChatInterface() {
     isActiveWorkspaceRemote,
     hasQueuedMessages,
     flushQueuedMessages,
+  ]);
+
+  // Create session once workspace becomes healthy after resume
+  useEffect(() => {
+    if (!pendingSessionCreationWorkspaceId) return;
+    if (healthStatus !== "healthy") return;
+
+    // Only proceed if this is the workspace we're waiting for
+    const ws = allWorkspaces.find(
+      (w) => w.id === pendingSessionCreationWorkspaceId,
+    );
+    if (!ws || ws.backend !== "remote") {
+      setPendingSessionCreationWorkspaceId(null);
+      return;
+    }
+
+    // Create the session
+    (async () => {
+      await createSession(pendingSessionCreationWorkspaceId);
+      setPendingSessionCreationWorkspaceId(null);
+    })();
+  }, [
+    pendingSessionCreationWorkspaceId,
+    healthStatus,
+    allWorkspaces,
+    createSession,
   ]);
 
   // Consume pending chat (e.g. from "Create Worktree" → auto-start plan)
@@ -848,16 +897,44 @@ export function ChatInterface() {
 
   const handleCreateSession = useCallback(() => {
     if (!activeWorkspaceId) return;
+
+    const ws = allWorkspaces.find((w) => w.id === activeWorkspaceId);
+    if (ws?.backend === "remote" && healthStatus !== "healthy") {
+      setPendingSessionCreationWorkspaceId(activeWorkspaceId);
+      resumeWorkspace(activeWorkspaceId);
+      return;
+    }
+
     createSession(activeWorkspaceId);
-  }, [activeWorkspaceId, createSession]);
+  }, [
+    activeWorkspaceId,
+    allWorkspaces,
+    healthStatus,
+    createSession,
+    resumeWorkspace,
+  ]);
 
   const handleCreateSessionInWorkspace = useCallback(
     (workspaceId: string) => {
       useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
       setActiveWorkspaceId(workspaceId);
+
+      const ws = allWorkspaces.find((w) => w.id === workspaceId);
+      if (ws?.backend === "remote" && healthStatus !== "healthy") {
+        setPendingSessionCreationWorkspaceId(workspaceId);
+        resumeWorkspace(workspaceId);
+        return;
+      }
+
       createSession(workspaceId);
     },
-    [setActiveWorkspaceId, createSession],
+    [
+      setActiveWorkspaceId,
+      allWorkspaces,
+      healthStatus,
+      createSession,
+      resumeWorkspace,
+    ],
   );
 
   const pendingDeletions = useRef<Map<string, ReturnType<typeof setTimeout>>>(

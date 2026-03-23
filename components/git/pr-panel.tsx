@@ -136,12 +136,8 @@ export function PrPanel({ onClose }: PrPanelProps) {
     useGitHubPrsCreatedByMe();
   const { data: currentUser } = useGitHubCurrentUser();
 
-  // Restore selected PR from localStorage (during render)
-  if (
-    !hasRestoredPr &&
-    !selectedPr &&
-    (reviewPrs.length > 0 || myPrs.length > 0)
-  ) {
+  const bothPrListsLoaded = !isReviewPrsLoading && !isMyPrsLoading;
+  if (!hasRestoredPr && !selectedPr && bothPrListsLoaded) {
     try {
       const stored = localStorage.getItem("dev-hub:git-selected-pr");
       if (!stored) {
@@ -315,7 +311,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
     activeTab === "for-review" ? isReviewPrsLoading : isMyPrsLoading;
   const activePrs = activeTab === "for-review" ? reviewPrs : myPrs;
 
-  if (isPrsLoading && !selectedPr) {
+  if (!selectedPr && (isPrsLoading || !hasRestoredPr)) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center">
         <Loader2 className="text-muted-foreground size-5 animate-spin" />

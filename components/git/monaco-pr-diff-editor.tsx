@@ -11,7 +11,15 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import type { editor } from "monaco-editor";
-import { MessageSquare, Send, X, Loader2, PanelLeft } from "lucide-react";
+import {
+  Send,
+  X,
+  Loader2,
+  PanelLeft,
+  MessageCircle,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DiffViewToggle } from "@/components/editor/diff-view-toggle";
 import { useEditorStore } from "@/stores/editor-store";
@@ -27,7 +35,6 @@ import {
   useTabSizeSetting,
 } from "@/hooks/use-settings";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
 import type { GitHubPrFileContent, GitHubReviewComment } from "@/types";
 
 const DiffEditor = dynamic(
@@ -82,6 +89,8 @@ export interface PrDiffEditorHandle {
 interface PendingComment {
   line: number;
   startLine: number;
+  leftOffset: number;
+  width: number;
 }
 
 interface CommentThreadProps {
@@ -143,7 +152,7 @@ function CommentThread({
   );
 
   return (
-    <div className="bg-muted/20 mx-2 my-1 overflow-hidden rounded-md border text-xs">
+    <div className="bg-popover mx-2 my-1 overflow-hidden rounded-md border text-xs shadow-lg">
       {comments.map((comment) => (
         <div key={comment.id} className="border-b px-3 py-2 last:border-b-0">
           <div className="mb-1 flex items-center gap-1.5">
@@ -232,6 +241,7 @@ export const MonacoPrDiffEditor = forwardRef<
   ref,
 ) {
   const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
+  const editorContainerRef = useRef<HTMLDivElement | null>(null);
   const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(
     null,
   );
@@ -250,15 +260,28 @@ export const MonacoPrDiffEditor = forwardRef<
   const [pendingComment, setPendingComment] = useState<PendingComment | null>(
     null,
   );
+  const [commentTopOffset, setCommentTopOffset] = useState<number | null>(null);
 
-  const handleOpenCommentAt = useCallback((line: number) => {
-    setActiveCommentLine(line);
-    setPendingComment({ line, startLine: line });
-  }, []);
+  const [prevFilePath, setPrevFilePath] = useState(fileContent.path);
+  if (prevFilePath !== fileContent.path) {
+    setPrevFilePath(fileContent.path);
+    setActiveCommentLine(null);
+    setPendingComment(null);
+    setCommentTopOffset(null);
+  }
+
+  const handleOpenCommentAt = useCallback(
+    (line: number, leftOffset: number, width: number) => {
+      setActiveCommentLine(line);
+      setPendingComment({ line, startLine: line, leftOffset, width });
+    },
+    [],
+  );
 
   const handleCloseComment = useCallback(() => {
     setActiveCommentLine(null);
     setPendingComment(null);
+    setCommentTopOffset(null);
   }, []);
 
   const commentsByLine = useMemo(() => {
@@ -296,9 +319,37 @@ export const MonacoPrDiffEditor = forwardRef<
     [getModifiedEditor],
   );
 
+  const pendingCommentRef = useRef(pendingComment);
+  const setCommentTopOffsetRef = useRef(setCommentTopOffset);
+
+  const updateCommentPosition = useCallback(() => {
+    const pc = pendingCommentRef.current;
+    if (!pc) return;
+    const me = getModifiedEditor();
+    if (!me) return;
+
+    const position = me.getScrolledVisiblePosition({
+      lineNumber: pc.line,
+      column: 1,
+    });
+
+    if (!position) {
+      setCommentTopOffsetRef.current(null);
+      return;
+    }
+
+    setCommentTopOffsetRef.current(position.top + position.height);
+  }, [getModifiedEditor]);
+
   const handleOpenCommentAtRef = useRef(handleOpenCommentAt);
+  const handleCloseCommentRef = useRef(handleCloseComment);
+  const updateCommentPositionRef = useRef(updateCommentPosition);
   useEffect(() => {
     handleOpenCommentAtRef.current = handleOpenCommentAt;
+    handleCloseCommentRef.current = handleCloseComment;
+    pendingCommentRef.current = pendingComment;
+    setCommentTopOffsetRef.current = setCommentTopOffset;
+    updateCommentPositionRef.current = updateCommentPosition;
   });
 
   const handleBeforeMount = useCallback(
@@ -320,13 +371,42 @@ export const MonacoPrDiffEditor = forwardRef<
 
       modifiedEditor.onMouseDown((e) => {
         if (
-          e.target.type ===
+          e.target.type !==
           monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN
         ) {
-          const lineNumber = e.target.position?.lineNumber;
-          if (lineNumber == null) return;
-          handleOpenCommentAtRef.current(lineNumber);
+          if (pendingCommentRef.current !== null) {
+            handleCloseCommentRef.current();
+          }
+          return;
         }
+
+        const lineNumber = e.target.position?.lineNumber;
+        if (lineNumber == null) return;
+
+        const modDom = modifiedEditor.getDomNode();
+        const containerDom = editorContainerRef.current;
+        let leftOffset = 16;
+        let width = 0;
+        if (modDom && containerDom) {
+          const modRect = modDom.getBoundingClientRect();
+          const containerRect = containerDom.getBoundingClientRect();
+          leftOffset = modRect.left - containerRect.left;
+          width = modRect.width;
+        }
+
+        const position = modifiedEditor.getScrolledVisiblePosition({
+          lineNumber,
+          column: 1,
+        });
+
+        handleOpenCommentAtRef.current(lineNumber, leftOffset, width);
+        setCommentTopOffsetRef.current(
+          position ? position.top + position.height : null,
+        );
+      });
+
+      modifiedEditor.onDidScrollChange(() => {
+        updateCommentPositionRef.current();
       });
 
       setIsEditorReady(true);
@@ -395,6 +475,61 @@ export const MonacoPrDiffEditor = forwardRef<
     }
   }, [currentContent]);
 
+  const sortedCommentLines = useMemo(
+    () => Array.from(commentsByLine.keys()).sort((a, b) => a - b),
+    [commentsByLine],
+  );
+
+  const navigateToComment = useCallback(
+    (line: number) => {
+      const modifiedEditor = getModifiedEditor();
+      if (!modifiedEditor) return;
+
+      modifiedEditor.revealLineInCenter(line);
+
+      requestAnimationFrame(() => {
+        const me = getModifiedEditor();
+        if (!me) return;
+
+        const modDom = me.getDomNode();
+        const containerDom = editorContainerRef.current;
+        let leftOffset = 16;
+        let width = 0;
+        if (modDom && containerDom) {
+          const modRect = modDom.getBoundingClientRect();
+          const containerRect = containerDom.getBoundingClientRect();
+          leftOffset = modRect.left - containerRect.left;
+          width = modRect.width;
+        }
+
+        const position = me.getScrolledVisiblePosition({
+          lineNumber: line,
+          column: 1,
+        });
+
+        handleOpenCommentAt(line, leftOffset, width);
+        setCommentTopOffset(position ? position.top + position.height : null);
+      });
+    },
+    [getModifiedEditor, handleOpenCommentAt],
+  );
+
+  const handlePrevComment = useCallback(() => {
+    if (sortedCommentLines.length === 0) return;
+    const currentLine = activeCommentLine ?? Infinity;
+    const prev = sortedCommentLines.filter((l) => l < currentLine).pop();
+    navigateToComment(
+      prev ?? sortedCommentLines[sortedCommentLines.length - 1],
+    );
+  }, [sortedCommentLines, activeCommentLine, navigateToComment]);
+
+  const handleNextComment = useCallback(() => {
+    if (sortedCommentLines.length === 0) return;
+    const currentLine = activeCommentLine ?? -1;
+    const next = sortedCommentLines.find((l) => l > currentLine);
+    navigateToComment(next ?? sortedCommentLines[0]);
+  }, [sortedCommentLines, activeCommentLine, navigateToComment]);
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -408,7 +543,7 @@ export const MonacoPrDiffEditor = forwardRef<
     activeCommentLine !== null
       ? (commentsByLine.get(activeCommentLine) ?? [])
       : [];
-  const existingCommentLines = Array.from(commentsByLine.keys());
+  const commentCount = comments.length;
   const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
 
   return (
@@ -429,99 +564,97 @@ export const MonacoPrDiffEditor = forwardRef<
           {fileName}
         </span>
 
-        {existingCommentLines.length > 0 && (
-          <span className="text-muted-foreground flex items-center gap-1 text-xs">
-            <MessageSquare className="size-3.5" />
-            {existingCommentLines.length}
-          </span>
-        )}
-
         <DiffViewToggle />
+
+        {commentCount > 0 && (
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={handlePrevComment}
+              aria-label="Previous comment"
+            >
+              <ChevronUp className="size-3.5" />
+            </Button>
+            <span className="text-muted-foreground flex items-center gap-1 text-xs">
+              <MessageCircle className="size-3.5" />
+              {commentCount}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={handleNextComment}
+              aria-label="Next comment"
+            >
+              <ChevronDown className="size-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
 
-      {existingCommentLines.length > 0 && (
-        <div className="bg-muted/10 flex shrink-0 flex-wrap gap-1 border-b px-3 py-1.5">
-          {existingCommentLines.map((line) => {
-            const threadComments = commentsByLine.get(line) ?? [];
-            return (
-              <button
-                type="button"
-                key={line}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors",
-                  activeCommentLine === line
-                    ? "bg-blue-500/20 text-blue-400"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-                onClick={() =>
-                  setActiveCommentLine((prev) => (prev === line ? null : line))
-                }
-              >
-                <MessageSquare className="size-3" />
-                <span>L{line}</span>
-                {threadComments.length > 1 && (
-                  <span className="text-muted-foreground">
-                    ({threadComments.length})
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {activeCommentLine !== null && (
-        <div className="max-h-80 shrink-0 overflow-y-auto border-b">
-          <CommentThread
-            comments={activeCommentThreadComments}
-            line={activeCommentLine}
-            onReply={onReplyToComment}
-            onAddComment={onAddComment}
-            onClose={handleCloseComment}
-            pendingLine={pendingComment?.line ?? activeCommentLine}
-            pendingStartLine={pendingComment?.startLine ?? activeCommentLine}
-            isSubmitting={isSubmittingComment}
+      <div
+        ref={editorContainerRef}
+        className="relative flex min-h-0 flex-1 overflow-hidden"
+      >
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <DiffEditor
+            original={fileContent.original}
+            modified={fileContent.current}
+            language={getMonacoLanguage(fileContent.language)}
+            theme={getMonacoThemeName(theme, resolvedMode)}
+            beforeMount={handleBeforeMount}
+            onMount={handleMount}
+            options={{
+              fontSize: effectiveFontSize,
+              lineHeight: Math.round(effectiveFontSize * 1.5),
+              fontFamily: MONACO_FONT_FAMILY,
+              fontLigatures: false,
+              wordWrap: "on",
+              renderSideBySide: diffViewMode === "side-by-side",
+              hideUnchangedRegions: { enabled: true },
+              renderIndicators: true,
+              renderMarginRevertIcon: false,
+              originalEditable: false,
+              readOnly: true,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              lineNumbers: "on",
+              automaticLayout: true,
+              glyphMargin: true,
+              folding: true,
+              smoothScrolling: true,
+              padding: { top: 8 },
+            }}
           />
         </div>
-      )}
 
-      {activeCommentLine === null && (
-        <div className="bg-muted/5 text-muted-foreground/60 flex shrink-0 items-center gap-1.5 border-b px-3 py-1 text-[11px]">
-          <MessageSquare className="size-3" />
-          <span>Click the gutter margin to add a comment</span>
-        </div>
-      )}
-
-      <div className="min-h-0 flex-1 overflow-hidden">
-        <DiffEditor
-          original={fileContent.original}
-          modified={fileContent.current}
-          language={getMonacoLanguage(fileContent.language)}
-          theme={getMonacoThemeName(theme, resolvedMode)}
-          beforeMount={handleBeforeMount}
-          onMount={handleMount}
-          options={{
-            fontSize: effectiveFontSize,
-            lineHeight: Math.round(effectiveFontSize * 1.5),
-            fontFamily: MONACO_FONT_FAMILY,
-            fontLigatures: false,
-            wordWrap: "on",
-            renderSideBySide: diffViewMode === "side-by-side",
-            hideUnchangedRegions: { enabled: true },
-            renderIndicators: true,
-            renderMarginRevertIcon: false,
-            originalEditable: false,
-            readOnly: true,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            lineNumbers: "on",
-            automaticLayout: true,
-            glyphMargin: true,
-            folding: true,
-            smoothScrolling: true,
-            padding: { top: 8 },
-          }}
-        />
+        {pendingComment && commentTopOffset !== null && (
+          <div
+            className="absolute z-20"
+            style={{
+              top: commentTopOffset,
+              left: pendingComment.width ? pendingComment.leftOffset : 16,
+              width: pendingComment.width ? pendingComment.width : undefined,
+              right: pendingComment.width ? undefined : 16,
+            }}
+            onWheel={(e) => {
+              const me = getModifiedEditor();
+              if (!me) return;
+              me.setScrollTop(me.getScrollTop() + e.deltaY);
+            }}
+          >
+            <CommentThread
+              comments={activeCommentThreadComments}
+              line={activeCommentLine ?? pendingComment.line}
+              onReply={onReplyToComment}
+              onAddComment={onAddComment}
+              onClose={handleCloseComment}
+              pendingLine={pendingComment.line}
+              pendingStartLine={pendingComment.startLine}
+              isSubmitting={isSubmittingComment}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

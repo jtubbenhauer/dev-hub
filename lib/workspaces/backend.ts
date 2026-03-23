@@ -26,6 +26,7 @@ import {
 import {
   getGitStatus,
   getLog,
+  getDefaultBranch,
   getDiff,
   getFileDiffs,
   getCommitDiff,
@@ -79,7 +80,8 @@ export interface WorkspaceBackend {
 
   // Git core
   getGitStatus(): Promise<GitStatusResult>;
-  getLog(maxCount?: number): Promise<GitLogEntry[]>;
+  getLog(maxCount?: number, baseRef?: string): Promise<GitLogEntry[]>;
+  getDefaultBranch(): Promise<string | null>;
   getDiff(file: string, staged: boolean): Promise<string>;
   getFileDiffs(staged: boolean): Promise<GitDiffResult[]>;
   getCommitDiff(hash: string): Promise<string>;
@@ -167,8 +169,12 @@ export class LocalBackend implements WorkspaceBackend {
     return getGitStatus(this.workspacePath);
   }
 
-  getLog(maxCount?: number) {
-    return getLog(this.workspacePath, maxCount);
+  getLog(maxCount?: number, baseRef?: string) {
+    return getLog(this.workspacePath, maxCount, baseRef);
+  }
+
+  getDefaultBranch() {
+    return getDefaultBranch(this.workspacePath);
   }
 
   getDiff(file: string, staged: boolean) {
@@ -419,10 +425,18 @@ export class RemoteBackend implements WorkspaceBackend {
     return this.agentGet<GitStatusResult>("/git/status");
   }
 
-  async getLog(maxCount?: number) {
+  async getLog(maxCount?: number, baseRef?: string) {
     const params: Record<string, string> = {};
     if (maxCount !== undefined) params.limit = String(maxCount);
+    if (baseRef) params.baseRef = baseRef;
     return this.agentGet<GitLogEntry[]>("/git/log", params);
+  }
+
+  async getDefaultBranch() {
+    const result = await this.agentGet<{ branch: string | null }>(
+      "/git/default-branch",
+    );
+    return result.branch;
   }
 
   async getDiff(file: string, staged: boolean) {

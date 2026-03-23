@@ -7,8 +7,16 @@ import {
   ChevronRight,
   Clock,
   User,
+  GitBranch,
+  ListTree,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { DiffViewer } from "@/components/git/diff-viewer";
 import { useGitCommitDiff } from "@/hooks/use-git";
 import { cn } from "@/lib/utils";
@@ -18,43 +26,88 @@ interface CommitLogProps {
   entries: GitLogEntry[];
   workspaceId: string;
   isLoading: boolean;
+  branchOnly: boolean;
+  onToggleBranchOnly: () => void;
 }
 
-export function CommitLog({ entries, workspaceId, isLoading }: CommitLogProps) {
+export function CommitLog({
+  entries,
+  workspaceId,
+  isLoading,
+  branchOnly,
+  onToggleBranchOnly,
+}: CommitLogProps) {
   const [expandedHash, setExpandedHash] = useState<string | null>(null);
+
+  const header = (
+    <div className="flex shrink-0 items-center justify-between border-b px-2 py-1">
+      <span className="text-muted-foreground text-[11px]">
+        {branchOnly ? "Branch commits" : "All commits"}
+      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant={branchOnly ? "secondary" : "ghost"}
+            size="icon-xs"
+            onClick={onToggleBranchOnly}
+          >
+            {branchOnly ? (
+              <GitBranch className="size-3.5" />
+            ) : (
+              <ListTree className="size-3.5" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {branchOnly
+            ? "Showing branch commits only — click for full history"
+            : "Showing full history — click for branch commits only"}
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
 
   if (isLoading) {
     return (
-      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        Loading commit history...
+      <div className="flex min-h-0 flex-1 flex-col">
+        {header}
+        <div className="text-muted-foreground flex flex-1 items-center justify-center text-sm">
+          Loading commit history...
+        </div>
       </div>
     );
   }
 
   if (entries.length === 0) {
     return (
-      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        No commits yet
+      <div className="flex min-h-0 flex-1 flex-col">
+        {header}
+        <div className="text-muted-foreground flex flex-1 items-center justify-center text-sm">
+          {branchOnly ? "No branch-specific commits" : "No commits yet"}
+        </div>
       </div>
     );
   }
 
   return (
-    <ScrollArea className="min-h-0 flex-1">
-      <div className="space-y-px p-2">
-        {entries.map((entry) => (
-          <CommitEntry
-            key={entry.hash}
-            entry={entry}
-            workspaceId={workspaceId}
-            isExpanded={expandedHash === entry.hash}
-            onToggle={() =>
-              setExpandedHash(expandedHash === entry.hash ? null : entry.hash)
-            }
-          />
-        ))}
-      </div>
-    </ScrollArea>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {header}
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="space-y-px p-2">
+          {entries.map((entry) => (
+            <CommitEntry
+              key={entry.hash}
+              entry={entry}
+              workspaceId={workspaceId}
+              isExpanded={expandedHash === entry.hash}
+              onToggle={() =>
+                setExpandedHash(expandedHash === entry.hash ? null : entry.hash)
+              }
+            />
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 

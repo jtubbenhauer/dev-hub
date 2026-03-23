@@ -62,12 +62,17 @@ export function useGitStatus(
   });
 }
 
-export function useGitLog(workspaceId: string | null, maxCount: number = 50) {
+export function useGitLog(
+  workspaceId: string | null,
+  maxCount: number = 50,
+  branchOnly: boolean = false,
+) {
   return useQuery<GitLogEntry[]>({
-    queryKey: ["git-log", workspaceId, maxCount],
+    queryKey: ["git-log", workspaceId, maxCount, branchOnly],
     queryFn: () =>
       gitGet<GitLogEntry[]>(workspaceId!, "log", {
         maxCount: String(maxCount),
+        ...(branchOnly ? { branchOnly: "true" } : {}),
       }),
     enabled: !!workspaceId,
   });

@@ -153,25 +153,27 @@ export function gitRoutes(workspacePath: string): Hono {
     } satisfies GitStatusResult);
   });
 
-  // GET /git/log?limit=<n>
+  // GET /git/log?limit=<n>&baseRef=<ref>
   app.get("/log", async (c) => {
     const git = createGit(workspacePath);
     const maxCount = parseInt(c.req.query("limit") ?? "50", 10);
+    const baseRef = c.req.query("baseRef");
+
+    const format = {
+      hash: "%H",
+      abbrevHash: "%h",
+      message: "%s",
+      body: "%b",
+      author: "%an",
+      authorEmail: "%ae",
+      date: "%aI",
+      refs: "%D",
+    };
 
     try {
-      const log = await git.log({
-        maxCount,
-        format: {
-          hash: "%H",
-          abbrevHash: "%h",
-          message: "%s",
-          body: "%b",
-          author: "%an",
-          authorEmail: "%ae",
-          date: "%aI",
-          refs: "%D",
-        },
-      });
+      const log = baseRef
+        ? await git.log({ maxCount, format, from: baseRef, to: "HEAD" })
+        : await git.log({ maxCount, format });
 
       const entries: GitLogEntry[] = log.all.map((entry) => ({
         hash: entry.hash,
@@ -190,7 +192,18 @@ export function gitRoutes(workspacePath: string): Hono {
     }
   });
 
-  // GET /git/diff?file=<path>&staged=<bool>
+  app.get("/default-branch", async (c) => {
+    const git = createGit(workspacePath);
+    const summary = await git.branchLocal();
+    const names = Object.keys(summary.branches);
+    for (const candidate of ["main", "master"]) {
+      if (names.includes(candidate)) {
+        return c.json({ branch: candidate });
+      }
+    }
+    return c.json({ branch: null });
+  });
+
   app.get("/diff", async (c) => {
     const git = createGit(workspacePath);
     const file = c.req.query("file");

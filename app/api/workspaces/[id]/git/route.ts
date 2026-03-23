@@ -49,7 +49,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
       case "log": {
         const maxCount = parseInt(url.searchParams.get("maxCount") ?? "50", 10);
-        const log = await backend.getLog(maxCount);
+        const branchOnly = url.searchParams.get("branchOnly") === "true";
+
+        let baseRef: string | undefined;
+        if (branchOnly) {
+          try {
+            const defaultBranch = await backend.getDefaultBranch();
+            if (defaultBranch) {
+              baseRef = await backend.getMergeBase(defaultBranch);
+            }
+          } catch {
+            // merge-base can fail if branch has no common ancestor — fall back to full log
+          }
+        }
+
+        const log = await backend.getLog(maxCount, baseRef);
         return NextResponse.json(log);
       }
 

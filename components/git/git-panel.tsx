@@ -150,6 +150,14 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   }
   const [openPanel, setOpenPanel] = useState<BottomPanel>(null);
   const [sortMode, setSortMode] = useState<SortMode>("path");
+  const [logBranchOnly, setLogBranchOnly] = useState(() => {
+    try {
+      const stored = localStorage.getItem("dev-hub:git-log-branch-only");
+      return stored !== null ? stored === "true" : true;
+    } catch {
+      return true;
+    }
+  });
   const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false);
   const isMobile = useIsMobile();
 
@@ -172,7 +180,11 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   const { data: status, isLoading: isStatusLoading } = useGitStatus(
     workspace.id,
   );
-  const { data: log = [], isLoading: isLogLoading } = useGitLog(workspace.id);
+  const { data: log = [], isLoading: isLogLoading } = useGitLog(
+    workspace.id,
+    50,
+    logBranchOnly,
+  );
   const { data: branches = [] } = useGitBranches(workspace.id);
   const { data: stashes = [] } = useGitStashList(workspace.id);
 
@@ -298,6 +310,16 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
 
   const handleTogglePanel = useCallback((panel: BottomPanel) => {
     setOpenPanel((prev) => (prev === panel ? null : panel));
+  }, []);
+
+  const handleToggleLogBranchOnly = useCallback(() => {
+    setLogBranchOnly((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("dev-hub:git-log-branch-only", String(next));
+      } catch {}
+      return next;
+    });
   }, []);
 
   const handleStageFiles = useCallback(
@@ -1216,6 +1238,8 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
                 entries={log}
                 workspaceId={workspace.id}
                 isLoading={isLogLoading}
+                branchOnly={logBranchOnly}
+                onToggleBranchOnly={handleToggleLogBranchOnly}
               />
             )}
             {openPanel === "stashes" && (

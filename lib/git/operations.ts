@@ -88,6 +88,18 @@ export async function getGitStatus(
   };
 }
 
+export async function getDefaultBranch(
+  workspacePath: string,
+): Promise<string | null> {
+  const git = createGit(workspacePath);
+  const summary = await git.branchLocal();
+  const names = Object.keys(summary.branches);
+  for (const candidate of ["main", "master"]) {
+    if (names.includes(candidate)) return candidate;
+  }
+  return null;
+}
+
 export async function stageFiles(
   workspacePath: string,
   files: string[],
@@ -134,23 +146,25 @@ export async function commit(
 export async function getLog(
   workspacePath: string,
   maxCount: number = 50,
+  baseRef?: string,
 ): Promise<GitLogEntry[]> {
   const git = createGit(workspacePath);
 
   try {
-    const log = await git.log({
-      maxCount,
-      format: {
-        hash: "%H",
-        abbrevHash: "%h",
-        message: "%s",
-        body: "%b",
-        author: "%an",
-        authorEmail: "%ae",
-        date: "%aI",
-        refs: "%D",
-      },
-    });
+    const format = {
+      hash: "%H",
+      abbrevHash: "%h",
+      message: "%s",
+      body: "%b",
+      author: "%an",
+      authorEmail: "%ae",
+      date: "%aI",
+      refs: "%D",
+    };
+
+    const log = baseRef
+      ? await git.log({ maxCount, format, from: baseRef, to: "HEAD" })
+      : await git.log({ maxCount, format });
 
     return log.all.map((entry) => ({
       hash: entry.hash,

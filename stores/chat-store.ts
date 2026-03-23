@@ -37,6 +37,7 @@ interface QueuedMessage {
   model?: { providerID: string; modelID: string };
   agent?: string;
   variant?: string;
+  attachments?: Array<{ mime: string; dataUrl: string; filename: string }>;
   optimisticMessageId: string;
 }
 
@@ -406,6 +407,7 @@ interface ChatState {
     model?: { providerID: string; modelID: string },
     agent?: string,
     variant?: string,
+    attachments?: Array<{ mime: string; dataUrl: string; filename: string }>,
   ) => Promise<void>;
   flushQueuedMessages: (workspaceId: string) => Promise<void>;
   hasQueuedMessages: (workspaceId: string) => boolean;
@@ -1052,7 +1054,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     return revertedText;
   },
 
-  sendMessage: async (sessionId, text, workspaceId, model, agent, variant) => {
+  sendMessage: async (
+    sessionId,
+    text,
+    workspaceId,
+    model,
+    agent,
+    variant,
+    attachments,
+  ) => {
     const isAlreadyStreaming = get().getStreamingStatus() === "streaming";
     if (!isAlreadyStreaming) {
       set({ optimisticStreamingSessionId: sessionId });
@@ -1067,6 +1077,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       model,
       agent,
       variant,
+      attachments,
       optimisticMessageId: optimisticId,
     };
     const optimisticMessage: MessageWithParts = {
@@ -1103,8 +1114,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     );
 
     try {
+      const parts: Array<Record<string, unknown>> = [{ type: "text", text }];
+      if (attachments?.length) {
+        for (const att of attachments) {
+          parts.push({
+            type: "file",
+            mime: att.mime,
+            url: att.dataUrl,
+            filename: att.filename,
+          });
+        }
+      }
       const body: Record<string, unknown> = {
-        parts: [{ type: "text", text }],
+        parts,
       };
       if (model) body.model = model;
       if (agent) body.agent = agent;
@@ -1255,6 +1277,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           message.model,
           message.agent,
           message.variant,
+          message.attachments,
         );
       }
     } finally {

@@ -24,7 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useCommand } from "@/hooks/use-command";
-import { useAgentHealth } from "@/hooks/use-git";
+import { useAgentHealth, useGitStatus } from "@/hooks/use-git";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
@@ -52,6 +52,7 @@ import {
   ChevronRight,
   Clock,
   Coins,
+  GitBranch,
   GripVertical,
   LayoutList,
   ListTodo,
@@ -496,6 +497,10 @@ export function ChatInterface() {
   const activeSessionDirectory = activeSessionId
     ? sessions[activeSessionId]?.directory
     : undefined;
+  const activeSessionTitle = activeSessionId
+    ? (sessions[activeSessionId]?.title ?? "")
+    : "";
+  const { data: gitStatus } = useGitStatus(activeWorkspaceId);
   const [unifiedLimit, setUnifiedLimit] = useState(20);
   const effectiveUnifiedLimit = groupByWorkspace
     ? Number.MAX_SAFE_INTEGER
@@ -1683,7 +1688,27 @@ export function ChatInterface() {
               </svg>
             </Button>
 
-            <div className="md:flex-1" />
+            {/* Session info */}
+            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+              {activeSessionTitle ? (
+                <span
+                  className="text-foreground truncate text-sm font-medium"
+                  title={activeSessionTitle}
+                >
+                  {activeSessionTitle}
+                </span>
+              ) : activeSessionId ? (
+                <span className="text-muted-foreground truncate text-sm italic">
+                  Untitled
+                </span>
+              ) : null}
+              {gitStatus?.branch && (
+                <span className="text-muted-foreground hidden shrink-0 items-center gap-1 text-xs md:inline-flex">
+                  <GitBranch className="size-3" />
+                  {gitStatus.branch}
+                </span>
+              )}
+            </div>
 
             <Button
               size="icon-sm"

@@ -1,0 +1,71 @@
+stores/command-store.ts
+  f77e07ba95a196f0 177-179,194-197,200
+tests/api/start.test.ts
+  f77e07ba95a196f0 1,7-27,42,72-73,75
+components/chat/streaming-indicator.tsx
+  f77e07ba95a196f0 1-80
+components/chat/empty-chat.tsx
+  f77e07ba95a196f0 1-35
+components/terminal/terminal-drawer.tsx
+  f77e07ba95a196f0 4-8
+hooks/use-system-stats.ts
+  f77e07ba95a196f0 24
+app/globals.css
+  f77e07ba95a196f0 8-9,18-19,28-29,38-39
+components/chat/use-chat-commands.ts
+  f77e07ba95a196f0 1-290
+components/chat/use-chat-effects.ts
+  f77e07ba95a196f0 1-96
+AGENTS.md
+  f77e07ba95a196f0 203-224,233-234
+hooks/use-git.ts
+  f77e07ba95a196f0 62
+components/chat/use-agent-model-sync.ts
+  f77e07ba95a196f0 1-148
+components/chat/question-banner.tsx
+  f77e07ba95a196f0 1-275
+stores/chat-store.ts
+  f77e07ba95a196f0 761,814-815,1856
+components/providers/providers.tsx
+  f77e07ba95a196f0 68
+app/api/opencode/[...path]/route.ts
+  f77e07ba95a196f0 200
+app/page.tsx
+  f77e07ba95a196f0 3,10-16
+components/chat/markdown-content.tsx
+  f77e07ba95a196f0 8-9
+tests/api/health.test.ts
+  f77e07ba95a196f0 7-23,34,54-60,62,211
+components/chat/chat-interface.tsx
+  f77e07ba95a196f0 3,6,9,13-16,18-25,42-43,63,197,199-201,203,205-209,211,238,251-277,279-299,302-303,417,419,422,625-637,643-648,651-658,672-720,731,737,758,764
+drizzle/schema.ts
+  f77e07ba95a196f0 6,19-28,31-67,70-88,103-118,121-143,146-170,187-212,215-233
+components/chat/use-session-management.ts
+  f77e07ba95a196f0 1-373
+components/chat/use-session-navigation.ts
+  f77e07ba95a196f0 1-105
+components/chat/permission-banner.tsx
+  f77e07ba95a196f0 1-57
+lib/db.ts
+  f77e07ba95a196f0 11-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "4e6194144553784d3a02a92e0b16551f7ba39e67",
+  "prompts": {
+    "f77e07ba95a196f0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2e5718ab3ffe1sB6HloABpVfLe",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 1999,
+      "total_deletions": 1658,
+      "accepted_lines": 1935,
+      "overriden_lines": 0
+    }
+  }
+}

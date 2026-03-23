@@ -200,6 +200,28 @@ API routes live in `app/api/` and follow Next.js App Router conventions:
 - **Formatting:** Prettier is configured (`.prettierrc`). Run `pnpm format` to format all files, or `pnpm format:check` to verify. Prettier runs with semicolons, double quotes, 80-char print width, 2-space indent, trailing commas, and `prettier-plugin-tailwindcss` for automatic Tailwind class sorting.
 - Schema types are inferred from Drizzle (`typeof table.$inferSelect`, `typeof table.$inferInsert`).
 
+## File Size Guidelines
+
+Large files degrade LLM context utilisation and increase the chance of ordering bugs (e.g. temporal dead zone errors when variable declarations shift during refactoring).
+
+- **Components:** Aim for ~500 lines. Extract custom hooks, sub-components, and constant maps when a file grows past this.
+- **Stores:** Up to ~800 lines is acceptable — they tend to be dense state logic — but watch for unbounded growth.
+- **Extraction rules of thumb:**
+  - Groups of related `useCallback`/`useEffect` that share state → custom hook.
+  - Self-contained JSX blocks with their own state → sub-component file.
+  - When extracting, verify variable declaration order — `const` destructuring has a temporal dead zone. If hook A returns `foo` and code above hook A references `foo`, the call must be reordered.
+  - Extracted hooks imported only by `"use client"` components don't need their own `"use client"` directive.
+
+## Performance
+
+This app is self-hosted (localhost). CDN, SEO, image optimisation, and compression are irrelevant — focus on runtime performance, memory, and CPU.
+
+- **Zustand selectors:** Never call `useSomeStore()` without a selector — it subscribes to the entire store and re-renders on every change. Use `useSomeStore((s) => s.field)` for reactive state, and `useSomeStore.getState()` for actions/callbacks that don't need reactivity.
+- **Database indexes:** Always add indexes on foreign key columns and columns used in `WHERE` clauses. SQLite does not auto-index FKs.
+- **TanStack Query:** Set `staleTime` on queries that poll — prevents redundant refetches between intervals.
+- **Lazy loading:** Use `next/dynamic` for heavy components not needed on initial render (modals, drawers, panels behind toggles).
+- **Unbounded collections:** Cap any in-memory collection that grows over time (output buffers, Maps keyed by session/entity ID). Clean up entries when the parent entity is deleted.
+
 ## Common Gotchas
 
 1. **Edge Runtime:** Any code imported into middleware or instrumentation must not use Node.js-only APIs at the top level. Use dynamic imports inside runtime guards.
@@ -208,3 +230,5 @@ API routes live in `app/api/` and follow Next.js App Router conventions:
 4. **Worktree types:** `WorkspaceRow` is inferred from the schema (`typeof workspaces.$inferSelect`), so adding columns to the schema auto-propagates to all typed references.
 5. **Fresh DB:** If starting from scratch, `pnpm db:push` creates all tables. The auto-migration in `instrumentation.ts` handles journal seeding. After that, never use `db:push` again — use `db:generate` + restart.
 6. **Dual editor engines:** The diff/code editor supports Monaco and Neovim. A user setting (`editorType`) controls which one renders. Monaco is the default. Any change to editor UI (toolbar, headers, features) must be applied to both Monaco and Neovim implementations where applicable.
+7. **React Compiler lint — refs in hooks:** `ref.current = value` is allowed in components but NOT in custom hooks. In hooks, use `useEffect` to sync ref values instead of assigning during render.
+8. **React Compiler lint — memoization deps:** `react-hooks/preserve-manual-memoization` requires destructuring object properties before using them in `useCallback`/`useMemo` dependency arrays.

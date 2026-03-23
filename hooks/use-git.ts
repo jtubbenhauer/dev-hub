@@ -59,6 +59,7 @@ export function useGitStatus(
     queryFn: () => gitGet<GitStatusResult>(workspaceId!, "status"),
     enabled: !!workspaceId,
     refetchInterval: refetchIntervalMs,
+    staleTime: Math.max(refetchIntervalMs - 2_000, 0),
   });
 }
 

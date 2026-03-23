@@ -21,7 +21,7 @@ async function fetchSystemStats(
 }
 
 export function useSystemStats(options: UseSystemStatsOptions = {}) {
-  const { interval = 5_000, history = false, enabled = true } = options;
+  const { interval = 15_000, history = false, enabled = true } = options;
 
   return useQuery<SystemStats | SystemStatsWithHistory>({
     queryKey: ["system-stats", { history }],

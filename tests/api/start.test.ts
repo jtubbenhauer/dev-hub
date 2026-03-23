@@ -1,16 +1,30 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { EventEmitter } from "node:events";
 import type { Workspace } from "@/types";
 
-const mockAuth = vi.fn();
-vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
-
-const mockWhere = vi.fn();
-const mockFrom = vi.fn();
-const mockSelect = vi.fn();
-const mockSet = vi.fn();
-const mockUpdate = vi.fn();
+const {
+  mockAuth,
+  mockWhere,
+  mockFrom,
+  mockSelect,
+  mockSet,
+  mockUpdate,
+  mockToWorkspace,
+  mockInterpolateProviderCommand,
+  mockSpawn,
+} = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+  mockWhere: vi.fn(),
+  mockFrom: vi.fn(),
+  mockSelect: vi.fn(),
+  mockSet: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockToWorkspace: vi.fn(),
+  mockInterpolateProviderCommand: vi.fn(),
+  mockSpawn: vi.fn(),
+}));
 
 const mockDbChain = {
   from: mockFrom,
@@ -24,6 +38,8 @@ mockWhere.mockResolvedValue([]);
 mockSelect.mockReturnValue(mockDbChain);
 mockSet.mockReturnValue(mockDbChain);
 mockUpdate.mockReturnValue(mockDbChain);
+
+vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
 
 vi.mock("@/lib/db", () => ({
   db: { select: mockSelect, update: mockUpdate },
@@ -44,20 +60,19 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args) => ({ and: args })),
 }));
 
-const mockToWorkspace = vi.fn();
 vi.mock("@/lib/workspaces/backend", () => ({
   toWorkspace: (...args: unknown[]) => mockToWorkspace(...args),
 }));
 
-const mockInterpolateProviderCommand = vi.fn();
 vi.mock("@/lib/workspaces/resume", () => ({
   interpolateProviderCommand: (...args: unknown[]) =>
     mockInterpolateProviderCommand(...args),
 }));
 
-const mockSpawn = vi.fn();
-vi.mock("node:child_process", () => {
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
   return {
+    ...actual,
     spawn: mockSpawn,
     __esModule: true,
     default: { spawn: mockSpawn },

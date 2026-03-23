@@ -174,6 +174,9 @@ export const useCommandStore = create<CommandState>()((set, get) => ({
 const pendingLines = new Map<string, string[]>();
 let flushHandle: number | null = null;
 
+// Cap stored output to prevent unbounded memory growth for long-running commands
+const MAX_OUTPUT_LINES = 10_000;
+
 function doFlush(
   set: (updater: (state: CommandState) => Partial<CommandState>) => void,
 ) {
@@ -188,9 +191,13 @@ function doFlush(
     for (const [sessionId, newLines] of snapshot) {
       const session = updatedSessions[sessionId];
       if (!session) continue;
+      let merged = [...session.lines, ...newLines];
+      if (merged.length > MAX_OUTPUT_LINES) {
+        merged = merged.slice(-MAX_OUTPUT_LINES);
+      }
       updatedSessions[sessionId] = {
         ...session,
-        lines: [...session.lines, ...newLines],
+        lines: merged,
       };
     }
     return { sessions: updatedSessions };

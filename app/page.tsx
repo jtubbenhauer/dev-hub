@@ -1,11 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
-import { SystemStatsCards } from "@/components/dashboard/system-stats";
 import { ProcessList } from "@/components/dashboard/process-list";
 import { WorkspaceOverview } from "@/components/dashboard/workspace-overview";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { ClickUpTasks } from "@/components/dashboard/clickup-tasks";
+
+const SystemStatsCards = dynamic(
+  () =>
+    import("@/components/dashboard/system-stats").then(
+      (mod) => mod.SystemStatsCards,
+    ),
+  { ssr: false },
+);
 
 export default function DashboardPage() {
   return (

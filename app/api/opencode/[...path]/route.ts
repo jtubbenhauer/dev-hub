@@ -197,8 +197,7 @@ async function proxyResponse(upstream: Response, isSSE: boolean) {
     responseHeaders.set("content-type", upstreamContentType);
   }
 
-  const body = await upstream.arrayBuffer();
-  return new Response(body, {
+  return new Response(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,
   });

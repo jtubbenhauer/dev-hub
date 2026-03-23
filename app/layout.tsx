@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, IBM_Plex_Mono } from "next/font/google";
-import "highlight.js/styles/github-dark-dimmed.css";
-import "highlight.js/styles/github.css";
 import "./globals.css";
 import { Providers } from "@/components/providers/providers";
 

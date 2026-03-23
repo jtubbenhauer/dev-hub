@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TerminalPanel } from "./terminal-panel";
+import dynamic from "next/dynamic";
+
+const TerminalPanel = dynamic(() =>
+  import("./terminal-panel").then((mod) => mod.TerminalPanel),
+);
 import { useTerminalStore } from "@/stores/terminal-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import {

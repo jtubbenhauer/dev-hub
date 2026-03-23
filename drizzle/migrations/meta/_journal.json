@@ -78,6 +78,13 @@
       "when": 1773873172803,
       "tag": "0010_amazing_nebula",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1774268613786,
+      "tag": "0011_cloudy_shatterstar",
+      "breakpoints": true
     }
   ]
 }

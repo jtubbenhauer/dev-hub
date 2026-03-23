@@ -1,14 +1,26 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { EventEmitter } from "node:events";
 import type { DEFAULT_PROVIDER_BEHAVIOUR, Workspace } from "@/types";
 
-const mockAuth = vi.fn();
-vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
-
-const mockWhere = vi.fn();
-const mockFrom = vi.fn();
-const mockSelect = vi.fn();
+const {
+  mockAuth,
+  mockWhere,
+  mockFrom,
+  mockSelect,
+  mockToWorkspace,
+  mockInterpolateProviderCommand,
+  mockSpawn,
+} = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+  mockWhere: vi.fn(),
+  mockFrom: vi.fn(),
+  mockSelect: vi.fn(),
+  mockToWorkspace: vi.fn(),
+  mockInterpolateProviderCommand: vi.fn(),
+  mockSpawn: vi.fn(),
+}));
 
 const mockDbChain = {
   from: mockFrom,
@@ -18,6 +30,8 @@ const mockDbChain = {
 mockFrom.mockReturnValue(mockDbChain);
 mockWhere.mockResolvedValue([]);
 mockSelect.mockReturnValue(mockDbChain);
+
+vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
 
 vi.mock("@/lib/db", () => ({
   db: { select: mockSelect },
@@ -33,14 +47,19 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args) => ({ and: args })),
 }));
 
-const mockToWorkspace = vi.fn();
 vi.mock("@/lib/workspaces/backend", () => ({
   toWorkspace: (...args: unknown[]) => mockToWorkspace(...args),
 }));
 
-const mockSpawn = vi.fn();
-vi.mock("node:child_process", () => {
+vi.mock("@/lib/workspaces/resume", () => ({
+  interpolateProviderCommand: (...args: unknown[]) =>
+    mockInterpolateProviderCommand(...args),
+}));
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
   return {
+    ...actual,
     spawn: mockSpawn,
     __esModule: true,
     default: { spawn: mockSpawn },
@@ -189,6 +208,7 @@ beforeEach(() => {
   mockFrom.mockReturnValue(mockDbChain);
   mockWhere.mockResolvedValue([]);
   mockSelect.mockReturnValue(mockDbChain);
+  mockInterpolateProviderCommand.mockReturnValue("rig status --json");
   fetchSpy.mockReset();
 });
 

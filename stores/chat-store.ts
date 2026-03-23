@@ -758,6 +758,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       await fetch(buildProxyUrl(`session/${sessionId}`, workspaceId), {
         method: "DELETE",
       });
+      sessionSourceWorkspace.delete(sessionId);
       set((state) => {
         const ws = state.workspaceStates[workspaceId] ?? emptyWorkspaceState();
         const { [sessionId]: _s, ...remainingSessions } = ws.sessions;
@@ -809,6 +810,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const state = get();
     const ws = state.workspaceStates[workspaceId];
     if (!ws || !(sessionId in ws.sessions)) return null;
+
+    sessionSourceWorkspace.delete(sessionId);
 
     const snapshot: SessionSnapshot = {
       sessionId,
@@ -1850,6 +1853,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       case "session.deleted": {
         const info = properties.info as Session;
         if (!info) return;
+        sessionSourceWorkspace.delete(info.id);
         set((state) => {
           const ws =
             state.workspaceStates[sourceWorkspaceId] ?? emptyWorkspaceState();

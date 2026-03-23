@@ -14,6 +14,7 @@ import type {
   Command,
 } from "@/lib/opencode/types";
 import { playSoundForEvent } from "@/lib/sounds";
+import { sendBrowserNotification } from "@/lib/notifications";
 import { toast } from "sonner";
 
 export type StreamingStatus =
@@ -1947,6 +1948,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           get().clearStreamingPoll();
         }
         playSoundForEvent("agent");
+        sendBrowserNotification("Agent completed", {
+          body: "The agent has finished processing.",
+        });
         break;
       }
 
@@ -1977,6 +1981,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           });
         }
         playSoundForEvent("errors");
+        sendBrowserNotification("Session error", {
+          body: errorObj?.data?.message ?? "An error occurred.",
+        });
         break;
       }
 
@@ -1997,6 +2004,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           })),
         );
         playSoundForEvent("permissions");
+        sendBrowserNotification("Permission required", {
+          body: "The agent is waiting for your approval.",
+        });
         break;
       }
 

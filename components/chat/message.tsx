@@ -287,6 +287,10 @@ export const ChatMessage = memo(
             <div className="bg-primary/10 flex size-8 shrink-0 items-center justify-center rounded-full">
               <Bot className="text-primary size-4" />
             </div>
+          ) : showTimestamps ? (
+            <span className="text-muted-foreground/40 pt-2 flex size-8 shrink-0 items-start justify-center font-mono text-[9px] leading-tight">
+              {formatMessageTime(info.time.created)}
+            </span>
           ) : (
             <div className="size-8 shrink-0" />
           ))}
@@ -317,11 +321,6 @@ export const ChatMessage = memo(
                   workspaceId={activeWorkspaceId}
                 />
               </div>
-              {showTimestamps && (
-                <span className="text-muted-foreground/60 text-[10px]">
-                  {formatMessageTime(info.time.created)}
-                </span>
-              )}
             </>
           ) : (
             <div className="w-full min-w-0 space-y-3 overflow-hidden">
@@ -370,27 +369,15 @@ export const ChatMessage = memo(
                 </div>
               )}
 
-              {(showTokens || showTimestamps) && isAssistant && (
+              {showTokens && isAssistant && "tokens" in info && (
                 <div className="flex items-center gap-2">
-                  {showTokens && "tokens" in info && (
-                    <>
-                      <Badge variant="outline" className="text-xs font-normal">
-                        {info.tokens.input + info.tokens.output} tokens
-                      </Badge>
-                      {info.cost > 0 && (
-                        <Badge
-                          variant="outline"
-                          className="text-xs font-normal"
-                        >
-                          ${info.cost.toFixed(4)}
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                  {showTimestamps && (
-                    <span className="text-muted-foreground/60 text-[10px]">
-                      {formatMessageTime(info.time.created)}
-                    </span>
+                  <Badge variant="outline" className="text-xs font-normal">
+                    {info.tokens.input + info.tokens.output} tokens
+                  </Badge>
+                  {info.cost > 0 && (
+                    <Badge variant="outline" className="text-xs font-normal">
+                      ${info.cost.toFixed(4)}
+                    </Badge>
                   )}
                 </div>
               )}
@@ -403,6 +390,10 @@ export const ChatMessage = memo(
             <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-full">
               <User className="text-muted-foreground size-4" />
             </div>
+          ) : showTimestamps ? (
+            <span className="text-muted-foreground/40 mt-0.5 flex size-8 shrink-0 items-start justify-center font-mono text-[9px] leading-tight">
+              {formatMessageTime(info.time.created)}
+            </span>
           ) : (
             <div className="size-8 shrink-0" />
           ))}

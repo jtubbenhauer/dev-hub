@@ -1,0 +1,37 @@
+components/task-picker/task-picker.tsx
+  91efd01aac0a796a 482-483,501,507-514,519-520
+  42a84b93fae3542b 164,182,188-195,200-201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "797ed81f60fe4480bee63437f11ee9426a9b2411",
+  "prompts": {
+    "42a84b93fae3542b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e5724585ffeNVum86vwsXpBZG-7d1dff2b-7e78-43ae-bebc-71f5ad888b6c",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    },
+    "91efd01aac0a796a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e5724585ffeNVum86vwsXpBZG-b628d3b9-dd41-4e1a-ad08-ec5c6b36690b",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}

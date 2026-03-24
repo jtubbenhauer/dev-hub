@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useMemo } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Link from "next/link";
@@ -30,13 +31,26 @@ import {
 import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog";
 import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-provider-workspace-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   useClickUpTaskDetail,
   useClickUpTaskComments,
 } from "@/hooks/use-clickup";
 import { useWorkspaceProviders } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { ClickUpTask, ClickUpCustomField, Workspace } from "@/types";
+import { toast } from "sonner";
+import type {
+  ClickUpTask,
+  ClickUpCustomField,
+  LinkedTaskMeta,
+  Workspace,
+} from "@/types";
 
 const PRIORITY_LABELS: Record<string, string> = {
   urgent: "Urgent",
@@ -177,7 +191,15 @@ function slugify(text: string): string {
     .slice(0, 60);
 }
 
-function LinkedWorkspaceRow({ workspace }: { workspace: Workspace }) {
+function LinkedWorkspaceRow({
+  workspace,
+  onUnlink,
+  isPending,
+}: {
+  workspace: Workspace;
+  onUnlink: (workspaceId: string) => void;
+  isPending: boolean;
+}) {
   const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
   const isRemote = workspace.backend === "remote";
 
@@ -206,6 +228,16 @@ function LinkedWorkspaceRow({ workspace }: { workspace: Workspace }) {
       >
         <MessageSquare className="size-3.5" />
       </Link>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-destructive size-7 shrink-0"
+        onClick={() => onUnlink(workspace.id)}
+        disabled={isPending}
+      >
+        <X className="size-3.5" />
+      </Button>
     </div>
   );
 }
@@ -223,7 +255,9 @@ export function TaskDetailPanel({
   style,
   className,
 }: TaskDetailPanelProps) {
+  const queryClient = useQueryClient();
   const [worktreeOpen, setWorktreeOpen] = useState(false);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
 
   const {
     data: detail,
@@ -261,7 +295,71 @@ export function TaskDetailPanel({
     [workspaces, task.id],
   );
 
+  const linkableWorkspaces = useMemo(
+    () =>
+      workspaces.filter(
+        (ws) => !ws.linkedTaskId || ws.linkedTaskId === task.id,
+      ),
+    [workspaces, task.id],
+  );
+
   const hasLinkedWorkspaces = linkedWorkspaces.length > 0;
+
+  const workspaceLinkMutation = useMutation({
+    mutationFn: async ({
+      workspaceId,
+      linkedTaskId,
+      linkedTaskMeta,
+    }: {
+      workspaceId: string;
+      linkedTaskId: string | null;
+      linkedTaskMeta: LinkedTaskMeta | null;
+    }) => {
+      const response = await fetch(`/api/workspaces/${workspaceId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ linkedTaskId, linkedTaskMeta }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update workspace link");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      setSelectedWorkspaceId("");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const handleLinkWorkspace = (workspaceId: string) => {
+    const linkedTaskMeta: LinkedTaskMeta = {
+      name: task.name,
+      customId: task.custom_id,
+      url: task.url,
+      status: task.status.status,
+      provider: "clickup",
+    };
+
+    workspaceLinkMutation.mutate({
+      workspaceId,
+      linkedTaskId: task.id,
+      linkedTaskMeta,
+    });
+  };
+
+  const handleUnlinkWorkspace = (workspaceId: string) => {
+    workspaceLinkMutation.mutate({
+      workspaceId,
+      linkedTaskId: null,
+      linkedTaskMeta: null,
+    });
+  };
 
   const nonEmptyCustomFields = (detail?.custom_fields ?? []).filter(
     (f) =>
@@ -320,6 +418,7 @@ export function TaskDetailPanel({
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded p-1 transition-colors"
           >
@@ -333,13 +432,45 @@ export function TaskDetailPanel({
             {hasLinkedWorkspaces && (
               <div className="space-y-1.5">
                 {linkedWorkspaces.map((ws) => (
-                  <LinkedWorkspaceRow key={ws.id} workspace={ws} />
+                  <LinkedWorkspaceRow
+                    key={ws.id}
+                    workspace={ws}
+                    onUnlink={handleUnlinkWorkspace}
+                    isPending={workspaceLinkMutation.isPending}
+                  />
                 ))}
               </div>
             )}
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={selectedWorkspaceId}
+                  onValueChange={(workspaceId) => {
+                    setSelectedWorkspaceId(workspaceId);
+                    handleLinkWorkspace(workspaceId);
+                  }}
+                >
+                  <SelectTrigger size="sm" className="h-8 w-[220px]">
+                    <SelectValue placeholder="Link Workspace" />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    {linkableWorkspaces.length > 0 ? (
+                      linkableWorkspaces.map((workspace) => (
+                        <SelectItem key={workspace.id} value={workspace.id}>
+                          {workspace.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        No workspaces available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {hasLinkedWorkspaces ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

@@ -50,10 +50,24 @@ import {
   CheckSquare,
   TerminalSquare,
   Loader2,
+  Link2,
+  MoreHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils";
-import type { Workspace, QuickCommand, LinkedTaskMeta } from "@/types";
+import { TaskPicker } from "@/components/task-picker/task-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type {
+  ClickUpTask,
+  Workspace,
+  QuickCommand,
+  LinkedTaskMeta,
+} from "@/types";
 
 interface WorkspaceCardProps {
   workspace: Workspace;
@@ -337,6 +351,7 @@ export function WorkspaceCard({
           </div>
           <div className="flex items-center gap-1">
             <QuickCommandsEditor workspace={workspace} />
+            <WorkspaceTaskLinkMenu workspace={workspace} />
             {hasProvider ? (
               <Popover>
                 <PopoverTrigger asChild>
@@ -429,6 +444,116 @@ export function WorkspaceCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function WorkspaceTaskLinkMenu({ workspace }: { workspace: Workspace }) {
+  const queryClient = useQueryClient();
+  const [isTaskPickerOpen, setIsTaskPickerOpen] = useState(false);
+
+  const linkTaskMutation = useMutation({
+    mutationFn: async (data: {
+      linkedTaskId: string | null;
+      linkedTaskMeta: LinkedTaskMeta | null;
+    }) => {
+      const response = await fetch(`/api/workspaces/${workspace.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update linked task");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      setIsTaskPickerOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const handleTaskSelect = useCallback(
+    (task: ClickUpTask) => {
+      const linkedTaskMeta: LinkedTaskMeta = {
+        name: task.name,
+        customId: task.custom_id,
+        url: task.url,
+        status: task.status.status,
+        provider: "clickup",
+      };
+
+      linkTaskMutation.mutate({
+        linkedTaskId: task.id,
+        linkedTaskMeta,
+      });
+    },
+    [linkTaskMutation],
+  );
+
+  const handleUnlink = useCallback(() => {
+    linkTaskMutation.mutate({
+      linkedTaskId: null,
+      linkedTaskMeta: null,
+    });
+  }, [linkTaskMutation]);
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={(event) => event.stopPropagation()}
+            disabled={linkTaskMutation.isPending}
+          >
+            <MoreHorizontal className="size-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {workspace.linkedTaskId ? (
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                handleUnlink();
+              }}
+              disabled={linkTaskMutation.isPending}
+            >
+              <Link2 className="mr-2 size-3.5" />
+              Unlink Task
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                setIsTaskPickerOpen(true);
+              }}
+            >
+              <Link2 className="mr-2 size-3.5" />
+              Link Task
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <TaskPicker
+        open={isTaskPickerOpen}
+        onOpenChange={setIsTaskPickerOpen}
+        onSelectTask={handleTaskSelect}
+        title="Link task"
+        description={`Select a ClickUp task to link to ${workspace.name}`}
+      />
+    </>
   );
 }
 
@@ -684,7 +809,10 @@ function QuickCommandsEditor({ workspace }: { workspace: Workspace }) {
           {commands.length > 0 && (
             <div className="space-y-1.5">
               {commands.map((cmd, index) => (
-                <div key={index} className="flex items-center gap-2">
+                <div
+                  key={`${cmd.label}-${cmd.command}`}
+                  className="flex items-center gap-2"
+                >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium">{cmd.label}</p>
                     <p className="text-muted-foreground truncate font-mono text-xs">

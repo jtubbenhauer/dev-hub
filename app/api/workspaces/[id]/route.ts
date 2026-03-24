@@ -5,14 +5,15 @@ import { workspaces, settings, cachedSessions } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { exec } from "node:child_process";
 import { removeWorktree, pruneWorktrees } from "@/lib/git/worktrees";
-import type { WorkspaceProvider } from "@/types";
+import type { LinkedTaskMeta, WorkspaceProvider } from "@/types";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 // GET: single workspace
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
+  void _request;
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -45,7 +46,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 
   const { id } = await params;
-  const body = await request.json();
+  const body = (await request.json()) as {
+    name?: string;
+    quickCommands?: unknown;
+    agentUrl?: string | null;
+    opencodeUrl?: string | null;
+    provider?: string | null;
+    providerMeta?: Record<string, unknown> | null;
+    shellCommand?: string | null;
+    color?: string | null;
+    linkedTaskId?: string | null;
+    linkedTaskMeta?: LinkedTaskMeta | null;
+  };
   const {
     name,
     quickCommands,
@@ -55,6 +67,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     providerMeta,
     shellCommand,
     color,
+    linkedTaskId,
+    linkedTaskMeta,
   } = body;
 
   const updateData: Record<string, unknown> = {};
@@ -66,6 +80,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (providerMeta !== undefined) updateData.providerMeta = providerMeta;
   if (shellCommand !== undefined) updateData.shellCommand = shellCommand;
   if (color !== undefined) updateData.color = color;
+  if (linkedTaskId !== undefined) {
+    if (linkedTaskId === null) {
+      updateData.linkedTaskId = null;
+      updateData.linkedTaskMeta = null;
+    } else {
+      updateData.linkedTaskId = linkedTaskId;
+    }
+  }
+  if (linkedTaskMeta !== undefined && linkedTaskId !== null) {
+    updateData.linkedTaskMeta = linkedTaskMeta;
+  }
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });

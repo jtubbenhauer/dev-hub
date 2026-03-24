@@ -6,7 +6,12 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceFiles } from "@/components/file-picker/file-picker";
 import { useFileTabsSetting } from "@/hooks/use-settings";
-import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match";
+import {
+  fuzzySearch,
+  basenamePositions,
+  type FuzzyMatch,
+} from "@/lib/fuzzy-match";
+import { HighlightedText } from "@/components/ui/highlighted-text";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { cn, isEditorElement } from "@/lib/utils";
@@ -141,57 +146,9 @@ function flattenVisibleEntries(
 // Highlighted path for fzf search results
 // ---------------------------------------------------------------------------
 
-function HighlightedPath({
-  path,
-  positions,
-}: {
-  path: string;
-  positions: Set<number>;
-}) {
-  if (positions.size === 0) {
-    return <span className="truncate">{path}</span>;
-  }
-
-  const parts: React.ReactNode[] = [];
-  let i = 0;
-  while (i < path.length) {
-    if (positions.has(i)) {
-      let end = i;
-      while (end < path.length && positions.has(end)) end++;
-      parts.push(
-        <span key={i} className="text-primary font-semibold">
-          {path.slice(i, end)}
-        </span>,
-      );
-      i = end;
-    } else {
-      let end = i;
-      while (end < path.length && !positions.has(end)) end++;
-      parts.push(<span key={i}>{path.slice(i, end)}</span>);
-      i = end;
-    }
-  }
-
-  return <span className="truncate">{parts}</span>;
-}
-
 // ---------------------------------------------------------------------------
 // Flat fzf search result list (replaces tree when searching)
 // ---------------------------------------------------------------------------
-
-function basenamePositions(match: FuzzyMatch): Set<number> {
-  const lastSlash = match.path.lastIndexOf("/");
-  if (lastSlash === -1) return match.positions;
-
-  const offset = lastSlash + 1;
-  const result = new Set<number>();
-  for (const pos of match.positions) {
-    if (pos >= offset) {
-      result.add(pos - offset);
-    }
-  }
-  return result;
-}
 
 interface FuzzyResultListProps {
   results: FuzzyMatch[];
@@ -239,9 +196,9 @@ function FuzzyResultList({
             <File className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
             <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
               <span className="shrink-0 font-mono text-xs">
-                <HighlightedPath
-                  path={basename}
-                  positions={basenamePositions(match)}
+                <HighlightedText
+                  text={basename}
+                  positions={basenamePositions(match.path, match.positions)}
                 />
               </span>
               {dirname && (

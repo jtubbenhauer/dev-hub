@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  type MouseEvent,
+  type WheelEvent,
+} from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -279,6 +286,27 @@ export function TerminalPanel({
     };
   }, [connect]);
 
+  // Re-focus xterm when the user interacts with the terminal container.
+  // xterm.js only forwards mouse/wheel events to the PTY when its internal
+  // textarea has focus — without this, scrolling silently stops working
+  // after any click outside the terminal (toolbar, file tree, etc.).
+  const handleContainerMouseDown = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      const term = termRef.current;
+      if (!term) return;
+      // Only refocus if the click target is the container padding area,
+      // not the xterm canvas itself (xterm handles its own canvas clicks)
+      if (e.target === e.currentTarget) {
+        term.focus();
+      }
+    },
+    [],
+  );
+
+  const handleContainerWheel = useCallback((_e: WheelEvent<HTMLDivElement>) => {
+    termRef.current?.focus();
+  }, []);
+
   const handleReconnect = useCallback(() => {
     abortRef.current?.abort();
     wsRef.current?.close();
@@ -325,7 +353,12 @@ export function TerminalPanel({
           )}
         </div>
       )}
-      <div ref={containerRef} className="min-h-0 flex-1 p-1" />
+      <div
+        ref={containerRef}
+        className="min-h-0 flex-1 p-1"
+        onMouseDown={handleContainerMouseDown}
+        onWheel={handleContainerWheel}
+      />
     </div>
   );
 }

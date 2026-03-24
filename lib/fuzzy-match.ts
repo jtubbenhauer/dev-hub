@@ -47,3 +47,19 @@ export function fuzzySearch(
   const results = fzf.find(query);
   return results.map(toFuzzyMatch);
 }
+
+// Remap full-path character positions to basename-relative positions
+export function basenamePositions(
+  fullPath: string,
+  positions: Set<number>,
+): Set<number> {
+  const lastSlash = fullPath.lastIndexOf("/");
+  if (lastSlash === -1) return positions;
+
+  const offset = lastSlash + 1;
+  const result = new Set<number>();
+  for (const pos of positions) {
+    if (pos >= offset) result.add(pos - offset);
+  }
+  return result;
+}

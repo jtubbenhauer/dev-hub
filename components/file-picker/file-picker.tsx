@@ -12,7 +12,12 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match";
+import {
+  fuzzySearch,
+  basenamePositions,
+  type FuzzyMatch,
+} from "@/lib/fuzzy-match";
+import { HighlightedText } from "@/components/ui/highlighted-text";
 import {
   Dialog,
   DialogContent,
@@ -78,46 +83,6 @@ export function useWorkspaceFiles(workspaceId: string | null) {
     enabled: !!workspaceId,
     staleTime: 60 * 1000, // cache for 1 minute
   });
-}
-
-// ---------------------------------------------------------------------------
-// Highlighted path renderer
-// ---------------------------------------------------------------------------
-
-function HighlightedPath({
-  path,
-  positions,
-}: {
-  path: string;
-  positions: Set<number>;
-}) {
-  if (positions.size === 0) {
-    return <span className="truncate">{path}</span>;
-  }
-
-  const parts: React.ReactNode[] = [];
-  let i = 0;
-  while (i < path.length) {
-    if (positions.has(i)) {
-      // Find consecutive highlighted characters
-      let end = i;
-      while (end < path.length && positions.has(end)) end++;
-      parts.push(
-        <span key={i} className="text-primary font-semibold">
-          {path.slice(i, end)}
-        </span>,
-      );
-      i = end;
-    } else {
-      // Find consecutive non-highlighted characters
-      let end = i;
-      while (end < path.length && !positions.has(end)) end++;
-      parts.push(<span key={i}>{path.slice(i, end)}</span>);
-      i = end;
-    }
-  }
-
-  return <span className="truncate">{parts}</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,9 +325,12 @@ export function FilePickerDialog() {
                     <File className="text-muted-foreground size-3.5 shrink-0" />
                     <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
                       <span className="truncate font-mono text-xs">
-                        <HighlightedPath
-                          path={basename}
-                          positions={basenamePositions(match)}
+                        <HighlightedText
+                          text={basename}
+                          positions={basenamePositions(
+                            match.path,
+                            match.positions,
+                          )}
                         />
                       </span>
                       {dirname && (
@@ -388,21 +356,4 @@ export function FilePickerDialog() {
       </DialogContent>
     </Dialog>
   );
-}
-
-/**
- * Remap positions from the full path into basename-relative positions
- */
-function basenamePositions(match: FuzzyMatch): Set<number> {
-  const lastSlash = match.path.lastIndexOf("/");
-  if (lastSlash === -1) return match.positions;
-
-  const offset = lastSlash + 1;
-  const result = new Set<number>();
-  for (const pos of match.positions) {
-    if (pos >= offset) {
-      result.add(pos - offset);
-    }
-  }
-  return result;
 }

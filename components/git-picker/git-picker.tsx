@@ -16,7 +16,12 @@ import {
   useGitChangedFiles,
   useGitBranches,
 } from "@/hooks/use-git";
-import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match";
+import {
+  fuzzySearch,
+  basenamePositions,
+  type FuzzyMatch,
+} from "@/lib/fuzzy-match";
+import { HighlightedText } from "@/components/ui/highlighted-text";
 import {
   Dialog,
   DialogContent,
@@ -155,53 +160,6 @@ function buildBranchFiles(changedFiles: ReviewChangedFile[]): PickerFile[] {
 // ---------------------------------------------------------------------------
 // Highlighted text renderer
 // ---------------------------------------------------------------------------
-
-function HighlightedText({
-  text,
-  positions,
-}: {
-  text: string;
-  positions: Set<number>;
-}) {
-  if (positions.size === 0) return <>{text}</>;
-
-  const parts: React.ReactNode[] = [];
-  let i = 0;
-  while (i < text.length) {
-    if (positions.has(i)) {
-      let end = i;
-      while (end < text.length && positions.has(end)) end++;
-      parts.push(
-        <span key={i} className="text-primary font-semibold">
-          {text.slice(i, end)}
-        </span>,
-      );
-      i = end;
-    } else {
-      let end = i;
-      while (end < text.length && !positions.has(end)) end++;
-      parts.push(<span key={i}>{text.slice(i, end)}</span>);
-      i = end;
-    }
-  }
-
-  return <>{parts}</>;
-}
-
-function basenamePositions(
-  fullPath: string,
-  positions: Set<number>,
-): Set<number> {
-  const lastSlash = fullPath.lastIndexOf("/");
-  if (lastSlash === -1) return positions;
-
-  const offset = lastSlash + 1;
-  const result = new Set<number>();
-  for (const pos of positions) {
-    if (pos >= offset) result.add(pos - offset);
-  }
-  return result;
-}
 
 // ---------------------------------------------------------------------------
 // Section header

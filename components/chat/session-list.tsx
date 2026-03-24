@@ -19,6 +19,7 @@ import {
   Pin,
   PinOff,
   Clock,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -753,15 +754,12 @@ function SessionItem({
           )}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
         {onTogglePin && (
           <Button
             size="icon-xs"
             variant="ghost"
-            className={cn(
-              "shrink-0 transition-opacity",
-              "opacity-0 group-hover:opacity-100",
-            )}
+            className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               onTogglePin();
@@ -786,6 +784,52 @@ function SessionItem({
         >
           <Trash2 className="text-muted-foreground size-3" />
         </Button>
+      </div>
+
+      <div className="shrink-0 lg:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <MoreVertical className="text-muted-foreground size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {onTogglePin && (
+              <DropdownMenuItem
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onTogglePin();
+                }}
+              >
+                {isPinned ? (
+                  <>
+                    <PinOff className="mr-2 size-3.5" />
+                    Unpin
+                  </>
+                ) : (
+                  <>
+                    <Pin className="mr-2 size-3.5" />
+                    Pin
+                  </>
+                )}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+            >
+              <Trash2 className="mr-2 size-3.5" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

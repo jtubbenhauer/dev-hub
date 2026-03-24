@@ -27,6 +27,14 @@ import { cn } from "@/lib/utils";
 import { Loader2, Search } from "lucide-react";
 import type { ClickUpTask } from "@/types";
 
+interface TaskPickerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSelectTask: (task: ClickUpTask) => void;
+  title?: string;
+  description?: string;
+}
+
 interface TaskPickerContextValue {
   isOpen: boolean;
   open: () => void;
@@ -153,17 +161,13 @@ export function TaskPickerDialog() {
   );
 
   const fuzzyResults = useMemo(
-    () => (isServerSearch ? [] : fuzzySearch(query, taskNames, 100)),
-    [isServerSearch, query, taskNames],
+    () => (query ? fuzzySearch(query, taskNames, 100) : []),
+    [query, taskNames],
   );
 
   const results = useMemo<
     Array<{ task: ClickUpTask; match: FuzzyMatch | null }>
   >(() => {
-    if (isServerSearch) {
-      return (searchTasks ?? []).map((task) => ({ task, match: null }));
-    }
-
     if (!query) {
       return (myTasks ?? []).map((task) => ({ task, match: null }));
     }
@@ -175,19 +179,26 @@ export function TaskPickerDialog() {
       nameToTasks.set(task.name, list);
     }
     const consumed = new Map<string, number>();
-    return fuzzyResults.map((match) => {
+    const localResults = fuzzyResults.map((match) => {
       const list = nameToTasks.get(match.path) ?? [];
       const idx = consumed.get(match.path) ?? 0;
       consumed.set(match.path, idx + 1);
       return { task: list[idx] ?? list[0], match };
     });
+
+    if (!isServerSearch || !searchTasks?.length) return localResults;
+
+    const localIds = new Set(localResults.map((r) => r.task.id));
+    const serverResults = searchTasks
+      .filter((t) => !localIds.has(t.id))
+      .map((task) => ({ task, match: null as FuzzyMatch | null }));
+    return [...localResults, ...serverResults];
   }, [isServerSearch, query, myTasks, searchTasks, fuzzyResults]);
 
   const totalItems = results.length;
 
-  const isLoading =
-    isSettingsLoading || (isServerSearch ? isSearchLoading : isMyTasksLoading);
-  const error = isServerSearch ? searchError : myTasksError;
+  const isLoading = isSettingsLoading || isMyTasksLoading;
+  const error = myTasksError ?? (isServerSearch ? searchError : null);
 
   // Reset state when dialog opens (during-render pattern)
   const [prevIsOpen, setPrevIsOpen] = useState(false);
@@ -325,6 +336,303 @@ export function TaskPickerDialog() {
                 <Link
                   href="/settings"
                   onClick={() => close()}
+                  className="text-primary hover:text-primary/80 text-sm underline underline-offset-4"
+                >
+                  Configure in Settings
+                </Link>
+              </div>
+            )}
+
+            {isConfigured && isLoading && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="text-muted-foreground size-5 animate-spin" />
+              </div>
+            )}
+
+            {isConfigured && !isLoading && error && (
+              <p className="text-muted-foreground py-8 text-center text-sm">
+                {error.message}
+              </p>
+            )}
+
+            {isConfigured && !isLoading && !error && totalItems === 0 && (
+              <p className="text-muted-foreground py-8 text-center text-sm">
+                No tasks found
+              </p>
+            )}
+
+            {isConfigured &&
+              !isLoading &&
+              !error &&
+              results.map((result, i) => {
+                const isSelected = i === selectedIndex;
+                const { task, match } = result;
+                const priorityColor = task.priority
+                  ? (PRIORITY_COLORS[task.priority.priority] ?? "bg-gray-400")
+                  : "bg-gray-300";
+
+                return (
+                  <button
+                    type="button"
+                    key={task.id}
+                    data-index={i}
+                    className={cn(
+                      "flex w-full items-center gap-2 overflow-hidden rounded-sm px-2 py-1.5 text-left text-sm",
+                      isSelected
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-accent/50",
+                    )}
+                    onClick={() => handleSelectTask(task)}
+                    onMouseEnter={() => setSelectedIndex(i)}
+                  >
+                    <span
+                      className={cn(
+                        "size-2 shrink-0 rounded-full",
+                        priorityColor,
+                      )}
+                    />
+
+                    <div className="min-w-0 flex-1 truncate text-xs">
+                      {match ? (
+                        <HighlightedText
+                          text={task.name}
+                          positions={match.positions}
+                        />
+                      ) : (
+                        task.name
+                      )}
+                    </div>
+
+                    <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-[11px]">
+                      <span className="max-w-[80px] truncate">
+                        {task.list.name}
+                      </span>
+                      <span>·</span>
+                      <Badge
+                        variant="secondary"
+                        className="px-1 py-0 text-[10px] font-normal"
+                        style={{ color: task.status.color }}
+                      >
+                        {task.status.status}
+                      </Badge>
+                      <span>·</span>
+                      <span className="whitespace-nowrap">
+                        {formatRelativeTime(task.date_updated)}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        </ScrollArea>
+
+        <div className="text-muted-foreground/60 flex items-center gap-3 border-t px-3 py-1.5 text-[10px]">
+          <span>↑↓ navigate</span>
+          <span>↵ select</span>
+          <span>esc close</span>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function TaskPicker({
+  open,
+  onOpenChange,
+  onSelectTask,
+  title = "Select task",
+  description = "Search and select a ClickUp task",
+}: TaskPickerProps) {
+  const { isConfigured, isLoading: isSettingsLoading } = useClickUpSettings();
+
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const {
+    data: myTasks,
+    isLoading: isMyTasksLoading,
+    error: myTasksError,
+  } = useMyClickUpTasks({ enabled: isConfigured });
+
+  const isServerSearch = debouncedQuery.length >= 2;
+  const {
+    data: searchTasks,
+    isLoading: isSearchLoading,
+    error: searchError,
+  } = useClickUpSearch(
+    debouncedQuery,
+    {},
+    { enabled: isConfigured && isServerSearch },
+  );
+
+  const taskNames = useMemo(
+    () => (myTasks ?? []).map((t) => t.name),
+    [myTasks],
+  );
+
+  const fuzzyResults = useMemo(
+    () => (query ? fuzzySearch(query, taskNames, 100) : []),
+    [query, taskNames],
+  );
+
+  const results = useMemo<
+    Array<{ task: ClickUpTask; match: FuzzyMatch | null }>
+  >(() => {
+    if (!query) {
+      return (myTasks ?? []).map((task) => ({ task, match: null }));
+    }
+
+    const nameToTasks = new Map<string, ClickUpTask[]>();
+    for (const task of myTasks ?? []) {
+      const list = nameToTasks.get(task.name) ?? [];
+      list.push(task);
+      nameToTasks.set(task.name, list);
+    }
+
+    const consumed = new Map<string, number>();
+    const localResults = fuzzyResults.map((match) => {
+      const list = nameToTasks.get(match.path) ?? [];
+      const idx = consumed.get(match.path) ?? 0;
+      consumed.set(match.path, idx + 1);
+      return { task: list[idx] ?? list[0], match };
+    });
+
+    if (!isServerSearch || !searchTasks?.length) return localResults;
+
+    const localIds = new Set(localResults.map((r) => r.task.id));
+    const serverResults = searchTasks
+      .filter((t) => !localIds.has(t.id))
+      .map((task) => ({ task, match: null as FuzzyMatch | null }));
+    return [...localResults, ...serverResults];
+  }, [isServerSearch, query, myTasks, searchTasks, fuzzyResults]);
+
+  const totalItems = results.length;
+
+  const isLoading = isSettingsLoading || isMyTasksLoading;
+  const error = myTasksError ?? (isServerSearch ? searchError : null);
+
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (open && !prevOpen) {
+    setPrevOpen(true);
+    setQuery("");
+    setDebouncedQuery("");
+    setSelectedIndex(0);
+  } else if (!open && prevOpen) {
+    setPrevOpen(false);
+  }
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  if (selectedIndex >= totalItems && totalItems > 0) {
+    setSelectedIndex(Math.max(0, totalItems - 1));
+  }
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const selected = list.querySelector(`[data-index="${selectedIndex}"]`);
+    if (selected) {
+      selected.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedIndex]);
+
+  const handleSelectTask = useCallback(
+    (task: ClickUpTask) => {
+      onSelectTask(task);
+      onOpenChange(false);
+    },
+    [onSelectTask, onOpenChange],
+  );
+
+  const handleSelect = useCallback(
+    (index: number) => {
+      const result = results[index];
+      if (result) {
+        handleSelectTask(result.task);
+      }
+    },
+    [results, handleSelectTask],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      switch (e.key) {
+        case "ArrowDown":
+        case "j":
+          if (e.ctrlKey || e.key === "ArrowDown") {
+            e.preventDefault();
+            setSelectedIndex((i) => Math.min(i + 1, totalItems - 1));
+          }
+          break;
+        case "ArrowUp":
+        case "k":
+          if (e.ctrlKey || e.key === "ArrowUp") {
+            e.preventDefault();
+            setSelectedIndex((i) => Math.max(i - 1, 0));
+          }
+          break;
+        case "Enter":
+          e.preventDefault();
+          handleSelect(selectedIndex);
+          break;
+        case "Escape":
+          e.preventDefault();
+          onOpenChange(false);
+          break;
+      }
+    },
+    [totalItems, selectedIndex, handleSelect, onOpenChange],
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-w-lg gap-0 overflow-hidden p-0"
+        showCloseButton={false}
+        onKeyDown={handleKeyDown}
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2 border-b px-3 py-2">
+          <Search className="text-muted-foreground size-4 shrink-0" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIndex(0);
+            }}
+            placeholder="Search tasks..."
+            className="placeholder:text-muted-foreground flex-1 bg-transparent text-sm outline-none"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+
+        <ScrollArea className="h-[min(400px,60vh)] [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block">
+          <div ref={listRef} className="p-1">
+            {!isSettingsLoading && !isConfigured && (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <p className="text-muted-foreground text-sm">
+                  ClickUp not configured
+                </p>
+                <Link
+                  href="/settings"
+                  onClick={() => onOpenChange(false)}
                   className="text-primary hover:text-primary/80 text-sm underline underline-offset-4"
                 >
                   Configure in Settings

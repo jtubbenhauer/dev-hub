@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { FileCode2, ChevronRight, ChevronDown, GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   extractSessionFiles,
   type SessionFile,
 } from "@/lib/chat/extract-session-files";
@@ -58,7 +63,12 @@ const FileRow = memo(function FileRow({
       )}
     >
       <FileCode2 className="text-muted-foreground size-3.5 shrink-0" />
-      <span className="flex-1 truncate">{relativePath}</span>
+      <Tooltip delayDuration={500} disableHoverableContent>
+        <TooltipTrigger asChild>
+          <span className="flex-1 truncate">{relativePath}</span>
+        </TooltipTrigger>
+        <TooltipContent side="left">{relativePath}</TooltipContent>
+      </Tooltip>
       <span
         onClick={handleOpenGitDiff}
         title="Open in git diff"

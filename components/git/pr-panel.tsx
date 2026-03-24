@@ -60,6 +60,7 @@ import {
   useGitHubPrFileContent,
   useGitHubAddComment,
   useGitHubReplyToComment,
+  useGitHubDeleteComment,
   useGitHubSubmitReview,
   useGitHubMergePr,
   useGitHubCurrentUser,
@@ -204,6 +205,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
 
   const addCommentMutation = useGitHubAddComment(owner, repo, prNumber);
   const replyToCommentMutation = useGitHubReplyToComment(owner, repo, prNumber);
+  const deleteCommentMutation = useGitHubDeleteComment(owner, repo, prNumber);
   const submitReviewMutation = useGitHubSubmitReview(owner, repo, prNumber);
   const mergeMutation = useGitHubMergePr();
 
@@ -289,6 +291,18 @@ export function PrPanel({ onClose }: PrPanelProps) {
       });
     },
     [owner, repo, prNumber, replyToCommentMutation],
+  );
+
+  const handleDeleteComment = useCallback(
+    async (commentId: number) => {
+      if (!owner || !repo) return;
+      await deleteCommentMutation.mutateAsync({
+        owner,
+        repo,
+        commentId,
+      });
+    },
+    [owner, repo, deleteCommentMutation],
   );
 
   const handleSubmitReview = useCallback(
@@ -510,6 +524,8 @@ export function PrPanel({ onClose }: PrPanelProps) {
               isSubmittingComment={isSubmittingComment}
               onAddComment={handleAddComment}
               onReplyToComment={handleReplyToComment}
+              onDeleteComment={handleDeleteComment}
+              currentUserLogin={currentUser?.login ?? null}
               onOpenFileList={
                 isMobile ? () => setIsMobileFileListOpen(true) : undefined
               }

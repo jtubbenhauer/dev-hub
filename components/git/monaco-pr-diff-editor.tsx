@@ -19,6 +19,7 @@ import {
   MessageCircle,
   ChevronUp,
   ChevronDown,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DiffViewToggle } from "@/components/editor/diff-view-toggle";
@@ -102,6 +103,8 @@ interface CommentThreadProps {
     line: number,
     startLine: number,
   ) => Promise<void>;
+  onDeleteComment: (commentId: number) => Promise<void>;
+  currentUserLogin: string | null;
   onClose: () => void;
   pendingLine: number;
   pendingStartLine: number;
@@ -112,12 +115,15 @@ function CommentThread({
   comments,
   onReply,
   onAddComment,
+  onDeleteComment,
+  currentUserLogin,
   onClose,
   pendingLine,
   pendingStartLine,
   isSubmitting,
 }: CommentThreadProps) {
   const [replyBody, setReplyBody] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const lastCommentId = comments[comments.length - 1]?.id;
 
   const handleSubmit = useCallback(async () => {
@@ -159,9 +165,31 @@ function CommentThread({
             <span className="text-foreground font-medium">
               {comment.user.login}
             </span>
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground flex-1">
               {new Date(comment.created_at).toLocaleDateString()}
             </span>
+            {currentUserLogin === comment.user.login && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="text-muted-foreground hover:text-destructive -mr-1 shrink-0"
+                disabled={deletingId === comment.id}
+                onClick={async () => {
+                  setDeletingId(comment.id);
+                  try {
+                    await onDeleteComment(comment.id);
+                  } finally {
+                    setDeletingId(null);
+                  }
+                }}
+              >
+                {deletingId === comment.id ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Trash2 className="size-3" />
+                )}
+              </Button>
+            )}
           </div>
           <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap">
             {comment.body}
@@ -170,6 +198,7 @@ function CommentThread({
       ))}
       <div className="px-3 py-2">
         <textarea
+          ref={(el) => el?.focus()}
           value={replyBody}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
             setReplyBody(e.target.value)
@@ -222,6 +251,8 @@ interface PrDiffEditorProps {
     startLine: number,
   ) => Promise<void>;
   onReplyToComment: (body: string, inReplyToId: number) => Promise<void>;
+  onDeleteComment: (commentId: number) => Promise<void>;
+  currentUserLogin: string | null;
   onOpenFileList?: () => void;
 }
 
@@ -236,6 +267,8 @@ export const MonacoPrDiffEditor = forwardRef<
     isSubmittingComment,
     onAddComment,
     onReplyToComment,
+    onDeleteComment,
+    currentUserLogin,
     onOpenFileList,
   },
   ref,
@@ -648,6 +681,8 @@ export const MonacoPrDiffEditor = forwardRef<
               line={activeCommentLine ?? pendingComment.line}
               onReply={onReplyToComment}
               onAddComment={onAddComment}
+              onDeleteComment={onDeleteComment}
+              currentUserLogin={currentUserLogin}
               onClose={handleCloseComment}
               pendingLine={pendingComment.line}
               pendingStartLine={pendingComment.startLine}

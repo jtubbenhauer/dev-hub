@@ -58,6 +58,9 @@ async function githubFetch<T>(path: string, options?: RequestInit): Promise<T> {
     }
     throw new Error(message);
   }
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
   return res.json() as Promise<T>;
 }
 
@@ -415,6 +418,36 @@ export function useGitHubReplyToComment(
             in_reply_to: input.commentId,
           }),
         },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["github", "pr-comments", owner, repo, prNumber],
+      });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
+}
+
+interface DeleteCommentInput {
+  owner: string;
+  repo: string;
+  commentId: number;
+}
+
+export function useGitHubDeleteComment(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: DeleteCommentInput) =>
+      githubFetch<void>(
+        `repos/${input.owner}/${input.repo}/pulls/comments/${input.commentId}`,
+        { method: "DELETE" },
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({

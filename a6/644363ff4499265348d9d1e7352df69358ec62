@@ -1,0 +1,50 @@
+components/editor/file-tree.tsx
+  9815bdc0f7fafef8 9-14,199-201
+tests/components/terminal/terminal-panel-focus.test.tsx
+  d2c9ee917aefbd61 1-241
+components/git-picker/git-picker.tsx
+  9815bdc0f7fafef8 19-24
+components/chat/file-picker.tsx
+  9815bdc0f7fafef8 6-8,23,27,41,49,57,73,86-89,93,99,103-106
+components/terminal/terminal-panel.tsx
+  d2c9ee917aefbd61 3-9,289-309,356-361
+components/ui/highlighted-text.tsx
+  9815bdc0f7fafef8 1-32
+components/file-picker/file-picker.tsx
+  9815bdc0f7fafef8 15-20,328-333
+lib/fuzzy-match.ts
+  9815bdc0f7fafef8 50-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "a6644363ff4499265348d9d1e7352df69358ec62",
+  "prompts": {
+    "9815bdc0f7fafef8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2e2dbd50bffeYX8ODkgCry2hVI",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 94,
+      "total_deletions": 209,
+      "accepted_lines": 94,
+      "overriden_lines": 0
+    },
+    "d2c9ee917aefbd61": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2e3470914ffe1xtvRRv8ibadbQ",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 299,
+      "total_deletions": 25,
+      "accepted_lines": 275,
+      "overriden_lines": 0
+    }
+  }
+}

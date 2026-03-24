@@ -1,0 +1,37 @@
+components/chat/session-files-panel.tsx
+  518e746cf099bf97 66-71
+  604bf0529b34c27d 8-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "8d87ddff3ab29f737cf394fc63e4cc9757e5227d",
+  "prompts": {
+    "518e746cf099bf97": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e33f2496fferMtyHUUcjVaQb6-4125111a-230b-47f1-b300-d296b1651404",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    },
+    "604bf0529b34c27d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2e33f2496fferMtyHUUcjVaQb6-703b0448-923f-403b-a9f7-440f8fa15f37",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

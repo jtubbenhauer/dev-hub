@@ -1407,7 +1407,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         command,
         arguments: args,
       };
-      if (model) body.model = model.modelID;
+      if (model) body.model = `${model.providerID}/${model.modelID}`;
       if (agent) body.agent = agent;
       if (variant) body.variant = variant;
 

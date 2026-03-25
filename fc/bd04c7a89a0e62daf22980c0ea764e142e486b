@@ -1,0 +1,65 @@
+components/git/monaco-pr-diff-editor.tsx
+  80a99083611fbdfd 12,271-273,323-326,329,338,386,405,440,446,450-461,464,466-470,472-489,518,520,528-529,536-540,542-552,649,652-655,657-659,662,677-719,767,799
+  a20f4465c8b4a8a7 663
+  78623d36d4644633 650-651,656,660-661
+  cea411396b19f955 377-385,387-392,395-397,399-404,407-439,441-444,530-535,541,553
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "fcbd04c7a89a0e62daf22980c0ea764e142e486b",
+  "prompts": {
+    "78623d36d4644633": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d9b55fa3ffePUTT40j0hjDJL1-55711fc0-77f2-493e-a85c-a3793d683279",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "80a99083611fbdfd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d9b55fa3ffePUTT40j0hjDJL1-fe6a6ba7-9c9a-438b-9498-5f2d1c3f4d9f",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 124,
+      "overriden_lines": 0
+    },
+    "a20f4465c8b4a8a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d9b55fa3ffePUTT40j0hjDJL1-a4d9d0bd-8214-4cea-a8b7-3dad2d3abda3",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "cea411396b19f955": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d9b55fa3ffePUTT40j0hjDJL1-ab4312ae-8e42-4a20-b619-3d9cd07e396c",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 69,
+      "overriden_lines": 0
+    }
+  }
+}

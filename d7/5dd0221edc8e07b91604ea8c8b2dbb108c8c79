@@ -1,0 +1,33 @@
+app/globals.css
+  a09d695ccdb727ba 503,506-593
+components/chat/variant-selector.tsx
+  a09d695ccdb727ba 61
+components/chat/agent-selector.tsx
+  a09d695ccdb727ba 110
+components/chat/file-picker.tsx
+  a09d695ccdb727ba 3-9,34-38
+lib/fuzzy-match.ts
+  a09d695ccdb727ba 26-37,49,51
+components/chat/model-selector.tsx
+  a09d695ccdb727ba 239
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "d75dd0221edc8e07b91604ea8c8b2dbb108c8c79",
+  "prompts": {
+    "a09d695ccdb727ba": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2dc21f7edffenvYGxznIH3fE7R",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 119,
+      "total_deletions": 18,
+      "accepted_lines": 118,
+      "overriden_lines": 0
+    }
+  }
+}

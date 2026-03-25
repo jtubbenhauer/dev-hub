@@ -1,0 +1,23 @@
+app/api/workspaces/[id]/session-notes/route.ts
+  5cc1bfa3d61a2198 1-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "36a74982f4bf3b55602c453c9dd4f3f7289b03c8",
+  "prompts": {
+    "5cc1bfa3d61a2198": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2dd968e80ffemp4a9X4NEqGyRz-f12741f5-7bb3-44a3-b16b-9a6a277b105a",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 119,
+      "overriden_lines": 0
+    }
+  }
+}

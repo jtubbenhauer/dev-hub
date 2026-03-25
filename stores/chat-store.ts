@@ -24,7 +24,7 @@ export type StreamingStatus =
   | "waiting"
   | "error";
 
-const MAX_CACHED_SESSIONS = 5;
+const MAX_CACHED_SESSIONS = 15;
 
 interface LruEntry {
   sessionId: string;
@@ -63,6 +63,7 @@ export interface WorkspaceState {
   sessionModels: Record<string, { providerID: string; modelID: string }>;
   lastViewedAt: Record<string, number>;
   pinnedSessionIds: Set<string>;
+  sessionNotes: Record<string, string>;
 }
 
 function emptyWorkspaceState(): WorkspaceState {
@@ -79,6 +80,7 @@ function emptyWorkspaceState(): WorkspaceState {
     sessionModels: {},
     lastViewedAt: {},
     pinnedSessionIds: new Set(),
+    sessionNotes: {},
   };
 }
 
@@ -93,6 +95,7 @@ const EMPTY_SESSION_STATUSES: Record<string, SessionStatus> = {};
 const EMPTY_LAST_VIEWED: Record<string, number> = {};
 const EMPTY_UNIFIED_SESSIONS: SessionWithWorkspace[] = [];
 const EMPTY_PINNED: Set<string> = new Set();
+const EMPTY_SESSION_NOTES: Record<string, string> = {};
 
 // Memoization cache for getRecentSessionsAcrossWorkspaces.
 // We compare each workspace's `sessions` record by reference to detect changes.
@@ -114,6 +117,9 @@ let _unifiedLastViewedCacheRefs = new Map<string, Record<string, number>>();
 
 let _unifiedPinnedCache: Set<string> = EMPTY_PINNED;
 let _unifiedPinnedCacheRefs = new Map<string, Set<string>>();
+
+let _unifiedSessionNotesCache: Record<string, string> = EMPTY_SESSION_NOTES;
+let _unifiedSessionNotesCacheRefs = new Map<string, Record<string, string>>();
 
 // Memoization caches for question-session-id selectors.
 const EMPTY_QUESTION_SESSION_IDS: Set<string> = new Set();
@@ -492,6 +498,16 @@ interface ChatState {
   unpinSession: (sessionId: string, workspaceId: string) => Promise<void>;
   isSessionPinned: (sessionId: string, workspaceId: string) => boolean;
   getPinnedSessionIds: (workspaceId: string) => Set<string>;
+
+  fetchSessionNotes: (workspaceId: string) => Promise<void>;
+  setSessionNote: (
+    sessionId: string,
+    workspaceId: string,
+    note: string,
+  ) => Promise<void>;
+  clearSessionNote: (sessionId: string, workspaceId: string) => Promise<void>;
+  getActiveSessionNotes: () => Record<string, string>;
+  getUnifiedSessionNotes: () => Record<string, string>;
 }
 
 function buildProxyUrl(
@@ -923,6 +939,43 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   fetchMessages: async (sessionId, workspaceId) => {
+    const hasInMemory =
+      (get().workspaceStates[workspaceId]?.messages[sessionId]?.length ?? 0) >
+      0;
+
+    if (!hasInMemory) {
+      try {
+        const cacheResponse = await fetch(
+          `/api/sessions/cache/messages?sessionId=${sessionId}&workspaceId=${workspaceId}`,
+        );
+        if (cacheResponse.ok) {
+          const cached = await cacheResponse.json();
+          if (cached?.messages?.length > 0) {
+            // Only populate if still empty (avoid overwriting SSE-delivered data)
+            set((state) => {
+              const ws = state.workspaceStates[workspaceId];
+              if (ws?.messages[sessionId]?.length) return state;
+              const wsUpdate = updateWorkspace(state, workspaceId, () => ({
+                messages: {
+                  ...ws?.messages,
+                  [sessionId]: cached.messages,
+                },
+              }));
+              const stateAfterWsUpdate = { ...state, ...wsUpdate };
+              const lruUpdate = touchLru(
+                stateAfterWsUpdate,
+                sessionId,
+                workspaceId,
+              );
+              return { ...wsUpdate, ...lruUpdate };
+            });
+          }
+        }
+      } catch {
+        // Best effort — proceed to remote fetch
+      }
+    }
+
     try {
       const response = await fetch(
         buildProxyUrl(`session/${sessionId}/message`, workspaceId),
@@ -974,6 +1027,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const lruUpdate = touchLru(stateAfterWsUpdate, sessionId, workspaceId);
         return { ...wsUpdate, ...lruUpdate };
       });
+
+      fetch("/api/sessions/cache/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId, workspaceId, messages: data }),
+      }).catch(() => {});
     } catch {
       set((state) =>
         updateWorkspace(state, workspaceId, (ws) => ({
@@ -2583,5 +2642,103 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   getPinnedSessionIds: (workspaceId) => {
     return get().workspaceStates[workspaceId]?.pinnedSessionIds ?? EMPTY_PINNED;
+  },
+
+  fetchSessionNotes: async (workspaceId) => {
+    try {
+      const response = await fetch(
+        `/api/workspaces/${workspaceId}/session-notes`,
+      );
+      if (!response.ok) return;
+      const notes: Record<string, string> = await response.json();
+      set((state) =>
+        updateWorkspace(state, workspaceId, () => ({
+          sessionNotes: notes,
+        })),
+      );
+    } catch {
+      // Best effort
+    }
+  },
+
+  setSessionNote: async (sessionId, workspaceId, note) => {
+    set((state) =>
+      updateWorkspace(state, workspaceId, (ws) => ({
+        sessionNotes: { ...ws.sessionNotes, [sessionId]: note },
+      })),
+    );
+    try {
+      await fetch(`/api/workspaces/${workspaceId}/session-notes`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId, note }),
+      });
+    } catch {
+      set((state) =>
+        updateWorkspace(state, workspaceId, (ws) => {
+          const { [sessionId]: _, ...remaining } = ws.sessionNotes;
+          return { sessionNotes: remaining };
+        }),
+      );
+    }
+  },
+
+  clearSessionNote: async (sessionId, workspaceId) => {
+    const previousNotes = get().workspaceStates[workspaceId]?.sessionNotes;
+    set((state) =>
+      updateWorkspace(state, workspaceId, (ws) => {
+        const { [sessionId]: _, ...remaining } = ws.sessionNotes;
+        return { sessionNotes: remaining };
+      }),
+    );
+    try {
+      await fetch(
+        `/api/workspaces/${workspaceId}/session-notes?sessionId=${sessionId}`,
+        { method: "DELETE" },
+      );
+    } catch {
+      if (previousNotes) {
+        set((state) =>
+          updateWorkspace(state, workspaceId, () => ({
+            sessionNotes: previousNotes,
+          })),
+        );
+      }
+    }
+  },
+
+  getActiveSessionNotes: () => {
+    const { activeWorkspaceId, workspaceStates } = get();
+    if (!activeWorkspaceId) return EMPTY_SESSION_NOTES;
+    const notes = workspaceStates[activeWorkspaceId]?.sessionNotes;
+    return notes && Object.keys(notes).length > 0 ? notes : EMPTY_SESSION_NOTES;
+  },
+
+  getUnifiedSessionNotes: () => {
+    const { workspaceStates } = get();
+    const entries = Object.entries(workspaceStates);
+
+    if (entries.length === 0) return EMPTY_SESSION_NOTES;
+
+    if (
+      entries.length === _unifiedSessionNotesCacheRefs.size &&
+      entries.every(
+        ([id, ws]) => _unifiedSessionNotesCacheRefs.get(id) === ws.sessionNotes,
+      )
+    ) {
+      return _unifiedSessionNotesCache;
+    }
+
+    const merged: Record<string, string> = {};
+    const newRefs = new Map<string, Record<string, string>>();
+    for (const [wsId, ws] of entries) {
+      newRefs.set(wsId, ws.sessionNotes);
+      Object.assign(merged, ws.sessionNotes);
+    }
+
+    _unifiedSessionNotesCache =
+      Object.keys(merged).length > 0 ? merged : EMPTY_SESSION_NOTES;
+    _unifiedSessionNotesCacheRefs = newRefs;
+    return _unifiedSessionNotesCache;
   },
 }));

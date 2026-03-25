@@ -212,6 +212,21 @@ export const fileComments = sqliteTable(
   ],
 );
 
+export const sessionNotes = sqliteTable(
+  "session_notes",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    note: text("note").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.sessionId] })],
+);
+
 export const cachedSessions = sqliteTable(
   "cached_sessions",
   {
@@ -230,5 +245,21 @@ export const cachedSessions = sqliteTable(
       table.workspaceId,
       table.cachedAt,
     ),
+  ],
+);
+
+export const cachedMessages = sqliteTable(
+  "cached_messages",
+  {
+    sessionId: text("session_id").notNull(),
+    workspaceId: text("workspace_id").notNull(),
+    userId: text("user_id").notNull(),
+    messagesJson: text("messages_json").notNull(),
+    cachedAt: integer("cached_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.workspaceId] }),
+    index("cached_messages_workspace_id_idx").on(table.workspaceId),
+    index("cached_messages_user_id_idx").on(table.userId),
   ],
 );

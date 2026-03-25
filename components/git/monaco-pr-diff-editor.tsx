@@ -322,6 +322,7 @@ export const MonacoPrDiffEditor = forwardRef<
   const { tabSize } = useTabSizeSetting();
   const isMobile = useIsMobile();
   const [isEditorReady, setIsEditorReady] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
 
   const [overlayPositions, setOverlayPositions] = useState<
     Map<number, { top: number; left: number; width: number }>
@@ -400,11 +401,20 @@ export const MonacoPrDiffEditor = forwardRef<
     };
   }, [getModifiedEditor]);
 
+  const overlayPositionsRef = useRef(overlayPositions);
+  const newCommentTopRef = useRef(newCommentTop);
+  useEffect(() => {
+    overlayPositionsRef.current = overlayPositions;
+    newCommentTopRef.current = newCommentTop;
+  });
+
   const updateAllPositions = useCallback(() => {
     const me = getModifiedEditor();
     if (!me) return;
 
     const pane = computeModifiedPaneRect();
+    const prev = overlayPositionsRef.current;
+    let changed = false;
     const next = new Map<
       number,
       { top: number; left: number; width: number }
@@ -416,10 +426,20 @@ export const MonacoPrDiffEditor = forwardRef<
         column: 1,
       });
       if (pos) {
-        next.set(line, { top: pos.top + pos.height, ...pane });
+        const top = pos.top + pos.height;
+        const old = prev.get(line);
+        if (!old || old.top !== top || old.left !== pane.left) {
+          changed = true;
+        }
+        next.set(line, { top, ...pane });
+      } else if (prev.has(line)) {
+        changed = true;
       }
     }
-    setOverlayPositions(next);
+
+    if (changed || next.size !== prev.size) {
+      setOverlayPositions(next);
+    }
 
     const nc = newCommentRef.current;
     if (nc) {
@@ -427,7 +447,10 @@ export const MonacoPrDiffEditor = forwardRef<
         lineNumber: nc.line,
         column: 1,
       });
-      setNewCommentTop(pos ? pos.top + pos.height : null);
+      const nextTop = pos ? pos.top + pos.height : null;
+      if (nextTop !== newCommentTopRef.current) {
+        setNewCommentTop(nextTop);
+      }
     }
   }, [getModifiedEditor, computeModifiedPaneRect]);
 
@@ -482,8 +505,14 @@ export const MonacoPrDiffEditor = forwardRef<
         setNewCommentTop(pos ? pos.top + pos.height : null);
       });
 
+      let scrollTimer: ReturnType<typeof setTimeout> | null = null;
       modifiedEditor.onDidScrollChange(() => {
-        updateAllPositionsRef.current();
+        setIsScrolling(true);
+        if (scrollTimer) clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          updateAllPositionsRef.current();
+          setIsScrolling(false);
+        }, 100);
       });
 
       setIsEditorReady(true);
@@ -688,55 +717,56 @@ export const MonacoPrDiffEditor = forwardRef<
           />
         </div>
 
-        {sortedCommentLines.map((line) => {
-          const pos = overlayPositions.get(line);
-          if (!pos) return null;
-          const threadComments = commentsByLine.get(line) ?? [];
-          return (
-            <div
-              key={`thread-${line}`}
-              className="absolute z-20"
-              style={{
-                top: pos.top,
-                left: pos.width ? pos.left : 16,
-                width: pos.width || undefined,
-                right: pos.width ? undefined : 16,
-              }}
-              onWheel={(e) => {
-                const me = getModifiedEditor();
-                if (!me) return;
-                me.setScrollTop(me.getScrollTop() + e.deltaY);
-              }}
-            >
-              <CommentThread
-                comments={threadComments}
-                line={line}
-                isResolved={resolvedLines.has(line)}
-                isCollapsed={collapsedLines.has(line)}
-                onToggleCollapse={() => {
-                  setCollapsedLines((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(line)) next.delete(line);
-                    else next.add(line);
-                    return next;
-                  });
+        {!isScrolling &&
+          sortedCommentLines.map((line) => {
+            const pos = overlayPositions.get(line);
+            if (!pos) return null;
+            const threadComments = commentsByLine.get(line) ?? [];
+            return (
+              <div
+                key={`thread-${line}`}
+                className="absolute z-20"
+                style={{
+                  top: pos.top,
+                  left: pos.width ? pos.left : 16,
+                  width: pos.width || undefined,
+                  right: pos.width ? undefined : 16,
                 }}
-                onReply={onReplyToComment}
-                onAddComment={onAddComment}
-                onDeleteComment={onDeleteComment}
-                currentUserLogin={currentUserLogin}
-                onClose={() =>
-                  setCollapsedLines((prev) => new Set(prev).add(line))
-                }
-                pendingLine={line}
-                pendingStartLine={line}
-                isSubmitting={isSubmittingComment}
-              />
-            </div>
-          );
-        })}
+                onWheel={(e) => {
+                  const me = getModifiedEditor();
+                  if (!me) return;
+                  me.setScrollTop(me.getScrollTop() + e.deltaY);
+                }}
+              >
+                <CommentThread
+                  comments={threadComments}
+                  line={line}
+                  isResolved={resolvedLines.has(line)}
+                  isCollapsed={collapsedLines.has(line)}
+                  onToggleCollapse={() => {
+                    setCollapsedLines((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(line)) next.delete(line);
+                      else next.add(line);
+                      return next;
+                    });
+                  }}
+                  onReply={onReplyToComment}
+                  onAddComment={onAddComment}
+                  onDeleteComment={onDeleteComment}
+                  currentUserLogin={currentUserLogin}
+                  onClose={() =>
+                    setCollapsedLines((prev) => new Set(prev).add(line))
+                  }
+                  pendingLine={line}
+                  pendingStartLine={line}
+                  isSubmitting={isSubmittingComment}
+                />
+              </div>
+            );
+          })}
 
-        {newComment && newCommentTop !== null && (
+        {!isScrolling && newComment && newCommentTop !== null && (
           <div
             className="absolute z-20"
             style={{

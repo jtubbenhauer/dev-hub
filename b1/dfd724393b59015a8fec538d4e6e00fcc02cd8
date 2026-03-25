@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "b1dfd724393b59015a8fec538d4e6e00fcc02cd8",
+  "prompts": {
+    "d3bdfb05ee4199fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2dd968e80ffemp4a9X4NEqGyRz-2dfb5900-ce57-47f9-aded-4a0cb6fa0dd6",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 0,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -32,6 +32,9 @@ export function useSessionManagement({
     fetchCachedSessions,
     pinSession,
     unpinSession,
+    fetchSessionNotes,
+    setSessionNote,
+    clearSessionNote,
   } = useChatStore.getState();
 
   const [
@@ -325,15 +328,34 @@ export function useSessionManagement({
     [activeWorkspaceId, unpinSession],
   );
 
-  // Re-fetch sessions for all workspaces when entering unified mode
+  const handleSetSessionNote = useCallback(
+    (sessionId: string, note: string, workspaceId?: string) => {
+      const wsId = workspaceId ?? activeWorkspaceId;
+      if (!wsId) return;
+      setSessionNote(sessionId, wsId, note);
+    },
+    [activeWorkspaceId, setSessionNote],
+  );
+
+  const handleClearSessionNote = useCallback(
+    (sessionId: string, workspaceId?: string) => {
+      const wsId = workspaceId ?? activeWorkspaceId;
+      if (!wsId) return;
+      clearSessionNote(sessionId, wsId);
+    },
+    [activeWorkspaceId, clearSessionNote],
+  );
+
   useEffect(() => {
     if (!isUnifiedMode) return;
     for (const ws of allWorkspaces) {
       if (shouldSSEConnect(ws, activeWorkspaceId)) {
         fetchSessions(ws.id);
         fetchPinnedSessions(ws.id);
+        fetchSessionNotes(ws.id);
       } else {
         fetchCachedSessions(ws.id);
+        fetchSessionNotes(ws.id);
       }
     }
   }, [
@@ -342,6 +364,7 @@ export function useSessionManagement({
     activeWorkspaceId,
     fetchSessions,
     fetchPinnedSessions,
+    fetchSessionNotes,
     fetchCachedSessions,
   ]);
 
@@ -369,5 +392,7 @@ export function useSessionManagement({
     handleToggleWorkspaceExpanded,
     handlePinSession,
     handleUnpinSession,
+    handleSetSessionNote,
+    handleClearSessionNote,
   };
 }

@@ -55,9 +55,11 @@ import {
   Loader2,
   MessageCircleQuestion,
   MessageSquare,
+  PanelRight,
   PanelTop,
   Plus,
   ScrollText,
+  StickyNote,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -131,6 +133,10 @@ export function ChatInterface() {
     });
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false);
   const [, setHasPlanFiles] = useState(false);
+  const [isMobileRightPanelOpen, setIsMobileRightPanelOpen] = useState(false);
+  const [isEditingSessionNote, setIsEditingSessionNote] = useState(false);
+  const [sessionNoteValue, setSessionNoteValue] = useState("");
+  const sessionNoteInputRef = useRef<HTMLInputElement>(null);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -233,8 +239,12 @@ export function ChatInterface() {
     getUnifiedLastViewedAt,
     getUnifiedPinnedSessionIds,
     getActivePinnedSessionIds,
+    getActiveSessionNotes,
+    getUnifiedSessionNotes,
+    clearSessionNote,
     setSessionAgent,
     clearSessionModel,
+    setSessionVariant,
   } = useChatStore.getState();
 
   // getStreamingStatus must be passed as a stable reference — inline lambdas like
@@ -269,6 +279,8 @@ export function ChatInterface() {
     handleToggleWorkspaceExpanded,
     handlePinSession,
     handleUnpinSession,
+    handleSetSessionNote,
+    handleClearSessionNote,
   } = useSessionManagement({
     activeWorkspaceId,
     allWorkspaces,
@@ -358,6 +370,12 @@ export function ChatInterface() {
   const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
   const activePinnedIds = useChatStore(getActivePinnedSessionIds);
   const pinnedSessionIds = isUnifiedMode ? unifiedPinnedIds : activePinnedIds;
+  const unifiedSessionNotes = useChatStore(getUnifiedSessionNotes);
+  const activeSessionNotes = useChatStore(getActiveSessionNotes);
+  const sessionNotes = isUnifiedMode ? unifiedSessionNotes : activeSessionNotes;
+  const activeNote = activeSessionId
+    ? sessionNotes[activeSessionId]
+    : undefined;
   const activeQuestionSessionIds = useChatStore(getActiveQuestionSessionIds);
   const unifiedQuestionSessionIds = useChatStore(getUnifiedQuestionSessionIds);
   const questionSessionIds = isUnifiedMode
@@ -455,6 +473,7 @@ export function ChatInterface() {
   // Reset jump-to-bottom when switching sessions.
   useEffect(() => {
     setShowJumpToBottom(false);
+    setIsEditingSessionNote(false);
   }, [activeSessionId]);
 
   const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
@@ -499,6 +518,10 @@ export function ChatInterface() {
         selectedVariant ?? undefined,
         attachments,
       );
+
+      if (sessionNotes[sessionId]) {
+        clearSessionNote(sessionId, activeWorkspaceId);
+      }
     },
     [
       activeWorkspaceId,
@@ -508,6 +531,8 @@ export function ChatInterface() {
       selectedVariant,
       createSession,
       sendMessage,
+      sessionNotes,
+      clearSessionNote,
     ],
   );
 
@@ -587,6 +612,33 @@ export function ChatInterface() {
       behavior: "smooth",
     });
   }, []);
+
+  const handleStartEditSessionNote = useCallback(() => {
+    setSessionNoteValue(activeNote ?? "");
+    setIsEditingSessionNote(true);
+    requestAnimationFrame(() => sessionNoteInputRef.current?.focus());
+  }, [activeNote]);
+
+  const handleSaveSessionNote = useCallback(() => {
+    if (!activeSessionId || !activeWorkspaceId) {
+      setIsEditingSessionNote(false);
+      return;
+    }
+    const trimmed = sessionNoteValue.trim();
+    if (trimmed) {
+      handleSetSessionNote(activeSessionId, trimmed);
+    } else if (activeNote) {
+      handleClearSessionNote(activeSessionId);
+    }
+    setIsEditingSessionNote(false);
+  }, [
+    activeSessionId,
+    activeWorkspaceId,
+    sessionNoteValue,
+    activeNote,
+    handleSetSessionNote,
+    handleClearSessionNote,
+  ]);
 
   const handleAbort = useCallback(() => {
     if (!activeSessionId || !activeWorkspaceId) return;
@@ -686,9 +738,12 @@ export function ChatInterface() {
     lastViewedAt,
     isLoading: isSessionsLoading,
     pinnedSessionIds,
+    sessionNotes,
     onDeleteSession: handleDeleteSession,
     onPinSession: handlePinSession,
     onUnpinSession: handleUnpinSession,
+    onSetSessionNote: handleSetSessionNote,
+    onClearSessionNote: handleClearSessionNote,
     isUnifiedMode,
     onToggleMode: handleToggleUnifiedMode,
     groupByWorkspace,
@@ -710,10 +765,13 @@ export function ChatInterface() {
     questionSessionIds,
     lastViewedAt,
     pinnedSessionIds,
+    sessionNotes,
     isLoading: isSessionsLoading,
     onDeleteSession: handleDeleteSession,
     onPinSession: handlePinSession,
     onUnpinSession: handleUnpinSession,
+    onSetSessionNote: handleSetSessionNote,
+    onClearSessionNote: handleClearSessionNote,
     isUnifiedMode,
     onToggleMode: handleToggleUnifiedMode,
   };
@@ -739,6 +797,57 @@ export function ChatInterface() {
               onCreateSession={handleMobileCreateSession}
             />
           )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Mobile right panel sheet */}
+      <Sheet
+        open={isMobileRightPanelOpen}
+        onOpenChange={setIsMobileRightPanelOpen}
+      >
+        <SheetContent side="right" className="w-72 p-0" showCloseButton={false}>
+          <SheetHeader className="sr-only">
+            <SheetTitle>Side Panel</SheetTitle>
+          </SheetHeader>
+          <div className="h-full overflow-y-auto">
+            {activeWorkspaceId && activeWorkspace && (
+              <WorkspaceContextPanel
+                workspaceId={activeWorkspaceId}
+                workspace={activeWorkspace}
+              />
+            )}
+            {activeTodos.length > 0 && (
+              <>
+                <div className="border-t px-3 py-2">
+                  <span className="text-muted-foreground text-xs font-medium">
+                    Task Progress
+                  </span>
+                </div>
+                <div className="px-3 pb-3">
+                  <TaskProgressPanel todos={activeTodos} />
+                </div>
+              </>
+            )}
+            <div className="border-t px-3 py-2">
+              <span className="text-muted-foreground text-xs font-medium">
+                MCP Servers
+              </span>
+            </div>
+            <div className="px-3 pb-3">
+              <McpStatusPanel />
+            </div>
+            <div className="border-t px-3 py-2">
+              <span className="text-muted-foreground text-xs font-medium">
+                Session Files
+              </span>
+            </div>
+            <div className="px-3 pb-3">
+              <SessionFilesPanel
+                messages={activeMessagesRaw}
+                workspacePath={activeWorkspacePath}
+              />
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -838,6 +947,18 @@ export function ChatInterface() {
 
             <Button
               size="icon-sm"
+              variant={activeNote ? "secondary" : "outline"}
+              onClick={handleStartEditSessionNote}
+              disabled={!activeSessionId}
+              title={activeNote ? "Edit note" : "Add note"}
+            >
+              <StickyNote
+                className={cn("size-4", activeNote && "text-amber-400")}
+              />
+            </Button>
+
+            <Button
+              size="icon-sm"
               variant={isPlanPanelOpen ? "secondary" : "outline"}
               onClick={() => setIsPlanPanelOpen(!isPlanPanelOpen)}
               title="Plan notes"
@@ -858,7 +979,74 @@ export function ChatInterface() {
             >
               <Plus className="size-4" />
             </Button>
+
+            <Button
+              size="icon-sm"
+              variant="outline"
+              onClick={() => setIsMobileRightPanelOpen(true)}
+              title="Side panel"
+              className="md:hidden"
+            >
+              <PanelRight className="size-4" />
+            </Button>
           </div>
+
+          {/* Session note banner */}
+          {(activeNote || isEditingSessionNote) && (
+            <div className="flex shrink-0 items-center gap-2 border-b bg-amber-500/10 px-3 py-1.5 md:px-4">
+              <StickyNote className="size-3.5 shrink-0 text-amber-400" />
+              {isEditingSessionNote ? (
+                <form
+                  className="flex min-w-0 flex-1 items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSaveSessionNote();
+                  }}
+                >
+                  <input
+                    ref={sessionNoteInputRef}
+                    type="text"
+                    className="border-input bg-background text-foreground placeholder:text-muted-foreground min-w-0 flex-1 rounded border px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                    value={sessionNoteValue}
+                    onChange={(e) => setSessionNoteValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setIsEditingSessionNote(false);
+                      }
+                    }}
+                    onBlur={handleSaveSessionNote}
+                    placeholder="Where I'm at / what to do next…"
+                  />
+                </form>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 truncate text-sm text-amber-300/90">
+                    {activeNote}
+                  </span>
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    onClick={handleStartEditSessionNote}
+                    title="Edit note"
+                  >
+                    <StickyNote className="size-3 text-amber-400" />
+                  </Button>
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    onClick={() => {
+                      if (activeSessionId && activeWorkspaceId) {
+                        handleClearSessionNote(activeSessionId);
+                      }
+                    }}
+                    title="Dismiss note"
+                  >
+                    <X className="size-3 text-amber-400/70 hover:text-amber-300" />
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Messages area or plan panel — mutually exclusive */}
           <div className="chat-scroll-area relative min-h-0 min-w-0 flex-1 overflow-hidden [contain:strict]">
@@ -1116,7 +1304,18 @@ export function ChatInterface() {
             onModelSelectorOpenChange={setIsModelSelectorOpen}
             availableVariants={availableVariants}
             selectedVariant={selectedVariant}
-            onVariantChange={setSelectedVariant}
+            onVariantChange={(variant) => {
+              setSelectedVariant(variant);
+              if (activeSessionId && activeWorkspaceId) {
+                if (variant) {
+                  setSessionVariant(
+                    activeSessionId,
+                    activeWorkspaceId,
+                    variant,
+                  );
+                }
+              }
+            }}
             isVariantSelectorOpen={isVariantSelectorOpen}
             onVariantSelectorOpenChange={setIsVariantSelectorOpen}
           />

@@ -20,6 +20,7 @@ import {
   PinOff,
   Clock,
   MoreVertical,
+  StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -46,6 +47,13 @@ interface BaseSessionListProps {
   onDeleteSession: (sessionId: string, workspaceId?: string) => void;
   onPinSession?: (sessionId: string, workspaceId?: string) => void;
   onUnpinSession?: (sessionId: string, workspaceId?: string) => void;
+  sessionNotes?: Record<string, string>;
+  onSetSessionNote?: (
+    sessionId: string,
+    note: string,
+    workspaceId?: string,
+  ) => void;
+  onClearSessionNote?: (sessionId: string, workspaceId?: string) => void;
   isUnifiedMode?: boolean;
   onToggleMode?: () => void;
 }
@@ -92,6 +100,9 @@ export function SessionList(props: SessionListProps) {
     onDeleteSession,
     onPinSession,
     onUnpinSession,
+    sessionNotes,
+    onSetSessionNote,
+    onClearSessionNote,
   } = props;
 
   const sortedSessions = useMemo(() => {
@@ -332,6 +343,8 @@ export function SessionList(props: SessionListProps) {
                         : undefined
                     }
                     pinnedSessionIds={pinnedSessionIds}
+                    sessionNotes={sessionNotes}
+                    onClearSessionNote={onClearSessionNote}
                     onSelectSession={(
                       session: Session | SessionWithWorkspace,
                     ) => handleSelect(session)}
@@ -395,6 +408,7 @@ export function SessionList(props: SessionListProps) {
                           ? props.workspaceColor
                           : undefined
                     }
+                    note={sessionNotes?.[session.id]}
                     onSelect={() => handleSelect(session)}
                     onDelete={() =>
                       onDeleteSession(
@@ -416,6 +430,17 @@ export function SessionList(props: SessionListProps) {
                             } else {
                               onPinSession(session.id, wsId);
                             }
+                          }
+                        : undefined
+                    }
+                    onClearNote={
+                      onClearSessionNote
+                        ? () => {
+                            const wsId =
+                              props.mode === "unified"
+                                ? (session as SessionWithWorkspace).workspaceId
+                                : undefined;
+                            onClearSessionNote(session.id, wsId);
                           }
                         : undefined
                     }
@@ -459,6 +484,8 @@ interface WorkspaceGroupProps {
   onDeleteSession: (sessionId: string, workspaceId?: string) => void;
   onPinSession?: (sessionId: string, workspaceId?: string) => void;
   onUnpinSession?: (sessionId: string, workspaceId?: string) => void;
+  sessionNotes?: Record<string, string>;
+  onClearSessionNote?: (sessionId: string, workspaceId?: string) => void;
   onCreateSession?: () => void;
   onDragStart: () => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -483,6 +510,8 @@ function WorkspaceGroup({
   onDeleteSession,
   onPinSession,
   onUnpinSession,
+  sessionNotes,
+  onClearSessionNote,
   onCreateSession,
   onDragStart,
   onDragOver,
@@ -597,6 +626,7 @@ function WorkspaceGroup({
               )
             }
             workspaceColor={workspaceColor}
+            note={sessionNotes?.[session.id]}
             onSelect={() => onSelectSession(session)}
             onDelete={() => onDeleteSession(session.id, workspaceId)}
             onTogglePin={
@@ -608,6 +638,11 @@ function WorkspaceGroup({
                       onPinSession(session.id, workspaceId);
                     }
                   }
+                : undefined
+            }
+            onClearNote={
+              onClearSessionNote
+                ? () => onClearSessionNote(session.id, workspaceId)
                 : undefined
             }
           />
@@ -646,9 +681,12 @@ interface SessionItemProps {
   isUnread: boolean;
   workspaceBranch?: string;
   workspaceColor?: string;
+  note?: string;
   onSelect: () => void;
   onDelete: () => void;
   onTogglePin?: () => void;
+  onSetNote?: (note: string) => void;
+  onClearNote?: () => void;
 }
 
 function SessionItem({
@@ -660,9 +698,11 @@ function SessionItem({
   isUnread,
   workspaceBranch,
   workspaceColor,
+  note,
   onSelect,
   onDelete,
   onTogglePin,
+  onClearNote,
 }: SessionItemProps) {
   const formattedTime = useMemo(() => {
     return formatRelativeTime(session.time.updated);
@@ -753,6 +793,25 @@ function SessionItem({
             </Badge>
           )}
         </div>
+        {note && (
+          <div className="flex items-center gap-1 text-[11px] text-amber-500/80">
+            <StickyNote className="size-2.5 shrink-0" />
+            <span className="truncate">{note}</span>
+            {onClearNote && (
+              <button
+                type="button"
+                className="ml-auto shrink-0 text-amber-500/50 hover:text-amber-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClearNote();
+                }}
+                title="Dismiss note"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
         {onTogglePin && (

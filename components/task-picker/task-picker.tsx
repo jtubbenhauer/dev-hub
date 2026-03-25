@@ -145,11 +145,7 @@ export function TaskPickerDialog() {
   } = useMyClickUpTasks({ enabled: isConfigured });
 
   const isServerSearch = debouncedQuery.length >= 2;
-  const {
-    data: searchTasks,
-    isLoading: isSearchLoading,
-    error: searchError,
-  } = useClickUpSearch(
+  const { data: searchTasks, error: searchError } = useClickUpSearch(
     debouncedQuery,
     {},
     { enabled: isConfigured && isServerSearch },
@@ -463,11 +459,7 @@ export function TaskPicker({
   } = useMyClickUpTasks({ enabled: isConfigured });
 
   const isServerSearch = debouncedQuery.length >= 2;
-  const {
-    data: searchTasks,
-    isLoading: isSearchLoading,
-    error: searchError,
-  } = useClickUpSearch(
+  const { data: searchTasks, error: searchError } = useClickUpSearch(
     debouncedQuery,
     {},
     { enabled: isConfigured && isServerSearch },

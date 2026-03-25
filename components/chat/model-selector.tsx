@@ -236,7 +236,7 @@ export function ModelSelector({
           <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[320px] p-0" align="end">
+      <PopoverContent className="w-[320px] p-0" align="start">
         <Command>
           <CommandInput placeholder="Search models..." />
           <CommandList>

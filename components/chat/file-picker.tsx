@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  useDeferredValue,
+} from "react";
 import { FileIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fuzzySearch, basenamePositions } from "@/lib/fuzzy-match";
@@ -24,7 +31,11 @@ export function FilePicker({
   const [activeIndex, setActiveIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const results = fuzzySearch(query, allFiles ?? [], 50);
+  const deferredQuery = useDeferredValue(query);
+  const results = useMemo(
+    () => fuzzySearch(deferredQuery, allFiles ?? [], 50),
+    [deferredQuery, allFiles],
+  );
 
   // Reset active index when query changes
   const [prevQuery, setPrevQuery] = useState(query);

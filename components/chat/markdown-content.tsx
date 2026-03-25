@@ -5,7 +5,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeHighlight from "rehype-highlight";
-import "highlight.js/styles/github-dark-dimmed.css";
 import "highlight.js/styles/github.css";
 import { Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";

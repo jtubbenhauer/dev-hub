@@ -23,10 +23,18 @@ function toFuzzyMatch(entry: FzfResultItem<string>): FuzzyMatch {
   };
 }
 
-/**
- * Search a list of paths with the given query, returning scored + sorted results.
- * Empty query returns all paths (score 0, no highlights).
- */
+// Cache the Fzf instance so the rune index is only built once per file list.
+// Uses reference equality — TanStack Query returns the same array while cached.
+let cachedPaths: string[] | null = null;
+let cachedFzf: Fzf<string[]> | null = null;
+
+function getFzf(paths: string[]): Fzf<string[]> {
+  if (cachedPaths === paths && cachedFzf) return cachedFzf;
+  cachedFzf = new Fzf(paths, { fuzzy: "v2" });
+  cachedPaths = paths;
+  return cachedFzf;
+}
+
 export function fuzzySearch(
   query: string,
   paths: string[],
@@ -38,14 +46,9 @@ export function fuzzySearch(
       .map((p) => ({ path: p, score: 0, positions: new Set<number>() }));
   }
 
-  const fzf = new Fzf(paths, {
-    limit: maxResults,
-    // Use v2 algorithm with extended-search disabled for simple fuzzy matching
-    fuzzy: "v2",
-  });
-
+  const fzf = getFzf(paths);
   const results = fzf.find(query);
-  return results.map(toFuzzyMatch);
+  return results.slice(0, maxResults).map(toFuzzyMatch);
 }
 
 // Remap full-path character positions to basename-relative positions

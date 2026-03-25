@@ -166,7 +166,7 @@ function CommentThread({
   );
 
   return (
-    <div className="bg-popover mx-2 my-1 overflow-hidden rounded-md border text-xs shadow-lg">
+    <div className="bg-popover mx-2 my-1 max-h-60 overflow-y-auto rounded-md border text-xs shadow-lg">
       {comments.length > 0 && (
         <button
           type="button"
@@ -323,41 +323,29 @@ export const MonacoPrDiffEditor = forwardRef<
   const isMobile = useIsMobile();
   const [isEditorReady, setIsEditorReady] = useState(false);
 
-  const [activeCommentLine, setActiveCommentLine] = useState<number | null>(
-    null,
-  );
-  const [pendingComment, setPendingComment] = useState<PendingComment | null>(
-    null,
-  );
-  const [commentTopOffset, setCommentTopOffset] = useState<number | null>(null);
+  const [overlayPositions, setOverlayPositions] = useState<
+    Map<number, { top: number; left: number; width: number }>
+  >(() => new Map());
+
+  const [newComment, setNewComment] = useState<PendingComment | null>(null);
+  const [newCommentTop, setNewCommentTop] = useState<number | null>(null);
 
   const [collapsedLines, setCollapsedLines] = useState<Set<number>>(
     () => new Set(resolvedLines),
   );
-  const [hasAutoExpanded, setHasAutoExpanded] = useState(false);
 
   const [prevFilePath, setPrevFilePath] = useState(fileContent.path);
   if (prevFilePath !== fileContent.path) {
     setPrevFilePath(fileContent.path);
-    setActiveCommentLine(null);
-    setPendingComment(null);
-    setCommentTopOffset(null);
+    setNewComment(null);
+    setNewCommentTop(null);
+    setOverlayPositions(new Map());
     setCollapsedLines(new Set(resolvedLines));
-    setHasAutoExpanded(false);
   }
 
-  const handleOpenCommentAt = useCallback(
-    (line: number, leftOffset: number, width: number) => {
-      setActiveCommentLine(line);
-      setPendingComment({ line, startLine: line, leftOffset, width });
-    },
-    [],
-  );
-
-  const handleCloseComment = useCallback(() => {
-    setActiveCommentLine(null);
-    setPendingComment(null);
-    setCommentTopOffset(null);
+  const handleCloseNewComment = useCallback(() => {
+    setNewComment(null);
+    setNewCommentTop(null);
   }, []);
 
   const commentsByLine = useMemo(() => {
@@ -395,37 +383,59 @@ export const MonacoPrDiffEditor = forwardRef<
     [getModifiedEditor],
   );
 
-  const pendingCommentRef = useRef(pendingComment);
-  const setCommentTopOffsetRef = useRef(setCommentTopOffset);
+  const commentsByLineRef = useRef(commentsByLine);
+  const newCommentRef = useRef(newComment);
 
-  const updateCommentPosition = useCallback(() => {
-    const pc = pendingCommentRef.current;
-    if (!pc) return;
+  const computeModifiedPaneRect = useCallback(() => {
+    const me = getModifiedEditor();
+    if (!me) return { left: 16, width: 0 };
+    const modDom = me.getDomNode();
+    const containerDom = editorContainerRef.current;
+    if (!modDom || !containerDom) return { left: 16, width: 0 };
+    const modRect = modDom.getBoundingClientRect();
+    const containerRect = containerDom.getBoundingClientRect();
+    return {
+      left: modRect.left - containerRect.left,
+      width: modRect.width,
+    };
+  }, [getModifiedEditor]);
+
+  const updateAllPositions = useCallback(() => {
     const me = getModifiedEditor();
     if (!me) return;
 
-    const position = me.getScrolledVisiblePosition({
-      lineNumber: pc.line,
-      column: 1,
-    });
+    const pane = computeModifiedPaneRect();
+    const next = new Map<
+      number,
+      { top: number; left: number; width: number }
+    >();
 
-    if (!position) {
-      setCommentTopOffsetRef.current(null);
-      return;
+    for (const line of commentsByLineRef.current.keys()) {
+      const pos = me.getScrolledVisiblePosition({
+        lineNumber: line,
+        column: 1,
+      });
+      if (pos) {
+        next.set(line, { top: pos.top + pos.height, ...pane });
+      }
     }
+    setOverlayPositions(next);
 
-    setCommentTopOffsetRef.current(position.top + position.height);
-  }, [getModifiedEditor]);
+    const nc = newCommentRef.current;
+    if (nc) {
+      const pos = me.getScrolledVisiblePosition({
+        lineNumber: nc.line,
+        column: 1,
+      });
+      setNewCommentTop(pos ? pos.top + pos.height : null);
+    }
+  }, [getModifiedEditor, computeModifiedPaneRect]);
 
-  const handleOpenCommentAtRef = useRef(handleOpenCommentAt);
-  const handleCloseCommentRef = useRef(handleCloseComment);
-  const updateCommentPositionRef = useRef(updateCommentPosition);
+  const updateAllPositionsRef = useRef(updateAllPositions);
   useEffect(() => {
-    handleOpenCommentAtRef.current = handleOpenCommentAt;
-    handleCloseCommentRef.current = handleCloseComment;
-    pendingCommentRef.current = pendingComment;
-    setCommentTopOffsetRef.current = setCommentTopOffset;
-    updateCommentPositionRef.current = updateCommentPosition;
+    commentsByLineRef.current = commentsByLine;
+    newCommentRef.current = newComment;
+    updateAllPositionsRef.current = updateAllPositions;
   });
 
   const handleBeforeMount = useCallback(
@@ -450,44 +460,35 @@ export const MonacoPrDiffEditor = forwardRef<
           e.target.type !==
           monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN
         ) {
-          if (pendingCommentRef.current !== null) {
-            handleCloseCommentRef.current();
-          }
           return;
         }
 
         const lineNumber = e.target.position?.lineNumber;
         if (lineNumber == null) return;
+        if (commentsByLineRef.current.has(lineNumber)) return;
 
-        const modDom = modifiedEditor.getDomNode();
-        const containerDom = editorContainerRef.current;
-        let leftOffset = 16;
-        let width = 0;
-        if (modDom && containerDom) {
-          const modRect = modDom.getBoundingClientRect();
-          const containerRect = containerDom.getBoundingClientRect();
-          leftOffset = modRect.left - containerRect.left;
-          width = modRect.width;
-        }
-
-        const position = modifiedEditor.getScrolledVisiblePosition({
+        const pane = computeModifiedPaneRect();
+        const pos = modifiedEditor.getScrolledVisiblePosition({
           lineNumber,
           column: 1,
         });
 
-        handleOpenCommentAtRef.current(lineNumber, leftOffset, width);
-        setCommentTopOffsetRef.current(
-          position ? position.top + position.height : null,
-        );
+        setNewComment({
+          line: lineNumber,
+          startLine: lineNumber,
+          leftOffset: pane.left,
+          width: pane.width,
+        });
+        setNewCommentTop(pos ? pos.top + pos.height : null);
       });
 
       modifiedEditor.onDidScrollChange(() => {
-        updateCommentPositionRef.current();
+        updateAllPositionsRef.current();
       });
 
       setIsEditorReady(true);
     },
-    [],
+    [computeModifiedPaneRect],
   );
 
   useEffect(() => {
@@ -529,6 +530,13 @@ export const MonacoPrDiffEditor = forwardRef<
   }, [commentedLines, isEditorReady]);
 
   useEffect(() => {
+    if (!isEditorReady) return;
+    void commentedLines;
+    const id = requestAnimationFrame(() => updateAllPositions());
+    return () => cancelAnimationFrame(id);
+  }, [isEditorReady, commentedLines, updateAllPositions]);
+
+  useEffect(() => {
     if (!diffEditorRef.current) return;
     const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
     diffEditorRef.current
@@ -558,69 +566,33 @@ export const MonacoPrDiffEditor = forwardRef<
 
   const navigateToComment = useCallback(
     (line: number) => {
-      const modifiedEditor = getModifiedEditor();
-      if (!modifiedEditor) return;
-
-      modifiedEditor.revealLineInCenter(line);
-
-      requestAnimationFrame(() => {
-        const me = getModifiedEditor();
-        if (!me) return;
-
-        const modDom = me.getDomNode();
-        const containerDom = editorContainerRef.current;
-        let leftOffset = 16;
-        let width = 0;
-        if (modDom && containerDom) {
-          const modRect = modDom.getBoundingClientRect();
-          const containerRect = containerDom.getBoundingClientRect();
-          leftOffset = modRect.left - containerRect.left;
-          width = modRect.width;
-        }
-
-        const position = me.getScrolledVisiblePosition({
-          lineNumber: line,
-          column: 1,
-        });
-
-        handleOpenCommentAt(line, leftOffset, width);
-        setCommentTopOffset(position ? position.top + position.height : null);
-      });
+      const me = getModifiedEditor();
+      if (!me) return;
+      me.revealLineInCenter(line);
+      requestAnimationFrame(() => updateAllPositions());
     },
-    [getModifiedEditor, handleOpenCommentAt],
+    [getModifiedEditor, updateAllPositions],
   );
+
+  const [navLine, setNavLine] = useState<number | null>(null);
 
   const handlePrevComment = useCallback(() => {
     if (sortedCommentLines.length === 0) return;
-    const currentLine = activeCommentLine ?? Infinity;
+    const currentLine = navLine ?? Infinity;
     const prev = sortedCommentLines.filter((l) => l < currentLine).pop();
-    navigateToComment(
-      prev ?? sortedCommentLines[sortedCommentLines.length - 1],
-    );
-  }, [sortedCommentLines, activeCommentLine, navigateToComment]);
+    const target = prev ?? sortedCommentLines[sortedCommentLines.length - 1];
+    setNavLine(target);
+    navigateToComment(target);
+  }, [sortedCommentLines, navLine, navigateToComment]);
 
   const handleNextComment = useCallback(() => {
     if (sortedCommentLines.length === 0) return;
-    const currentLine = activeCommentLine ?? -1;
+    const currentLine = navLine ?? -1;
     const next = sortedCommentLines.find((l) => l > currentLine);
-    navigateToComment(next ?? sortedCommentLines[0]);
-  }, [sortedCommentLines, activeCommentLine, navigateToComment]);
-
-  const shouldAutoExpand =
-    isEditorReady && !hasAutoExpanded && sortedCommentLines.length > 0;
-  if (shouldAutoExpand) {
-    setHasAutoExpanded(true);
-  }
-
-  useEffect(() => {
-    if (!shouldAutoExpand) return;
-    const firstUnresolved = sortedCommentLines.find(
-      (l) => !resolvedLines.has(l),
-    );
-    if (firstUnresolved !== undefined) {
-      navigateToComment(firstUnresolved);
-    }
-  }, [shouldAutoExpand, sortedCommentLines, resolvedLines, navigateToComment]);
+    const target = next ?? sortedCommentLines[0];
+    setNavLine(target);
+    navigateToComment(target);
+  }, [sortedCommentLines, navLine, navigateToComment]);
 
   if (isLoading) {
     return (
@@ -631,10 +603,6 @@ export const MonacoPrDiffEditor = forwardRef<
   }
 
   const fileName = fileContent.path;
-  const activeCommentThreadComments =
-    activeCommentLine !== null
-      ? (commentsByLine.get(activeCommentLine) ?? [])
-      : [];
   const commentCount = comments.length;
   const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
 
@@ -720,14 +688,62 @@ export const MonacoPrDiffEditor = forwardRef<
           />
         </div>
 
-        {pendingComment && commentTopOffset !== null && (
+        {sortedCommentLines.map((line) => {
+          const pos = overlayPositions.get(line);
+          if (!pos) return null;
+          const threadComments = commentsByLine.get(line) ?? [];
+          return (
+            <div
+              key={`thread-${line}`}
+              className="absolute z-20"
+              style={{
+                top: pos.top,
+                left: pos.width ? pos.left : 16,
+                width: pos.width || undefined,
+                right: pos.width ? undefined : 16,
+              }}
+              onWheel={(e) => {
+                const me = getModifiedEditor();
+                if (!me) return;
+                me.setScrollTop(me.getScrollTop() + e.deltaY);
+              }}
+            >
+              <CommentThread
+                comments={threadComments}
+                line={line}
+                isResolved={resolvedLines.has(line)}
+                isCollapsed={collapsedLines.has(line)}
+                onToggleCollapse={() => {
+                  setCollapsedLines((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(line)) next.delete(line);
+                    else next.add(line);
+                    return next;
+                  });
+                }}
+                onReply={onReplyToComment}
+                onAddComment={onAddComment}
+                onDeleteComment={onDeleteComment}
+                currentUserLogin={currentUserLogin}
+                onClose={() =>
+                  setCollapsedLines((prev) => new Set(prev).add(line))
+                }
+                pendingLine={line}
+                pendingStartLine={line}
+                isSubmitting={isSubmittingComment}
+              />
+            </div>
+          );
+        })}
+
+        {newComment && newCommentTop !== null && (
           <div
             className="absolute z-20"
             style={{
-              top: commentTopOffset,
-              left: pendingComment.width ? pendingComment.leftOffset : 16,
-              width: pendingComment.width ? pendingComment.width : undefined,
-              right: pendingComment.width ? undefined : 16,
+              top: newCommentTop,
+              left: newComment.width ? newComment.leftOffset : 16,
+              width: newComment.width || undefined,
+              right: newComment.width ? undefined : 16,
             }}
             onWheel={(e) => {
               const me = getModifiedEditor();
@@ -736,30 +752,18 @@ export const MonacoPrDiffEditor = forwardRef<
             }}
           >
             <CommentThread
-              comments={activeCommentThreadComments}
-              line={activeCommentLine ?? pendingComment.line}
-              isResolved={resolvedLines.has(
-                activeCommentLine ?? pendingComment.line,
-              )}
-              isCollapsed={collapsedLines.has(
-                activeCommentLine ?? pendingComment.line,
-              )}
-              onToggleCollapse={() => {
-                const line = activeCommentLine ?? pendingComment.line;
-                setCollapsedLines((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(line)) next.delete(line);
-                  else next.add(line);
-                  return next;
-                });
-              }}
+              comments={[]}
+              line={newComment.line}
+              isResolved={false}
+              isCollapsed={false}
+              onToggleCollapse={() => {}}
               onReply={onReplyToComment}
               onAddComment={onAddComment}
               onDeleteComment={onDeleteComment}
               currentUserLogin={currentUserLogin}
-              onClose={handleCloseComment}
-              pendingLine={pendingComment.line}
-              pendingStartLine={pendingComment.startLine}
+              onClose={handleCloseNewComment}
+              pendingLine={newComment.line}
+              pendingStartLine={newComment.startLine}
               isSubmitting={isSubmittingComment}
             />
           </div>

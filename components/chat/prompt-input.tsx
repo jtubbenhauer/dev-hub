@@ -49,7 +49,52 @@ type SessionDraft = {
   attachments: Attachment[];
 };
 
-const sessionDrafts = new Map<string, SessionDraft>();
+const DRAFTS_STORAGE_KEY = "dev-hub-chat-drafts";
+
+function loadDraftsFromStorage(): Map<string, SessionDraft> {
+  if (typeof window === "undefined") return new Map();
+  try {
+    const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<
+      string,
+      { text: string; files: string[] }
+    >;
+    const map = new Map<string, SessionDraft>();
+    for (const [id, draft] of Object.entries(parsed)) {
+      if (draft.text || draft.files?.length) {
+        map.set(id, {
+          text: draft.text ?? "",
+          files: draft.files ?? [],
+          commentChips: [],
+          attachments: [],
+        });
+      }
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+function saveDraftsToStorage(drafts: Map<string, SessionDraft>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const obj: Record<string, { text: string; files: string[] }> = {};
+    for (const [id, draft] of drafts) {
+      if (draft.text || draft.files.length) {
+        obj[id] = { text: draft.text, files: draft.files };
+      }
+    }
+    if (Object.keys(obj).length > 0) {
+      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(obj));
+    } else {
+      localStorage.removeItem(DRAFTS_STORAGE_KEY);
+    }
+  } catch {}
+}
+
+const sessionDrafts = loadDraftsFromStorage();
 
 interface SelectedModel {
   providerID: string;
@@ -155,6 +200,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           files: selectedFiles,
           attachments,
         });
+        saveDraftsToStorage(sessionDrafts);
       }
       setPrevSessionId(sessionId);
       const draft = sessionId ? sessionDrafts.get(sessionId) : undefined;
@@ -189,6 +235,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       } else {
         sessionDrafts.delete(sessionId);
       }
+      saveDraftsToStorage(sessionDrafts);
     }, [sessionId, value, selectedComments, selectedFiles, attachments]);
 
     useImperativeHandle(

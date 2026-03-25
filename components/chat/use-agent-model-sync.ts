@@ -87,14 +87,26 @@ export function useAgentModelSync({
     // Agent config can advertise a variant not in the model's variant map → API error
     if (agentChanged) {
       const agentVariant = agent?.variant ?? null;
+      const {
+        activeSessionId: sid,
+        activeWorkspaceId: wsId,
+        setSessionVariant: storeVariant,
+        clearSessionVariant,
+      } = useChatStore.getState();
       if (
         agentVariant &&
         availableVariants.length > 0 &&
         !availableVariants.includes(agentVariant)
       ) {
         setSelectedVariant(null);
+        if (sid && wsId) clearSessionVariant(sid, wsId);
       } else {
         setSelectedVariant(agentVariant);
+        if (sid && wsId && agentVariant) {
+          storeVariant(sid, wsId, agentVariant);
+        } else if (sid && wsId) {
+          clearSessionVariant(sid, wsId);
+        }
       }
     }
   }, [
@@ -117,10 +129,9 @@ export function useAgentModelSync({
     }
   }, [availableVariants, selectedVariant, setSelectedVariant]);
 
-  const { getSessionAgent, getSessionModel } = useChatStore.getState();
+  const { getSessionAgent, getSessionModel, getSessionVariant } =
+    useChatStore.getState();
 
-  // Restore per-session agent when the active session changes.
-  // Falls back to "code" (or the first available agent) when the session has no stored agent.
   useEffect(() => {
     if (primaryAgents.length === 0) return;
 
@@ -140,6 +151,13 @@ export function useAgentModelSync({
       : null;
     if (storedModel) {
       setSelectedModel(storedModel);
+    }
+
+    const storedVariant = activeSessionId
+      ? getSessionVariant(activeSessionId)
+      : null;
+    if (storedVariant) {
+      setSelectedVariant(storedVariant);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, primaryAgents]);

@@ -2083,6 +2083,11 @@ describe("handleVisibilityRestored", () => {
   });
 
   it("does not reconnect when globalEventSource is already open", () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+
     useChatStore.getState().connectGlobalSSE(["ws-a"]);
     const es = useChatStore.getState().globalEventSource!;
     Object.defineProperty(es, "readyState", {
@@ -2099,6 +2104,83 @@ describe("handleVisibilityRestored", () => {
 
     // The globalEventSource reference must be unchanged — no reconnect happened
     expect(useChatStore.getState().globalEventSource).toBe(es);
+  });
+
+  it("reconciles pending questions and permissions when SSE is still open", async () => {
+    const pendingQuestion = makeQuestion("q-1", "sess-a");
+    const pendingPermission = makePermission("p-1", "sess-a");
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/question")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([pendingQuestion]),
+        });
+      }
+      if (url.includes("/permission")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([pendingPermission]),
+        });
+      }
+      if (url.includes("/session/status")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({}),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    useChatStore.getState().connectGlobalSSE(["ws-a"]);
+    const es = useChatStore.getState().globalEventSource!;
+    Object.defineProperty(es, "readyState", {
+      value: EventSource.OPEN,
+      writable: true,
+    });
+
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          sessionsLoaded: true,
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+        },
+      },
+    });
+
+    useChatStore.getState().handleVisibilityRestored();
+
+    await vi.waitFor(() => {
+      const ws = useChatStore.getState().workspaceStates["ws-a"];
+      expect(ws.questions).toHaveLength(1);
+      expect(ws.questions[0].id).toBe("q-1");
+      expect(ws.permissions).toHaveLength(1);
+      expect(ws.permissions[0].id).toBe("p-1");
+    });
+
+    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const questionFetch = fetchCalls.find(
+      ([url]: [string]) => url.includes("/question") && url.includes("ws-a"),
+    );
+    const permissionFetch = fetchCalls.find(
+      ([url]: [string]) => url.includes("/permission") && url.includes("ws-a"),
+    );
+    expect(questionFetch).toBeTruthy();
+    expect(permissionFetch).toBeTruthy();
   });
 });
 
@@ -2852,6 +2934,7 @@ describe("removeSessionLocal and restoreSessionLocal", () => {
     todos: {} as Record<string, never[]>,
     sessionAgents: { "sess-a": "code" },
     sessionModels: {},
+    sessionVariants: {},
     lastViewedAt: { "sess-a": 1500, "sess-b": 900 },
     pinnedSessionIds: new Set<string>(),
     sessionsLoaded: true,
@@ -3404,5 +3487,112 @@ describe("fetchSessions fallback to cache", () => {
         args[0].includes("/api/sessions/cache?workspaceId="),
     );
     expect(cacheReads).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sessionVariants CRUD
+// ---------------------------------------------------------------------------
+
+describe("sessionVariants", () => {
+  beforeEach(resetStore);
+
+  it("setSessionVariant stores the variant per session per workspace", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+
+    useChatStore.getState().setSessionVariant("sess-a", "ws-a", "concise");
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].sessionVariants["sess-a"],
+    ).toBe("concise");
+  });
+
+  it("getSessionVariant returns the stored variant", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: { "sess-a": "verbose" },
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+
+    expect(useChatStore.getState().getSessionVariant("sess-a")).toBe("verbose");
+  });
+
+  it("getSessionVariant returns null when no variant is stored", () => {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+
+    expect(useChatStore.getState().getSessionVariant("sess-a")).toBeNull();
+  });
+
+  it("clearSessionVariant removes the variant for the session", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: { "sess-a": "concise" },
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+
+    useChatStore.getState().clearSessionVariant("sess-a", "ws-a");
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].sessionVariants["sess-a"],
+    ).toBeUndefined();
+    expect(useChatStore.getState().getSessionVariant("sess-a")).toBeNull();
   });
 });

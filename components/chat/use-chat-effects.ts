@@ -21,6 +21,7 @@ export function useChatEffects({
     fetchMessages,
     fetchCommands,
     fetchPinnedSessions,
+    fetchSessionNotes,
     createSession,
     sendMessage,
     hasQueuedMessages,
@@ -37,7 +38,14 @@ export function useChatEffects({
     fetchSessions(activeWorkspaceId);
     fetchCommands(activeWorkspaceId);
     fetchPinnedSessions(activeWorkspaceId);
-  }, [activeWorkspaceId, fetchSessions, fetchCommands, fetchPinnedSessions]);
+    fetchSessionNotes(activeWorkspaceId);
+  }, [
+    activeWorkspaceId,
+    fetchSessions,
+    fetchCommands,
+    fetchPinnedSessions,
+    fetchSessionNotes,
+  ]);
 
   // Fetch messages when active session changes
   useEffect(() => {

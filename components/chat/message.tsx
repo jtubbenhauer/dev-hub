@@ -288,7 +288,7 @@ export const ChatMessage = memo(
               <Bot className="text-primary size-4" />
             </div>
           ) : showTimestamps ? (
-            <span className="text-muted-foreground/40 pt-2 flex size-8 shrink-0 items-start justify-center font-mono text-[9px] leading-tight">
+            <span className="text-muted-foreground/40 flex size-8 shrink-0 items-start justify-center pt-2 font-mono text-[9px] leading-tight">
               {formatMessageTime(info.time.created)}
             </span>
           ) : (

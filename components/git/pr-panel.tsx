@@ -53,8 +53,10 @@ import { cn } from "@/lib/utils";
 import {
   useGitHubPrsAwaitingReview,
   useGitHubPrsCreatedByMe,
+  useGitHubPr,
   useGitHubPrFiles,
   useGitHubPrComments,
+  useGitHubPrReviewThreads,
   useGitHubPrReviews,
   useGitHubPrChecks,
   useGitHubPrFileContent,
@@ -121,51 +123,45 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const [isPrListOpen, setIsPrListOpen] = useState(false);
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [groupByFolder, setGroupByFolder] = useState(false);
-  const [hasRestoredPr, setHasRestoredPr] = useState(false);
-
   const isMobile = useIsMobile();
   const editorHandleRef = useRef<PrDiffEditorHandle>(null);
   const { width: panelWidth, handleDragStart } = useResizablePanel({
     minWidth: MIN_PANEL_WIDTH,
     maxWidth: MAX_PANEL_WIDTH,
     defaultWidth: DEFAULT_PANEL_WIDTH,
+    storageKey: "dev-hub:pr-file-panel-width",
   });
 
-  const { data: reviewPrs = [], isLoading: isReviewPrsLoading } =
-    useGitHubPrsAwaitingReview();
-  const { data: myPrs = [], isLoading: isMyPrsLoading } =
-    useGitHubPrsCreatedByMe();
-  const { data: currentUser } = useGitHubCurrentUser();
-
-  const bothPrListsLoaded = !isReviewPrsLoading && !isMyPrsLoading;
-  if (!hasRestoredPr && !selectedPr && bothPrListsLoaded) {
+  const [storedPrParam, setStoredPrParam] = useState(() => {
     try {
       const stored = localStorage.getItem("dev-hub:git-selected-pr");
-      if (!stored) {
-        setHasRestoredPr(true);
-      } else {
-        const parsed = parsePrParam(stored);
-        if (!parsed) {
-          setHasRestoredPr(true);
-        } else {
-          const allPrs = [...reviewPrs, ...myPrs];
-          const match = allPrs.find(
-            (pr) =>
-              pr.base.repo.full_name === parsed.fullName &&
-              pr.number === parsed.number,
-          );
-          if (match) {
-            setSelectedPr(match);
-            if (reviewPrs.includes(match)) setActiveTab("for-review");
-            else setActiveTab("my-prs");
-          }
-          setHasRestoredPr(true);
-        }
-      }
+      return stored ? parsePrParam(stored) : null;
     } catch {
-      setHasRestoredPr(true);
+      return null;
     }
+  });
+
+  const storedOwner = storedPrParam?.fullName.split("/")[0] ?? null;
+  const storedRepo = storedPrParam?.fullName.split("/")[1] ?? null;
+  const storedNumber = storedPrParam?.number ?? null;
+
+  const { data: directPr, isLoading: isDirectPrLoading } = useGitHubPr(
+    !selectedPr ? storedOwner : null,
+    !selectedPr ? storedRepo : null,
+    !selectedPr ? storedNumber : null,
+  );
+
+  if (!selectedPr && directPr && !isDirectPrLoading) {
+    setSelectedPr(directPr);
   }
+
+  const shouldDeferLists = !!storedPrParam && !selectedPr;
+
+  const { data: reviewPrs = [], isLoading: isReviewPrsLoading } =
+    useGitHubPrsAwaitingReview({ enabled: !shouldDeferLists });
+  const { data: myPrs = [], isLoading: isMyPrsLoading } =
+    useGitHubPrsCreatedByMe({ enabled: !shouldDeferLists });
+  const { data: currentUser } = useGitHubCurrentUser();
 
   const owner = selectedPr?.base.repo.owner.login ?? null;
   const repo = selectedPr?.base.repo.name ?? null;
@@ -179,6 +175,11 @@ export function PrPanel({ onClose }: PrPanelProps) {
     prNumber,
   );
   const { data: prComments = [] } = useGitHubPrComments(owner, repo, prNumber);
+  const { data: prThreads = [] } = useGitHubPrReviewThreads(
+    owner,
+    repo,
+    prNumber,
+  );
   const { data: prReviews = [] } = useGitHubPrReviews(owner, repo, prNumber);
   const { data: prChecks = [] } = useGitHubPrChecks(owner, repo, headSha);
   const { data: viewedFilePaths = [] } = useGitHubPrViewedFiles(
@@ -224,6 +225,20 @@ export function PrPanel({ onClose }: PrPanelProps) {
     [prComments, selectedFilename],
   );
 
+  const resolvedLines = useMemo(() => {
+    const lines = new Set<number>();
+    for (const thread of prThreads) {
+      if (
+        thread.isResolved &&
+        thread.path === selectedFilename &&
+        thread.line
+      ) {
+        lines.add(thread.line);
+      }
+    }
+    return lines;
+  }, [prThreads, selectedFilename]);
+
   const handleSelectPr = useCallback((pr: GitHubPullRequest) => {
     setSelectedPr(pr);
     setSelectedFilename(null);
@@ -238,6 +253,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
     setSelectedPr(null);
     setSelectedFilename(null);
     setIsDescriptionOpen(false);
+    setStoredPrParam(null);
     try {
       localStorage.removeItem("dev-hub:git-selected-pr");
     } catch {}
@@ -325,7 +341,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
     activeTab === "for-review" ? isReviewPrsLoading : isMyPrsLoading;
   const activePrs = activeTab === "for-review" ? reviewPrs : myPrs;
 
-  if (!selectedPr && (isPrsLoading || !hasRestoredPr)) {
+  if (!selectedPr && (isDirectPrLoading || isPrsLoading)) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center">
         <Loader2 className="text-muted-foreground size-5 animate-spin" />
@@ -520,6 +536,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
               ref={editorHandleRef}
               fileContent={fileContent}
               comments={fileComments}
+              resolvedLines={resolvedLines}
               isLoading={isFileContentLoading}
               isSubmittingComment={isSubmittingComment}
               onAddComment={handleAddComment}

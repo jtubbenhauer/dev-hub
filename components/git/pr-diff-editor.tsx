@@ -23,6 +23,7 @@ export interface PrDiffEditorHandle {
 interface PrDiffEditorProps {
   fileContent: GitHubPrFileContent;
   comments: GitHubReviewComment[];
+  resolvedLines: Set<number>;
   isLoading: boolean;
   isSubmittingComment: boolean;
   onAddComment: (

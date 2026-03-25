@@ -99,9 +99,12 @@ async function githubGraphQL<T>(
 
 // The GitHub search/pulls API returns paginated results. For the review-requested list
 // we use the search API which is the most reliable cross-org approach.
-export function useGitHubPrsAwaitingReview() {
+export function useGitHubPrsAwaitingReview(
+  options: { enabled?: boolean } = {},
+) {
   return useQuery<GitHubPullRequest[]>({
     queryKey: ["github", "prs-awaiting-review"],
+    enabled: options.enabled !== false,
     queryFn: async () => {
       const data = await githubFetch<{ items: GitHubPullRequest[] }>(
         "search/issues?q=is:open+is:pr+review-requested:@me&per_page=50",
@@ -129,9 +132,10 @@ export function useGitHubPrsAwaitingReview() {
   });
 }
 
-export function useGitHubPrsCreatedByMe() {
+export function useGitHubPrsCreatedByMe(options: { enabled?: boolean } = {}) {
   return useQuery<GitHubPullRequest[]>({
     queryKey: ["github", "prs-created-by-me"],
+    enabled: options.enabled !== false,
     queryFn: async () => {
       const data = await githubFetch<{ items: GitHubPullRequest[] }>(
         "search/issues?q=is:open+is:pr+author:@me&per_page=50",
@@ -197,6 +201,25 @@ export function useWorkspacePr(
   });
 }
 
+export function useGitHubPr(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
+  return useQuery<GitHubPullRequest | null>({
+    queryKey: ["github", "pr", owner, repo, prNumber],
+    queryFn: async () => {
+      const pr = await githubFetch<GitHubPullRequest>(
+        `repos/${owner}/${repo}/pulls/${prNumber}`,
+      );
+      if (pr.head.repo === null) return null;
+      return pr;
+    },
+    enabled: !!(owner && repo && prNumber),
+    staleTime: 60_000,
+  });
+}
+
 export function useGitHubPrFiles(
   owner: string | null,
   repo: string | null,
@@ -224,6 +247,62 @@ export function useGitHubPrComments(
       githubFetch<GitHubReviewComment[]>(
         `repos/${owner}/${repo}/pulls/${prNumber}/comments?per_page=100`,
       ),
+    enabled: !!(owner && repo && prNumber),
+    staleTime: 15_000,
+  });
+}
+
+interface PrReviewThread {
+  isResolved: boolean;
+  line: number | null;
+  path: string;
+}
+
+interface PrReviewThreadsPage {
+  repository: {
+    pullRequest: {
+      reviewThreads: {
+        nodes: Array<{
+          isResolved: boolean;
+          line: number | null;
+          path: string;
+        }>;
+      };
+    };
+  };
+}
+
+const PR_THREADS_QUERY = `
+  query ($owner: String!, $repo: String!, $number: Int!) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100) {
+          nodes {
+            isResolved
+            line
+            path
+          }
+        }
+      }
+    }
+  }
+`;
+
+export function useGitHubPrReviewThreads(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
+  return useQuery<PrReviewThread[]>({
+    queryKey: ["github", "pr-threads", owner, repo, prNumber],
+    queryFn: async () => {
+      const data = await githubGraphQL<PrReviewThreadsPage>(PR_THREADS_QUERY, {
+        owner,
+        repo,
+        number: prNumber,
+      });
+      return data.repository.pullRequest.reviewThreads.nodes;
+    },
     enabled: !!(owner && repo && prNumber),
     staleTime: 15_000,
   });

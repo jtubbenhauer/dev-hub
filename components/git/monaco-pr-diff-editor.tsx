@@ -20,6 +20,7 @@ import {
   ChevronUp,
   ChevronDown,
   Trash2,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DiffViewToggle } from "@/components/editor/diff-view-toggle";
@@ -36,6 +37,7 @@ import {
   useTabSizeSetting,
 } from "@/hooks/use-settings";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { replaceEmoji } from "@/lib/emoji";
 import type { GitHubPrFileContent, GitHubReviewComment } from "@/types";
 
 const DiffEditor = dynamic(
@@ -97,6 +99,9 @@ interface PendingComment {
 interface CommentThreadProps {
   comments: GitHubReviewComment[];
   line: number;
+  isResolved: boolean;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
   onReply: (body: string, inReplyToId: number) => Promise<void>;
   onAddComment: (
     body: string,
@@ -113,6 +118,9 @@ interface CommentThreadProps {
 
 function CommentThread({
   comments,
+  isResolved,
+  isCollapsed,
+  onToggleCollapse,
   onReply,
   onAddComment,
   onDeleteComment,
@@ -159,83 +167,109 @@ function CommentThread({
 
   return (
     <div className="bg-popover mx-2 my-1 overflow-hidden rounded-md border text-xs shadow-lg">
-      {comments.map((comment) => (
-        <div key={comment.id} className="border-b px-3 py-2 last:border-b-0">
-          <div className="mb-1 flex items-center gap-1.5">
-            <span className="text-foreground font-medium">
-              {comment.user.login}
-            </span>
-            <span className="text-muted-foreground flex-1">
-              {new Date(comment.created_at).toLocaleDateString()}
-            </span>
-            {currentUserLogin === comment.user.login && (
+      {comments.length > 0 && (
+        <button
+          type="button"
+          className="hover:bg-muted/50 flex w-full items-center gap-1.5 border-b px-3 py-1.5 transition-colors"
+          onClick={onToggleCollapse}
+        >
+          {isResolved && <Check className="size-3 text-green-500" />}
+          <span className="text-muted-foreground flex-1 text-left text-[11px]">
+            {comments[0].user.login}
+            {comments.length > 1 && ` + ${comments.length - 1} more`}
+            {isResolved && " · Resolved"}
+          </span>
+          {isCollapsed ? (
+            <ChevronDown className="text-muted-foreground size-3" />
+          ) : (
+            <ChevronUp className="text-muted-foreground size-3" />
+          )}
+        </button>
+      )}
+      {!isCollapsed && (
+        <>
+          {comments.map((comment) => (
+            <div
+              key={comment.id}
+              className="border-b px-3 py-2 last:border-b-0"
+            >
+              <div className="mb-1 flex items-center gap-1.5">
+                <span className="text-foreground font-medium">
+                  {comment.user.login}
+                </span>
+                <span className="text-muted-foreground flex-1">
+                  {new Date(comment.created_at).toLocaleDateString()}
+                </span>
+                {currentUserLogin === comment.user.login && (
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-muted-foreground hover:text-destructive -mr-1 shrink-0"
+                    disabled={deletingId === comment.id}
+                    onClick={async () => {
+                      setDeletingId(comment.id);
+                      try {
+                        await onDeleteComment(comment.id);
+                      } finally {
+                        setDeletingId(null);
+                      }
+                    }}
+                  >
+                    {deletingId === comment.id ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-3" />
+                    )}
+                  </Button>
+                )}
+              </div>
+              <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                {replaceEmoji(comment.body)}
+              </p>
+            </div>
+          ))}
+          <div className="px-3 py-2">
+            <textarea
+              ref={(el) => el?.focus()}
+              value={replyBody}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                setReplyBody(e.target.value)
+              }
+              onKeyDown={handleKeyDown}
+              placeholder={
+                comments.length > 0
+                  ? "Reply\u2026 (Ctrl+Enter to submit)"
+                  : "Add a comment\u2026 (Ctrl+Enter to submit)"
+              }
+              className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[60px] w-full resize-none rounded-md border px-3 py-2 text-xs focus-visible:ring-1 focus-visible:outline-none"
+            />
+            <div className="mt-2 flex justify-end gap-1.5">
               <Button
                 variant="ghost"
-                size="icon-xs"
-                className="text-muted-foreground hover:text-destructive -mr-1 shrink-0"
-                disabled={deletingId === comment.id}
-                onClick={async () => {
-                  setDeletingId(comment.id);
-                  try {
-                    await onDeleteComment(comment.id);
-                  } finally {
-                    setDeletingId(null);
-                  }
-                }}
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={onClose}
               >
-                {deletingId === comment.id ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Trash2 className="size-3" />
-                )}
+                <X className="mr-1 size-3" />
+                Cancel
               </Button>
-            )}
+              <Button
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => void handleSubmit()}
+                disabled={!replyBody.trim() || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="mr-1 size-3 animate-spin" />
+                ) : (
+                  <Send className="mr-1 size-3" />
+                )}
+                {comments.length > 0 ? "Reply" : "Comment"}
+              </Button>
+            </div>
           </div>
-          <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap">
-            {comment.body}
-          </p>
-        </div>
-      ))}
-      <div className="px-3 py-2">
-        <textarea
-          ref={(el) => el?.focus()}
-          value={replyBody}
-          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-            setReplyBody(e.target.value)
-          }
-          onKeyDown={handleKeyDown}
-          placeholder={
-            comments.length > 0
-              ? "Reply\u2026 (Ctrl+Enter to submit)"
-              : "Add a comment\u2026 (Ctrl+Enter to submit)"
-          }
-          className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[60px] w-full resize-none rounded-md border px-3 py-2 text-xs focus-visible:ring-1 focus-visible:outline-none"
-        />
-        <div className="mt-2 flex justify-end gap-1.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={onClose}
-          >
-            <X className="mr-1 size-3" />
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={() => void handleSubmit()}
-            disabled={!replyBody.trim() || isSubmitting}
-          >
-            {isSubmitting ? (
-              <Loader2 className="mr-1 size-3 animate-spin" />
-            ) : (
-              <Send className="mr-1 size-3" />
-            )}
-            {comments.length > 0 ? "Reply" : "Comment"}
-          </Button>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }
@@ -243,6 +277,7 @@ function CommentThread({
 interface PrDiffEditorProps {
   fileContent: GitHubPrFileContent;
   comments: GitHubReviewComment[];
+  resolvedLines: Set<number>;
   isLoading: boolean;
   isSubmittingComment: boolean;
   onAddComment: (
@@ -263,6 +298,7 @@ export const MonacoPrDiffEditor = forwardRef<
   {
     fileContent,
     comments,
+    resolvedLines,
     isLoading,
     isSubmittingComment,
     onAddComment,
@@ -295,12 +331,19 @@ export const MonacoPrDiffEditor = forwardRef<
   );
   const [commentTopOffset, setCommentTopOffset] = useState<number | null>(null);
 
+  const [collapsedLines, setCollapsedLines] = useState<Set<number>>(
+    () => new Set(resolvedLines),
+  );
+  const [hasAutoExpanded, setHasAutoExpanded] = useState(false);
+
   const [prevFilePath, setPrevFilePath] = useState(fileContent.path);
   if (prevFilePath !== fileContent.path) {
     setPrevFilePath(fileContent.path);
     setActiveCommentLine(null);
     setPendingComment(null);
     setCommentTopOffset(null);
+    setCollapsedLines(new Set(resolvedLines));
+    setHasAutoExpanded(false);
   }
 
   const handleOpenCommentAt = useCallback(
@@ -563,6 +606,22 @@ export const MonacoPrDiffEditor = forwardRef<
     navigateToComment(next ?? sortedCommentLines[0]);
   }, [sortedCommentLines, activeCommentLine, navigateToComment]);
 
+  const shouldAutoExpand =
+    isEditorReady && !hasAutoExpanded && sortedCommentLines.length > 0;
+  if (shouldAutoExpand) {
+    setHasAutoExpanded(true);
+  }
+
+  useEffect(() => {
+    if (!shouldAutoExpand) return;
+    const firstUnresolved = sortedCommentLines.find(
+      (l) => !resolvedLines.has(l),
+    );
+    if (firstUnresolved !== undefined) {
+      navigateToComment(firstUnresolved);
+    }
+  }, [shouldAutoExpand, sortedCommentLines, resolvedLines, navigateToComment]);
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -679,6 +738,21 @@ export const MonacoPrDiffEditor = forwardRef<
             <CommentThread
               comments={activeCommentThreadComments}
               line={activeCommentLine ?? pendingComment.line}
+              isResolved={resolvedLines.has(
+                activeCommentLine ?? pendingComment.line,
+              )}
+              isCollapsed={collapsedLines.has(
+                activeCommentLine ?? pendingComment.line,
+              )}
+              onToggleCollapse={() => {
+                const line = activeCommentLine ?? pendingComment.line;
+                setCollapsedLines((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(line)) next.delete(line);
+                  else next.add(line);
+                  return next;
+                });
+              }}
               onReply={onReplyToComment}
               onAddComment={onAddComment}
               onDeleteComment={onDeleteComment}

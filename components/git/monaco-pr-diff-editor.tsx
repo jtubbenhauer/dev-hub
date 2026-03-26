@@ -275,6 +275,7 @@ interface ZoneEntry {
   zoneId: string;
   domNode: HTMLDivElement;
   contentWrapper: HTMLDivElement;
+  currentHeight: number;
 }
 
 interface PrDiffEditorProps {
@@ -440,6 +441,7 @@ export const MonacoPrDiffEditor = forwardRef<
               showInHiddenAreas: true,
             });
             existing.zoneId = newId;
+            existing.currentHeight = targetHeight;
           } else {
             const isCollapsed =
               currentCollapsed.has(line) && currentCommentedLines.has(line);
@@ -457,7 +459,12 @@ export const MonacoPrDiffEditor = forwardRef<
               suppressMouseDown: false,
               showInHiddenAreas: true,
             });
-            zones.set(line, { zoneId, domNode, contentWrapper });
+            zones.set(line, {
+              zoneId,
+              domNode,
+              contentWrapper,
+              currentHeight: estimatedHeight,
+            });
             portalsDirty = true;
           }
         }
@@ -478,7 +485,9 @@ export const MonacoPrDiffEditor = forwardRef<
     for (const [line, entry] of zones) {
       const measuredHeight = entry.contentWrapper.scrollHeight;
       const targetHeight = Math.max(measuredHeight, COLLAPSED_ZONE_HEIGHT);
-      resizes.push({ line, height: targetHeight });
+      if (targetHeight !== entry.currentHeight) {
+        resizes.push({ line, height: targetHeight });
+      }
     }
 
     if (resizes.length === 0) return;
@@ -497,6 +506,7 @@ export const MonacoPrDiffEditor = forwardRef<
           showInHiddenAreas: true,
         });
         entry.zoneId = newId;
+        entry.currentHeight = height;
       }
     });
   }, [getModifiedEditor]);

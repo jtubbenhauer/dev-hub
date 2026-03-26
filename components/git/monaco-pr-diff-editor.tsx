@@ -38,7 +38,7 @@ import {
   useTabSizeSetting,
 } from "@/hooks/use-settings";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { replaceEmoji } from "@/lib/emoji";
+import { GitHubMarkdown } from "@/components/git/github-markdown";
 import type { GitHubPrFileContent, GitHubReviewComment } from "@/types";
 import type { ReviewDraft } from "@/stores/review-draft-store";
 
@@ -290,9 +290,10 @@ function CommentThread({
                   </Button>
                 )}
               </div>
-              <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                {replaceEmoji(comment.body)}
-              </p>
+              <GitHubMarkdown
+                content={comment.body}
+                className="text-foreground/80"
+              />
             </div>
           ))}
           <div className="px-3 py-2">

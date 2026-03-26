@@ -68,6 +68,7 @@ import {
   useGitHubToggleFileViewed,
 } from "@/hooks/use-github";
 import { useReviewDraftStore } from "@/stores/review-draft-store";
+import { GitHubMarkdown } from "@/components/git/github-markdown";
 import type {
   GitHubPullRequest,
   GitHubReviewEvent,
@@ -968,8 +969,8 @@ function PrDetailBar({ pr, reviews, isOpen, onToggle }: PrDetailBarProps) {
       {isOpen && (
         <div className="space-y-2 px-3 pb-2">
           {hasDescription && (
-            <div className="bg-muted/30 text-foreground max-h-48 overflow-y-auto rounded-md px-3 py-2 text-xs break-words whitespace-pre-wrap">
-              {pr.body}
+            <div className="bg-muted/30 max-h-48 overflow-y-auto rounded-md px-3 py-2">
+              <GitHubMarkdown content={pr.body ?? ""} className="text-xs" />
             </div>
           )}
           {hasReviewInfo && (

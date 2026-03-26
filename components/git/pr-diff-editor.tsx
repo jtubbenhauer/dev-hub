@@ -3,6 +3,7 @@
 import { forwardRef } from "react";
 import dynamic from "next/dynamic";
 import type { GitHubPrFileContent, GitHubReviewComment } from "@/types";
+import type { ReviewDraft } from "@/stores/review-draft-store";
 
 const MonacoPrDiffEditor = dynamic(
   () =>
@@ -23,6 +24,7 @@ export interface PrDiffEditorHandle {
 interface PrDiffEditorProps {
   fileContent: GitHubPrFileContent;
   comments: GitHubReviewComment[];
+  drafts: ReviewDraft[];
   resolvedLines: Set<number>;
   isLoading: boolean;
   isSubmittingComment: boolean;
@@ -30,9 +32,11 @@ interface PrDiffEditorProps {
     body: string,
     line: number,
     startLine: number,
+    isInDiffHunk: boolean,
   ) => Promise<void>;
   onReplyToComment: (body: string, inReplyToId: number) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
+  onDeleteDraft: (draftId: string) => void;
   currentUserLogin: string | null;
   onOpenFileList?: () => void;
 }

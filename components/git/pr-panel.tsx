@@ -60,8 +60,6 @@ import {
   useGitHubPrReviews,
   useGitHubPrChecks,
   useGitHubPrFileContent,
-  useGitHubAddComment,
-  useGitHubReplyToComment,
   useGitHubDeleteComment,
   useGitHubSubmitReview,
   useGitHubMergePr,
@@ -69,6 +67,7 @@ import {
   useGitHubPrViewedFiles,
   useGitHubToggleFileViewed,
 } from "@/hooks/use-github";
+import { useReviewDraftStore } from "@/stores/review-draft-store";
 import type {
   GitHubPullRequest,
   GitHubReviewEvent,
@@ -78,6 +77,7 @@ import type {
   GitHubUser,
 } from "@/types";
 
+const EMPTY_DRAFTS: import("@/stores/review-draft-store").ReviewDraft[] = [];
 const MIN_PANEL_WIDTH = 200;
 const MAX_PANEL_WIDTH = 500;
 const DEFAULT_PANEL_WIDTH = 280;
@@ -204,11 +204,17 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const { data: fileContent, isLoading: isFileContentLoading } =
     useGitHubPrFileContent(owner, repo, selectedFile, baseSha, headSha);
 
-  const addCommentMutation = useGitHubAddComment(owner, repo, prNumber);
-  const replyToCommentMutation = useGitHubReplyToComment(owner, repo, prNumber);
   const deleteCommentMutation = useGitHubDeleteComment(owner, repo, prNumber);
   const submitReviewMutation = useGitHubSubmitReview(owner, repo, prNumber);
   const mergeMutation = useGitHubMergePr();
+
+  const prKey =
+    owner && repo && prNumber ? `${owner}/${repo}/${prNumber}` : null;
+  const prDrafts = useReviewDraftStore((state) =>
+    prKey ? (state.drafts[prKey] ?? EMPTY_DRAFTS) : EMPTY_DRAFTS,
+  );
+  const addDraft = useReviewDraftStore((state) => state.addDraft);
+  const removeDraft = useReviewDraftStore((state) => state.removeDraft);
 
   const isMyPr = activeTab === "my-prs";
 
@@ -223,6 +229,11 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const fileComments = useMemo(
     () => prComments.filter((c) => c.path === selectedFilename),
     [prComments, selectedFilename],
+  );
+
+  const fileDrafts = useMemo(
+    () => prDrafts.filter((draft) => draft.path === selectedFilename),
+    [prDrafts, selectedFilename],
   );
 
   const resolvedLines = useMemo(() => {
@@ -279,34 +290,44 @@ export function PrPanel({ onClose }: PrPanelProps) {
   );
 
   const handleAddComment = useCallback(
-    async (body: string, line: number, startLine: number) => {
-      if (!owner || !repo || !prNumber || !selectedFilename || !headSha) return;
-      await addCommentMutation.mutateAsync({
-        owner,
-        repo,
-        prNumber,
-        body,
-        commitId: headSha,
+    async (
+      body: string,
+      line: number,
+      startLine: number,
+      _isInDiffHunk: boolean,
+    ) => {
+      if (!owner || !repo || !prNumber || !selectedFilename || !prKey) return;
+      addDraft(prKey, {
+        type: "inline",
         path: selectedFilename,
         line,
+        side: "RIGHT",
+        body,
         startLine: startLine !== line ? startLine : undefined,
       });
     },
-    [owner, repo, prNumber, selectedFilename, headSha, addCommentMutation],
+    [owner, repo, prNumber, selectedFilename, prKey, addDraft],
   );
 
   const handleReplyToComment = useCallback(
     async (body: string, inReplyToId: number) => {
-      if (!owner || !repo || !prNumber) return;
-      await replyToCommentMutation.mutateAsync({
-        owner,
-        repo,
-        prNumber,
-        commentId: inReplyToId,
+      if (!owner || !repo || !prNumber || !prKey) return;
+      const originalComment = prComments.find(
+        (comment) => comment.id === inReplyToId,
+      );
+      if (!originalComment) return;
+      const line = originalComment.line ?? originalComment.original_line;
+      if (line === null || line === undefined) return;
+      addDraft(prKey, {
+        type: "reply",
+        path: originalComment.path,
+        line,
+        side: "RIGHT",
         body,
+        replyToId: inReplyToId,
       });
     },
-    [owner, repo, prNumber, replyToCommentMutation],
+    [owner, repo, prNumber, prKey, prComments, addDraft],
   );
 
   const handleDeleteComment = useCallback(
@@ -323,10 +344,26 @@ export function PrPanel({ onClose }: PrPanelProps) {
 
   const handleSubmitReview = useCallback(
     (event: GitHubReviewEvent, body: string) => {
-      if (!owner || !repo || !prNumber) return;
-      submitReviewMutation.mutate({ owner, repo, prNumber, event, body });
+      if (!owner || !repo || !prNumber || !prKey) return;
+      submitReviewMutation.mutate({
+        owner,
+        repo,
+        prNumber,
+        event,
+        body,
+        headSha,
+        prKey,
+      });
     },
-    [owner, repo, prNumber, submitReviewMutation],
+    [owner, repo, prNumber, prKey, submitReviewMutation, headSha],
+  );
+
+  const handleDeleteDraft = useCallback(
+    (draftId: string) => {
+      if (!prKey) return;
+      removeDraft(prKey, draftId);
+    },
+    [prKey, removeDraft],
   );
 
   const handleMerge = useCallback(
@@ -365,8 +402,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
     );
   }
 
-  const isSubmittingComment =
-    addCommentMutation.isPending || replyToCommentMutation.isPending;
+  const isSubmittingComment = false;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -381,6 +417,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
           <TooltipContent>Back to PR list</TooltipContent>
         </Tooltip>
         <button
+          type="button"
           className="flex min-w-0 flex-1 items-start gap-1.5 text-left transition-opacity hover:opacity-80"
           onClick={() => setIsPrListOpen(true)}
         >
@@ -521,12 +558,14 @@ export function PrPanel({ onClose }: PrPanelProps) {
 
         {/* Drag handle — desktop only */}
         {!isMobile && (
-          <div
+          <button
+            type="button"
             className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
             onMouseDown={handleDragStart}
+            aria-label="Resize file list"
           >
             <GripVertical className="text-muted-foreground/30 size-3.5" />
-          </div>
+          </button>
         )}
 
         {/* Diff editor */}
@@ -536,12 +575,14 @@ export function PrPanel({ onClose }: PrPanelProps) {
               ref={editorHandleRef}
               fileContent={fileContent}
               comments={fileComments}
+              drafts={fileDrafts}
               resolvedLines={resolvedLines}
               isLoading={isFileContentLoading}
               isSubmittingComment={isSubmittingComment}
               onAddComment={handleAddComment}
               onReplyToComment={handleReplyToComment}
               onDeleteComment={handleDeleteComment}
+              onDeleteDraft={handleDeleteDraft}
               currentUserLogin={currentUser?.login ?? null}
               onOpenFileList={
                 isMobile ? () => setIsMobileFileListOpen(true) : undefined
@@ -581,7 +622,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
         <ReviewSubmitBar
           onSubmit={handleSubmitReview}
           isSubmitting={submitReviewMutation.isPending}
-          commentCount={prComments.length}
+          draftCount={prDrafts.length}
         />
       )}
       {selectedPr && isMyPr && (
@@ -758,6 +799,7 @@ function PrListItems({
           const isOwnPr = currentUser?.login === pr.user.login;
           return (
             <button
+              type="button"
               key={`${repoName}/${pr.number}`}
               className={cn(
                 "hover:bg-accent/50 w-full rounded-sm px-3 py-2 text-left text-xs transition-colors",
@@ -887,6 +929,7 @@ function PrDetailBar({ pr, reviews, isOpen, onToggle }: PrDetailBarProps) {
   return (
     <div className="shrink-0 border-b">
       <button
+        type="button"
         className="hover:bg-accent/30 flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors"
         onClick={onToggle}
       >
@@ -1111,6 +1154,7 @@ function ChecksStatusBadge({ checks }: { checks: GitHubCheckRun[] }) {
       <Tooltip>
         <TooltipTrigger asChild>
           <button
+            type="button"
             className="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1 text-[11px] transition-colors"
             onClick={(e) => {
               e.stopPropagation();
@@ -1177,13 +1221,13 @@ function CheckRunIcon({ check }: { check: GitHubCheckRun }) {
 interface ReviewSubmitBarProps {
   onSubmit: (event: GitHubReviewEvent, body: string) => void;
   isSubmitting: boolean;
-  commentCount: number;
+  draftCount: number;
 }
 
 function ReviewSubmitBar({
   onSubmit,
   isSubmitting,
-  commentCount,
+  draftCount,
 }: ReviewSubmitBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [reviewBody, setReviewBody] = useState("");
@@ -1200,10 +1244,10 @@ function ReviewSubmitBar({
   if (!isExpanded) {
     return (
       <div className="bg-muted/10 flex shrink-0 items-center gap-2 border-t px-3 py-2">
-        {commentCount > 0 && (
+        {draftCount > 0 && (
           <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
             <MessageSquare className="size-3" />
-            {commentCount} comment{commentCount !== 1 ? "s" : ""}
+            {draftCount} draft{draftCount !== 1 ? "s" : ""}
           </span>
         )}
         <div className="flex-1" />

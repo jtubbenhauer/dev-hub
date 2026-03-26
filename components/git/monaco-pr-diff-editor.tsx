@@ -40,6 +40,55 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { replaceEmoji } from "@/lib/emoji";
 import type { GitHubPrFileContent, GitHubReviewComment } from "@/types";
+import type { ReviewDraft } from "@/stores/review-draft-store";
+
+type DraftDisplayComment = GitHubReviewComment & {
+  isDraft: true;
+  draftId: string;
+};
+
+type DisplayComment = GitHubReviewComment | DraftDisplayComment;
+
+function isDraftDisplayComment(
+  comment: DisplayComment,
+): comment is DraftDisplayComment {
+  return "isDraft" in comment && comment.isDraft;
+}
+
+function getDraftCommentId(draftId: string): number {
+  const raw = draftId.replace(/-/g, "").slice(0, 8);
+  return -Math.max(Number.parseInt(raw || "1", 16), 1);
+}
+
+function buildDraftDisplayComment(draft: ReviewDraft): DraftDisplayComment {
+  return {
+    id: getDraftCommentId(draft.id),
+    body: draft.body,
+    path: draft.path,
+    line: draft.line,
+    start_line: draft.startLine ?? null,
+    side: draft.side,
+    start_side: draft.startLine !== undefined ? draft.side : null,
+    original_line: draft.line,
+    original_start_line: draft.startLine ?? null,
+    diff_hunk: "",
+    commit_id: "",
+    original_commit_id: "",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    user: {
+      login: "you",
+      id: 0,
+      avatar_url: "",
+      html_url: "",
+      name: null,
+    },
+    html_url: "",
+    in_reply_to_id: draft.replyToId,
+    isDraft: true,
+    draftId: draft.id,
+  };
+}
 
 const DiffEditor = dynamic(
   () => import("@monaco-editor/react").then((mod) => mod.DiffEditor),
@@ -91,7 +140,7 @@ export interface PrDiffEditorHandle {
 }
 
 interface CommentThreadProps {
-  comments: GitHubReviewComment[];
+  comments: DisplayComment[];
   line: number;
   isResolved: boolean;
   isCollapsed: boolean;
@@ -101,8 +150,10 @@ interface CommentThreadProps {
     body: string,
     line: number,
     startLine: number,
+    isInDiffHunk: boolean,
   ) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
+  onDeleteDraft: (draftId: string) => void;
   currentUserLogin: string | null;
   onClose: () => void;
   pendingLine: number;
@@ -118,6 +169,7 @@ function CommentThread({
   onReply,
   onAddComment,
   onDeleteComment,
+  onDeleteDraft,
   currentUserLogin,
   onClose,
   pendingLine,
@@ -126,20 +178,26 @@ function CommentThread({
 }: CommentThreadProps) {
   const [replyBody, setReplyBody] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const lastCommentId = comments[comments.length - 1]?.id;
+  const replyTargetId = useMemo(() => {
+    for (let i = comments.length - 1; i >= 0; i--) {
+      const comment = comments[i];
+      if (!isDraftDisplayComment(comment)) return comment.id;
+    }
+    return undefined;
+  }, [comments]);
 
   const handleSubmit = useCallback(async () => {
     const body = replyBody.trim();
     if (!body) return;
-    if (lastCommentId !== undefined) {
-      await onReply(body, lastCommentId);
+    if (replyTargetId !== undefined) {
+      await onReply(body, replyTargetId);
     } else {
-      await onAddComment(body, pendingLine, pendingStartLine);
+      await onAddComment(body, pendingLine, pendingStartLine, true);
     }
     setReplyBody("");
   }, [
     replyBody,
-    lastCommentId,
+    replyTargetId,
     onReply,
     onAddComment,
     pendingLine,
@@ -191,16 +249,30 @@ function CommentThread({
                 <span className="text-foreground font-medium">
                   {comment.user.login}
                 </span>
+                {isDraftDisplayComment(comment) && (
+                  <span className="rounded bg-yellow-500/20 px-1 py-0.5 text-[10px] font-medium text-yellow-600 dark:text-yellow-400">
+                    Draft
+                  </span>
+                )}
                 <span className="text-muted-foreground flex-1">
                   {new Date(comment.created_at).toLocaleDateString()}
                 </span>
-                {currentUserLogin === comment.user.login && (
+                {(isDraftDisplayComment(comment) ||
+                  currentUserLogin === comment.user.login) && (
                   <Button
                     variant="ghost"
                     size="icon-xs"
                     className="text-muted-foreground hover:text-destructive -mr-1 shrink-0"
-                    disabled={deletingId === comment.id}
+                    disabled={
+                      isDraftDisplayComment(comment)
+                        ? false
+                        : deletingId === comment.id
+                    }
                     onClick={async () => {
+                      if (isDraftDisplayComment(comment)) {
+                        onDeleteDraft(comment.draftId);
+                        return;
+                      }
                       setDeletingId(comment.id);
                       try {
                         await onDeleteComment(comment.id);
@@ -209,7 +281,8 @@ function CommentThread({
                       }
                     }}
                   >
-                    {deletingId === comment.id ? (
+                    {!isDraftDisplayComment(comment) &&
+                    deletingId === comment.id ? (
                       <Loader2 className="size-3 animate-spin" />
                     ) : (
                       <Trash2 className="size-3" />
@@ -281,6 +354,7 @@ interface ZoneEntry {
 interface PrDiffEditorProps {
   fileContent: GitHubPrFileContent;
   comments: GitHubReviewComment[];
+  drafts: ReviewDraft[];
   resolvedLines: Set<number>;
   isLoading: boolean;
   isSubmittingComment: boolean;
@@ -288,9 +362,11 @@ interface PrDiffEditorProps {
     body: string,
     line: number,
     startLine: number,
+    isInDiffHunk: boolean,
   ) => Promise<void>;
   onReplyToComment: (body: string, inReplyToId: number) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
+  onDeleteDraft: (draftId: string) => void;
   currentUserLogin: string | null;
   onOpenFileList?: () => void;
 }
@@ -302,12 +378,14 @@ export const MonacoPrDiffEditor = forwardRef<
   {
     fileContent,
     comments,
+    drafts,
     resolvedLines,
     isLoading,
     isSubmittingComment,
     onAddComment,
     onReplyToComment,
     onDeleteComment,
+    onDeleteDraft,
     currentUserLogin,
     onOpenFileList,
   },
@@ -346,7 +424,7 @@ export const MonacoPrDiffEditor = forwardRef<
   }
 
   const commentsByLine = useMemo(() => {
-    const map = new Map<number, GitHubReviewComment[]>();
+    const map = new Map<number, DisplayComment[]>();
     for (const comment of comments) {
       const line = comment.line ?? comment.original_line;
       if (line === null) continue;
@@ -354,8 +432,14 @@ export const MonacoPrDiffEditor = forwardRef<
       existing.push(comment);
       map.set(line, existing);
     }
+    for (const draft of drafts) {
+      if (draft.line <= 0) continue;
+      const existing = map.get(draft.line) ?? [];
+      existing.push(buildDraftDisplayComment(draft));
+      map.set(draft.line, existing);
+    }
     return map;
-  }, [comments]);
+  }, [comments, drafts]);
 
   const commentedLines = useMemo(
     () => new Set(commentsByLine.keys()),
@@ -408,11 +492,13 @@ export const MonacoPrDiffEditor = forwardRef<
       }
 
       const zones = zonesRef.current;
+      const resizeObserver = resizeObserverRef.current;
       let portalsDirty = false;
 
       me.changeViewZones((accessor) => {
         for (const [line, entry] of zones) {
           if (!linesNeedingZones.has(line)) {
+            resizeObserver?.unobserve(entry.contentWrapper);
             accessor.removeZone(entry.zoneId);
             zones.delete(line);
             portalsDirty = true;
@@ -432,29 +518,30 @@ export const MonacoPrDiffEditor = forwardRef<
                 ? COLLAPSED_ZONE_HEIGHT
                 : Math.max(measuredHeight, EXPANDED_ZONE_HEIGHT);
 
-            accessor.removeZone(existing.zoneId);
-            const newId = accessor.addZone({
-              afterLineNumber: line,
-              heightInPx: targetHeight,
-              domNode: existing.domNode,
-              suppressMouseDown: false,
-              showInHiddenAreas: true,
-            });
-            existing.zoneId = newId;
-            existing.currentHeight = targetHeight;
+            if (targetHeight !== existing.currentHeight) {
+              accessor.removeZone(existing.zoneId);
+              const newId = accessor.addZone({
+                afterLineNumber: line,
+                heightInPx: targetHeight,
+                domNode: existing.domNode,
+                suppressMouseDown: false,
+                showInHiddenAreas: true,
+              });
+              existing.zoneId = newId;
+              existing.currentHeight = targetHeight;
+            }
           } else {
             const isCollapsed =
               currentCollapsed.has(line) && currentCommentedLines.has(line);
             const isResolved = currentResolved.has(line);
-            const estimatedHeight =
+            const initialHeight =
               isCollapsed || isResolved
                 ? COLLAPSED_ZONE_HEIGHT
                 : EXPANDED_ZONE_HEIGHT;
-
             const { domNode, contentWrapper } = createZoneDomNodes();
             const zoneId = accessor.addZone({
               afterLineNumber: line,
-              heightInPx: estimatedHeight,
+              heightInPx: initialHeight,
               domNode,
               suppressMouseDown: false,
               showInHiddenAreas: true,
@@ -463,8 +550,9 @@ export const MonacoPrDiffEditor = forwardRef<
               zoneId,
               domNode,
               contentWrapper,
-              currentHeight: estimatedHeight,
+              currentHeight: initialHeight,
             });
+            resizeObserver?.observe(contentWrapper);
             portalsDirty = true;
           }
         }
@@ -475,41 +563,45 @@ export const MonacoPrDiffEditor = forwardRef<
     [getModifiedEditor, createZoneDomNodes],
   );
 
-  const resizeViewZones = useCallback(() => {
-    const me = getModifiedEditor();
-    if (!me) return;
+  const resizeViewZones = useCallback(
+    (
+      currentCommentedLines: Set<number>,
+      currentCollapsed: Set<number>,
+      currentResolved: Set<number>,
+    ) => {
+      const me = getModifiedEditor();
+      if (!me) return;
 
-    const zones = zonesRef.current;
-    const resizes: Array<{ line: number; height: number }> = [];
+      const zones = zonesRef.current;
 
-    for (const [line, entry] of zones) {
-      const measuredHeight = entry.contentWrapper.scrollHeight;
-      const targetHeight = Math.max(measuredHeight, COLLAPSED_ZONE_HEIGHT);
-      if (targetHeight !== entry.currentHeight) {
-        resizes.push({ line, height: targetHeight });
-      }
-    }
+      me.changeViewZones((accessor) => {
+        for (const [line, existing] of zones) {
+          const isCollapsed =
+            currentCollapsed.has(line) && currentCommentedLines.has(line);
+          const isResolved = currentResolved.has(line);
+          const measuredHeight = existing.contentWrapper.scrollHeight;
+          const targetHeight =
+            isCollapsed || isResolved
+              ? COLLAPSED_ZONE_HEIGHT
+              : Math.max(measuredHeight, EXPANDED_ZONE_HEIGHT);
 
-    if (resizes.length === 0) return;
-
-    me.changeViewZones((accessor) => {
-      for (const { line, height } of resizes) {
-        const entry = zones.get(line);
-        if (!entry) continue;
-
-        accessor.removeZone(entry.zoneId);
-        const newId = accessor.addZone({
-          afterLineNumber: line,
-          heightInPx: height,
-          domNode: entry.domNode,
-          suppressMouseDown: false,
-          showInHiddenAreas: true,
-        });
-        entry.zoneId = newId;
-        entry.currentHeight = height;
-      }
-    });
-  }, [getModifiedEditor]);
+          if (targetHeight !== existing.currentHeight) {
+            accessor.removeZone(existing.zoneId);
+            const newId = accessor.addZone({
+              afterLineNumber: line,
+              heightInPx: targetHeight,
+              domNode: existing.domNode,
+              suppressMouseDown: false,
+              showInHiddenAreas: true,
+            });
+            existing.zoneId = newId;
+            existing.currentHeight = targetHeight;
+          }
+        }
+      });
+    },
+    [getModifiedEditor],
+  );
 
   const handleBeforeMount = useCallback(
     (monacoInstance: typeof import("monaco-editor")) => {
@@ -563,6 +655,13 @@ export const MonacoPrDiffEditor = forwardRef<
       }
       queueMicrotask(() => setPortalTargets(targets));
     }
+
+    const resizeObserver = resizeObserverRef.current;
+    if (resizeObserver) {
+      for (const entry of zonesRef.current.values()) {
+        resizeObserver.observe(entry.contentWrapper);
+      }
+    }
   }, [
     isEditorReady,
     commentedLines,
@@ -573,20 +672,29 @@ export const MonacoPrDiffEditor = forwardRef<
   ]);
 
   useEffect(() => {
-    if (portalTargets.size === 0) return;
-
-    resizeObserverRef.current?.disconnect();
-    const observer = new ResizeObserver(() => {
-      resizeViewZones();
+    if (!isEditorReady) return;
+    const resizeObserver = new ResizeObserver(() => {
+      resizeViewZones(commentedLines, collapsedLines, resolvedLines);
     });
-    resizeObserverRef.current = observer;
+    resizeObserverRef.current = resizeObserver;
 
-    for (const wrapper of portalTargets.values()) {
-      observer.observe(wrapper);
+    for (const entry of zonesRef.current.values()) {
+      resizeObserver.observe(entry.contentWrapper);
     }
 
-    return () => observer.disconnect();
-  }, [portalTargets, resizeViewZones]);
+    return () => {
+      resizeObserver.disconnect();
+      if (resizeObserverRef.current === resizeObserver) {
+        resizeObserverRef.current = null;
+      }
+    };
+  }, [
+    isEditorReady,
+    commentedLines,
+    collapsedLines,
+    resolvedLines,
+    resizeViewZones,
+  ]);
 
   useEffect(() => {
     if (!isEditorReady || !decorationsRef.current || !diffEditorRef.current)
@@ -686,6 +794,7 @@ export const MonacoPrDiffEditor = forwardRef<
     const zones = zonesRef.current;
     return () => {
       resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
       const me = diffEditorRef.current?.getModifiedEditor();
       if (!me) return;
       me.changeViewZones((accessor) => {
@@ -706,7 +815,7 @@ export const MonacoPrDiffEditor = forwardRef<
   }
 
   const fileName = fileContent.path;
-  const commentCount = comments.length;
+  const commentCount = comments.length + drafts.length;
   const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
 
   const portalEntries: React.ReactNode[] = [];
@@ -735,6 +844,7 @@ export const MonacoPrDiffEditor = forwardRef<
           onReply={onReplyToComment}
           onAddComment={onAddComment}
           onDeleteComment={onDeleteComment}
+          onDeleteDraft={onDeleteDraft}
           currentUserLogin={currentUserLogin}
           onClose={() => {
             if (isNewComment) {

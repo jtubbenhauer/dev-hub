@@ -160,7 +160,7 @@ function CommentThread({
   );
 
   return (
-    <div className="bg-popover mx-2 my-1 max-h-60 overflow-y-auto rounded-md border text-xs shadow-lg">
+    <div className="bg-popover mx-2 my-1 rounded-md border text-xs shadow-lg">
       {comments.length > 0 && (
         <button
           type="button"
@@ -268,9 +268,14 @@ function CommentThread({
   );
 }
 
-const MAX_ZONE_HEIGHT = 300;
 const COLLAPSED_ZONE_HEIGHT = 32;
 const EXPANDED_ZONE_HEIGHT = 200;
+
+interface ZoneEntry {
+  zoneId: string;
+  domNode: HTMLDivElement;
+  contentWrapper: HTMLDivElement;
+}
 
 interface PrDiffEditorProps {
   fileContent: GitHubPrFileContent;
@@ -320,8 +325,8 @@ export const MonacoPrDiffEditor = forwardRef<
   const isMobile = useIsMobile();
   const [isEditorReady, setIsEditorReady] = useState(false);
 
-  const viewZoneIdsRef = useRef<Map<number, string>>(new Map());
-  const viewZoneDomNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const zonesRef = useRef<Map<number, ZoneEntry>>(new Map());
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [portalTargets, setPortalTargets] = useState<
     Map<number, HTMLDivElement>
   >(() => new Map());
@@ -374,15 +379,24 @@ export const MonacoPrDiffEditor = forwardRef<
     [getModifiedEditor],
   );
 
+  const createZoneDomNodes = useCallback(() => {
+    const domNode = document.createElement("div");
+    domNode.style.zIndex = "10";
+    const contentWrapper = document.createElement("div");
+    contentWrapper.style.overflow = "visible";
+    domNode.appendChild(contentWrapper);
+    return { domNode, contentWrapper };
+  }, []);
+
   const syncViewZones = useCallback(
     (
       currentCommentedLines: Set<number>,
       currentCollapsed: Set<number>,
       currentNewCommentLine: number | null,
       currentResolved: Set<number>,
-    ) => {
+    ): boolean => {
       const me = getModifiedEditor();
-      if (!me) return;
+      if (!me) return false;
 
       const linesNeedingZones = new Set<number>(currentCommentedLines);
       if (
@@ -392,72 +406,78 @@ export const MonacoPrDiffEditor = forwardRef<
         linesNeedingZones.add(currentNewCommentLine);
       }
 
-      me.changeViewZones((accessor) => {
-        const existingZoneIds = viewZoneIdsRef.current;
-        const existingDomNodes = viewZoneDomNodesRef.current;
+      const zones = zonesRef.current;
+      let portalsDirty = false;
 
-        for (const [line, zoneId] of existingZoneIds) {
+      me.changeViewZones((accessor) => {
+        for (const [line, entry] of zones) {
           if (!linesNeedingZones.has(line)) {
-            accessor.removeZone(zoneId);
-            existingZoneIds.delete(line);
-            existingDomNodes.delete(line);
+            accessor.removeZone(entry.zoneId);
+            zones.delete(line);
+            portalsDirty = true;
           }
         }
 
         for (const line of linesNeedingZones) {
-          const isCollapsed =
-            currentCollapsed.has(line) && currentCommentedLines.has(line);
-          const isResolved = currentResolved.has(line);
-          const estimatedHeight =
-            isCollapsed || isResolved
-              ? COLLAPSED_ZONE_HEIGHT
-              : EXPANDED_ZONE_HEIGHT;
+          const existing = zones.get(line);
 
-          const existingId = existingZoneIds.get(line);
-          if (existingId) {
-            accessor.removeZone(existingId);
+          if (existing) {
+            const isCollapsed =
+              currentCollapsed.has(line) && currentCommentedLines.has(line);
+            const isResolved = currentResolved.has(line);
+            const measuredHeight = existing.contentWrapper.scrollHeight;
+            const targetHeight =
+              isCollapsed || isResolved
+                ? COLLAPSED_ZONE_HEIGHT
+                : Math.max(measuredHeight, EXPANDED_ZONE_HEIGHT);
+
+            accessor.removeZone(existing.zoneId);
+            const newId = accessor.addZone({
+              afterLineNumber: line,
+              heightInPx: targetHeight,
+              domNode: existing.domNode,
+              suppressMouseDown: false,
+              showInHiddenAreas: true,
+            });
+            existing.zoneId = newId;
+          } else {
+            const isCollapsed =
+              currentCollapsed.has(line) && currentCommentedLines.has(line);
+            const isResolved = currentResolved.has(line);
+            const estimatedHeight =
+              isCollapsed || isResolved
+                ? COLLAPSED_ZONE_HEIGHT
+                : EXPANDED_ZONE_HEIGHT;
+
+            const { domNode, contentWrapper } = createZoneDomNodes();
+            const zoneId = accessor.addZone({
+              afterLineNumber: line,
+              heightInPx: estimatedHeight,
+              domNode,
+              suppressMouseDown: false,
+              showInHiddenAreas: true,
+            });
+            zones.set(line, { zoneId, domNode, contentWrapper });
+            portalsDirty = true;
           }
-
-          const domNode = document.createElement("div");
-          domNode.style.zIndex = "10";
-          const contentWrapper = document.createElement("div");
-          contentWrapper.style.overflowY = "auto";
-          contentWrapper.style.maxHeight = `${MAX_ZONE_HEIGHT}px`;
-          domNode.appendChild(contentWrapper);
-
-          const newId = accessor.addZone({
-            afterLineNumber: line,
-            heightInPx: estimatedHeight,
-            domNode,
-            suppressMouseDown: false,
-            showInHiddenAreas: true,
-          });
-
-          existingZoneIds.set(line, newId);
-          existingDomNodes.set(line, contentWrapper);
         }
       });
 
-      setPortalTargets(new Map(viewZoneDomNodesRef.current));
+      return portalsDirty;
     },
-    [getModifiedEditor],
+    [getModifiedEditor, createZoneDomNodes],
   );
 
   const resizeViewZones = useCallback(() => {
     const me = getModifiedEditor();
     if (!me) return;
 
-    const domNodes = viewZoneDomNodesRef.current;
-    const zoneIds = viewZoneIdsRef.current;
-
+    const zones = zonesRef.current;
     const resizes: Array<{ line: number; height: number }> = [];
-    for (const [line, contentWrapper] of domNodes) {
-      if (!zoneIds.has(line)) continue;
-      const measuredHeight = contentWrapper.scrollHeight;
-      const targetHeight = Math.min(
-        Math.max(measuredHeight, COLLAPSED_ZONE_HEIGHT),
-        MAX_ZONE_HEIGHT,
-      );
+
+    for (const [line, entry] of zones) {
+      const measuredHeight = entry.contentWrapper.scrollHeight;
+      const targetHeight = Math.max(measuredHeight, COLLAPSED_ZONE_HEIGHT);
       resizes.push({ line, height: targetHeight });
     }
 
@@ -465,25 +485,18 @@ export const MonacoPrDiffEditor = forwardRef<
 
     me.changeViewZones((accessor) => {
       for (const { line, height } of resizes) {
-        const oldId = zoneIds.get(line);
-        const contentWrapper = domNodes.get(line);
-        if (!oldId || !contentWrapper) continue;
+        const entry = zones.get(line);
+        if (!entry) continue;
 
-        accessor.removeZone(oldId);
-
-        const domNode =
-          contentWrapper.parentElement ?? document.createElement("div");
-        domNode.style.zIndex = "10";
-
+        accessor.removeZone(entry.zoneId);
         const newId = accessor.addZone({
           afterLineNumber: line,
           heightInPx: height,
-          domNode,
+          domNode: entry.domNode,
           suppressMouseDown: false,
           showInHiddenAreas: true,
         });
-
-        zoneIds.set(line, newId);
+        entry.zoneId = newId;
       }
     });
   }, [getModifiedEditor]);
@@ -527,12 +540,19 @@ export const MonacoPrDiffEditor = forwardRef<
 
   useEffect(() => {
     if (!isEditorReady) return;
-    syncViewZones(
+    const portalsDirty = syncViewZones(
       commentedLines,
       collapsedLines,
       newCommentLine,
       resolvedLines,
     );
+    if (portalsDirty) {
+      const targets = new Map<number, HTMLDivElement>();
+      for (const [line, entry] of zonesRef.current) {
+        targets.set(line, entry.contentWrapper);
+      }
+      queueMicrotask(() => setPortalTargets(targets));
+    }
   }, [
     isEditorReady,
     commentedLines,
@@ -544,12 +564,18 @@ export const MonacoPrDiffEditor = forwardRef<
 
   useEffect(() => {
     if (portalTargets.size === 0) return;
-    const t1 = setTimeout(() => resizeViewZones(), 50);
-    const t2 = setTimeout(() => resizeViewZones(), 200);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
+
+    resizeObserverRef.current?.disconnect();
+    const observer = new ResizeObserver(() => {
+      resizeViewZones();
+    });
+    resizeObserverRef.current = observer;
+
+    for (const wrapper of portalTargets.values()) {
+      observer.observe(wrapper);
+    }
+
+    return () => observer.disconnect();
   }, [portalTargets, resizeViewZones]);
 
   useEffect(() => {
@@ -647,18 +673,17 @@ export const MonacoPrDiffEditor = forwardRef<
   }, [sortedCommentLines, navLine, navigateToComment]);
 
   useEffect(() => {
-    const zoneIds = viewZoneIdsRef.current;
-    const domNodes = viewZoneDomNodesRef.current;
+    const zones = zonesRef.current;
     return () => {
+      resizeObserverRef.current?.disconnect();
       const me = diffEditorRef.current?.getModifiedEditor();
       if (!me) return;
       me.changeViewZones((accessor) => {
-        for (const zoneId of zoneIds.values()) {
-          accessor.removeZone(zoneId);
+        for (const entry of zones.values()) {
+          accessor.removeZone(entry.zoneId);
         }
       });
-      zoneIds.clear();
-      domNodes.clear();
+      zones.clear();
     };
   }, []);
 

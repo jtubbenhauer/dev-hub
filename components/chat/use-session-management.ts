@@ -262,11 +262,24 @@ export function useSessionManagement({
       const next = !prev;
       localStorage.setItem("dev-hub:chat-unified-mode", String(next));
       if (next) {
+        let delayIndex = 0;
         for (const ws of allWorkspaces) {
-          if (shouldSSEConnect(ws, activeWorkspaceId)) {
-            fetchSessions(ws.id);
+          const isActive = ws.id === activeWorkspaceId;
+          if (isActive) {
+            if (shouldSSEConnect(ws, activeWorkspaceId)) {
+              fetchSessions(ws.id);
+            } else {
+              fetchCachedSessions(ws.id);
+            }
           } else {
-            fetchCachedSessions(ws.id);
+            const delay = ++delayIndex * 150;
+            setTimeout(() => {
+              if (shouldSSEConnect(ws, activeWorkspaceId)) {
+                fetchSessions(ws.id);
+              } else {
+                fetchCachedSessions(ws.id);
+              }
+            }, delay);
           }
         }
       }
@@ -348,16 +361,46 @@ export function useSessionManagement({
 
   useEffect(() => {
     if (!isUnifiedMode) return;
+
+    // Stagger non-active workspace fetches to avoid N parallel API calls on mount
+    let cancelled = false;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    let delayIndex = 0;
     for (const ws of allWorkspaces) {
-      if (shouldSSEConnect(ws, activeWorkspaceId)) {
-        fetchSessions(ws.id);
-        fetchPinnedSessions(ws.id);
+      const isSSE = shouldSSEConnect(ws, activeWorkspaceId);
+      const isActive = ws.id === activeWorkspaceId;
+
+      if (isActive) {
+        // Fetch active workspace immediately
+        if (isSSE) {
+          fetchSessions(ws.id);
+          fetchPinnedSessions(ws.id);
+        } else {
+          fetchCachedSessions(ws.id);
+        }
         fetchSessionNotes(ws.id);
       } else {
-        fetchCachedSessions(ws.id);
-        fetchSessionNotes(ws.id);
+        // Stagger non-active workspaces by 150ms each
+        const delay = ++delayIndex * 150;
+        const timer = setTimeout(() => {
+          if (cancelled) return;
+          if (isSSE) {
+            fetchSessions(ws.id);
+            fetchPinnedSessions(ws.id);
+          } else {
+            fetchCachedSessions(ws.id);
+          }
+          fetchSessionNotes(ws.id);
+        }, delay);
+        timeouts.push(timer);
       }
     }
+
+    return () => {
+      cancelled = true;
+      for (const t of timeouts) clearTimeout(t);
+    };
   }, [
     isUnifiedMode,
     allWorkspaces,

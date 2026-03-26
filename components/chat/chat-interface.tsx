@@ -323,8 +323,11 @@ export function ChatInterface() {
     : "";
   const { data: gitStatus } = useGitStatus(activeWorkspaceId);
   const [unifiedLimit, setUnifiedLimit] = useState(20);
+  // In grouped mode, we still cap per-workspace to avoid sorting thousands of sessions.
+  // WorkspaceGroup already collapses to ~3 visible per group, so 50 per workspace is generous.
+  const MAX_GROUPED_PER_WORKSPACE = 50;
   const effectiveUnifiedLimit = groupByWorkspace
-    ? Number.MAX_SAFE_INTEGER
+    ? allWorkspaces.length * MAX_GROUPED_PER_WORKSPACE
     : unifiedLimit;
   const allUnifiedSessions = useChatStore((state) =>
     state.getRecentSessionsAcrossWorkspaces(effectiveUnifiedLimit),

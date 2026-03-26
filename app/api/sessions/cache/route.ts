@@ -64,54 +64,57 @@ export async function POST(request: NextRequest) {
   const userId = session.user.id;
   const { workspaceId, sessions: incoming } = body;
 
-  for (const s of incoming) {
-    await db
-      .insert(cachedSessions)
-      .values({
-        id: s.id,
-        workspaceId,
-        userId,
-        title: s.title ?? null,
-        parentId: s.parentID ?? null,
-        status: s.status ?? null,
-        createdAt: s.time.created,
-        updatedAt: s.time.updated,
-        cachedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: cachedSessions.id,
-        set: {
+  // Single transaction: turns N individual fsync'd writes into one
+  db.transaction((tx) => {
+    for (const s of incoming) {
+      tx.insert(cachedSessions)
+        .values({
+          id: s.id,
+          workspaceId,
+          userId,
           title: s.title ?? null,
           parentId: s.parentID ?? null,
           status: s.status ?? null,
           createdAt: s.time.created,
           updatedAt: s.time.updated,
           cachedAt: now,
-        },
-      });
-  }
+        })
+        .onConflictDoUpdate({
+          target: cachedSessions.id,
+          set: {
+            title: s.title ?? null,
+            parentId: s.parentID ?? null,
+            status: s.status ?? null,
+            createdAt: s.time.created,
+            updatedAt: s.time.updated,
+            cachedAt: now,
+          },
+        })
+        .run();
+    }
 
-  const incomingIds = incoming.map((s) => s.id);
-  if (incomingIds.length > 0) {
-    await db
-      .delete(cachedSessions)
-      .where(
-        and(
-          eq(cachedSessions.workspaceId, workspaceId),
-          eq(cachedSessions.userId, userId),
-          notInArray(cachedSessions.id, incomingIds),
-        ),
-      );
-  } else {
-    await db
-      .delete(cachedSessions)
-      .where(
-        and(
-          eq(cachedSessions.workspaceId, workspaceId),
-          eq(cachedSessions.userId, userId),
-        ),
-      );
-  }
+    const incomingIds = incoming.map((s) => s.id);
+    if (incomingIds.length > 0) {
+      tx.delete(cachedSessions)
+        .where(
+          and(
+            eq(cachedSessions.workspaceId, workspaceId),
+            eq(cachedSessions.userId, userId),
+            notInArray(cachedSessions.id, incomingIds),
+          ),
+        )
+        .run();
+    } else {
+      tx.delete(cachedSessions)
+        .where(
+          and(
+            eq(cachedSessions.workspaceId, workspaceId),
+            eq(cachedSessions.userId, userId),
+          ),
+        )
+        .run();
+    }
+  });
 
   return NextResponse.json({ ok: true });
 }

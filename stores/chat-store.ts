@@ -105,6 +105,7 @@ const EMPTY_SESSION_NOTES: Record<string, string> = {};
 let _unifiedSessionsCache: SessionWithWorkspace[] = EMPTY_UNIFIED_SESSIONS;
 let _unifiedSessionsCacheRefs = new Map<string, Record<string, Session>>();
 let _unifiedSessionsCacheLimit = 0;
+let _unifiedSessionsCacheTime = 0;
 
 // Memoization cache for getUnifiedSessionStatuses.
 let _unifiedStatusesCache: Record<string, SessionStatus> =
@@ -141,6 +142,9 @@ let partFlushHandle: number | null = null;
 // Aborted when SSE reconnects or disconnects to prevent stale responses.
 let sseOnopenAbortController: AbortController | null = null;
 
+// Dedup in-flight fetchSessions calls to prevent duplicate API requests
+const _fetchSessionsInFlight = new Set<string>();
+
 // RAF-batched buffer for message.updated events.
 // Keyed: sessionId → Message (latest info wins)
 interface PendingMessageUpdate {
@@ -156,6 +160,36 @@ let messageFlushHandle: number | null = null;
 
 // Fallback for routing events for child sessions not yet in ws.sessions
 const sessionSourceWorkspace = new Map<string, string>();
+
+// Exported for tests — resets all module-level memoization caches between runs
+export function _resetModuleCaches() {
+  _unifiedSessionsCache = EMPTY_UNIFIED_SESSIONS;
+  _unifiedSessionsCacheRefs = new Map();
+  _unifiedSessionsCacheLimit = 0;
+  _unifiedSessionsCacheTime = 0;
+
+  _unifiedStatusesCache = EMPTY_SESSION_STATUSES;
+  _unifiedStatusesCacheRefs = new Map();
+
+  _unifiedLastViewedCache = EMPTY_LAST_VIEWED;
+  _unifiedLastViewedCacheRefs = new Map();
+
+  _unifiedPinnedCache = EMPTY_PINNED;
+  _unifiedPinnedCacheRefs = new Map();
+
+  _unifiedSessionNotesCache = EMPTY_SESSION_NOTES;
+  _unifiedSessionNotesCacheRefs = new Map();
+
+  _activeQuestionSessionIdsCache = EMPTY_QUESTION_SESSION_IDS;
+  _activeQuestionSessionIdsCacheRef = EMPTY_QUESTIONS;
+  _unifiedQuestionSessionIdsCache = EMPTY_QUESTION_SESSION_IDS;
+  _unifiedQuestionSessionIdsCacheRefs = new Map();
+
+  _fetchSessionsInFlight.clear();
+  pendingPartUpdates.clear();
+  pendingMessageUpdates.clear();
+  sessionSourceWorkspace.clear();
+}
 const flushingQueuedWorkspaces = new Set<string>();
 
 function flushPendingPartUpdates(
@@ -671,6 +705,8 @@ export const useChatStore = create<ChatState>()(
       },
 
       fetchSessions: async (workspaceId) => {
+        if (_fetchSessionsInFlight.has(workspaceId)) return;
+        _fetchSessionsInFlight.add(workspaceId);
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10_000);
@@ -757,6 +793,8 @@ export const useChatStore = create<ChatState>()(
               sessionsLoaded: true,
             }));
           });
+        } finally {
+          _fetchSessionsInFlight.delete(workspaceId);
         }
       },
 
@@ -1904,6 +1942,48 @@ export const useChatStore = create<ChatState>()(
         const es = get().globalEventSource;
         if (es && es.readyState === EventSource.CLOSED) {
           get().connectGlobalSSE(get().sseWorkspaceIds);
+        } else if (es && es.readyState === EventSource.OPEN) {
+          // SSE stayed open while backgrounded — reconcile questions/permissions
+          // in case events were missed or arrived before the tab could process them.
+          for (const wsId of get().sseWorkspaceIds) {
+            fetch(buildProxyUrl("permission", wsId))
+              .then((res) => res.json())
+              .then((permissions: PermissionRequest[]) => {
+                if (!Array.isArray(permissions)) return;
+                const serverIds = new Set(permissions.map((p) => p.id));
+                set((state) =>
+                  updateWorkspace(state, wsId, (ws) => {
+                    const known = new Set(ws.permissions.map((p) => p.id));
+                    const incoming = permissions.filter(
+                      (p) => !known.has(p.id),
+                    );
+                    const reconciled = ws.permissions.filter((p) =>
+                      serverIds.has(p.id),
+                    );
+                    return { permissions: [...reconciled, ...incoming] };
+                  }),
+                );
+              })
+              .catch(() => {});
+
+            fetch(buildProxyUrl("question", wsId))
+              .then((res) => res.json())
+              .then((questions: QuestionRequest[]) => {
+                if (!Array.isArray(questions)) return;
+                const serverIds = new Set(questions.map((q) => q.id));
+                set((state) =>
+                  updateWorkspace(state, wsId, (ws) => {
+                    const known = new Set(ws.questions.map((q) => q.id));
+                    const incoming = questions.filter((q) => !known.has(q.id));
+                    const reconciled = ws.questions.filter((q) =>
+                      serverIds.has(q.id),
+                    );
+                    return { questions: [...reconciled, ...incoming] };
+                  }),
+                );
+              })
+              .catch(() => {});
+          }
         }
       },
 
@@ -2436,13 +2516,23 @@ export const useChatStore = create<ChatState>()(
 
         if (entries.length === 0) return EMPTY_UNIFIED_SESSIONS;
 
-        // Check if all workspace session refs are unchanged and limit is the same
-        if (
+        const refsUnchanged =
           limit === _unifiedSessionsCacheLimit &&
           entries.length === _unifiedSessionsCacheRefs.size &&
           entries.every(
             ([id, ws]) => _unifiedSessionsCacheRefs.get(id) === ws.sessions,
-          )
+          );
+
+        // Exact cache hit — refs unchanged
+        if (refsUnchanged) {
+          return _unifiedSessionsCache;
+        }
+
+        // During rapid SSE bursts (streaming), return stale cache for up to 500ms
+        const now = Date.now();
+        if (
+          _unifiedSessionsCache !== EMPTY_UNIFIED_SESSIONS &&
+          now - _unifiedSessionsCacheTime < 500
         ) {
           return _unifiedSessionsCache;
         }
@@ -2463,6 +2553,7 @@ export const useChatStore = create<ChatState>()(
           .slice(0, limit);
         _unifiedSessionsCacheRefs = newRefs;
         _unifiedSessionsCacheLimit = limit;
+        _unifiedSessionsCacheTime = now;
         return _unifiedSessionsCache;
       },
 

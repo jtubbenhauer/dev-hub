@@ -13,6 +13,7 @@ import type {
   GitHubCheckRun,
   GitHubMergeMethod,
 } from "@/types";
+import { useReviewDraftStore } from "@/stores/review-draft-store";
 
 const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
   ".ts": "typescript",
@@ -64,6 +65,19 @@ async function githubFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function githubFetchAllPages<T>(path: string): Promise<T[]> {
+  const separator = path.includes("?") ? "&" : "?";
+  const perPage = 100;
+  const results: T[] = [];
+  for (let page = 1; ; page++) {
+    const pagePath = `${path}${separator}per_page=${perPage}&page=${page}`;
+    const batch = await githubFetch<T[]>(pagePath);
+    results.push(...batch);
+    if (batch.length < perPage) break;
+  }
+  return results;
+}
+
 // ─── GitHub GraphQL helper ───────────────────────────────────────────────────
 
 interface GraphQLResponse<T> {
@@ -106,17 +120,24 @@ export function useGitHubPrsAwaitingReview(
     queryKey: ["github", "prs-awaiting-review"],
     enabled: options.enabled !== false,
     queryFn: async () => {
-      const data = await githubFetch<{ items: GitHubPullRequest[] }>(
-        "search/issues?q=is:open+is:pr+review-requested:@me&per_page=50",
-      );
-      // The search API returns issue objects; we need to fetch the full PR for each
-      // to get head/base sha etc. We do this in parallel but cap at 20 to avoid rate limits.
-      const items = data.items.slice(0, 20);
+      const [requested, reviewed] = await Promise.all([
+        githubFetch<{ items: GitHubPullRequest[] }>(
+          "search/issues?q=is:open+is:pr+review-requested:@me&per_page=50",
+        ),
+        githubFetch<{ items: GitHubPullRequest[] }>(
+          "search/issues?q=is:open+is:pr+reviewed-by:@me+-author:@me&per_page=50",
+        ),
+      ]);
+      const seen = new Set<string>();
+      const merged: GitHubPullRequest[] = [];
+      for (const item of [...requested.items, ...reviewed.items]) {
+        if (seen.has(item.node_id)) continue;
+        seen.add(item.node_id);
+        merged.push(item);
+      }
+      const items = merged.slice(0, 20);
       const prs = await Promise.all(
         items.map((item) => {
-          // item.pull_request.url is the full PR API URL, e.g.
-          // https://api.github.com/repos/owner/repo/pulls/123
-          // We strip the base to get the path for our proxy.
           const url =
             (item as unknown as { pull_request: { url: string } }).pull_request
               ?.url ?? "";
@@ -228,8 +249,8 @@ export function useGitHubPrFiles(
   return useQuery<GitHubPullRequestFile[]>({
     queryKey: ["github", "pr-files", owner, repo, prNumber],
     queryFn: () =>
-      githubFetch<GitHubPullRequestFile[]>(
-        `repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=100`,
+      githubFetchAllPages<GitHubPullRequestFile>(
+        `repos/${owner}/${repo}/pulls/${prNumber}/files`,
       ),
     enabled: !!(owner && repo && prNumber),
     staleTime: 30_000,
@@ -244,8 +265,8 @@ export function useGitHubPrComments(
   return useQuery<GitHubReviewComment[]>({
     queryKey: ["github", "pr-comments", owner, repo, prNumber],
     queryFn: () =>
-      githubFetch<GitHubReviewComment[]>(
-        `repos/${owner}/${repo}/pulls/${prNumber}/comments?per_page=100`,
+      githubFetchAllPages<GitHubReviewComment>(
+        `repos/${owner}/${repo}/pulls/${prNumber}/comments`,
       ),
     enabled: !!(owner && repo && prNumber),
     staleTime: 15_000,
@@ -428,6 +449,7 @@ interface AddCommentInput {
   startLine?: number;
   side?: "LEFT" | "RIGHT";
   startSide?: "LEFT" | "RIGHT";
+  subjectType?: "line" | "file";
 }
 
 export function useGitHubAddComment(
@@ -443,12 +465,16 @@ export function useGitHubAddComment(
         body: input.body,
         commit_id: input.commitId,
         path: input.path,
-        line: input.line,
-        side: input.side ?? "RIGHT",
       };
-      if (input.startLine !== undefined && input.startLine !== input.line) {
-        payload.start_line = input.startLine;
-        payload.start_side = input.startSide ?? "RIGHT";
+      if (input.subjectType === "file") {
+        payload.subject_type = "file";
+      } else {
+        payload.line = input.line;
+        payload.side = input.side ?? "RIGHT";
+        if (input.startLine !== undefined && input.startLine !== input.line) {
+          payload.start_line = input.startLine;
+          payload.start_side = input.startSide ?? "RIGHT";
+        }
       }
       return githubFetch<GitHubReviewComment>(
         `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/comments`,
@@ -545,6 +571,8 @@ interface SubmitReviewInput {
   prNumber: number;
   event: GitHubReviewEvent;
   body: string;
+  headSha: string | null;
+  prKey: string;
 }
 
 export function useGitHubSubmitReview(
@@ -555,18 +583,85 @@ export function useGitHubSubmitReview(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: SubmitReviewInput) =>
-      githubFetch<GitHubReview>(
+    mutationFn: async (input: SubmitReviewInput) => {
+      const drafts = useReviewDraftStore.getState().getDrafts(input.prKey);
+      const inlineDrafts = drafts.filter((draft) => draft.type === "inline");
+      const replyDrafts = drafts.filter((draft) => draft.type === "reply");
+
+      if (inlineDrafts.length > 0 && !input.headSha) {
+        throw new Error(
+          "Cannot submit inline drafts yet because the PR head commit is unavailable. Refresh and try again.",
+        );
+      }
+
+      const createPayload: Record<string, unknown> = {};
+      if (input.body.trim()) {
+        createPayload.body = input.body;
+      }
+      if (input.headSha) {
+        createPayload.commit_id = input.headSha;
+      }
+      if (inlineDrafts.length > 0) {
+        createPayload.comments = inlineDrafts.map((draft) => {
+          const comment: Record<string, unknown> = {
+            path: draft.path,
+            line: draft.line,
+            side: draft.side,
+            body: draft.body,
+          };
+          if (draft.startLine !== undefined && draft.startLine !== draft.line) {
+            comment.start_line = draft.startLine;
+            comment.start_side = draft.side;
+          }
+          return comment;
+        });
+      }
+
+      const pendingReview = await githubFetch<GitHubReview>(
         `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/reviews`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event: input.event, body: input.body }),
+          body: JSON.stringify(createPayload),
         },
-      ),
+      );
+
+      await githubFetch<GitHubReview>(
+        `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/reviews/${pendingReview.id}/events`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event: input.event }),
+        },
+      );
+
+      for (const draft of replyDrafts) {
+        if (!draft.replyToId) continue;
+        await githubFetch<GitHubReviewComment>(
+          `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/comments`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              body: draft.body,
+              in_reply_to: draft.replyToId,
+            }),
+          },
+        );
+      }
+
+      useReviewDraftStore.getState().clearDrafts(input.prKey);
+      return pendingReview;
+    },
     onSuccess: (_, input) => {
       queryClient.invalidateQueries({
         queryKey: ["github", "pr-reviews", owner, repo, prNumber],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["github", "pr-comments", owner, repo, prNumber],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["github", "pr-threads", owner, repo, prNumber],
       });
       const label =
         input.event === "APPROVE"

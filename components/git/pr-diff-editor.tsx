@@ -33,6 +33,7 @@ interface PrDiffEditorProps {
     line: number,
     startLine: number,
     isInDiffHunk: boolean,
+    side: "LEFT" | "RIGHT",
   ) => Promise<void>;
   onReplyToComment: (body: string, inReplyToId: number) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;

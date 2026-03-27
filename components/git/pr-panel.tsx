@@ -119,7 +119,15 @@ function parsePrParam(
 export function PrPanel({ onClose }: PrPanelProps) {
   const [activeTab, setActiveTab] = useState<PrTab>("for-review");
   const [selectedPr, setSelectedPr] = useState<GitHubPullRequest | null>(null);
-  const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
+  const [selectedFilename, setSelectedFilename] = useState<string | null>(
+    () => {
+      try {
+        return localStorage.getItem("dev-hub:pr-selected-file");
+      } catch {
+        return null;
+      }
+    },
+  );
   const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false);
   const [isPrListOpen, setIsPrListOpen] = useState(false);
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
@@ -199,8 +207,21 @@ export function PrPanel({ onClose }: PrPanelProps) {
     [viewedFilePaths],
   );
 
+  const resolvedFilename = useMemo(() => {
+    if (!selectedFilename) return null;
+    if (isFilesLoading || prFiles.length === 0) return selectedFilename;
+    const exists = prFiles.some((f) => f.filename === selectedFilename);
+    if (!exists) {
+      try {
+        localStorage.removeItem("dev-hub:pr-selected-file");
+      } catch {}
+      return null;
+    }
+    return selectedFilename;
+  }, [selectedFilename, prFiles, isFilesLoading]);
+
   const selectedFile =
-    prFiles.find((f) => f.filename === selectedFilename) ?? null;
+    prFiles.find((f) => f.filename === resolvedFilename) ?? null;
 
   const { data: fileContent, isLoading: isFileContentLoading } =
     useGitHubPrFileContent(owner, repo, selectedFile, baseSha, headSha);
@@ -228,13 +249,13 @@ export function PrPanel({ onClose }: PrPanelProps) {
   }, [prComments]);
 
   const fileComments = useMemo(
-    () => prComments.filter((c) => c.path === selectedFilename),
-    [prComments, selectedFilename],
+    () => prComments.filter((c) => c.path === resolvedFilename),
+    [prComments, resolvedFilename],
   );
 
   const fileDrafts = useMemo(
-    () => prDrafts.filter((draft) => draft.path === selectedFilename),
-    [prDrafts, selectedFilename],
+    () => prDrafts.filter((draft) => draft.path === resolvedFilename),
+    [prDrafts, resolvedFilename],
   );
 
   const resolvedLines = useMemo(() => {
@@ -242,14 +263,14 @@ export function PrPanel({ onClose }: PrPanelProps) {
     for (const thread of prThreads) {
       if (
         thread.isResolved &&
-        thread.path === selectedFilename &&
+        thread.path === resolvedFilename &&
         thread.line
       ) {
         lines.add(thread.line);
       }
     }
     return lines;
-  }, [prThreads, selectedFilename]);
+  }, [prThreads, resolvedFilename]);
 
   const handleSelectPr = useCallback((pr: GitHubPullRequest) => {
     setSelectedPr(pr);
@@ -258,6 +279,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
     setIsDescriptionOpen(false);
     try {
       localStorage.setItem("dev-hub:git-selected-pr", encodePrParam(pr));
+      localStorage.removeItem("dev-hub:pr-selected-file");
     } catch {}
   }, []);
 
@@ -268,12 +290,16 @@ export function PrPanel({ onClose }: PrPanelProps) {
     setStoredPrParam(null);
     try {
       localStorage.removeItem("dev-hub:git-selected-pr");
+      localStorage.removeItem("dev-hub:pr-selected-file");
     } catch {}
   }, []);
 
   const handleSelectFile = useCallback((filename: string) => {
     setSelectedFilename(filename);
     setIsMobileFileListOpen(false);
+    try {
+      localStorage.setItem("dev-hub:pr-selected-file", filename);
+    } catch {}
   }, []);
 
   const handleToggleReviewed = useCallback(
@@ -296,18 +322,19 @@ export function PrPanel({ onClose }: PrPanelProps) {
       line: number,
       startLine: number,
       _isInDiffHunk: boolean,
+      side: "LEFT" | "RIGHT",
     ) => {
-      if (!owner || !repo || !prNumber || !selectedFilename || !prKey) return;
+      if (!owner || !repo || !prNumber || !resolvedFilename || !prKey) return;
       addDraft(prKey, {
         type: "inline",
-        path: selectedFilename,
+        path: resolvedFilename,
         line,
-        side: "RIGHT",
+        side,
         body,
         startLine: startLine !== line ? startLine : undefined,
       });
     },
-    [owner, repo, prNumber, selectedFilename, prKey, addDraft],
+    [owner, repo, prNumber, resolvedFilename, prKey, addDraft],
   );
 
   const handleReplyToComment = useCallback(
@@ -379,7 +406,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
     activeTab === "for-review" ? isReviewPrsLoading : isMyPrsLoading;
   const activePrs = activeTab === "for-review" ? reviewPrs : myPrs;
 
-  if (!selectedPr && (isDirectPrLoading || isPrsLoading)) {
+  if (!selectedPr && (isDirectPrLoading || (!storedPrParam && isPrsLoading))) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center">
         <Loader2 className="text-muted-foreground size-5 animate-spin" />
@@ -496,7 +523,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <PrFileList
                   files={prFiles}
-                  selectedFilename={selectedFilename}
+                  selectedFilename={resolvedFilename}
                   isLoading={isFilesLoading}
                   reviewedFilenames={reviewedFilenames}
                   commentCountByFilename={commentCountByFilename}
@@ -546,7 +573,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
             </div>
             <PrFileList
               files={prFiles}
-              selectedFilename={selectedFilename}
+              selectedFilename={resolvedFilename}
               isLoading={isFilesLoading}
               reviewedFilenames={reviewedFilenames}
               commentCountByFilename={commentCountByFilename}
@@ -591,7 +618,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
             />
           ) : (
             <div className="text-muted-foreground flex h-full items-center justify-center text-xs">
-              {selectedFilename ? (
+              {resolvedFilename ? (
                 isFileContentLoading ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (

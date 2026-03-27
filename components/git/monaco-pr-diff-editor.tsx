@@ -48,6 +48,28 @@ type DraftDisplayComment = GitHubReviewComment & {
 };
 
 type DisplayComment = GitHubReviewComment | DraftDisplayComment;
+type DiffCommentSide = "LEFT" | "RIGHT";
+
+interface CommentLineTarget {
+  line: number;
+  side: DiffCommentSide;
+}
+
+function toLineKey(side: DiffCommentSide, line: number): string {
+  return `${side}:${line}`;
+}
+
+function fromLineKey(key: string): CommentLineTarget | null {
+  const [side, lineText] = key.split(":");
+  if ((side !== "LEFT" && side !== "RIGHT") || !lineText) {
+    return null;
+  }
+  const line = Number.parseInt(lineText, 10);
+  if (!Number.isInteger(line) || line <= 0) {
+    return null;
+  }
+  return { side, line };
+}
 
 function isDraftDisplayComment(
   comment: DisplayComment,
@@ -151,6 +173,7 @@ interface CommentThreadProps {
     line: number,
     startLine: number,
     isInDiffHunk: boolean,
+    side: DiffCommentSide,
   ) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
   onDeleteDraft: (draftId: string) => void;
@@ -158,6 +181,7 @@ interface CommentThreadProps {
   onClose: () => void;
   pendingLine: number;
   pendingStartLine: number;
+  pendingSide: DiffCommentSide;
   isSubmitting: boolean;
 }
 
@@ -174,6 +198,7 @@ function CommentThread({
   onClose,
   pendingLine,
   pendingStartLine,
+  pendingSide,
   isSubmitting,
 }: CommentThreadProps) {
   const [replyBody, setReplyBody] = useState("");
@@ -192,7 +217,13 @@ function CommentThread({
     if (replyTargetId !== undefined) {
       await onReply(body, replyTargetId);
     } else {
-      await onAddComment(body, pendingLine, pendingStartLine, true);
+      await onAddComment(
+        body,
+        pendingLine,
+        pendingStartLine,
+        true,
+        pendingSide,
+      );
     }
     setReplyBody("");
   }, [
@@ -202,6 +233,7 @@ function CommentThread({
     onAddComment,
     pendingLine,
     pendingStartLine,
+    pendingSide,
   ]);
 
   const handleKeyDown = useCallback(
@@ -298,7 +330,9 @@ function CommentThread({
           ))}
           <div className="px-3 py-2">
             <textarea
-              ref={(el) => el?.focus()}
+              ref={(el) => {
+                if (el) setTimeout(() => el.focus(), 0);
+              }}
               value={replyBody}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                 setReplyBody(e.target.value)
@@ -364,6 +398,7 @@ interface PrDiffEditorProps {
     line: number,
     startLine: number,
     isInDiffHunk: boolean,
+    side: DiffCommentSide,
   ) => Promise<void>;
   onReplyToComment: (body: string, inReplyToId: number) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
@@ -393,9 +428,9 @@ export const MonacoPrDiffEditor = forwardRef<
   ref,
 ) {
   const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
-  const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(
-    null,
-  );
+  const decorationsRef = useRef<
+    Record<DiffCommentSide, editor.IEditorDecorationsCollection | null>
+  >({ LEFT: null, RIGHT: null });
 
   const diffViewMode = useEditorStore((s) => s.diffViewMode);
   const { theme, resolvedMode } = useTheme();
@@ -405,51 +440,76 @@ export const MonacoPrDiffEditor = forwardRef<
   const isMobile = useIsMobile();
   const [isEditorReady, setIsEditorReady] = useState(false);
 
-  const zonesRef = useRef<Map<number, ZoneEntry>>(new Map());
+  const zonesRef = useRef<Map<string, ZoneEntry>>(new Map());
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [portalTargets, setPortalTargets] = useState<
-    Map<number, HTMLDivElement>
+    Map<string, HTMLDivElement>
   >(() => new Map());
 
-  const [newCommentLine, setNewCommentLine] = useState<number | null>(null);
+  const [newCommentLine, setNewCommentLine] =
+    useState<CommentLineTarget | null>(null);
 
-  const [collapsedLines, setCollapsedLines] = useState<Set<number>>(
-    () => new Set(resolvedLines),
+  const [collapsedLines, setCollapsedLines] = useState<Set<string>>(
+    () => new Set(),
   );
 
   const [prevFilePath, setPrevFilePath] = useState(fileContent.path);
   if (prevFilePath !== fileContent.path) {
     setPrevFilePath(fileContent.path);
     setNewCommentLine(null);
-    setCollapsedLines(new Set(resolvedLines));
+    setCollapsedLines(new Set());
   }
 
   const commentsByLine = useMemo(() => {
-    const map = new Map<number, DisplayComment[]>();
+    const map = new Map<string, DisplayComment[]>();
+    const effectiveCommentSide = (side: DiffCommentSide): DiffCommentSide => {
+      return diffViewMode === "side-by-side" ? side : "RIGHT";
+    };
     for (const comment of comments) {
       const line = comment.line ?? comment.original_line;
       if (line === null) continue;
-      const existing = map.get(line) ?? [];
+      const side = effectiveCommentSide(comment.side ?? "RIGHT");
+      const key = toLineKey(side, line);
+      const existing = map.get(key) ?? [];
       existing.push(comment);
-      map.set(line, existing);
+      map.set(key, existing);
     }
     for (const draft of drafts) {
       if (draft.line <= 0) continue;
-      const existing = map.get(draft.line) ?? [];
+      const side = effectiveCommentSide(draft.side);
+      const key = toLineKey(side, draft.line);
+      const existing = map.get(key) ?? [];
       existing.push(buildDraftDisplayComment(draft));
-      map.set(draft.line, existing);
+      map.set(key, existing);
     }
     return map;
-  }, [comments, drafts]);
+  }, [comments, drafts, diffViewMode]);
 
-  const commentedLines = useMemo(
-    () => new Set(commentsByLine.keys()),
+  const commentedLineKeys = useMemo(
+    () => new Set<string>(commentsByLine.keys()),
     [commentsByLine],
   );
-  const commentedLinesRef = useRef(commentedLines);
+  const commentedLinesBySide = useMemo(() => {
+    const bySide: Record<DiffCommentSide, Set<number>> = {
+      LEFT: new Set<number>(),
+      RIGHT: new Set<number>(),
+    };
+    for (const lineKey of commentedLineKeys) {
+      const target = fromLineKey(lineKey);
+      if (!target) continue;
+      bySide[target.side].add(target.line);
+    }
+    return bySide;
+  }, [commentedLineKeys]);
+  const commentedLineKeysRef = useRef(commentedLineKeys);
   useEffect(() => {
-    commentedLinesRef.current = commentedLines;
+    commentedLineKeysRef.current = commentedLineKeys;
   });
+
+  const getOriginalEditor =
+    useCallback((): editor.IStandaloneCodeEditor | null => {
+      return diffEditorRef.current?.getOriginalEditor() ?? null;
+    }, []);
 
   const getModifiedEditor =
     useCallback((): editor.IStandaloneCodeEditor | null => {
@@ -476,43 +536,137 @@ export const MonacoPrDiffEditor = forwardRef<
 
   const syncViewZones = useCallback(
     (
-      currentCommentedLines: Set<number>,
-      currentCollapsed: Set<number>,
-      currentNewCommentLine: number | null,
+      currentCommentedLineKeys: Set<string>,
+      currentCollapsed: Set<string>,
+      currentNewCommentLine: CommentLineTarget | null,
       currentResolved: Set<number>,
     ): boolean => {
-      const me = getModifiedEditor();
-      if (!me) return false;
-
-      const linesNeedingZones = new Set<number>(currentCommentedLines);
-      if (
-        currentNewCommentLine !== null &&
-        !currentCommentedLines.has(currentNewCommentLine)
-      ) {
-        linesNeedingZones.add(currentNewCommentLine);
+      const linesNeedingZonesBySide: Record<DiffCommentSide, Set<number>> = {
+        LEFT: new Set(),
+        RIGHT: new Set(),
+      };
+      for (const key of currentCommentedLineKeys) {
+        const target = fromLineKey(key);
+        if (!target) continue;
+        linesNeedingZonesBySide[target.side].add(target.line);
+      }
+      if (currentNewCommentLine) {
+        const key = toLineKey(
+          currentNewCommentLine.side,
+          currentNewCommentLine.line,
+        );
+        if (!currentCommentedLineKeys.has(key)) {
+          linesNeedingZonesBySide[currentNewCommentLine.side].add(
+            currentNewCommentLine.line,
+          );
+        }
       }
 
       const zones = zonesRef.current;
       const resizeObserver = resizeObserverRef.current;
       let portalsDirty = false;
 
-      me.changeViewZones((accessor) => {
-        for (const [line, entry] of zones) {
-          if (!linesNeedingZones.has(line)) {
-            resizeObserver?.unobserve(entry.contentWrapper);
-            accessor.removeZone(entry.zoneId);
-            zones.delete(line);
-            portalsDirty = true;
+      for (const side of ["LEFT", "RIGHT"] as const) {
+        const targetEditor =
+          side === "LEFT" ? getOriginalEditor() : getModifiedEditor();
+        if (!targetEditor) continue;
+        const linesNeedingZones = linesNeedingZonesBySide[side];
+
+        targetEditor.changeViewZones((accessor) => {
+          for (const [lineKey, entry] of Array.from(zones.entries())) {
+            const target = fromLineKey(lineKey);
+            if (!target || target.side !== side) continue;
+            if (!linesNeedingZones.has(target.line)) {
+              resizeObserver?.unobserve(entry.contentWrapper);
+              accessor.removeZone(entry.zoneId);
+              zones.delete(lineKey);
+              portalsDirty = true;
+            }
           }
-        }
 
-        for (const line of linesNeedingZones) {
-          const existing = zones.get(line);
+          for (const line of linesNeedingZones) {
+            const lineKey = toLineKey(side, line);
+            const existing = zones.get(lineKey);
 
-          if (existing) {
+            if (existing) {
+              const isCollapsed =
+                currentCollapsed.has(lineKey) &&
+                currentCommentedLineKeys.has(lineKey);
+              const isResolved = currentResolved.has(line);
+              const measuredHeight = existing.contentWrapper.scrollHeight;
+              const targetHeight =
+                isCollapsed || isResolved
+                  ? COLLAPSED_ZONE_HEIGHT
+                  : Math.max(measuredHeight, EXPANDED_ZONE_HEIGHT);
+
+              if (targetHeight !== existing.currentHeight) {
+                accessor.removeZone(existing.zoneId);
+                const newId = accessor.addZone({
+                  afterLineNumber: line,
+                  heightInPx: targetHeight,
+                  domNode: existing.domNode,
+                  suppressMouseDown: false,
+                  showInHiddenAreas: true,
+                });
+                existing.zoneId = newId;
+                existing.currentHeight = targetHeight;
+              }
+            } else {
+              const isCollapsed =
+                currentCollapsed.has(lineKey) &&
+                currentCommentedLineKeys.has(lineKey);
+              const isResolved = currentResolved.has(line);
+              const initialHeight =
+                isCollapsed || isResolved
+                  ? COLLAPSED_ZONE_HEIGHT
+                  : EXPANDED_ZONE_HEIGHT;
+              const { domNode, contentWrapper } = createZoneDomNodes();
+              const zoneId = accessor.addZone({
+                afterLineNumber: line,
+                heightInPx: initialHeight,
+                domNode,
+                suppressMouseDown: false,
+                showInHiddenAreas: true,
+              });
+              zones.set(lineKey, {
+                zoneId,
+                domNode,
+                contentWrapper,
+                currentHeight: initialHeight,
+              });
+              resizeObserver?.observe(contentWrapper);
+              portalsDirty = true;
+            }
+          }
+        });
+      }
+
+      return portalsDirty;
+    },
+    [getOriginalEditor, getModifiedEditor, createZoneDomNodes],
+  );
+
+  const resizeViewZones = useCallback(
+    (
+      currentCommentedLines: Set<string>,
+      currentCollapsed: Set<string>,
+      currentResolved: Set<number>,
+    ) => {
+      const zones = zonesRef.current;
+
+      for (const side of ["LEFT", "RIGHT"] as const) {
+        const targetEditor =
+          side === "LEFT" ? getOriginalEditor() : getModifiedEditor();
+        if (!targetEditor) continue;
+
+        targetEditor.changeViewZones((accessor) => {
+          for (const [lineKey, existing] of zones) {
+            const target = fromLineKey(lineKey);
+            if (!target || target.side !== side) continue;
             const isCollapsed =
-              currentCollapsed.has(line) && currentCommentedLines.has(line);
-            const isResolved = currentResolved.has(line);
+              currentCollapsed.has(lineKey) &&
+              currentCommentedLines.has(lineKey);
+            const isResolved = currentResolved.has(target.line);
             const measuredHeight = existing.contentWrapper.scrollHeight;
             const targetHeight =
               isCollapsed || isResolved
@@ -522,7 +676,7 @@ export const MonacoPrDiffEditor = forwardRef<
             if (targetHeight !== existing.currentHeight) {
               accessor.removeZone(existing.zoneId);
               const newId = accessor.addZone({
-                afterLineNumber: line,
+                afterLineNumber: target.line,
                 heightInPx: targetHeight,
                 domNode: existing.domNode,
                 suppressMouseDown: false,
@@ -531,77 +685,11 @@ export const MonacoPrDiffEditor = forwardRef<
               existing.zoneId = newId;
               existing.currentHeight = targetHeight;
             }
-          } else {
-            const isCollapsed =
-              currentCollapsed.has(line) && currentCommentedLines.has(line);
-            const isResolved = currentResolved.has(line);
-            const initialHeight =
-              isCollapsed || isResolved
-                ? COLLAPSED_ZONE_HEIGHT
-                : EXPANDED_ZONE_HEIGHT;
-            const { domNode, contentWrapper } = createZoneDomNodes();
-            const zoneId = accessor.addZone({
-              afterLineNumber: line,
-              heightInPx: initialHeight,
-              domNode,
-              suppressMouseDown: false,
-              showInHiddenAreas: true,
-            });
-            zones.set(line, {
-              zoneId,
-              domNode,
-              contentWrapper,
-              currentHeight: initialHeight,
-            });
-            resizeObserver?.observe(contentWrapper);
-            portalsDirty = true;
           }
-        }
-      });
-
-      return portalsDirty;
+        });
+      }
     },
-    [getModifiedEditor, createZoneDomNodes],
-  );
-
-  const resizeViewZones = useCallback(
-    (
-      currentCommentedLines: Set<number>,
-      currentCollapsed: Set<number>,
-      currentResolved: Set<number>,
-    ) => {
-      const me = getModifiedEditor();
-      if (!me) return;
-
-      const zones = zonesRef.current;
-
-      me.changeViewZones((accessor) => {
-        for (const [line, existing] of zones) {
-          const isCollapsed =
-            currentCollapsed.has(line) && currentCommentedLines.has(line);
-          const isResolved = currentResolved.has(line);
-          const measuredHeight = existing.contentWrapper.scrollHeight;
-          const targetHeight =
-            isCollapsed || isResolved
-              ? COLLAPSED_ZONE_HEIGHT
-              : Math.max(measuredHeight, EXPANDED_ZONE_HEIGHT);
-
-          if (targetHeight !== existing.currentHeight) {
-            accessor.removeZone(existing.zoneId);
-            const newId = accessor.addZone({
-              afterLineNumber: line,
-              heightInPx: targetHeight,
-              domNode: existing.domNode,
-              suppressMouseDown: false,
-              showInHiddenAreas: true,
-            });
-            existing.zoneId = newId;
-            existing.currentHeight = targetHeight;
-          }
-        }
-      });
-    },
-    [getModifiedEditor],
+    [getOriginalEditor, getModifiedEditor],
   );
 
   const handleBeforeMount = useCallback(
@@ -618,8 +706,31 @@ export const MonacoPrDiffEditor = forwardRef<
     ) => {
       diffEditorRef.current = diffEditor;
 
+      const originalEditor = diffEditor.getOriginalEditor();
       const modifiedEditor = diffEditor.getModifiedEditor();
-      decorationsRef.current = modifiedEditor.createDecorationsCollection([]);
+      decorationsRef.current.LEFT = originalEditor.createDecorationsCollection(
+        [],
+      );
+      decorationsRef.current.RIGHT = modifiedEditor.createDecorationsCollection(
+        [],
+      );
+
+      originalEditor.onMouseDown((e) => {
+        if (
+          e.target.type !==
+          monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN
+        ) {
+          return;
+        }
+
+        const lineNumber = e.target.position?.lineNumber;
+        if (lineNumber == null) return;
+        if (commentedLineKeysRef.current.has(toLineKey("LEFT", lineNumber))) {
+          return;
+        }
+
+        setNewCommentLine({ line: lineNumber, side: "LEFT" });
+      });
 
       modifiedEditor.onMouseDown((e) => {
         if (
@@ -631,9 +742,11 @@ export const MonacoPrDiffEditor = forwardRef<
 
         const lineNumber = e.target.position?.lineNumber;
         if (lineNumber == null) return;
-        if (commentedLinesRef.current.has(lineNumber)) return;
+        if (commentedLineKeysRef.current.has(toLineKey("RIGHT", lineNumber))) {
+          return;
+        }
 
-        setNewCommentLine(lineNumber);
+        setNewCommentLine({ line: lineNumber, side: "RIGHT" });
       });
 
       setIsEditorReady(true);
@@ -644,15 +757,15 @@ export const MonacoPrDiffEditor = forwardRef<
   useEffect(() => {
     if (!isEditorReady) return;
     const portalsDirty = syncViewZones(
-      commentedLines,
+      commentedLineKeys,
       collapsedLines,
       newCommentLine,
       resolvedLines,
     );
     if (portalsDirty) {
-      const targets = new Map<number, HTMLDivElement>();
-      for (const [line, entry] of zonesRef.current) {
-        targets.set(line, entry.contentWrapper);
+      const targets = new Map<string, HTMLDivElement>();
+      for (const [lineKey, entry] of zonesRef.current) {
+        targets.set(lineKey, entry.contentWrapper);
       }
       queueMicrotask(() => setPortalTargets(targets));
     }
@@ -665,7 +778,7 @@ export const MonacoPrDiffEditor = forwardRef<
     }
   }, [
     isEditorReady,
-    commentedLines,
+    commentedLineKeys,
     collapsedLines,
     newCommentLine,
     resolvedLines,
@@ -675,7 +788,7 @@ export const MonacoPrDiffEditor = forwardRef<
   useEffect(() => {
     if (!isEditorReady) return;
     const resizeObserver = new ResizeObserver(() => {
-      resizeViewZones(commentedLines, collapsedLines, resolvedLines);
+      resizeViewZones(commentedLineKeys, collapsedLines, resolvedLines);
     });
     resizeObserverRef.current = resizeObserver;
 
@@ -691,49 +804,69 @@ export const MonacoPrDiffEditor = forwardRef<
     };
   }, [
     isEditorReady,
-    commentedLines,
+    commentedLineKeys,
     collapsedLines,
     resolvedLines,
     resizeViewZones,
   ]);
 
   useEffect(() => {
-    if (!isEditorReady || !decorationsRef.current || !diffEditorRef.current)
-      return;
+    if (!isEditorReady || !diffEditorRef.current) return;
 
-    const modifiedEditor = diffEditorRef.current.getModifiedEditor();
-    const model = modifiedEditor.getModel();
-    if (!model) return;
-
-    const lineCount = model.getLineCount();
-    const newDecorations: editor.IModelDeltaDecoration[] = [];
-
-    for (let ln = 1; ln <= lineCount; ln++) {
-      if (commentedLines.has(ln)) {
-        newDecorations.push({
-          range: {
-            startLineNumber: ln,
-            startColumn: 1,
-            endLineNumber: ln,
-            endColumn: 1,
-          },
-          options: { glyphMarginClassName: "monaco-comment-dot" },
-        });
-      } else {
-        newDecorations.push({
-          range: {
-            startLineNumber: ln,
-            startColumn: 1,
-            endLineNumber: ln,
-            endColumn: 1,
-          },
-          options: { glyphMarginClassName: "monaco-comment-add" },
-        });
+    const bySide: Record<
+      DiffCommentSide,
+      {
+        editorInstance: editor.IStandaloneCodeEditor;
+        decorationCollection: editor.IEditorDecorationsCollection | null;
       }
-    }
+    > = {
+      LEFT: {
+        editorInstance: diffEditorRef.current.getOriginalEditor(),
+        decorationCollection: decorationsRef.current.LEFT,
+      },
+      RIGHT: {
+        editorInstance: diffEditorRef.current.getModifiedEditor(),
+        decorationCollection: decorationsRef.current.RIGHT,
+      },
+    };
 
-    decorationsRef.current.set(newDecorations);
-  }, [commentedLines, isEditorReady]);
+    for (const side of ["LEFT", "RIGHT"] as const) {
+      const { editorInstance, decorationCollection } = bySide[side];
+      if (!decorationCollection) continue;
+      const model = editorInstance.getModel();
+      if (!model) continue;
+
+      const sideCommentedLines = commentedLinesBySide[side];
+      const lineCount = model.getLineCount();
+      const newDecorations: editor.IModelDeltaDecoration[] = [];
+
+      for (let ln = 1; ln <= lineCount; ln++) {
+        if (sideCommentedLines.has(ln)) {
+          newDecorations.push({
+            range: {
+              startLineNumber: ln,
+              startColumn: 1,
+              endLineNumber: ln,
+              endColumn: 1,
+            },
+            options: { glyphMarginClassName: "monaco-comment-dot" },
+          });
+        } else {
+          newDecorations.push({
+            range: {
+              startLineNumber: ln,
+              startColumn: 1,
+              endLineNumber: ln,
+              endColumn: 1,
+            },
+            options: { glyphMarginClassName: "monaco-comment-add" },
+          });
+        }
+      }
+
+      decorationCollection.set(newDecorations);
+    }
+  }, [commentedLinesBySide, isEditorReady]);
 
   useEffect(() => {
     if (!diffEditorRef.current) return;
@@ -757,52 +890,91 @@ export const MonacoPrDiffEditor = forwardRef<
     }
   }, [currentContent]);
 
-  const sortedCommentLines = useMemo(
-    () => Array.from(commentsByLine.keys()).sort((a, b) => a - b),
+  const sortedCommentTargets = useMemo(
+    () =>
+      Array.from(commentsByLine.keys())
+        .map((lineKey) => {
+          const target = fromLineKey(lineKey);
+          if (!target) return null;
+          return { ...target, lineKey };
+        })
+        .filter((target): target is CommentLineTarget & { lineKey: string } => {
+          return target !== null;
+        })
+        .sort((a, b) => {
+          if (a.line !== b.line) return a.line - b.line;
+          return a.side.localeCompare(b.side);
+        }),
     [commentsByLine],
   );
 
   const navigateToComment = useCallback(
-    (line: number) => {
-      const me = getModifiedEditor();
-      if (!me) return;
-      me.revealLineInCenter(line);
+    (target: CommentLineTarget) => {
+      const editorForSide =
+        target.side === "LEFT" && diffViewMode === "side-by-side"
+          ? getOriginalEditor()
+          : getModifiedEditor();
+      if (!editorForSide) return;
+      editorForSide.revealLineInCenter(target.line);
     },
-    [getModifiedEditor],
+    [getOriginalEditor, getModifiedEditor, diffViewMode],
   );
 
-  const [navLine, setNavLine] = useState<number | null>(null);
+  const [navLineKey, setNavLineKey] = useState<string | null>(null);
 
   const handlePrevComment = useCallback(() => {
-    if (sortedCommentLines.length === 0) return;
-    const currentLine = navLine ?? Infinity;
-    const prev = sortedCommentLines.filter((l) => l < currentLine).pop();
-    const target = prev ?? sortedCommentLines[sortedCommentLines.length - 1];
-    setNavLine(target);
+    if (sortedCommentTargets.length === 0) return;
+    const currentIndex = navLineKey
+      ? sortedCommentTargets.findIndex(
+          (target) => target.lineKey === navLineKey,
+        )
+      : -1;
+    const targetIndex =
+      currentIndex <= 0 ? sortedCommentTargets.length - 1 : currentIndex - 1;
+    const target = sortedCommentTargets[targetIndex];
+    setNavLineKey(target.lineKey);
     navigateToComment(target);
-  }, [sortedCommentLines, navLine, navigateToComment]);
+  }, [sortedCommentTargets, navLineKey, navigateToComment]);
 
   const handleNextComment = useCallback(() => {
-    if (sortedCommentLines.length === 0) return;
-    const currentLine = navLine ?? -1;
-    const next = sortedCommentLines.find((l) => l > currentLine);
-    const target = next ?? sortedCommentLines[0];
-    setNavLine(target);
+    if (sortedCommentTargets.length === 0) return;
+    const currentIndex = navLineKey
+      ? sortedCommentTargets.findIndex(
+          (target) => target.lineKey === navLineKey,
+        )
+      : -1;
+    const targetIndex =
+      currentIndex === -1 || currentIndex === sortedCommentTargets.length - 1
+        ? 0
+        : currentIndex + 1;
+    const target = sortedCommentTargets[targetIndex];
+    setNavLineKey(target.lineKey);
     navigateToComment(target);
-  }, [sortedCommentLines, navLine, navigateToComment]);
+  }, [sortedCommentTargets, navLineKey, navigateToComment]);
 
   useEffect(() => {
     const zones = zonesRef.current;
     return () => {
       resizeObserverRef.current?.disconnect();
       resizeObserverRef.current = null;
-      const me = diffEditorRef.current?.getModifiedEditor();
-      if (!me) return;
-      me.changeViewZones((accessor) => {
-        for (const entry of zones.values()) {
-          accessor.removeZone(entry.zoneId);
-        }
-      });
+      const originalEditor = diffEditorRef.current?.getOriginalEditor();
+      const modifiedEditor = diffEditorRef.current?.getModifiedEditor();
+      if (originalEditor) {
+        originalEditor.changeViewZones((accessor) => {
+          for (const [lineKey, entry] of zones.entries()) {
+            if (!lineKey.startsWith("LEFT:")) continue;
+            accessor.removeZone(entry.zoneId);
+          }
+        });
+      }
+      if (modifiedEditor) {
+        modifiedEditor.changeViewZones((accessor) => {
+          for (const [lineKey, entry] of zones.entries()) {
+            if (!lineKey.startsWith("RIGHT:")) continue;
+            accessor.removeZone(entry.zoneId);
+          }
+        });
+      }
       zones.clear();
     };
   }, []);
@@ -820,25 +992,30 @@ export const MonacoPrDiffEditor = forwardRef<
   const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
 
   const portalEntries: React.ReactNode[] = [];
-  for (const [line, domNode] of portalTargets) {
-    const threadComments = commentsByLine.get(line) ?? [];
-    const isNewComment = newCommentLine === line && !commentsByLine.has(line);
+  for (const [lineKey, domNode] of portalTargets) {
+    const target = fromLineKey(lineKey);
+    if (!target) continue;
+    const threadComments = commentsByLine.get(lineKey) ?? [];
+    const isNewComment =
+      newCommentLine?.line === target.line &&
+      newCommentLine.side === target.side &&
+      !commentsByLine.has(lineKey);
 
     if (threadComments.length === 0 && !isNewComment) continue;
 
     portalEntries.push(
       createPortal(
         <CommentThread
-          key={`thread-${line}`}
+          key={`thread-${lineKey}`}
           comments={threadComments}
-          line={line}
-          isResolved={resolvedLines.has(line)}
-          isCollapsed={collapsedLines.has(line)}
+          line={target.line}
+          isResolved={resolvedLines.has(target.line)}
+          isCollapsed={collapsedLines.has(lineKey)}
           onToggleCollapse={() => {
             setCollapsedLines((prev) => {
               const next = new Set(prev);
-              if (next.has(line)) next.delete(line);
-              else next.add(line);
+              if (next.has(lineKey)) next.delete(lineKey);
+              else next.add(lineKey);
               return next;
             });
           }}
@@ -851,15 +1028,16 @@ export const MonacoPrDiffEditor = forwardRef<
             if (isNewComment) {
               setNewCommentLine(null);
             } else {
-              setCollapsedLines((prev) => new Set(prev).add(line));
+              setCollapsedLines((prev) => new Set(prev).add(lineKey));
             }
           }}
-          pendingLine={line}
-          pendingStartLine={line}
+          pendingLine={target.line}
+          pendingStartLine={target.line}
+          pendingSide={target.side}
           isSubmitting={isSubmittingComment}
         />,
         domNode,
-        `portal-${line}`,
+        `portal-${lineKey}`,
       ),
     );
   }

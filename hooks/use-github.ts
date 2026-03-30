@@ -8,11 +8,12 @@ import type {
   GitHubReviewComment,
   GitHubReview,
   GitHubReviewEvent,
-  GitHubPrFileContent,
-  GitHubUser,
-  GitHubCheckRun,
   GitHubMergeMethod,
+  GitHubCheckRun,
+  GitHubUser,
+  GitHubPrFileContent,
 } from "@/types";
+import { parseDiffHunkLines } from "@/lib/github-diff";
 import { useReviewDraftStore } from "@/stores/review-draft-store";
 
 const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
@@ -614,8 +615,20 @@ export function useGitHubSubmitReview(
       if (input.headSha) {
         createPayload.commit_id = input.headSha;
       }
-      if (inlineDrafts.length > 0) {
-        createPayload.comments = inlineDrafts.map((draft) => {
+      const prFiles = await githubFetchAllPages<GitHubPullRequestFile>(
+        `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/files`,
+      );
+      const patchByFile = new Map<string, string | undefined>();
+      for (const file of prFiles) {
+        patchByFile.set(file.filename, file.patch);
+      }
+
+      const reviewComments: Record<string, unknown>[] = [];
+      const fileComments: typeof inlineDrafts = [];
+
+      for (const draft of inlineDrafts) {
+        const validLines = parseDiffHunkLines(patchByFile.get(draft.path));
+        if (validLines.has(draft.line)) {
           const comment: Record<string, unknown> = {
             path: draft.path,
             line: draft.line,
@@ -626,8 +639,14 @@ export function useGitHubSubmitReview(
             comment.start_line = draft.startLine;
             comment.start_side = draft.side;
           }
-          return comment;
-        });
+          reviewComments.push(comment);
+        } else {
+          fileComments.push(draft);
+        }
+      }
+
+      if (reviewComments.length > 0) {
+        createPayload.comments = reviewComments;
       }
 
       const pendingReview = await githubFetch<GitHubReview>(
@@ -647,6 +666,22 @@ export function useGitHubSubmitReview(
           body: JSON.stringify({ event: input.event }),
         },
       );
+
+      for (const draft of fileComments) {
+        await githubFetch<GitHubReviewComment>(
+          `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/comments`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              body: draft.body,
+              commit_id: input.headSha,
+              path: draft.path,
+              subject_type: "file",
+            }),
+          },
+        );
+      }
 
       for (const draft of replyDrafts) {
         if (!draft.replyToId) continue;

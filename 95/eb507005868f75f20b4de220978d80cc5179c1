@@ -1,0 +1,38 @@
+hooks/use-github.ts
+  ba7be8f8b87e352a 281,293,310
+components/git/pr-panel.tsx
+  50a1f5be4a7593c0 275-277,285-287
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "95eb507005868f75f20b4de220978d80cc5179c1",
+  "prompts": {
+    "50a1f5be4a7593c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d6dbce22ffe58NeXiHllv0dnE-b92e6d42-bd90-47cf-b1f4-b9c5071c8612",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 10,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    },
+    "ba7be8f8b87e352a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d6dbce22ffe58NeXiHllv0dnE-04ef6620-9fac-436f-b7d2-10f98902acef",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -464,6 +464,35 @@ pre code.hljs {
   content: none;
 }
 
+.user-bubble-prose {
+  --tw-prose-body: inherit;
+  --tw-prose-headings: inherit;
+  --tw-prose-lead: inherit;
+  --tw-prose-links: inherit;
+  --tw-prose-bold: inherit;
+  --tw-prose-counters: inherit;
+  --tw-prose-bullets: inherit;
+  --tw-prose-hr: currentColor;
+  --tw-prose-quotes: inherit;
+  --tw-prose-quote-borders: currentColor;
+  --tw-prose-captions: inherit;
+  --tw-prose-kbd: inherit;
+  --tw-prose-code: inherit;
+  --tw-prose-pre-code: inherit;
+  --tw-prose-pre-bg: var(--muted);
+  --tw-prose-th-borders: currentColor;
+  --tw-prose-td-borders: currentColor;
+  color: inherit !important;
+}
+
+.user-bubble-prose pre code {
+  background-color: transparent !important;
+}
+
+.user-bubble-prose [class*="hljs"] {
+  color: inherit !important;
+}
+
 /* Radix ScrollArea viewport injects an inner div with `display: table; min-width: 100%`.
    Table layout uses content intrinsic width as the minimum, preventing shrink below that
    width when the browser window narrows (the ~830px mobile overflow bug in chat).

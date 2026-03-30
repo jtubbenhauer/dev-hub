@@ -128,8 +128,11 @@ function UserMessageBubble({
         </div>
       )}
       <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2.5">
-        <div className="prose prose-sm prose-invert prose-p:my-1 prose-pre:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-1.5 max-w-full overflow-hidden break-words">
-          <MarkdownContent content={cleanedText || textContent} />
+        <div className="user-bubble-prose prose prose-sm prose-p:my-1 prose-pre:my-1 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-1.5 max-w-full overflow-hidden break-words">
+          <MarkdownContent
+            content={cleanedText || textContent}
+            variant="bubble"
+          />
         </div>
       </div>
     </>

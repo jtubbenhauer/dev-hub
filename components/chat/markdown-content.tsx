@@ -13,25 +13,36 @@ import { isCodePath, FilePathCode } from "@/components/chat/file-path-code";
 
 export const MarkdownContent = memo(function MarkdownContent({
   content,
+  variant = "default",
 }: {
   content: string;
+  variant?: "default" | "bubble";
 }) {
+  const isBubble = variant === "bubble";
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkBreaks]}
-      rehypePlugins={[rehypeHighlight]}
+      rehypePlugins={isBubble ? [] : [rehypeHighlight]}
       components={{
         pre({ children, ...props }) {
           return (
             <div className="overflow-x-auto">
               <pre
                 {...props}
-                className={cn(props.className, "group/code relative")}
+                className={cn(
+                  props.className,
+                  isBubble
+                    ? "rounded-md border border-current/20 bg-current/8 p-3"
+                    : "group/code relative",
+                )}
               >
-                <CopyButton
-                  content={extractCodeFromPre(children)}
-                  className="absolute top-2 right-2 z-10"
-                />
+                {!isBubble && (
+                  <CopyButton
+                    content={extractCodeFromPre(children)}
+                    className="absolute top-2 right-2 z-10"
+                  />
+                )}
                 {children}
               </pre>
             </div>
@@ -49,12 +60,17 @@ export const MarkdownContent = memo(function MarkdownContent({
           if (isInline) {
             const text =
               typeof children === "string" ? children : String(children ?? "");
-            if (isCodePath(text)) {
+            if (!isBubble && isCodePath(text)) {
               return <FilePathCode text={text}>{children}</FilePathCode>;
             }
             return (
               <code
-                className="bg-muted rounded px-1.5 py-0.5 font-mono text-sm"
+                className={cn(
+                  "rounded px-1.5 py-0.5 font-mono text-sm",
+                  isBubble
+                    ? "border border-current/20 bg-current/8"
+                    : "bg-muted",
+                )}
                 {...props}
               >
                 {children}

@@ -272,13 +272,9 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const resolvedLines = useMemo(() => {
     const lines = new Set<number>();
     for (const thread of prThreads) {
-      if (
-        thread.isResolved &&
-        thread.path === resolvedFilename &&
-        thread.line
-      ) {
-        lines.add(thread.line);
-      }
+      if (!thread.isResolved || thread.path !== resolvedFilename) continue;
+      const line = thread.line ?? thread.originalLine;
+      if (line) lines.add(line);
     }
     return lines;
   }, [prThreads, resolvedFilename]);
@@ -286,9 +282,9 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const threadIdByLine = useMemo(() => {
     const map = new Map<number, string>();
     for (const thread of prThreads) {
-      if (thread.path === resolvedFilename && thread.line) {
-        map.set(thread.line, thread.id);
-      }
+      if (thread.path !== resolvedFilename) continue;
+      const line = thread.line ?? thread.originalLine;
+      if (line) map.set(line, thread.id);
     }
     return map;
   }, [prThreads, resolvedFilename]);

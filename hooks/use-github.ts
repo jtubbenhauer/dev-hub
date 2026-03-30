@@ -278,6 +278,7 @@ interface PrReviewThread {
   id: string;
   isResolved: boolean;
   line: number | null;
+  originalLine: number | null;
   path: string;
 }
 
@@ -289,6 +290,7 @@ interface PrReviewThreadsPage {
           id: string;
           isResolved: boolean;
           line: number | null;
+          originalLine: number | null;
           path: string;
         }>;
       };
@@ -305,6 +307,7 @@ const PR_THREADS_QUERY = `
             id
             isResolved
             line
+            originalLine
             path
           }
         }

@@ -277,6 +277,7 @@ export function useGitHubPrComments(
 interface PrReviewThread {
   id: string;
   isResolved: boolean;
+  isOutdated: boolean;
   line: number | null;
   originalLine: number | null;
   path: string;
@@ -289,6 +290,7 @@ interface PrReviewThreadsPage {
         nodes: Array<{
           id: string;
           isResolved: boolean;
+          isOutdated: boolean;
           line: number | null;
           originalLine: number | null;
           path: string;
@@ -306,6 +308,7 @@ const PR_THREADS_QUERY = `
           nodes {
             id
             isResolved
+            isOutdated
             line
             originalLine
             path

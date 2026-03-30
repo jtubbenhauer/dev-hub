@@ -279,6 +279,16 @@ export function PrPanel({ onClose }: PrPanelProps) {
     return lines;
   }, [prThreads, resolvedFilename]);
 
+  const outdatedLines = useMemo(() => {
+    const lines = new Set<number>();
+    for (const thread of prThreads) {
+      if (!thread.isOutdated || thread.path !== resolvedFilename) continue;
+      const line = thread.line ?? thread.originalLine;
+      if (line) lines.add(line);
+    }
+    return lines;
+  }, [prThreads, resolvedFilename]);
+
   const threadIdByLine = useMemo(() => {
     const map = new Map<number, string>();
     for (const thread of prThreads) {
@@ -679,6 +689,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
               comments={fileComments}
               drafts={fileDrafts}
               resolvedLines={resolvedLines}
+              outdatedLines={outdatedLines}
               isLoading={isFileContentLoading}
               isSubmittingComment={isSubmittingComment}
               onAddComment={handleAddComment}

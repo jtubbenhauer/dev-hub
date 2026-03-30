@@ -26,6 +26,7 @@ interface PrDiffEditorProps {
   comments: GitHubReviewComment[];
   drafts: ReviewDraft[];
   resolvedLines: Set<number>;
+  outdatedLines: Set<number>;
   isLoading: boolean;
   isSubmittingComment: boolean;
   onAddComment: (

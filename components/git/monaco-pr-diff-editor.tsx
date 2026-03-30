@@ -167,6 +167,7 @@ interface CommentThreadProps {
   comments: DisplayComment[];
   line: number;
   isResolved: boolean;
+  isOutdated: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onReply: (body: string, inReplyToId: number) => Promise<void>;
@@ -192,6 +193,7 @@ function CommentThread({
   comments,
   line,
   isResolved,
+  isOutdated,
   isCollapsed,
   onToggleCollapse,
   onReply,
@@ -267,6 +269,11 @@ function CommentThread({
             {comments[0].user.login}
             {comments.length > 1 && ` + ${comments.length - 1} more`}
             {isResolved && " · Resolved"}
+            {isOutdated && (
+              <span className="ml-1 rounded bg-yellow-500/20 px-1 py-0.5 text-[10px] font-medium text-yellow-600 dark:text-yellow-400">
+                Outdated
+              </span>
+            )}
           </span>
           {isCollapsed ? (
             <ChevronDown className="text-muted-foreground size-3" />
@@ -416,6 +423,7 @@ interface PrDiffEditorProps {
   comments: GitHubReviewComment[];
   drafts: ReviewDraft[];
   resolvedLines: Set<number>;
+  outdatedLines: Set<number>;
   isLoading: boolean;
   isSubmittingComment: boolean;
   onAddComment: (
@@ -449,6 +457,7 @@ export const MonacoPrDiffEditor = forwardRef<
     onDeleteComment,
     onDeleteDraft,
     onResolveThread,
+    outdatedLines,
     currentUserLogin,
     onOpenFileList,
   },
@@ -1037,6 +1046,7 @@ export const MonacoPrDiffEditor = forwardRef<
           comments={threadComments}
           line={target.line}
           isResolved={resolvedLines.has(target.line)}
+          isOutdated={outdatedLines.has(target.line)}
           isCollapsed={collapsedLines.has(lineKey)}
           onToggleCollapse={() => {
             setCollapsedLines((prev) => {

@@ -1047,7 +1047,9 @@ export const MonacoPrDiffEditor = forwardRef<
           line={target.line}
           isResolved={resolvedLines.has(target.line)}
           isOutdated={outdatedLines.has(target.line)}
-          isCollapsed={collapsedLines.has(lineKey)}
+          isCollapsed={
+            collapsedLines.has(lineKey) || resolvedLines.has(target.line)
+          }
           onToggleCollapse={() => {
             setCollapsedLines((prev) => {
               const next = new Set(prev);

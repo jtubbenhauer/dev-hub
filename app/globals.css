@@ -479,7 +479,11 @@ pre code.hljs {
   --tw-prose-kbd: inherit;
   --tw-prose-code: inherit;
   --tw-prose-pre-code: inherit;
-  --tw-prose-pre-bg: var(--muted);
+  --tw-prose-pre-bg: color-mix(
+    in oklab,
+    var(--primary) 70%,
+    var(--primary-foreground) 30%
+  );
   --tw-prose-th-borders: currentColor;
   --tw-prose-td-borders: currentColor;
   color: inherit !important;
@@ -491,6 +495,24 @@ pre code.hljs {
 
 .user-bubble-prose [class*="hljs"] {
   color: inherit !important;
+}
+
+.user-bubble-code {
+  background-color: color-mix(
+    in oklab,
+    var(--primary) 75%,
+    var(--primary-foreground) 25%
+  );
+}
+
+.user-bubble-pre {
+  background-color: color-mix(
+    in oklab,
+    var(--primary) 70%,
+    var(--primary-foreground) 30%
+  ) !important;
+  border: 1px solid
+    color-mix(in oklab, var(--primary) 60%, var(--primary-foreground) 40%) !important;
 }
 
 /* Radix ScrollArea viewport injects an inner div with `display: table; min-width: 100%`.

@@ -33,7 +33,7 @@ export const MarkdownContent = memo(function MarkdownContent({
                 className={cn(
                   props.className,
                   isBubble
-                    ? "rounded-md border border-current/20 bg-current/8 p-3"
+                    ? "user-bubble-pre rounded-md p-3"
                     : "group/code relative",
                 )}
               >
@@ -67,9 +67,7 @@ export const MarkdownContent = memo(function MarkdownContent({
               <code
                 className={cn(
                   "rounded px-1.5 py-0.5 font-mono text-sm",
-                  isBubble
-                    ? "border border-current/20 bg-current/8"
-                    : "bg-muted",
+                  isBubble ? "user-bubble-code" : "bg-muted",
                 )}
                 {...props}
               >

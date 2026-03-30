@@ -60,6 +60,8 @@ import {
   useGitHubPrReviews,
   useGitHubPrChecks,
   useGitHubPrFileContent,
+  useGitHubAddComment,
+  useGitHubReplyToComment,
   useGitHubDeleteComment,
   useGitHubSubmitReview,
   useGitHubMergePr,
@@ -226,6 +228,8 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const { data: fileContent, isLoading: isFileContentLoading } =
     useGitHubPrFileContent(owner, repo, selectedFile, baseSha, headSha);
 
+  const addCommentMutation = useGitHubAddComment(owner, repo, prNumber);
+  const replyToCommentMutation = useGitHubReplyToComment(owner, repo, prNumber);
   const deleteCommentMutation = useGitHubDeleteComment(owner, repo, prNumber);
   const submitReviewMutation = useGitHubSubmitReview(owner, repo, prNumber);
   const mergeMutation = useGitHubMergePr();
@@ -321,10 +325,25 @@ export function PrPanel({ onClose }: PrPanelProps) {
       body: string,
       line: number,
       startLine: number,
-      _isInDiffHunk: boolean,
+      isInDiffHunk: boolean,
       side: "LEFT" | "RIGHT",
     ) => {
       if (!owner || !repo || !prNumber || !resolvedFilename || !prKey) return;
+      if (isMyPr) {
+        if (!headSha) return;
+        await addCommentMutation.mutateAsync({
+          owner,
+          repo,
+          prNumber,
+          body,
+          commitId: headSha,
+          path: resolvedFilename,
+          line,
+          startLine: startLine !== line ? startLine : undefined,
+          subjectType: isInDiffHunk ? "line" : "file",
+        });
+        return;
+      }
       addDraft(prKey, {
         type: "inline",
         path: resolvedFilename,
@@ -334,12 +353,32 @@ export function PrPanel({ onClose }: PrPanelProps) {
         startLine: startLine !== line ? startLine : undefined,
       });
     },
-    [owner, repo, prNumber, resolvedFilename, prKey, addDraft],
+    [
+      owner,
+      repo,
+      prNumber,
+      resolvedFilename,
+      prKey,
+      isMyPr,
+      headSha,
+      addDraft,
+      addCommentMutation,
+    ],
   );
 
   const handleReplyToComment = useCallback(
     async (body: string, inReplyToId: number) => {
       if (!owner || !repo || !prNumber || !prKey) return;
+      if (isMyPr) {
+        await replyToCommentMutation.mutateAsync({
+          owner,
+          repo,
+          prNumber,
+          commentId: inReplyToId,
+          body,
+        });
+        return;
+      }
       const originalComment = prComments.find(
         (comment) => comment.id === inReplyToId,
       );
@@ -355,7 +394,16 @@ export function PrPanel({ onClose }: PrPanelProps) {
         replyToId: inReplyToId,
       });
     },
-    [owner, repo, prNumber, prKey, prComments, addDraft],
+    [
+      owner,
+      repo,
+      prNumber,
+      prKey,
+      isMyPr,
+      prComments,
+      addDraft,
+      replyToCommentMutation,
+    ],
   );
 
   const handleDeleteComment = useCallback(
@@ -430,7 +478,8 @@ export function PrPanel({ onClose }: PrPanelProps) {
     );
   }
 
-  const isSubmittingComment = false;
+  const isSubmittingComment =
+    addCommentMutation.isPending || replyToCommentMutation.isPending;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

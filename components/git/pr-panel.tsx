@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   ExternalLink,
@@ -64,6 +65,7 @@ import {
   useGitHubReplyToComment,
   useGitHubDeleteComment,
   useGitHubSubmitReview,
+  useGitHubToggleThreadResolved,
   useGitHubMergePr,
   useGitHubCurrentUser,
   useGitHubPrViewedFiles,
@@ -231,6 +233,11 @@ export function PrPanel({ onClose }: PrPanelProps) {
   const addCommentMutation = useGitHubAddComment(owner, repo, prNumber);
   const replyToCommentMutation = useGitHubReplyToComment(owner, repo, prNumber);
   const deleteCommentMutation = useGitHubDeleteComment(owner, repo, prNumber);
+  const toggleThreadResolvedMutation = useGitHubToggleThreadResolved(
+    owner,
+    repo,
+    prNumber,
+  );
   const submitReviewMutation = useGitHubSubmitReview(owner, repo, prNumber);
   const mergeMutation = useGitHubMergePr();
 
@@ -274,6 +281,16 @@ export function PrPanel({ onClose }: PrPanelProps) {
       }
     }
     return lines;
+  }, [prThreads, resolvedFilename]);
+
+  const threadIdByLine = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const thread of prThreads) {
+      if (thread.path === resolvedFilename && thread.line) {
+        map.set(thread.line, thread.id);
+      }
+    }
+    return map;
   }, [prThreads, resolvedFilename]);
 
   const handleSelectPr = useCallback((pr: GitHubPullRequest) => {
@@ -440,6 +457,18 @@ export function PrPanel({ onClose }: PrPanelProps) {
       removeDraft(prKey, draftId);
     },
     [prKey, removeDraft],
+  );
+
+  const handleResolveThread = useCallback(
+    (line: number, resolved: boolean) => {
+      const threadId = threadIdByLine.get(line);
+      if (!threadId) {
+        toast.error("Could not find thread for this comment");
+        return;
+      }
+      toggleThreadResolvedMutation.mutate({ threadId, resolved });
+    },
+    [threadIdByLine, toggleThreadResolvedMutation],
   );
 
   const handleMerge = useCallback(
@@ -660,6 +689,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
               onReplyToComment={handleReplyToComment}
               onDeleteComment={handleDeleteComment}
               onDeleteDraft={handleDeleteDraft}
+              onResolveThread={handleResolveThread}
               currentUserLogin={currentUser?.login ?? null}
               onOpenFileList={
                 isMobile ? () => setIsMobileFileListOpen(true) : undefined

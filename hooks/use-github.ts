@@ -275,6 +275,7 @@ export function useGitHubPrComments(
 }
 
 interface PrReviewThread {
+  id: string;
   isResolved: boolean;
   line: number | null;
   path: string;
@@ -285,6 +286,7 @@ interface PrReviewThreadsPage {
     pullRequest: {
       reviewThreads: {
         nodes: Array<{
+          id: string;
           isResolved: boolean;
           line: number | null;
           path: string;
@@ -300,6 +302,7 @@ const PR_THREADS_QUERY = `
       pullRequest(number: $number) {
         reviewThreads(first: 100) {
           nodes {
+            id
             isResolved
             line
             path
@@ -327,6 +330,50 @@ export function useGitHubPrReviewThreads(
     },
     enabled: !!(owner && repo && prNumber),
     staleTime: 15_000,
+  });
+}
+
+const RESOLVE_THREAD_MUTATION = `
+  mutation ($threadId: ID!) {
+    resolveReviewThread(input: {threadId: $threadId}) {
+      thread { id isResolved }
+    }
+  }
+`;
+
+const UNRESOLVE_THREAD_MUTATION = `
+  mutation ($threadId: ID!) {
+    unresolveReviewThread(input: {threadId: $threadId}) {
+      thread { id isResolved }
+    }
+  }
+`;
+
+export function useGitHubToggleThreadResolved(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { threadId: string; resolved: boolean }) => {
+      const mutation = input.resolved
+        ? RESOLVE_THREAD_MUTATION
+        : UNRESOLVE_THREAD_MUTATION;
+      await githubGraphQL<unknown>(mutation, {
+        threadId: input.threadId,
+      });
+    },
+    onSuccess: (_, input) => {
+      queryClient.invalidateQueries({
+        queryKey: ["github", "pr-threads", owner, repo, prNumber],
+      });
+      toast.success(input.resolved ? "Thread resolved" : "Thread unresolved");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
   });
 }
 

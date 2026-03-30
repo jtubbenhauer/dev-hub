@@ -38,6 +38,7 @@ interface PrDiffEditorProps {
   onReplyToComment: (body: string, inReplyToId: number) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
   onDeleteDraft: (draftId: string) => void;
+  onResolveThread: (line: number, resolved: boolean) => void;
   currentUserLogin: string | null;
   onOpenFileList?: () => void;
 }

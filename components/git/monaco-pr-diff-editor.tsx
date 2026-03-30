@@ -22,6 +22,8 @@ import {
   ChevronDown,
   Trash2,
   Check,
+  CheckCircle2,
+  CircleDot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DiffViewToggle } from "@/components/editor/diff-view-toggle";
@@ -177,6 +179,7 @@ interface CommentThreadProps {
   ) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
   onDeleteDraft: (draftId: string) => void;
+  onResolveThread: (line: number, resolved: boolean) => void;
   currentUserLogin: string | null;
   onClose: () => void;
   pendingLine: number;
@@ -187,6 +190,7 @@ interface CommentThreadProps {
 
 function CommentThread({
   comments,
+  line,
   isResolved,
   isCollapsed,
   onToggleCollapse,
@@ -194,6 +198,7 @@ function CommentThread({
   onAddComment,
   onDeleteComment,
   onDeleteDraft,
+  onResolveThread,
   currentUserLogin,
   onClose,
   pendingLine,
@@ -346,6 +351,26 @@ function CommentThread({
               className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[60px] w-full resize-none rounded-md border px-3 py-2 text-xs focus-visible:ring-1 focus-visible:outline-none"
             />
             <div className="mt-2 flex justify-end gap-1.5">
+              {comments.some((c) => !isDraftDisplayComment(c)) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mr-auto h-6 px-2 text-xs"
+                  onClick={() => onResolveThread(line, !isResolved)}
+                >
+                  {isResolved ? (
+                    <>
+                      <CircleDot className="mr-1 size-3" />
+                      Unresolve
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="mr-1 size-3" />
+                      Resolve
+                    </>
+                  )}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -403,6 +428,7 @@ interface PrDiffEditorProps {
   onReplyToComment: (body: string, inReplyToId: number) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
   onDeleteDraft: (draftId: string) => void;
+  onResolveThread: (line: number, resolved: boolean) => void;
   currentUserLogin: string | null;
   onOpenFileList?: () => void;
 }
@@ -422,6 +448,7 @@ export const MonacoPrDiffEditor = forwardRef<
     onReplyToComment,
     onDeleteComment,
     onDeleteDraft,
+    onResolveThread,
     currentUserLogin,
     onOpenFileList,
   },
@@ -1023,6 +1050,7 @@ export const MonacoPrDiffEditor = forwardRef<
           onAddComment={onAddComment}
           onDeleteComment={onDeleteComment}
           onDeleteDraft={onDeleteDraft}
+          onResolveThread={onResolveThread}
           currentUserLogin={currentUserLogin}
           onClose={() => {
             if (isNewComment) {

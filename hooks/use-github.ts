@@ -594,6 +594,19 @@ export function useGitHubSubmitReview(
         );
       }
 
+      const existingReviews = await githubFetch<GitHubReview[]>(
+        `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/reviews?per_page=100`,
+      );
+      const existingPending = existingReviews.find(
+        (r) => r.state === "PENDING",
+      );
+      if (existingPending) {
+        await githubFetch<GitHubReview>(
+          `repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/reviews/${existingPending.id}`,
+          { method: "DELETE" },
+        );
+      }
+
       const createPayload: Record<string, unknown> = {};
       if (input.body.trim()) {
         createPayload.body = input.body;

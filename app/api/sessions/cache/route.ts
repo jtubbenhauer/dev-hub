@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db";
-import { cachedSessions } from "@/drizzle/schema";
+import { cachedSessions, cachedMessages } from "@/drizzle/schema";
 import { eq, and, notInArray } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -104,12 +104,33 @@ export async function POST(request: NextRequest) {
           ),
         )
         .run();
+
+      // Clean up cached messages for sessions that no longer exist
+      tx.delete(cachedMessages)
+        .where(
+          and(
+            eq(cachedMessages.workspaceId, workspaceId),
+            eq(cachedMessages.userId, userId),
+            notInArray(cachedMessages.sessionId, incomingIds),
+          ),
+        )
+        .run();
     } else {
       tx.delete(cachedSessions)
         .where(
           and(
             eq(cachedSessions.workspaceId, workspaceId),
             eq(cachedSessions.userId, userId),
+          ),
+        )
+        .run();
+
+      // No sessions remain — remove all cached messages for this workspace
+      tx.delete(cachedMessages)
+        .where(
+          and(
+            eq(cachedMessages.workspaceId, workspaceId),
+            eq(cachedMessages.userId, userId),
           ),
         )
         .run();

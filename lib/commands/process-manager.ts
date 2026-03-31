@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import type { ActiveProcess } from "@/lib/commands/types";
 
 const OUTPUT_BUFFER_MAX_LINES = 500;
+export const MAX_CONCURRENT_PROCESSES = 10;
 
 export interface ManagedProcess {
   process: ChildProcess;
@@ -27,6 +28,14 @@ export function spawnProcess(
   workspaceId: string,
 ): void {
   killProcess(sessionId);
+  processes.delete(sessionId);
+
+  const runningCount = [...processes.values()].filter((p) => !p.exited).length;
+  if (runningCount >= MAX_CONCURRENT_PROCESSES) {
+    throw new Error(
+      `Too many concurrent processes (limit: ${MAX_CONCURRENT_PROCESSES}). Kill an existing process first.`,
+    );
+  }
 
   const child = spawn(command, {
     cwd,

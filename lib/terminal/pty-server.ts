@@ -422,6 +422,19 @@ export function startPtyServer(): number {
     clearInterval(heartbeat);
   });
 
+  httpServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.log(
+        `[terminal] Port ${port} in use — adopting existing PTY server`,
+      );
+      wss?.close();
+      wss = null;
+      httpServer = null;
+      return;
+    }
+    throw err;
+  });
+
   httpServer.listen(port, "127.0.0.1", () => {
     console.log(
       `[terminal] PTY WebSocket server listening on ws://127.0.0.1:${port}`,

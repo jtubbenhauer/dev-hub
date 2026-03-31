@@ -348,6 +348,27 @@ function flushPendingMessageUpdates(
     return { workspaceStates: nextWorkspaceStates };
   });
 
+  // Apply LRU touches for all sessions that received message updates
+  const sessionsToTouch: Array<{ sessionId: string; workspaceId: string }> = [];
+  for (const [sessionId, byMessage] of snapshot) {
+    for (const [, { sourceWorkspaceId }] of byMessage) {
+      sessionsToTouch.push({ sessionId, workspaceId: sourceWorkspaceId });
+      break; // one touch per session is sufficient
+    }
+  }
+  if (sessionsToTouch.length > 0) {
+    set((state) => {
+      let merged: Partial<ChatState> = {};
+      let current = state;
+      for (const { sessionId, workspaceId } of sessionsToTouch) {
+        const lruUpdate = touchLru(current, sessionId, workspaceId);
+        merged = { ...merged, ...lruUpdate };
+        current = { ...current, ...lruUpdate } as ChatState;
+      }
+      return merged;
+    });
+  }
+
   for (const wsId of finishedWorkspaces) {
     get().refreshActiveSessionStatus(wsId);
   }
@@ -1844,7 +1865,7 @@ export const useChatStore = create<ChatState>()(
       },
 
       disconnectGlobalSSE: () => {
-        const { globalEventSource, sseReconnectTimer } = get();
+        const { globalEventSource, sseReconnectTimer, sseWorkspaceIds } = get();
         if (globalEventSource) {
           globalEventSource.close();
         }
@@ -1860,6 +1881,12 @@ export const useChatStore = create<ChatState>()(
           sseWorkspaceIds: [],
           sseReconnectTimer: null,
         });
+        const disconnectedWsIds = new Set(sseWorkspaceIds);
+        for (const [sessionId, wsId] of sessionSourceWorkspace) {
+          if (disconnectedWsIds.has(wsId)) {
+            sessionSourceWorkspace.delete(sessionId);
+          }
+        }
       },
 
       refreshActiveSessionStatus: async (workspaceId) => {

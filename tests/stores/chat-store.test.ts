@@ -3722,3 +3722,117 @@ describe("sessionVariants", () => {
     expect(useChatStore.getState().getSessionVariant("sess-a")).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Memory management — LRU and sessionSourceWorkspace
+// ---------------------------------------------------------------------------
+
+describe("memory management — LRU and sessionSourceWorkspace", () => {
+  const MAX_CACHED_SESSIONS = 15;
+
+  beforeEach(resetStore);
+
+  it("flushPendingMessageUpdates triggers LRU eviction for SSE messages", () => {
+    const store = useChatStore.getState();
+
+    const lruEntries: Array<{ sessionId: string; workspaceId: string }> = [];
+    const sessionsMap: Record<string, ReturnType<typeof makeSession>> = {};
+    const messagesMap: Record<
+      string,
+      Array<{
+        info: ReturnType<typeof makeMessage>;
+        parts: ReturnType<typeof makePart>[];
+      }>
+    > = {};
+
+    for (let i = 0; i < MAX_CACHED_SESSIONS; i++) {
+      const sid = `sess-${i}`;
+      lruEntries.push({ sessionId: sid, workspaceId: "ws-1" });
+      sessionsMap[sid] = makeSession(sid);
+      messagesMap[sid] = [{ info: makeMessage(`msg-${i}`, sid), parts: [] }];
+    }
+
+    useChatStore.setState({
+      messageAccessOrder: lruEntries,
+      workspaceStates: {
+        "ws-1": {
+          sessions: sessionsMap,
+          sessionsLoaded: true,
+          messages: messagesMap,
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+        },
+      },
+    });
+
+    store.handleEvent(
+      {
+        type: "message.updated",
+        properties: { info: makeMessage("msg-new", "sess-new") },
+      },
+      "ws-1",
+    );
+
+    const { messageAccessOrder, workspaceStates } = useChatStore.getState();
+
+    expect(messageAccessOrder.length).toBeLessThanOrEqual(MAX_CACHED_SESSIONS);
+    expect(messageAccessOrder.some((e) => e.sessionId === "sess-new")).toBe(
+      true,
+    );
+
+    const oldestSessionId = lruEntries[lruEntries.length - 1].sessionId;
+    const ws = workspaceStates["ws-1"];
+    expect(ws.messages[oldestSessionId]).toBeUndefined();
+  });
+
+  it("disconnectGlobalSSE clears sessionSourceWorkspace entries", () => {
+    const store = useChatStore.getState();
+
+    useChatStore.setState({
+      sseWorkspaceIds: ["ws-1"],
+    });
+
+    store.handleEvent(
+      {
+        type: "message.updated",
+        properties: { info: makeMessage("msg-1", "s1") },
+      },
+      "ws-1",
+    );
+
+    const messagesBeforeDisconnect =
+      useChatStore.getState().workspaceStates["ws-1"]?.messages["s1"];
+    expect(messagesBeforeDisconnect).toHaveLength(1);
+
+    store.disconnectGlobalSSE();
+
+    const wsMessagesSnapshot = JSON.stringify(
+      useChatStore.getState().workspaceStates["ws-1"]?.messages,
+    );
+
+    store.handleEvent(
+      {
+        type: "message.part.updated",
+        properties: {
+          part: makePart("part-1", "s1", "msg-1"),
+        },
+      },
+      "ws-other",
+    );
+
+    expect(
+      JSON.stringify(useChatStore.getState().workspaceStates["ws-1"]?.messages),
+    ).toBe(wsMessagesSnapshot);
+
+    expect(useChatStore.getState().workspaceStates["ws-other"]).toBeUndefined();
+  });
+});

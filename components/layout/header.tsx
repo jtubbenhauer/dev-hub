@@ -8,6 +8,7 @@ import { CommandDrawer } from "@/components/command-runner/command-drawer";
 import { TerminalDrawer } from "@/components/terminal/terminal-drawer";
 import { ProviderCreationIndicator } from "@/components/workspace/provider-creation-indicator";
 import { useCommandPalette } from "@/components/providers/command-palette-provider";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCommandStore } from "@/stores/command-store";
@@ -25,6 +26,7 @@ export function Header() {
     <>
       <header className="bg-background sticky top-0 z-40 flex h-12 shrink-0 items-center justify-between border-b px-4">
         <div className="flex items-center gap-3">
+          <SidebarTrigger className="hidden md:inline-flex" />
           <div className="flex items-center gap-2 md:hidden">
             <Terminal className="text-primary h-5 w-5" />
             <span className="text-lg font-semibold">Dev Hub</span>

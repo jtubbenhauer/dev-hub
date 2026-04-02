@@ -1,0 +1,44 @@
+package.json
+  f5a9b3ca0aa59089 19,22-24
+stores/lens-store.ts
+  f46bf1583c389e33 128,180,193,203,225,248
+vitest.config.ts
+  f5a9b3ca0aa59089 9-14
+stores/chat-store.ts
+  f46bf1583c389e33 732-733,2784-2788
+opencode.json
+  f5a9b3ca0aa59089 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "b54e261678990f2ef81cb09b5daaf94ab87cdbc7",
+  "prompts": {
+    "f46bf1583c389e33": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2bf54aea7ffee5h5WHXikbuYhF",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 116,
+      "total_deletions": 42,
+      "accepted_lines": 116,
+      "overriden_lines": 0
+    },
+    "f5a9b3ca0aa59089": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_2c41794e8ffeekRzN28MpCxokY",
+        "model": "github-copilot/claude-opus-4.6"
+      },
+      "human_author": "Jack Tubbenhauer <jack@tubbs.dev>",
+      "messages": [],
+      "total_additions": 413,
+      "total_deletions": 3,
+      "accepted_lines": 382,
+      "overriden_lines": 0
+    }
+  }
+}

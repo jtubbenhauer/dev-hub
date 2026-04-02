@@ -14,7 +14,6 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { useMemo, useRef } from "react";
-import { cn } from "@/lib/utils";
 import { useCommand } from "@/hooks/use-command";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useCommandPalette } from "@/components/providers/command-palette-provider";
@@ -23,6 +22,16 @@ import { useSessionPicker } from "@/components/session-picker/session-picker";
 import { useTaskPicker } from "@/components/task-picker/task-picker";
 import { useGitPicker } from "@/components/git-picker/git-picker";
 import { useWorkspacePicker } from "@/components/workspace-picker/workspace-picker";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarHeader,
+  SidebarRail,
+} from "@/components/ui/sidebar";
 
 const navItems = [
   { href: "/", label: "Dash", icon: LayoutDashboard },
@@ -212,34 +221,39 @@ export function AppSidebar() {
   useLeaderAction(globalLeaderActions);
 
   return (
-    <aside className="bg-sidebar hidden h-screen w-16 flex-col border-r md:flex">
-      <div className="flex h-12 items-center justify-center border-b">
-        <Terminal className="text-sidebar-primary h-5 w-5" />
-      </div>
-      <nav className="flex flex-1 flex-col gap-1 p-2">
-        {navItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center gap-0.5 rounded-md py-2 text-[10px] font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              )}
-            >
-              <item.icon className="h-5 w-5" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
+    <Sidebar collapsible="offcanvas">
+      <SidebarHeader>
+        <div className="flex h-12 items-center justify-center">
+          <Terminal className="text-sidebar-primary h-5 w-5" />
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarMenu>
+            {navItems.map((item) => {
+              const isActive =
+                item.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(item.href);
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive}
+                    tooltip={item.label}
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarRail />
+    </Sidebar>
   );
 }

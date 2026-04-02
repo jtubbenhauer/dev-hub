@@ -12,10 +12,16 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCommandStore } from "@/stores/command-store";
-import { LogOut, Terminal, Search } from "lucide-react";
+import {
+  LogOut,
+  Terminal,
+  Search,
+  PanelLeftOpen,
+  PanelLeftClose,
+} from "lucide-react";
 
 export function Header() {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, open: sidebarOpen } = useSidebar();
   const setDrawerOpen = useCommandStore((s) => s.setDrawerOpen);
   const runningCount = useCommandStore(
     (s) =>
@@ -34,7 +40,11 @@ export function Header() {
             className="hidden size-7 md:inline-flex"
             onClick={toggleSidebar}
           >
-            <Terminal className="h-5 w-5" />
+            {sidebarOpen ? (
+              <PanelLeftClose className="text-accent-foreground h-5 w-5" />
+            ) : (
+              <PanelLeftOpen className="text-accent-foreground h-5 w-5" />
+            )}
           </Button>
           <div className="flex items-center gap-2 md:hidden">
             <Terminal className="text-primary h-5 w-5" />

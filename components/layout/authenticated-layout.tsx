@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -13,9 +13,16 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useDefaultWorkspaceSetting } from "@/hooks/use-settings";
 import type { Workspace } from "@/types";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
 import { cn } from "@/lib/utils";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
+
+function getSidebarCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  const match = document.cookie.match(/(?:^|;\s*)sidebar_state=(\w+)/);
+  return match ? match[1] === "true" : false;
+}
 
 export function AuthenticatedLayout({
   children,
@@ -37,6 +44,7 @@ export function AuthenticatedLayout({
     (s) => s.handleVisibilityRestored,
   );
   const isKeyboardVisible = useKeyboardVisible();
+  const [sidebarOpen, setSidebarOpen] = useState(() => getSidebarCookie());
   const wasAuthenticatedRef = useRef(false);
 
   const { data, isFetching } = useQuery<Workspace[]>({
@@ -121,7 +129,11 @@ export function AuthenticatedLayout({
   if (status === "unauthenticated") return null;
 
   return (
-    <div className="flex h-dvh">
+    <SidebarProvider
+      open={sidebarOpen}
+      onOpenChange={setSidebarOpen}
+      className="h-dvh"
+    >
       <AppSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
@@ -137,6 +149,6 @@ export function AuthenticatedLayout({
       <MobileNav />
       <WorkspaceCommands />
       <SoundSettingsSync />
-    </div>
+    </SidebarProvider>
   );
 }

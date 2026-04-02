@@ -898,7 +898,7 @@ export function ChatInterface() {
           className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         >
           {/* Chat toolbar */}
-          <div className="bg-background sticky top-0 z-30 flex shrink-0 items-center gap-1.5 border-b px-3 py-2 md:gap-2 md:px-4">
+          <div className="bg-background sticky top-0 z-30 flex h-10 shrink-0 items-center gap-1.5 border-b px-3 md:gap-2 md:px-4">
             {/* Mobile: open session sheet */}
             <Button
               size="icon-xs"
@@ -1341,7 +1341,7 @@ export function ChatInterface() {
             className="relative hidden shrink-0 overflow-y-auto border-l md:block"
             style={{ width: taskPanelWidth }}
           >
-            <div className="flex items-center justify-between border-b px-3 py-2">
+            <div className="flex h-10 items-center justify-between border-b px-3">
               <span className="text-muted-foreground text-xs font-medium">
                 Side Panel
               </span>

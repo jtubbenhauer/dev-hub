@@ -220,7 +220,7 @@ export function SessionList(props: SessionListProps) {
 
   return (
     <div className="bg-muted/30 flex h-full min-h-0 flex-col border-r">
-      <div className="flex items-center justify-between border-b px-3 py-2">
+      <div className="flex h-10 items-center justify-between border-b px-3">
         <span className="text-sm font-medium">
           {props.mode === "unified" ? "All sessions" : "Sessions"}
         </span>

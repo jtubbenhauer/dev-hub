@@ -8,13 +8,14 @@ import { CommandDrawer } from "@/components/command-runner/command-drawer";
 import { TerminalDrawer } from "@/components/terminal/terminal-drawer";
 import { ProviderCreationIndicator } from "@/components/workspace/provider-creation-indicator";
 import { useCommandPalette } from "@/components/providers/command-palette-provider";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCommandStore } from "@/stores/command-store";
 import { LogOut, Terminal, Search } from "lucide-react";
 
 export function Header() {
+  const { toggleSidebar } = useSidebar();
   const setDrawerOpen = useCommandStore((s) => s.setDrawerOpen);
   const runningCount = useCommandStore(
     (s) =>
@@ -26,7 +27,15 @@ export function Header() {
     <>
       <header className="bg-background sticky top-0 z-40 flex h-12 shrink-0 items-center justify-between border-b px-4">
         <div className="flex items-center gap-3">
-          <SidebarTrigger className="hidden md:inline-flex" />
+          <Button
+            data-sidebar="trigger"
+            variant="ghost"
+            size="icon"
+            className="hidden size-7 md:inline-flex"
+            onClick={toggleSidebar}
+          >
+            <Terminal className="h-5 w-5" />
+          </Button>
           <div className="flex items-center gap-2 md:hidden">
             <Terminal className="text-primary h-5 w-5" />
             <span className="text-lg font-semibold">Dev Hub</span>

@@ -114,11 +114,15 @@ describe("AppSidebar", () => {
     expect(sidebar).toBeInTheDocument();
   });
 
-  it("renders SidebarRail with data-sidebar='rail' attribute", () => {
+  it("renders nav items with vertical icon+label layout", () => {
     renderSidebar();
 
-    const rail = document.querySelector("[data-sidebar='rail']");
-    expect(rail).toBeInTheDocument();
+    const labels = screen.getAllByText(
+      /^(Dash|Chat|Files|Git|Term|Tasks|Repos|Settings)$/,
+    );
+    for (const label of labels) {
+      expect(label).toHaveClass("text-[10px]");
+    }
   });
 
   it("marks Chat nav item as active when pathname is /chat", () => {

@@ -133,6 +133,7 @@ export function AuthenticatedLayout({
       open={sidebarOpen}
       onOpenChange={setSidebarOpen}
       className="h-dvh"
+      style={{ "--sidebar-width": "4rem" } as React.CSSProperties}
     >
       <AppSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">

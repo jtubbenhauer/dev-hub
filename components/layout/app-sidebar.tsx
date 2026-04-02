@@ -29,8 +29,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarHeader,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 
 const navItems = [
@@ -222,14 +220,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="offcanvas">
-      <SidebarHeader>
-        <div className="flex h-12 items-center justify-center">
-          <Terminal className="text-sidebar-primary h-5 w-5" />
-        </div>
-      </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarMenu>
+        <SidebarGroup className="p-2">
+          <SidebarMenu className="gap-1">
             {navItems.map((item) => {
               const isActive =
                 item.href === "/"
@@ -241,10 +234,13 @@ export function AppSidebar() {
                     asChild
                     isActive={isActive}
                     tooltip={item.label}
+                    className="flex h-auto flex-col items-center gap-0.5 py-2 [&>svg]:size-5"
                   >
                     <Link href={item.href}>
                       <item.icon />
-                      <span>{item.label}</span>
+                      <span className="text-[10px] leading-tight font-medium">
+                        {item.label}
+                      </span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -253,7 +249,6 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarRail />
     </Sidebar>
   );
 }

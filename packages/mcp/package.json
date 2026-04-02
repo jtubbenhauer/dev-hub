@@ -1,0 +1,24 @@
+{
+  "name": "@devhub/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@opencode-ai/sdk": "^1.2.27",
+    "better-sqlite3": "^12.8.0",
+    "drizzle-orm": "^0.45.1",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

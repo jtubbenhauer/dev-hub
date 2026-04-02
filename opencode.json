@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "dev-hub": {
+      "type": "local",
+      "enabled": true,
+      "command": ["node", "--import", "tsx", "packages/mcp/src/index.ts"],
+      "environment": {
+        "DEVHUB_PROJECT_DIR": "."
+      }
+    }
+  }
+}

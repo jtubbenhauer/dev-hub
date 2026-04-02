@@ -11,6 +11,7 @@ import {
   Terminal,
   Settings,
   CheckSquare,
+  Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
@@ -22,6 +23,7 @@ const mobileNavItems = [
   { href: "/git", label: "Git", icon: GitMerge },
   { href: "/terminal", label: "Term", icon: Terminal },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
+  { href: "/lens", label: "Lens", icon: Eye },
   { href: "/workspaces", label: "Repos", icon: GitBranch },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

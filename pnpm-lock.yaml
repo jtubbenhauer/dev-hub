@@ -233,6 +233,37 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  packages/mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.12.1
+        version: 1.27.1(zod@3.25.76)
+      '@opencode-ai/sdk':
+        specifier: ^1.2.27
+        version: 1.2.27
+      better-sqlite3:
+        specifier: ^12.8.0
+        version: 12.8.0
+      drizzle-orm:
+        specifier: ^0.45.1
+        version: 0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@12.8.0)
+      zod:
+        specifier: ^3.25.67
+        version: 3.25.76
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
+      '@types/node':
+        specifier: ^20
+        version: 20.19.37
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   packages/shared:
     devDependencies:
       typescript:
@@ -6028,9 +6059,6 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
-
   zustand@5.0.12:
     resolution: {integrity: sha512-i77ae3aZq4dhMlRhJVCYgMLKuSiZAaUPAct2AksxQ+gOtimhGMdXljRT21P5BNpeT4kXlLIckvkPM029OljD7g==}
     engines: {node: '>=12.20.0'}
@@ -9274,8 +9302,8 @@ snapshots:
       '@babel/parser': 7.29.2
       eslint: 9.39.4(jiti@2.6.1)
       hermes-parser: 0.25.1
-      zod: 4.3.6
-      zod-validation-error: 4.0.2(zod@4.3.6)
+      zod: 3.25.76
+      zod-validation-error: 4.0.2(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
 
@@ -12269,13 +12297,11 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
-  zod-validation-error@4.0.2(zod@4.3.6):
+  zod-validation-error@4.0.2(zod@3.25.76):
     dependencies:
-      zod: 4.3.6
+      zod: 3.25.76
 
   zod@3.25.76: {}
-
-  zod@4.3.6: {}
 
   zustand@5.0.12(@types/react@19.2.14)(immer@11.1.4)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3)):
     optionalDependencies:

@@ -729,7 +729,8 @@ export const useChatStore = create<ChatState>()(
             return;
           }
 
-          const data: Session[] = await response.json();
+          const raw: Session[] = await response.json();
+          const data = raw.filter((s) => s.title !== "[lens]");
           const sessionsMap: Record<string, Session> = {};
           for (const session of data) {
             sessionsMap[session.id] = session;
@@ -2780,8 +2781,11 @@ export const useChatStore = create<ChatState>()(
             });
             return;
           }
-          const data = await response.json();
-          if (!Array.isArray(data) || data.length === 0) {
+          const raw = await response.json();
+          const data = Array.isArray(raw)
+            ? raw.filter((s: { title?: string }) => s.title !== "[lens]")
+            : [];
+          if (data.length === 0) {
             set((state) => {
               if (state.workspaceStates[workspaceId]?.sessionsLoaded)
                 return state;

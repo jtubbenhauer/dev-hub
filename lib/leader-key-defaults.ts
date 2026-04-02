@@ -11,6 +11,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "nav:repos", label: "Go to Repos", page: "global" },
   { id: "nav:settings", label: "Go to Settings", page: "global" },
   { id: "nav:terminal", label: "Go to Terminal", page: "global" },
+  { id: "nav:lens", label: "Go to Lens", page: "global" },
   {
     id: "global:command-palette",
     label: "Open command palette",
@@ -102,6 +103,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "nav:repos": "g r",
   "nav:settings": "g s",
   "nav:terminal": "g m",
+  "nav:lens": "g o",
   "global:command-palette": ",",
   "global:file-picker": "f",
   "global:session-picker": "e",

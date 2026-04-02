@@ -16,10 +16,12 @@
     "check": "pnpm format && pnpm lint && pnpm test && pnpm build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit && pnpm --filter @devhub/shared typecheck && pnpm --filter @devhub/agent typecheck",
+    "typecheck": "tsc --noEmit && pnpm --filter @devhub/shared typecheck && pnpm --filter @devhub/agent typecheck && pnpm --filter @devhub/mcp typecheck",
     "agent:dev": "pnpm --filter @devhub/agent dev",
     "agent:start": "pnpm --filter @devhub/agent start",
-    "agent:typecheck": "pnpm --filter @devhub/agent typecheck"
+    "agent:typecheck": "pnpm --filter @devhub/agent typecheck",
+    "mcp:dev": "pnpm --filter @devhub/mcp dev",
+    "mcp:start": "pnpm --filter @devhub/mcp start"
   },
   "dependencies": {
     "@devhub/shared": "workspace:*",

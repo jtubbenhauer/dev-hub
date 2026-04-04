@@ -109,9 +109,13 @@ function isSystemReminder(messageParts: readonly { type: string }[]): boolean {
 function UserMessageBubble({
   textContent,
   workspaceId,
+  owner,
+  repo,
 }: {
   textContent: string;
   workspaceId: string | null;
+  owner?: string;
+  repo?: string;
 }) {
   const { refs, cleanedText } = parseCommentRefs(textContent);
 
@@ -133,6 +137,8 @@ function UserMessageBubble({
           <MarkdownContent
             content={cleanedText || textContent}
             variant="bubble"
+            owner={owner}
+            repo={repo}
           />
         </div>
       </div>
@@ -324,6 +330,8 @@ export const ChatMessage = memo(
                 <UserMessageBubble
                   textContent={textContent}
                   workspaceId={activeWorkspaceId}
+                  owner={githubRepo?.owner}
+                  repo={githubRepo?.repo}
                 />
               </div>
             </>

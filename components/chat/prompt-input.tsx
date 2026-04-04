@@ -16,6 +16,7 @@ import {
   type SlashCommand,
 } from "@/components/chat/command-picker";
 import { PlanArgPicker } from "@/components/chat/plan-arg-picker";
+import { PrPicker } from "@/components/chat/pr-picker";
 import { cn } from "@/lib/utils";
 import type { Agent, Command } from "@/lib/opencode/types";
 import { AgentSelector } from "@/components/chat/agent-selector";
@@ -34,6 +35,9 @@ import {
   getAllCachedComments,
   type CommentChip,
 } from "@/lib/comment-chat-bridge";
+import { isPrTrigger } from "@/lib/pr-mention";
+import { fetchPrContext, formatPrContextForAI } from "@/lib/pr-context";
+import { useWorkspaceGitHub } from "@/hooks/use-git";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -101,6 +105,14 @@ interface SelectedModel {
   modelID: string;
 }
 
+interface PrContextChip {
+  prNumber: number;
+  owner: string;
+  repo: string;
+  title: string;
+  contextString: string;
+}
+
 interface SubmitAttachment {
   mime: string;
   dataUrl: string;
@@ -166,6 +178,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     ref,
   ) {
     const queryClient = useQueryClient();
+    const githubRepo = useWorkspaceGitHub(workspaceId);
     const [value, setValue] = useState(() => {
       const draft = sessionId ? sessionDrafts.get(sessionId) : undefined;
       return draft?.text ?? "";
@@ -188,6 +201,10 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     const [pickerQuery, setPickerQuery] = useState<string | null>(null);
     const [commandQuery, setCommandQuery] = useState<string | null>(null);
     const [planArgQuery, setPlanArgQuery] = useState<string | null>(null);
+    const [prPickerQuery, setPrPickerQuery] = useState<string | null>(null);
+    const [selectedPrContexts, setSelectedPrContexts] = useState<
+      PrContextChip[]
+    >([]);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [prevSessionId, setPrevSessionId] = useState(sessionId);
@@ -360,9 +377,11 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           setSelectedFiles([]);
           setSelectedComments([]);
           setAttachments([]);
+          setSelectedPrContexts([]);
           setPickerQuery(null);
           setCommandQuery(null);
           setPlanArgQuery(null);
+          setPrPickerQuery(null);
           if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
           }
@@ -402,6 +421,10 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         selectedFiles.length > 0
           ? `Context files: ${selectedFiles.join(", ")}\n\n`
           : "";
+      const prContext =
+        selectedPrContexts.length > 0
+          ? selectedPrContexts.map((c) => c.contextString).join("\n\n") + "\n\n"
+          : "";
       const submitAttachments =
         attachments.length > 0
           ? attachments.map((a) => ({
@@ -410,14 +433,19 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
               filename: a.filename,
             }))
           : undefined;
-      onSubmit(commentContext + fileContext + trimmed, submitAttachments);
+      onSubmit(
+        prContext + commentContext + fileContext + trimmed,
+        submitAttachments,
+      );
       setValue("");
       setSelectedFiles([]);
       setSelectedComments([]);
       setAttachments([]);
+      setSelectedPrContexts([]);
       setPickerQuery(null);
       setCommandQuery(null);
       setPlanArgQuery(null);
+      setPrPickerQuery(null);
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
       }
@@ -426,6 +454,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       disabled,
       selectedFiles,
       selectedComments,
+      selectedPrContexts,
       attachments,
       onSubmit,
       availableCommands,
@@ -454,6 +483,13 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           }
         }
         setPickerQuery(null);
+
+        const prTrigger = isPrTrigger(textUpToCursor);
+        if (prTrigger.triggered) {
+          setPrPickerQuery(prTrigger.query);
+          return;
+        }
+        setPrPickerQuery(null);
 
         if (newValue.startsWith("/")) {
           const firstSpace = newValue.indexOf(" ");
@@ -490,12 +526,14 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           event.key === "Escape" &&
           (pickerQuery !== null ||
             commandQuery !== null ||
-            planArgQuery !== null)
+            planArgQuery !== null ||
+            prPickerQuery !== null)
         ) {
           event.preventDefault();
           setPickerQuery(null);
           setCommandQuery(null);
           setPlanArgQuery(null);
+          setPrPickerQuery(null);
           return;
         }
         // Let FilePicker intercept ArrowUp/ArrowDown/Enter when picker is open
@@ -526,12 +564,21 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           event.preventDefault();
           return;
         }
+        if (
+          prPickerQuery !== null &&
+          (event.key === "ArrowUp" ||
+            event.key === "ArrowDown" ||
+            event.key === "Enter")
+        ) {
+          event.preventDefault();
+          return;
+        }
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
           handleSubmit();
         }
       },
-      [handleSubmit, pickerQuery, commandQuery, planArgQuery],
+      [handleSubmit, pickerQuery, commandQuery, planArgQuery, prPickerQuery],
     );
 
     const handleFileSelect = useCallback(
@@ -560,6 +607,59 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
 
     const handleRemoveFile = useCallback((path: string) => {
       setSelectedFiles((prev) => prev.filter((p) => p !== path));
+    }, []);
+
+    const handlePrSelect = useCallback(
+      async (prNumber: number) => {
+        const cursor = textareaRef.current?.selectionStart ?? value.length;
+        const textUpToCursor = value.slice(0, cursor);
+        const hashIndex = textUpToCursor.search(/(^|\s)#\d*$/);
+        const before =
+          hashIndex !== -1
+            ? value.slice(
+                0,
+                hashIndex + (textUpToCursor[hashIndex] === "#" ? 0 : 1),
+              )
+            : value;
+        const after = value.slice(cursor);
+        setValue(before + after);
+        setPrPickerQuery(null);
+
+        requestAnimationFrame(() => {
+          textareaRef.current?.focus();
+          autoResize();
+        });
+
+        if (!githubRepo) return;
+        const { owner, repo } = githubRepo;
+
+        try {
+          const prCtx = await fetchPrContext(owner, repo, prNumber);
+          const contextString = formatPrContextForAI(prCtx);
+          setSelectedPrContexts((prev) => {
+            if (prev.some((c) => c.prNumber === prNumber)) return prev;
+            return [
+              ...prev,
+              {
+                prNumber,
+                owner,
+                repo,
+                title: prCtx.pr.title,
+                contextString,
+              },
+            ];
+          });
+        } catch {
+          // skip — fetchPrContext failure is non-fatal
+        }
+      },
+      [value, autoResize, githubRepo],
+    );
+
+    const handleRemovePrContext = useCallback((prNumber: number) => {
+      setSelectedPrContexts((prev) =>
+        prev.filter((c) => c.prNumber !== prNumber),
+      );
     }, []);
 
     const handleRemoveComment = useCallback((id: number) => {
@@ -685,6 +785,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     const isPickerOpen = pickerQuery !== null && !!workspaceId;
     const isCommandPickerOpen = commandQuery !== null;
     const isPlanArgPickerOpen = planArgQuery !== null && !!workspaceId;
+    const isPrPickerOpen = prPickerQuery !== null && githubRepo !== null;
 
     return (
       <div className="shrink-0 px-4 pt-2 pb-4">
@@ -733,6 +834,16 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
                 onClose={() => setPlanArgQuery(null)}
               />
             )}
+
+            {isPrPickerOpen && githubRepo && (
+              <PrPicker
+                query={prPickerQuery ?? ""}
+                owner={githubRepo.owner}
+                repo={githubRepo.repo}
+                onSelect={handlePrSelect}
+                onDismiss={() => setPrPickerQuery(null)}
+              />
+            )}
           </div>
 
           {/* Selected file chips */}
@@ -759,12 +870,41 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
             </div>
           )}
 
+          {/* PR context chips */}
+          {selectedPrContexts.length > 0 && (
+            <div
+              className={cn(
+                "flex flex-wrap gap-1.5 px-3",
+                selectedFiles.length > 0 ? "pt-1" : "pt-2",
+              )}
+            >
+              {selectedPrContexts.map((prChip) => (
+                <span
+                  key={prChip.prNumber}
+                  className="bg-muted flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs"
+                >
+                  <span className="text-muted-foreground font-mono">#</span>
+                  {prChip.prNumber}: {prChip.title}
+                  <button
+                    onClick={() => handleRemovePrContext(prChip.prNumber)}
+                    aria-label={`Remove PR #${prChip.prNumber}`}
+                    className="text-muted-foreground hover:text-foreground ml-0.5"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Comment context chips */}
           {selectedComments.length > 0 && (
             <div
               className={cn(
                 "flex flex-wrap gap-1.5 px-3",
-                selectedFiles.length > 0 ? "pt-1" : "pt-2",
+                selectedFiles.length > 0 || selectedPrContexts.length > 0
+                  ? "pt-1"
+                  : "pt-2",
               )}
             >
               {selectedComments.map((comment) => {
@@ -799,7 +939,9 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
             <div
               className={cn(
                 "flex flex-wrap gap-1.5 px-3",
-                selectedFiles.length > 0 || selectedComments.length > 0
+                selectedFiles.length > 0 ||
+                  selectedPrContexts.length > 0 ||
+                  selectedComments.length > 0
                   ? "pt-1"
                   : "pt-2",
               )}
@@ -846,7 +988,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
             onKeyDown={handleKeyDown}
             onFocus={handleFocus}
             onPaste={handlePaste}
-            placeholder="Send a message... (type @ to reference files)"
+            placeholder="Send a message... (@ for files, # for PRs)"
             disabled={disabled}
             rows={1}
             className="placeholder:text-muted-foreground max-h-[200px] w-full resize-none bg-transparent px-3 py-2 text-base focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"

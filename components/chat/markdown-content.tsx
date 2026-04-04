@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useCallback } from "react";
+import React, { memo, useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -10,13 +10,49 @@ import { Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { isCodePath, FilePathCode } from "@/components/chat/file-path-code";
+import { PrBadge } from "@/components/chat/pr-badge";
+import { parsePrReferences } from "@/lib/pr-mention";
+
+function renderPrBadges(
+  text: string,
+  owner: string,
+  repo: string,
+): React.ReactNode[] {
+  const refs = parsePrReferences(text);
+  if (refs.length === 0) return [text];
+
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const ref of refs) {
+    if (ref.startIndex > cursor) {
+      nodes.push(text.slice(cursor, ref.startIndex));
+    }
+    nodes.push(
+      <PrBadge
+        key={ref.startIndex}
+        prNumber={ref.number}
+        owner={owner}
+        repo={repo}
+      />,
+    );
+    cursor = ref.endIndex;
+  }
+  if (cursor < text.length) {
+    nodes.push(text.slice(cursor));
+  }
+  return nodes;
+}
 
 export const MarkdownContent = memo(function MarkdownContent({
   content,
   variant = "default",
+  owner,
+  repo,
 }: {
   content: string;
   variant?: "default" | "bubble";
+  owner?: string;
+  repo?: string;
 }) {
   const isBubble = variant === "bubble";
 
@@ -54,6 +90,18 @@ export const MarkdownContent = memo(function MarkdownContent({
               <table {...props}>{children}</table>
             </div>
           );
+        },
+        p({ children }) {
+          if (!owner || !repo) {
+            return <p>{children}</p>;
+          }
+          const processedChildren = React.Children.map(children, (child) => {
+            if (typeof child === "string") {
+              return renderPrBadges(child, owner, repo);
+            }
+            return child;
+          });
+          return <p>{processedChildren}</p>;
         },
         code({ children, className, ...props }) {
           const isInline = !className;

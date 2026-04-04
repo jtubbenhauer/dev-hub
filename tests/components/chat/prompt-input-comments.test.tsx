@@ -47,6 +47,12 @@ vi.mock("@/components/chat/variant-selector", () => ({
 vi.mock("@/hooks/use-settings", () => ({
   useModelAllowlist: () => ({ allowlist: [], setAllowlist: vi.fn() }),
 }));
+vi.mock("@/hooks/use-git", () => ({
+  useWorkspaceGitHub: vi.fn().mockReturnValue(null),
+}));
+vi.mock("@/components/chat/pr-picker", () => ({
+  PrPicker: () => null,
+}));
 
 import {
   getPendingCommentChips,

@@ -10,6 +10,10 @@ vi.mock("@/stores/workspace-store", () => ({
   useWorkspaceStore: () => "ws-1",
 }));
 
+vi.mock("@/hooks/use-git", () => ({
+  useWorkspaceGitHub: () => null,
+}));
+
 function makeUserMessage(id: string, text: string): MessageWithParts {
   return {
     info: {

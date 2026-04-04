@@ -41,6 +41,7 @@ export function PrBadge({ prNumber, owner, repo }: PrBadgeProps) {
       href={githubUrl}
       target="_blank"
       rel="noopener noreferrer"
+      title={`${pr.title} (${pr.head.ref})`}
       className={cn(
         "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] leading-tight",
         "border-primary/20 bg-primary/5 text-foreground",

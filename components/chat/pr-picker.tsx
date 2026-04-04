@@ -117,6 +117,9 @@ export function PrPicker({
                 #{pr.number}
               </span>
               <span className="truncate">{pr.title}</span>
+              <span className="text-muted-foreground shrink-0">
+                {pr.user.login}
+              </span>
             </button>
           ))}
         </div>

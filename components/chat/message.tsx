@@ -22,6 +22,7 @@ import { MessageToolUse } from "@/components/chat/message-tool-use";
 import { parseCommentRefs } from "@/lib/comment-chat-bridge";
 import { CommentRefBadge } from "@/components/chat/comment-ref-badge";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useWorkspaceGitHub } from "@/hooks/use-git";
 import type { MessageWithParts } from "@/lib/opencode/types";
 import type { ToolPart, TextPart, ReasoningPart } from "@/lib/opencode/types";
 
@@ -156,6 +157,7 @@ export const ChatMessage = memo(
     const isCompaction =
       isAssistant && "summary" in info && info.summary === true;
     const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+    const githubRepo = useWorkspaceGitHub(activeWorkspaceId);
 
     const { textContent, inlineThinkingParts } = useMemo(() => {
       const raw = parts
@@ -349,7 +351,11 @@ export const ChatMessage = memo(
                     <div className="group/markdown relative">
                       <CopyMarkdownButton content={compactionTextContent} />
                       <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
-                        <MarkdownContent content={compactionTextContent} />
+                        <MarkdownContent
+                          content={compactionTextContent}
+                          owner={githubRepo?.owner}
+                          repo={githubRepo?.repo}
+                        />
                       </div>
                     </div>
                   </div>
@@ -360,7 +366,11 @@ export const ChatMessage = memo(
                 <div className="group/markdown relative">
                   <CopyMarkdownButton content={fullTextContent} />
                   <div className="prose prose-sm dark:prose-invert max-w-full overflow-hidden break-words">
-                    <MarkdownContent content={throttledTextContent} />
+                    <MarkdownContent
+                      content={throttledTextContent}
+                      owner={githubRepo?.owner}
+                      repo={githubRepo?.repo}
+                    />
                   </div>
                 </div>
               ) : null}

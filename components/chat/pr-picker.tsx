@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGitHubRepoPrs } from "@/hooks/use-github-repo-prs";
 
@@ -29,6 +30,17 @@ function statusDotClass(pr: RepoPr): string {
   return "bg-green-500";
 }
 
+function fuzzyMatch(value: string, query: string): boolean {
+  if (!query) return true;
+  const lower = value.toLowerCase();
+  const q = query.toLowerCase();
+  let qi = 0;
+  for (let i = 0; i < lower.length && qi < q.length; i++) {
+    if (lower[i] === q[qi]) qi++;
+  }
+  return qi === q.length;
+}
+
 export function PrPicker({
   query,
   owner,
@@ -39,21 +51,44 @@ export function PrPicker({
   const { data: prs = [], isLoading } = useGitHubRepoPrs(owner, repo, {
     search: query,
   });
+  const [localSearch, setLocalSearch] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!localSearch) return prs;
+    return prs.filter(
+      (pr) =>
+        fuzzyMatch(pr.title, localSearch) ||
+        String(pr.number).startsWith(localSearch) ||
+        fuzzyMatch(pr.user.login, localSearch),
+    );
+  }, [prs, localSearch]);
 
   const [prevQuery, setPrevQuery] = useState(query);
+  const [prevLocalSearch, setPrevLocalSearch] = useState(localSearch);
   if (prevQuery !== query) {
     setPrevQuery(query);
     setHighlightedIndex(0);
   }
+  if (prevLocalSearch !== localSearch) {
+    setPrevLocalSearch(localSearch);
+    setHighlightedIndex(0);
+  }
+
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setHighlightedIndex((prev) => Math.min(prev + 1, prs.length - 1));
+          setHighlightedIndex((prev) =>
+            Math.min(prev + 1, filtered.length - 1),
+          );
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -61,7 +96,8 @@ export function PrPicker({
           break;
         case "Enter":
           e.preventDefault();
-          if (prs[highlightedIndex]) onSelect(prs[highlightedIndex].number);
+          if (filtered[highlightedIndex])
+            onSelect(filtered[highlightedIndex].number);
           break;
         case "Escape":
           e.preventDefault();
@@ -69,7 +105,7 @@ export function PrPicker({
           break;
       }
     },
-    [prs, highlightedIndex, onSelect, onDismiss],
+    [filtered, highlightedIndex, onSelect, onDismiss],
   );
 
   useEffect(() => {
@@ -87,43 +123,61 @@ export function PrPicker({
   }, [highlightedIndex]);
 
   return (
-    <div className="bg-popover absolute z-50 max-h-64 w-80 overflow-y-auto rounded-lg border shadow-md">
-      {isLoading && (
-        <p className="text-muted-foreground px-3 py-2 text-xs">Loading...</p>
-      )}
-      {!isLoading && prs.length === 0 && (
-        <p className="text-muted-foreground px-3 py-2 text-xs">No PRs found</p>
-      )}
-      {!isLoading && prs.length > 0 && (
-        <div ref={listRef}>
-          {prs.map((pr, index) => (
-            <button
-              key={pr.number}
-              data-pr-item
-              className={cn(
-                "hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs",
-                index === highlightedIndex && "bg-accent",
-              )}
-              onMouseEnter={() => setHighlightedIndex(index)}
-              onClick={() => onSelect(pr.number)}
-            >
-              <span
-                className={cn(
-                  "size-2 shrink-0 rounded-full",
-                  statusDotClass(pr),
-                )}
-              />
-              <span className="text-muted-foreground shrink-0 font-mono">
-                #{pr.number}
-              </span>
-              <span className="truncate">{pr.title}</span>
-              <span className="text-muted-foreground shrink-0">
-                {pr.user.login}
-              </span>
-            </button>
-          ))}
+    <div className="bg-popover absolute bottom-full mb-1 max-h-80 w-full overflow-hidden rounded-lg border shadow-md">
+      <div className="border-b px-3 py-1.5">
+        <div className="flex items-center gap-2">
+          <Search className="text-muted-foreground size-3 shrink-0" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            placeholder="Search PRs by title, number, or author..."
+            className="placeholder:text-muted-foreground w-full bg-transparent text-xs outline-none"
+            data-pr-search
+          />
         </div>
-      )}
+      </div>
+      <div className="max-h-64 overflow-y-auto">
+        {isLoading && (
+          <p className="text-muted-foreground px-3 py-2 text-xs">Loading...</p>
+        )}
+        {!isLoading && filtered.length === 0 && (
+          <p className="text-muted-foreground px-3 py-2 text-xs">
+            No PRs found
+          </p>
+        )}
+        {!isLoading && filtered.length > 0 && (
+          <div ref={listRef}>
+            {filtered.map((pr, index) => (
+              <button
+                key={pr.number}
+                data-pr-item
+                className={cn(
+                  "hover:bg-accent flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs",
+                  index === highlightedIndex && "bg-accent",
+                )}
+                onMouseEnter={() => setHighlightedIndex(index)}
+                onClick={() => onSelect(pr.number)}
+              >
+                <span
+                  className={cn(
+                    "size-2 shrink-0 rounded-full",
+                    statusDotClass(pr),
+                  )}
+                />
+                <span className="text-muted-foreground shrink-0 font-mono">
+                  #{pr.number}
+                </span>
+                <span className="truncate">{pr.title}</span>
+                <span className="text-muted-foreground shrink-0">
+                  {pr.user.login}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

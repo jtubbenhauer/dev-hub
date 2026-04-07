@@ -118,6 +118,88 @@ describe("PrPicker", () => {
     });
   });
 
+  describe("search input", () => {
+    it("renders a search input", () => {
+      mockUseGitHubRepoPrs.mockReturnValue({
+        data: [openPr, draftPr],
+        isLoading: false,
+      });
+
+      const { container } = render(<PrPicker {...baseProps} />);
+
+      const searchInput = container.querySelector("[data-pr-search]");
+      expect(searchInput).toBeInTheDocument();
+    });
+
+    it("filters PRs by title when typing in search input", async () => {
+      mockUseGitHubRepoPrs.mockReturnValue({
+        data: [openPr, draftPr, mergedPr],
+        isLoading: false,
+      });
+
+      const { container } = render(<PrPicker {...baseProps} />);
+      const searchInput = container.querySelector(
+        "[data-pr-search]",
+      ) as HTMLInputElement;
+
+      await userEvent.type(searchInput, "dark");
+
+      expect(screen.getByText("Add dark mode")).toBeInTheDocument();
+      expect(screen.queryByText("WIP: refactor auth")).not.toBeInTheDocument();
+      expect(screen.queryByText("Fix login bug")).not.toBeInTheDocument();
+    });
+
+    it("filters PRs by number when typing digits in search input", async () => {
+      mockUseGitHubRepoPrs.mockReturnValue({
+        data: [openPr, draftPr, mergedPr],
+        isLoading: false,
+      });
+
+      const { container } = render(<PrPicker {...baseProps} />);
+      const searchInput = container.querySelector(
+        "[data-pr-search]",
+      ) as HTMLInputElement;
+
+      await userEvent.type(searchInput, "42");
+
+      expect(screen.getByText("Add dark mode")).toBeInTheDocument();
+      expect(screen.queryByText("WIP: refactor auth")).not.toBeInTheDocument();
+    });
+
+    it("filters PRs by author login", async () => {
+      mockUseGitHubRepoPrs.mockReturnValue({
+        data: [openPr, draftPr, mergedPr],
+        isLoading: false,
+      });
+
+      const { container } = render(<PrPicker {...baseProps} />);
+      const searchInput = container.querySelector(
+        "[data-pr-search]",
+      ) as HTMLInputElement;
+
+      await userEvent.type(searchInput, "carol");
+
+      expect(screen.getByText("Fix login bug")).toBeInTheDocument();
+      expect(screen.queryByText("Add dark mode")).not.toBeInTheDocument();
+    });
+
+    it("shows 'No PRs found' when search matches nothing", async () => {
+      mockUseGitHubRepoPrs.mockReturnValue({
+        data: [openPr, draftPr],
+        isLoading: false,
+      });
+
+      const { container } = render(<PrPicker {...baseProps} />);
+      const searchInput = container.querySelector(
+        "[data-pr-search]",
+      ) as HTMLInputElement;
+
+      await userEvent.type(searchInput, "zzzznonexistent");
+
+      expect(screen.getByText("No PRs found")).toBeInTheDocument();
+    });
+  });
+
   describe("loading state", () => {
     it("shows 'Loading...' when isLoading is true", () => {
       mockUseGitHubRepoPrs.mockReturnValue({

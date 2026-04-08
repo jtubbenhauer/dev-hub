@@ -1,0 +1,23 @@
+components/git/pr-panel.tsx
+  ac79787beb2e2905 547-551
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "ddeb06caa40f1da72a9758ce9cb98145db374b38",
+  "prompts": {
+    "ac79787beb2e2905": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d6dbce22ffe58NeXiHllv0dnE-98010a11-ba1b-47b1-b7ec-ea1cee962f8c",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 7,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}

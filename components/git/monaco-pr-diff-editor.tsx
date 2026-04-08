@@ -406,7 +406,7 @@ function CommentThread({
           <div className="px-3 py-2">
             <textarea
               ref={(el) => {
-                if (el) setTimeout(() => el.focus(), 0);
+                if (el && !editingKey) setTimeout(() => el.focus(), 0);
               }}
               value={replyBody}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>

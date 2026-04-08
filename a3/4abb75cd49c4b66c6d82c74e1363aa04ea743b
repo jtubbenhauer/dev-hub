@@ -1,0 +1,63 @@
+components/git/monaco-pr-diff-editor.tsx
+  44545caab56de778 491-493
+  975cf6c0a4ba890a 500
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "a34abb75cd49c4b66c6d82c74e1363aa04ea743b",
+  "prompts": {
+    "44545caab56de778": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d60bcb2affeu0fG5Mn0aGeu7J-fa9d1cb7-1f25-435b-bdf1-7fa7a8e5a6a4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "736f49d2c14fddec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d60bcb2affeu0fG5Mn0aGeu7J-c4ee2f53-f71d-4bb9-a66e-d14f23d9edab",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 2,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "975cf6c0a4ba890a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d60bcb2affeu0fG5Mn0aGeu7J-3009d5ba-ec5c-4e1b-be5b-b750dae6d426",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "d5610c99e5e4877d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d60bcb2affeu0fG5Mn0aGeu7J-8c730ede-6d9a-48b6-8260-ce8f1890c8f4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 3,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}

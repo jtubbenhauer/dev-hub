@@ -1,0 +1,23 @@
+components/git/monaco-pr-diff-editor.tsx
+  bb9b8dd62359b8de 409
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "f4912f53ecc99e604b88a3cdfe90dd0eb9b6bd1a",
+  "prompts": {
+    "bb9b8dd62359b8de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d6dbce22ffe58NeXiHllv0dnE-dde2d860-b24a-4c2b-9786-920692542617",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -780,13 +780,7 @@ export const MonacoPrDiffEditor = forwardRef<
 
         const lineNumber = e.target.position?.lineNumber;
         if (lineNumber == null) return;
-        const leftKey = toLineKey("LEFT", lineNumber);
-        if (commentedLineKeysRef.current.has(leftKey)) {
-          setCollapsedLines((prev) => {
-            const next = new Set(prev);
-            next.delete(leftKey);
-            return next;
-          });
+        if (commentedLineKeysRef.current.has(toLineKey("LEFT", lineNumber))) {
           return;
         }
 
@@ -803,13 +797,7 @@ export const MonacoPrDiffEditor = forwardRef<
 
         const lineNumber = e.target.position?.lineNumber;
         if (lineNumber == null) return;
-        const rightKey = toLineKey("RIGHT", lineNumber);
-        if (commentedLineKeysRef.current.has(rightKey)) {
-          setCollapsedLines((prev) => {
-            const next = new Set(prev);
-            next.delete(rightKey);
-            return next;
-          });
+        if (commentedLineKeysRef.current.has(toLineKey("RIGHT", lineNumber))) {
           return;
         }
 

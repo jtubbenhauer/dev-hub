@@ -537,6 +537,34 @@ export const MonacoPrDiffEditor = forwardRef<
     }
     return bySide;
   }, [commentedLineKeys]);
+  const resolvedLineKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const lineKey of commentedLineKeys) {
+      const target = fromLineKey(lineKey);
+      if (target && resolvedLines.has(target.line)) {
+        keys.add(lineKey);
+      }
+    }
+    return keys;
+  }, [commentedLineKeys, resolvedLines]);
+
+  const [prevResolvedLineKeys, setPrevResolvedLineKeys] =
+    useState(resolvedLineKeys);
+  if (resolvedLineKeys !== prevResolvedLineKeys) {
+    setPrevResolvedLineKeys(resolvedLineKeys);
+    const newKeys: string[] = [];
+    for (const key of resolvedLineKeys) {
+      if (!prevResolvedLineKeys.has(key)) newKeys.push(key);
+    }
+    if (newKeys.length > 0) {
+      setCollapsedLines((current) => {
+        const next = new Set(current);
+        for (const key of newKeys) next.add(key);
+        return next;
+      });
+    }
+  }
+
   const commentedLineKeysRef = useRef(commentedLineKeys);
   useEffect(() => {
     commentedLineKeysRef.current = commentedLineKeys;
@@ -575,7 +603,6 @@ export const MonacoPrDiffEditor = forwardRef<
       currentCommentedLineKeys: Set<string>,
       currentCollapsed: Set<string>,
       currentNewCommentLine: CommentLineTarget | null,
-      currentResolved: Set<number>,
     ): boolean => {
       const linesNeedingZonesBySide: Record<DiffCommentSide, Set<number>> = {
         LEFT: new Set(),
@@ -628,12 +655,10 @@ export const MonacoPrDiffEditor = forwardRef<
               const isCollapsed =
                 currentCollapsed.has(lineKey) &&
                 currentCommentedLineKeys.has(lineKey);
-              const isResolved = currentResolved.has(line);
               const measuredHeight = existing.contentWrapper.scrollHeight;
-              const targetHeight =
-                isCollapsed || isResolved
-                  ? COLLAPSED_ZONE_HEIGHT
-                  : Math.max(measuredHeight, EXPANDED_ZONE_HEIGHT);
+              const targetHeight = isCollapsed
+                ? COLLAPSED_ZONE_HEIGHT
+                : Math.max(measuredHeight, EXPANDED_ZONE_HEIGHT);
 
               if (targetHeight !== existing.currentHeight) {
                 accessor.removeZone(existing.zoneId);
@@ -651,11 +676,9 @@ export const MonacoPrDiffEditor = forwardRef<
               const isCollapsed =
                 currentCollapsed.has(lineKey) &&
                 currentCommentedLineKeys.has(lineKey);
-              const isResolved = currentResolved.has(line);
-              const initialHeight =
-                isCollapsed || isResolved
-                  ? COLLAPSED_ZONE_HEIGHT
-                  : EXPANDED_ZONE_HEIGHT;
+              const initialHeight = isCollapsed
+                ? COLLAPSED_ZONE_HEIGHT
+                : EXPANDED_ZONE_HEIGHT;
               const { domNode, contentWrapper } = createZoneDomNodes();
               const zoneId = accessor.addZone({
                 afterLineNumber: line,
@@ -683,11 +706,7 @@ export const MonacoPrDiffEditor = forwardRef<
   );
 
   const resizeViewZones = useCallback(
-    (
-      currentCommentedLines: Set<string>,
-      currentCollapsed: Set<string>,
-      currentResolved: Set<number>,
-    ) => {
+    (currentCommentedLines: Set<string>, currentCollapsed: Set<string>) => {
       const zones = zonesRef.current;
 
       for (const side of ["LEFT", "RIGHT"] as const) {
@@ -702,12 +721,10 @@ export const MonacoPrDiffEditor = forwardRef<
             const isCollapsed =
               currentCollapsed.has(lineKey) &&
               currentCommentedLines.has(lineKey);
-            const isResolved = currentResolved.has(target.line);
             const measuredHeight = existing.contentWrapper.scrollHeight;
-            const targetHeight =
-              isCollapsed || isResolved
-                ? COLLAPSED_ZONE_HEIGHT
-                : Math.max(measuredHeight, EXPANDED_ZONE_HEIGHT);
+            const targetHeight = isCollapsed
+              ? COLLAPSED_ZONE_HEIGHT
+              : Math.max(measuredHeight, EXPANDED_ZONE_HEIGHT);
 
             if (targetHeight !== existing.currentHeight) {
               accessor.removeZone(existing.zoneId);
@@ -796,7 +813,6 @@ export const MonacoPrDiffEditor = forwardRef<
       commentedLineKeys,
       collapsedLines,
       newCommentLine,
-      resolvedLines,
     );
     if (portalsDirty) {
       const targets = new Map<string, HTMLDivElement>();
@@ -817,14 +833,13 @@ export const MonacoPrDiffEditor = forwardRef<
     commentedLineKeys,
     collapsedLines,
     newCommentLine,
-    resolvedLines,
     syncViewZones,
   ]);
 
   useEffect(() => {
     if (!isEditorReady) return;
     const resizeObserver = new ResizeObserver(() => {
-      resizeViewZones(commentedLineKeys, collapsedLines, resolvedLines);
+      resizeViewZones(commentedLineKeys, collapsedLines);
     });
     resizeObserverRef.current = resizeObserver;
 
@@ -838,13 +853,7 @@ export const MonacoPrDiffEditor = forwardRef<
         resizeObserverRef.current = null;
       }
     };
-  }, [
-    isEditorReady,
-    commentedLineKeys,
-    collapsedLines,
-    resolvedLines,
-    resizeViewZones,
-  ]);
+  }, [isEditorReady, commentedLineKeys, collapsedLines, resizeViewZones]);
 
   useEffect(() => {
     if (!isEditorReady || !diffEditorRef.current) return;
@@ -1047,9 +1056,7 @@ export const MonacoPrDiffEditor = forwardRef<
           line={target.line}
           isResolved={resolvedLines.has(target.line)}
           isOutdated={outdatedLines.has(target.line)}
-          isCollapsed={
-            collapsedLines.has(lineKey) || resolvedLines.has(target.line)
-          }
+          isCollapsed={collapsedLines.has(lineKey)}
           onToggleCollapse={() => {
             setCollapsedLines((prev) => {
               const next = new Set(prev);

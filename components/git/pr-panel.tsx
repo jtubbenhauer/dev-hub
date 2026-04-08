@@ -543,7 +543,15 @@ export function PrPanel({ onClose }: PrPanelProps) {
               {selectedPr.user.login}
             </p>
           </div>
-          <ChevronDown className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
+        </button>
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground shrink-0 p-0.5 transition-colors"
+          onClick={() => setIsDescriptionOpen((prev) => !prev)}
+        >
+          <ChevronDown
+            className={`size-3.5 transition-transform ${isDescriptionOpen ? "rotate-180" : ""}`}
+          />
         </button>
         <ChecksStatusBadge checks={prChecks} />
         <a

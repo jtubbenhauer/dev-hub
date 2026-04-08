@@ -1,0 +1,23 @@
+lib/emoji.ts
+  0ae1e26f844a5aaa 1,3-8,14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "3b6070fbe4bc5a0a19e795fa494190629638e47b",
+  "prompts": {
+    "0ae1e26f844a5aaa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d6dbce22ffe58NeXiHllv0dnE-0b216607-e2c0-4f86-a44d-7a94ea95e024",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 146,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}

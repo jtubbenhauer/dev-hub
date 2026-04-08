@@ -488,12 +488,16 @@ export const MonacoPrDiffEditor = forwardRef<
   const [collapsedLines, setCollapsedLines] = useState<Set<string>>(
     () => new Set(),
   );
+  const [prevResolvedLineKeys, setPrevResolvedLineKeys] = useState(
+    () => new Set<string>(),
+  );
 
   const [prevFilePath, setPrevFilePath] = useState(fileContent.path);
   if (prevFilePath !== fileContent.path) {
     setPrevFilePath(fileContent.path);
     setNewCommentLine(null);
     setCollapsedLines(new Set());
+    setPrevResolvedLineKeys(new Set());
   }
 
   const commentsByLine = useMemo(() => {
@@ -548,8 +552,6 @@ export const MonacoPrDiffEditor = forwardRef<
     return keys;
   }, [commentedLineKeys, resolvedLines]);
 
-  const [prevResolvedLineKeys, setPrevResolvedLineKeys] =
-    useState(resolvedLineKeys);
   if (resolvedLineKeys !== prevResolvedLineKeys) {
     setPrevResolvedLineKeys(resolvedLineKeys);
     const newKeys: string[] = [];

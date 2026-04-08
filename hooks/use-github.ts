@@ -589,6 +589,42 @@ export function useGitHubReplyToComment(
   });
 }
 
+interface EditCommentInput {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  commentId: number;
+  body: string;
+}
+
+export function useGitHubEditComment(
+  owner: string | null,
+  repo: string | null,
+  prNumber: number | null,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: EditCommentInput) =>
+      githubFetch<GitHubReviewComment>(
+        `repos/${input.owner}/${input.repo}/pulls/comments/${input.commentId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: input.body }),
+        },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["github", "pr-comments", owner, repo, prNumber],
+      });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
+}
+
 interface DeleteCommentInput {
   owner: string;
   repo: string;

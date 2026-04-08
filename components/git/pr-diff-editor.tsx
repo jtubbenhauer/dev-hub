@@ -37,8 +37,10 @@ interface PrDiffEditorProps {
     side: "LEFT" | "RIGHT",
   ) => Promise<void>;
   onReplyToComment: (body: string, inReplyToId: number) => Promise<void>;
+  onEditComment: (commentId: number, body: string) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
   onDeleteDraft: (draftId: string) => void;
+  onEditDraft: (draftId: string, body: string) => void;
   onResolveThread: (line: number, resolved: boolean) => void;
   currentUserLogin: string | null;
   onOpenFileList?: () => void;

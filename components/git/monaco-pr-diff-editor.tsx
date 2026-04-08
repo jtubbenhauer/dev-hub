@@ -21,6 +21,7 @@ import {
   ChevronUp,
   ChevronDown,
   Trash2,
+  Pencil,
   Check,
   CheckCircle2,
   CircleDot,
@@ -178,8 +179,10 @@ interface CommentThreadProps {
     isInDiffHunk: boolean,
     side: DiffCommentSide,
   ) => Promise<void>;
+  onEditComment: (commentId: number, body: string) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
   onDeleteDraft: (draftId: string) => void;
+  onEditDraft: (draftId: string, body: string) => void;
   onResolveThread: (line: number, resolved: boolean) => void;
   currentUserLogin: string | null;
   onClose: () => void;
@@ -198,8 +201,10 @@ function CommentThread({
   onToggleCollapse,
   onReply,
   onAddComment,
+  onEditComment,
   onDeleteComment,
   onDeleteDraft,
+  onEditDraft,
   onResolveThread,
   currentUserLogin,
   onClose,
@@ -210,6 +215,8 @@ function CommentThread({
 }: CommentThreadProps) {
   const [replyBody, setReplyBody] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState("");
   const replyTargetId = useMemo(() => {
     for (let i = comments.length - 1; i >= 0; i--) {
       const comment = comments[i];
@@ -303,41 +310,97 @@ function CommentThread({
                 </span>
                 {(isDraftDisplayComment(comment) ||
                   currentUserLogin === comment.user.login) && (
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    className="text-muted-foreground hover:text-destructive -mr-1 shrink-0"
-                    disabled={
-                      isDraftDisplayComment(comment)
-                        ? false
-                        : deletingId === comment.id
-                    }
-                    onClick={async () => {
-                      if (isDraftDisplayComment(comment)) {
-                        onDeleteDraft(comment.draftId);
-                        return;
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="text-muted-foreground hover:text-foreground -mr-0.5 shrink-0"
+                      onClick={() => {
+                        const key = isDraftDisplayComment(comment)
+                          ? comment.draftId
+                          : String(comment.id);
+                        setEditingKey(key);
+                        setEditBody(comment.body);
+                      }}
+                    >
+                      <Pencil className="size-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="text-muted-foreground hover:text-destructive -mr-1 shrink-0"
+                      disabled={
+                        isDraftDisplayComment(comment)
+                          ? false
+                          : deletingId === comment.id
                       }
-                      setDeletingId(comment.id);
-                      try {
-                        await onDeleteComment(comment.id);
-                      } finally {
-                        setDeletingId(null);
-                      }
-                    }}
-                  >
-                    {!isDraftDisplayComment(comment) &&
-                    deletingId === comment.id ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <Trash2 className="size-3" />
-                    )}
-                  </Button>
+                      onClick={async () => {
+                        if (isDraftDisplayComment(comment)) {
+                          onDeleteDraft(comment.draftId);
+                          return;
+                        }
+                        setDeletingId(comment.id);
+                        try {
+                          await onDeleteComment(comment.id);
+                        } finally {
+                          setDeletingId(null);
+                        }
+                      }}
+                    >
+                      {!isDraftDisplayComment(comment) &&
+                      deletingId === comment.id ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="size-3" />
+                      )}
+                    </Button>
+                  </>
                 )}
               </div>
-              <GitHubMarkdown
-                content={comment.body}
-                className="text-foreground/80"
-              />
+              {editingKey ===
+              (isDraftDisplayComment(comment)
+                ? comment.draftId
+                : String(comment.id)) ? (
+                <div>
+                  <textarea
+                    value={editBody}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                      setEditBody(e.target.value)
+                    }
+                    className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[60px] w-full resize-none rounded-md border px-3 py-2 text-xs focus-visible:ring-1 focus-visible:outline-none"
+                  />
+                  <div className="mt-1.5 flex justify-end gap-1.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setEditingKey(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      disabled={!editBody.trim()}
+                      onClick={async () => {
+                        if (isDraftDisplayComment(comment)) {
+                          onEditDraft(comment.draftId, editBody.trim());
+                        } else {
+                          await onEditComment(comment.id, editBody.trim());
+                        }
+                        setEditingKey(null);
+                      }}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <GitHubMarkdown
+                  content={comment.body}
+                  className="text-foreground/80"
+                />
+              )}
             </div>
           ))}
           <div className="px-3 py-2">
@@ -434,8 +497,10 @@ interface PrDiffEditorProps {
     side: DiffCommentSide,
   ) => Promise<void>;
   onReplyToComment: (body: string, inReplyToId: number) => Promise<void>;
+  onEditComment: (commentId: number, body: string) => Promise<void>;
   onDeleteComment: (commentId: number) => Promise<void>;
   onDeleteDraft: (draftId: string) => void;
+  onEditDraft: (draftId: string, body: string) => void;
   onResolveThread: (line: number, resolved: boolean) => void;
   currentUserLogin: string | null;
   onOpenFileList?: () => void;
@@ -454,8 +519,10 @@ export const MonacoPrDiffEditor = forwardRef<
     isSubmittingComment,
     onAddComment,
     onReplyToComment,
+    onEditComment,
     onDeleteComment,
     onDeleteDraft,
+    onEditDraft,
     onResolveThread,
     outdatedLines,
     currentUserLogin,
@@ -1069,8 +1136,10 @@ export const MonacoPrDiffEditor = forwardRef<
           }}
           onReply={onReplyToComment}
           onAddComment={onAddComment}
+          onEditComment={onEditComment}
           onDeleteComment={onDeleteComment}
           onDeleteDraft={onDeleteDraft}
+          onEditDraft={onEditDraft}
           onResolveThread={onResolveThread}
           currentUserLogin={currentUserLogin}
           onClose={() => {

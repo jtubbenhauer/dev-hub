@@ -63,6 +63,7 @@ import {
   useGitHubPrFileContent,
   useGitHubAddComment,
   useGitHubReplyToComment,
+  useGitHubEditComment,
   useGitHubDeleteComment,
   useGitHubSubmitReview,
   useGitHubToggleThreadResolved,
@@ -232,6 +233,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
 
   const addCommentMutation = useGitHubAddComment(owner, repo, prNumber);
   const replyToCommentMutation = useGitHubReplyToComment(owner, repo, prNumber);
+  const editCommentMutation = useGitHubEditComment(owner, repo, prNumber);
   const deleteCommentMutation = useGitHubDeleteComment(owner, repo, prNumber);
   const toggleThreadResolvedMutation = useGitHubToggleThreadResolved(
     owner,
@@ -248,6 +250,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
   );
   const addDraft = useReviewDraftStore((state) => state.addDraft);
   const removeDraft = useReviewDraftStore((state) => state.removeDraft);
+  const updateDraft = useReviewDraftStore((state) => state.updateDraft);
 
   const isMyPr = activeTab === "my-prs";
 
@@ -429,6 +432,20 @@ export function PrPanel({ onClose }: PrPanelProps) {
     ],
   );
 
+  const handleEditComment = useCallback(
+    async (commentId: number, body: string) => {
+      if (!owner || !repo || !prNumber) return;
+      await editCommentMutation.mutateAsync({
+        owner,
+        repo,
+        prNumber,
+        commentId,
+        body,
+      });
+    },
+    [owner, repo, prNumber, editCommentMutation],
+  );
+
   const handleDeleteComment = useCallback(
     async (commentId: number) => {
       if (!owner || !repo) return;
@@ -455,6 +472,14 @@ export function PrPanel({ onClose }: PrPanelProps) {
       });
     },
     [owner, repo, prNumber, prKey, submitReviewMutation, headSha],
+  );
+
+  const handleEditDraft = useCallback(
+    (draftId: string, body: string) => {
+      if (!prKey) return;
+      updateDraft(prKey, draftId, body);
+    },
+    [prKey, updateDraft],
   );
 
   const handleDeleteDraft = useCallback(
@@ -700,8 +725,10 @@ export function PrPanel({ onClose }: PrPanelProps) {
               isSubmittingComment={isSubmittingComment}
               onAddComment={handleAddComment}
               onReplyToComment={handleReplyToComment}
+              onEditComment={handleEditComment}
               onDeleteComment={handleDeleteComment}
               onDeleteDraft={handleDeleteDraft}
+              onEditDraft={handleEditDraft}
               onResolveThread={handleResolveThread}
               currentUserLogin={currentUser?.login ?? null}
               onOpenFileList={

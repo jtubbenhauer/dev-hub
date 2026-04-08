@@ -41,6 +41,7 @@
     "cmdk": "^1.1.1",
     "drizzle-orm": "^0.45.1",
     "fzf": "^0.5.2",
+    "gemoji": "^8.1.0",
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.575.0",
     "monaco-editor": "^0.55.1",

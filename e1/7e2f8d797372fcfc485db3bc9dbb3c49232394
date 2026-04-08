@@ -1,0 +1,23 @@
+components/git/pr-panel.tsx
+  3d4a8be3e5961acb 546-554
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "e17e2f8d797372fcfc485db3bc9dbb3c49232394",
+  "prompts": {
+    "3d4a8be3e5961acb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_2d6dbce22ffe58NeXiHllv0dnE-66a47d63-b8dd-49a5-806f-1d7bb6e011a3",
+        "model": "unknown"
+      },
+      "human_author": null,
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}

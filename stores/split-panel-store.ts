@@ -27,7 +27,7 @@ interface SplitPanelState {
 
 export const useSplitPanelStore = create<SplitPanelState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       isOpen: false,
       activeTab: "files",
       currentFilePath: null,

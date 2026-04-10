@@ -90,7 +90,7 @@ function flattenTree(entries: FileTreeEntry[]): string[] {
 
 export function SplitPanelFiles({
   workspaceId,
-  workspacePath,
+  workspacePath: _workspacePath,
 }: SplitPanelFilesProps) {
   const currentFilePath = useSplitPanelStore((s) => s.currentFilePath);
   const currentFileContent = useSplitPanelStore((s) => s.currentFileContent);

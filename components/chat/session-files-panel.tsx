@@ -14,6 +14,9 @@ import {
   type SessionFile,
 } from "@/lib/chat/extract-session-files";
 import type { MessageWithParts } from "@/lib/opencode/types";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useSplitPanelStore } from "@/stores/split-panel-store";
 
 function stripWorkspacePrefix(filePath: string, workspacePath: string): string {
   if (!workspacePath) return filePath;
@@ -32,11 +35,38 @@ const FileRow = memo(function FileRow({
   workspacePath: string;
 }) {
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const relativePath = stripWorkspacePrefix(file.path, workspacePath);
 
-  const handleClick = useCallback(() => {
-    router.push(`/files?open=${encodeURIComponent(relativePath)}`);
-  }, [router, relativePath]);
+  const handleClick = useCallback(async () => {
+    if (isMobile) {
+      router.push(`/files?open=${encodeURIComponent(relativePath)}`);
+      return;
+    }
+    const { setIsLoading, clearError, openFile } =
+      useSplitPanelStore.getState();
+    setIsLoading(true);
+    clearError();
+    try {
+      const res = await fetch(
+        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(relativePath)}`,
+      );
+      if (!res.ok) {
+        router.push(`/files?open=${encodeURIComponent(relativePath)}`);
+        return;
+      }
+      const data = (await res.json()) as {
+        content: string;
+        language?: string;
+      };
+      openFile(relativePath, data.content, data.language ?? "plaintext");
+    } catch {
+      router.push(`/files?open=${encodeURIComponent(relativePath)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router, relativePath, isMobile, activeWorkspaceId]);
 
   const handleOpenGitDiff = useCallback(
     (e: React.MouseEvent) => {

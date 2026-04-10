@@ -490,6 +490,27 @@ export function ChatInterface() {
     setIsEditingSessionNote(false);
   }, [activeSessionId]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
+        e.preventDefault();
+        useSplitPanelStore.getState().togglePanel();
+        if (useSplitPanelStore.getState().isOpen) {
+          setIsTaskPanelOpen(false);
+          localStorage.setItem("dev-hub:chat-task-panel", "false");
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile && isSplitPanelOpen) {
+      useSplitPanelStore.getState().closePanel();
+    }
+  }, [isMobile, isSplitPanelOpen]);
+
   const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
     setShowJumpToBottom(!atBottom);
   }, []);
@@ -701,6 +722,7 @@ export function ChatInterface() {
     {
       isPlanPanelOpen,
       isTaskPanelOpen,
+      isSplitPanelOpen,
       showThinking,
       showToolCalls,
       showTokens,
@@ -1360,6 +1382,7 @@ export function ChatInterface() {
           handleDragStart={handleSplitPanelDragStart}
           workspaceId={activeWorkspaceId ?? ""}
           workspacePath={activeWorkspacePath}
+          onEscape={() => promptInputRef.current?.focus()}
         />
       ) : isTaskPanelOpen ? (
         <>

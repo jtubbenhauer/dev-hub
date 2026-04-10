@@ -12,6 +12,7 @@ interface SplitPanelProps {
   handleDragStart: (e: React.MouseEvent) => void;
   workspaceId: string;
   workspacePath: string;
+  onEscape?: () => void;
 }
 
 export function SplitPanel({
@@ -19,6 +20,7 @@ export function SplitPanel({
   handleDragStart,
   workspaceId,
   workspacePath,
+  onEscape,
 }: SplitPanelProps) {
   return (
     <>
@@ -33,6 +35,9 @@ export function SplitPanel({
         data-testid="split-panel"
         className="relative hidden shrink-0 overflow-y-auto border-l md:block"
         style={{ width }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onEscape?.();
+        }}
       >
         <div className="flex h-10 items-center justify-between border-b px-3">
           <span className="text-muted-foreground text-xs font-medium">

@@ -107,6 +107,7 @@ export function SplitPanelFiles({
   const clearError = useSplitPanelStore((s) => s.clearError);
   const toggleFilePicker = useSplitPanelStore((s) => s.toggleFilePicker);
   const setIsLoading = useSplitPanelStore((s) => s.setIsLoading);
+  const clearFile = useSplitPanelStore((s) => s.clearFile);
 
   const activeSessionId = useChatStore((s) => s.activeSessionId);
 
@@ -114,6 +115,10 @@ export function SplitPanelFiles({
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    clearFile();
+  }, [workspaceId, clearFile]);
 
   const { data: treeData } = useQuery<FileTreeEntry[]>({
     queryKey: ["file-tree", workspaceId],

@@ -8,12 +8,14 @@ import {
   Clock,
   Coins,
   ListTodo,
+  PanelRight,
   Plus,
   ScrollText,
   Wrench,
 } from "lucide-react";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useMemo, useState } from "react";
+import { useSplitPanelStore } from "@/stores/split-panel-store";
 
 interface ChatCommandRefs {
   handleCreateSession: RefObject<() => void>;
@@ -28,6 +30,7 @@ interface ChatCommandRefs {
 interface ChatCommandLabels {
   isPlanPanelOpen: boolean;
   isTaskPanelOpen: boolean;
+  isSplitPanelOpen: boolean;
   showThinking: boolean;
   showToolCalls: boolean;
   showTokens: boolean;
@@ -117,6 +120,22 @@ export function useChatCommands(
           }),
       },
       {
+        id: "chat:toggle-split-panel",
+        label: labels.isSplitPanelOpen ? "Hide Split View" : "Show Split View",
+        group: "Chat",
+        icon: PanelRight,
+        onSelect: () => {
+          useSplitPanelStore.getState().togglePanel();
+          if (useSplitPanelStore.getState().isOpen) {
+            refs.setIsTaskPanelOpen.current((prev) => {
+              if (prev)
+                localStorage.setItem("dev-hub:chat-task-panel", "false");
+              return false;
+            });
+          }
+        },
+      },
+      {
         id: "chat:toggle-thinking",
         label: labels.showThinking ? "Hide Thinking" : "Show Thinking",
         group: "Chat",
@@ -156,6 +175,7 @@ export function useChatCommands(
       labels.showTimestamps,
       labels.isPlanPanelOpen,
       labels.isTaskPanelOpen,
+      labels.isSplitPanelOpen,
       refs.setIsPlanPanelOpen,
       refs.handleCreateSession,
       refs.setIsTaskPanelOpen,

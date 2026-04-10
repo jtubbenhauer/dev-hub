@@ -366,10 +366,24 @@ export function FileTree({
     if (el) el.scrollIntoView({ block: "nearest" });
   }, [selectedPath, isSearching]);
 
+  // Stable refs for keyboard handler — avoids re-registering on every j/k navigation
+  const flatVisibleRef = useRef(flatVisible);
+  const selectedPathRef = useRef(selectedPath);
+  const isSearchingRef = useRef(isSearching);
+  const onToggleExpandRef = useRef(onToggleExpand);
+  const onFileClickRef = useRef(onFileClick);
+  useEffect(() => {
+    flatVisibleRef.current = flatVisible;
+    selectedPathRef.current = selectedPath;
+    isSearchingRef.current = isSearching;
+    onToggleExpandRef.current = onToggleExpand;
+    onFileClickRef.current = onFileClick;
+  });
+
   // Keyboard navigation for tree entries (j/k/Enter)
   useEffect(() => {
     function handleTreeKeyboard(e: KeyboardEvent) {
-      if (isSearching) return;
+      if (isSearchingRef.current) return;
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
@@ -378,10 +392,11 @@ export function FileTree({
         return;
       }
 
+      const flatVisible = flatVisibleRef.current;
       if (flatVisible.length === 0) return;
 
       const currentIdx = flatVisible.findIndex(
-        (entry) => entry.path === selectedPath,
+        (entry) => entry.path === selectedPathRef.current,
       );
 
       switch (e.key) {
@@ -405,9 +420,9 @@ export function FileTree({
           e.preventDefault();
           const entry = flatVisible[currentIdx];
           if (entry.type === "directory") {
-            onToggleExpand(entry.path);
+            onToggleExpandRef.current(entry.path);
           } else {
-            onFileClick(entry);
+            onFileClickRef.current(entry);
           }
           break;
         }
@@ -416,7 +431,7 @@ export function FileTree({
 
     window.addEventListener("keydown", handleTreeKeyboard);
     return () => window.removeEventListener("keydown", handleTreeKeyboard);
-  }, [flatVisible, selectedPath, isSearching, onToggleExpand, onFileClick]);
+  }, []);
 
   const searchResults = useMemo(() => {
     if (!isSearching || !allFiles) return [];

@@ -425,7 +425,7 @@ describe("expandPathToFile", () => {
 describe("persistence partialize", () => {
   beforeEach(resetStore);
 
-  it("only persists isOpen, openFilePaths, activeFilePath, isFilePickerOpen, and expandedPaths", () => {
+  it("only persists isOpen, isFilePickerOpen, and expandedPaths", () => {
     useSplitPanelStore
       .getState()
       .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
@@ -434,15 +434,11 @@ describe("persistence partialize", () => {
     const persisted = partialize(useSplitPanelStore.getState());
 
     expect(persisted).toHaveProperty("isOpen");
-    expect(persisted).toHaveProperty("openFilePaths");
-    expect(persisted).toHaveProperty("activeFilePath");
     expect(persisted).toHaveProperty("isFilePickerOpen");
     expect(persisted).toHaveProperty("expandedPaths");
 
-    expect((persisted as { openFilePaths: string[] }).openFilePaths).toEqual([
-      "src/utils.ts",
-    ]);
-
+    expect(persisted).not.toHaveProperty("openFilePaths");
+    expect(persisted).not.toHaveProperty("activeFilePath");
     expect(persisted).not.toHaveProperty("openFiles");
     expect(persisted).not.toHaveProperty("isLoading");
     expect(persisted).not.toHaveProperty("error");

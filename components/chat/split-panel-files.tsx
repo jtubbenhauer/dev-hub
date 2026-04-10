@@ -15,16 +15,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { CommentsSidebar } from "@/components/editor/comments-sidebar";
 import { FileTree } from "@/components/editor/file-tree";
 import { SplitPanelFileTabs } from "@/components/chat/split-panel-file-tabs";
@@ -49,7 +39,6 @@ const MonacoEditor = dynamic(
 
 interface SplitPanelFilesProps {
   workspaceId: string;
-  workspacePath: string;
 }
 
 const BINARY_EXTENSIONS = [
@@ -73,10 +62,7 @@ const BINARY_EXTENSIONS = [
   ".eot",
 ];
 
-export function SplitPanelFiles({
-  workspaceId,
-  workspacePath: _workspacePath,
-}: SplitPanelFilesProps) {
+export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
   const openFiles = useSplitPanelStore((s) => s.openFiles);
   const activeFilePath = useSplitPanelStore((s) => s.activeFilePath);
   const isFilePickerOpen = useSplitPanelStore((s) => s.isFilePickerOpen);
@@ -107,7 +93,6 @@ export function SplitPanelFiles({
   const currentFileLanguage = activeFile?.language ?? null;
   const isDirty = activeFile?.isDirty ?? false;
 
-  const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -132,7 +117,9 @@ export function SplitPanelFiles({
   });
 
   const explorerHeightRef = useRef(explorerHeight);
-  explorerHeightRef.current = explorerHeight;
+  useEffect(() => {
+    explorerHeightRef.current = explorerHeight;
+  });
 
   const explorerDragRef = useRef({
     isDragging: false,
@@ -252,13 +239,9 @@ export function SplitPanelFiles({
         useSplitPanelStore.getState().setActiveTab(path);
         return;
       }
-      if (isDirty) {
-        setPendingFilePath(path);
-        return;
-      }
       loadFile(path);
     },
-    [openFiles, isDirty, loadFile],
+    [openFiles, loadFile],
   );
 
   const handleTreeFileClick = useCallback(
@@ -313,27 +296,6 @@ export function SplitPanelFiles({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentFilePath, isDirty, saveFileMutation]);
 
-  const handleDirtyDialogSave = useCallback(() => {
-    const pending = pendingFilePath;
-    saveFileMutation.mutate(undefined, {
-      onSuccess: () => {
-        if (pending) loadFile(pending);
-        setPendingFilePath(null);
-      },
-    });
-  }, [pendingFilePath, saveFileMutation, loadFile]);
-
-  const handleDirtyDialogDiscard = useCallback(() => {
-    markSaved();
-    const pending = pendingFilePath;
-    setPendingFilePath(null);
-    if (pending) loadFile(pending);
-  }, [pendingFilePath, markSaved, loadFile]);
-
-  const handleDirtyDialogCancel = useCallback(() => {
-    setPendingFilePath(null);
-  }, []);
-
   const handleAttachToChat = useCallback(
     (comment: FileComment) => {
       attachCommentToChat({
@@ -373,8 +335,6 @@ export function SplitPanelFiles({
   const handleCloseComments = useCallback(() => {
     setIsCommentsOpen(false);
   }, []);
-
-  const filename = currentFilePath?.split("/").pop() ?? "";
 
   return (
     <div className="flex h-[calc(100%-2.5rem)] flex-col">
@@ -562,33 +522,6 @@ export function SplitPanelFiles({
             </button>
           </div>
         )}
-
-      <AlertDialog
-        open={pendingFilePath !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingFilePath(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved changes to {filename}. What would you like to do?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDirtyDialogCancel}>
-              Cancel
-            </AlertDialogCancel>
-            <Button variant="outline" onClick={handleDirtyDialogDiscard}>
-              Discard
-            </Button>
-            <AlertDialogAction onClick={handleDirtyDialogSave}>
-              Save
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

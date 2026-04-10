@@ -11,7 +11,6 @@ interface SplitPanelProps {
   width: number;
   handleDragStart: (e: React.MouseEvent) => void;
   workspaceId: string;
-  workspacePath: string;
   onEscape?: () => void;
 }
 
@@ -19,7 +18,6 @@ export function SplitPanel({
   width,
   handleDragStart,
   workspaceId,
-  workspacePath,
   onEscape,
 }: SplitPanelProps) {
   return (
@@ -53,10 +51,7 @@ export function SplitPanel({
           </Button>
         </div>
 
-        <SplitPanelFiles
-          workspaceId={workspaceId}
-          workspacePath={workspacePath}
-        />
+        <SplitPanelFiles workspaceId={workspaceId} />
       </div>
     </>
   );

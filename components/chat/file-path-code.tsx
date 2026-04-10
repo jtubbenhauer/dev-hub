@@ -6,7 +6,7 @@ import { FileCode2, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { useSplitPanelStore } from "@/stores/split-panel-store";
+import { openFileInSplitPanel } from "@/lib/split-panel-open-file";
 
 const FILE_EXTENSIONS = new Set([
   ".ts",
@@ -171,28 +171,9 @@ export function FilePathCode({ children, text }: FilePathCodeProps) {
         router.push(href);
         return;
       }
-      const { setIsLoading, clearError, openFile } =
-        useSplitPanelStore.getState();
-      setIsLoading(true);
-      clearError();
-      try {
-        const res = await fetch(
-          `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(cleanPath)}`,
-        );
-        if (!res.ok) {
-          router.push(href);
-          return;
-        }
-        const data = (await res.json()) as {
-          content: string;
-          language?: string;
-        };
-        openFile(cleanPath, data.content, data.language ?? "plaintext");
-      } catch {
-        router.push(href);
-      } finally {
-        setIsLoading(false);
-      }
+      await openFileInSplitPanel(activeWorkspaceId ?? "", cleanPath, () =>
+        router.push(href),
+      );
     },
     [router, href, isMobile, isFolder, cleanPath, activeWorkspaceId],
   );

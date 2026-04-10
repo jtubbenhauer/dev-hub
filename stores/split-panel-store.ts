@@ -170,8 +170,6 @@ export const useSplitPanelStore = create<SplitPanelState>()(
       name: "dev-hub:split-panel",
       partialize: (state) => ({
         isOpen: state.isOpen,
-        openFilePaths: state.openFiles.map((f) => f.path),
-        activeFilePath: state.activeFilePath,
         isFilePickerOpen: state.isFilePickerOpen,
         expandedPaths: state.expandedPaths,
       }),

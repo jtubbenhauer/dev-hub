@@ -16,7 +16,7 @@ import {
 import type { MessageWithParts } from "@/lib/opencode/types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { useSplitPanelStore } from "@/stores/split-panel-store";
+import { openFileInSplitPanel } from "@/lib/split-panel-open-file";
 
 function stripWorkspacePrefix(filePath: string, workspacePath: string): string {
   if (!workspacePath) return filePath;
@@ -44,28 +44,9 @@ const FileRow = memo(function FileRow({
       router.push(`/files?open=${encodeURIComponent(relativePath)}`);
       return;
     }
-    const { setIsLoading, clearError, openFile } =
-      useSplitPanelStore.getState();
-    setIsLoading(true);
-    clearError();
-    try {
-      const res = await fetch(
-        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(relativePath)}`,
-      );
-      if (!res.ok) {
-        router.push(`/files?open=${encodeURIComponent(relativePath)}`);
-        return;
-      }
-      const data = (await res.json()) as {
-        content: string;
-        language?: string;
-      };
-      openFile(relativePath, data.content, data.language ?? "plaintext");
-    } catch {
-      router.push(`/files?open=${encodeURIComponent(relativePath)}`);
-    } finally {
-      setIsLoading(false);
-    }
+    await openFileInSplitPanel(activeWorkspaceId ?? "", relativePath, () =>
+      router.push(`/files?open=${encodeURIComponent(relativePath)}`),
+    );
   }, [router, relativePath, isMobile, activeWorkspaceId]);
 
   const handleOpenGitDiff = useCallback(

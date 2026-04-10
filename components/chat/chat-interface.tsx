@@ -1340,7 +1340,7 @@ export function ChatInterface() {
             workspaceId={activeWorkspaceId}
             sessionId={activeSessionId}
             commands={commands}
-            agents={primaryAgents}
+            agents={orderedAgents}
             selectedAgent={selectedAgent}
             onAgentChange={(agent) => {
               setSelectedAgent(agent);
@@ -1381,7 +1381,6 @@ export function ChatInterface() {
           width={splitPanelWidth}
           handleDragStart={handleSplitPanelDragStart}
           workspaceId={activeWorkspaceId ?? ""}
-          workspacePath={activeWorkspacePath}
           onEscape={() => promptInputRef.current?.focus()}
         />
       ) : isTaskPanelOpen ? (

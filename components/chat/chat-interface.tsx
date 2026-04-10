@@ -27,6 +27,8 @@ import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
+import { SplitPanel } from "@/components/chat/split-panel";
+import { useSplitPanelStore } from "@/stores/split-panel-store";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -131,6 +133,15 @@ export function ChatInterface() {
       storageKey: "dev-hub:chat-task-panel-width",
       reverse: true,
     });
+  const { width: splitPanelWidth, handleDragStart: handleSplitPanelDragStart } =
+    useResizablePanel({
+      minWidth: 400,
+      maxWidth: 900,
+      defaultWidth: 500,
+      storageKey: "dev-hub:split-panel-width",
+      reverse: true,
+    });
+  const isSplitPanelOpen = useSplitPanelStore((s) => s.isOpen);
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false);
   const [, setHasPlanFiles] = useState(false);
   const [isMobileRightPanelOpen, setIsMobileRightPanelOpen] = useState(false);
@@ -969,6 +980,24 @@ export function ChatInterface() {
               <ScrollText className="size-4" />
             </Button>
 
+            <div className="hidden md:flex">
+              <Button
+                size="icon-sm"
+                variant={isSplitPanelOpen ? "secondary" : "outline"}
+                data-testid="split-panel-toggle"
+                onClick={() => {
+                  useSplitPanelStore.getState().togglePanel();
+                  if (!isSplitPanelOpen) {
+                    setIsTaskPanelOpen(false);
+                    localStorage.setItem("dev-hub:chat-task-panel", "false");
+                  }
+                }}
+                title="Split panel"
+              >
+                <PanelRight className="size-4" />
+              </Button>
+            </div>
+
             <Button
               size="icon-sm"
               variant="outline"
@@ -1325,7 +1354,14 @@ export function ChatInterface() {
         </div>
       </ChatDisplayContext.Provider>
 
-      {isTaskPanelOpen && (
+      {isSplitPanelOpen ? (
+        <SplitPanel
+          width={splitPanelWidth}
+          handleDragStart={handleSplitPanelDragStart}
+          workspaceId={activeWorkspaceId ?? ""}
+          workspacePath={activeWorkspacePath}
+        />
+      ) : isTaskPanelOpen ? (
         <>
           <div
             className="hover:bg-accent/50 active:bg-accent hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors md:flex"
@@ -1395,7 +1431,7 @@ export function ChatInterface() {
             </div>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

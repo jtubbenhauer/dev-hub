@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CommentsSidebar } from "@/components/editor/comments-sidebar";
 import { FileTree } from "@/components/editor/file-tree";
+import { SplitPanelFileTabs } from "@/components/chat/split-panel-file-tabs";
 import { useSplitPanelStore } from "@/stores/split-panel-store";
 import { useChatStore } from "@/stores/chat-store";
 import {
@@ -76,15 +77,13 @@ export function SplitPanelFiles({
   workspaceId,
   workspacePath: _workspacePath,
 }: SplitPanelFilesProps) {
-  const currentFilePath = useSplitPanelStore((s) => s.currentFilePath);
-  const currentFileContent = useSplitPanelStore((s) => s.currentFileContent);
-  const currentFileLanguage = useSplitPanelStore((s) => s.currentFileLanguage);
-  const isDirty = useSplitPanelStore((s) => s.isDirty);
+  const openFiles = useSplitPanelStore((s) => s.openFiles);
+  const activeFilePath = useSplitPanelStore((s) => s.activeFilePath);
   const isFilePickerOpen = useSplitPanelStore((s) => s.isFilePickerOpen);
   const isLoading = useSplitPanelStore((s) => s.isLoading);
   const error = useSplitPanelStore((s) => s.error);
 
-  const openFile = useSplitPanelStore((s) => s.openFile);
+  const openFileInTab = useSplitPanelStore((s) => s.openFileInTab);
   const setContent = useSplitPanelStore((s) => s.setContent);
   const markSaved = useSplitPanelStore((s) => s.markSaved);
   const setError = useSplitPanelStore((s) => s.setError);
@@ -98,6 +97,15 @@ export function SplitPanelFiles({
   const expandedPaths = useSplitPanelStore((s) => s.expandedPaths);
   const toggleExpandedPath = useSplitPanelStore((s) => s.toggleExpandedPath);
   const expandPathToFile = useSplitPanelStore((s) => s.expandPathToFile);
+
+  const activeFile = useMemo(
+    () => openFiles.find((f) => f.path === activeFilePath) ?? null,
+    [openFiles, activeFilePath],
+  );
+  const currentFilePath = activeFile?.path ?? null;
+  const currentFileContent = activeFile?.content ?? null;
+  const currentFileLanguage = activeFile?.language ?? null;
+  const isDirty = activeFile?.isDirty ?? false;
 
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
@@ -152,7 +160,7 @@ export function SplitPanelFiles({
           return;
         }
 
-        openFile(path, content, data.language ?? "plaintext");
+        openFileInTab(path, content, data.language ?? "plaintext");
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
         setError("Failed to load file");
@@ -162,18 +170,23 @@ export function SplitPanelFiles({
         }
       }
     },
-    [workspaceId, setIsLoading, clearError, setError, openFile],
+    [workspaceId, setIsLoading, clearError, setError, openFileInTab],
   );
 
   const handleFileClick = useCallback(
     (path: string) => {
+      const existingTab = openFiles.find((f) => f.path === path);
+      if (existingTab) {
+        useSplitPanelStore.getState().setActiveTab(path);
+        return;
+      }
       if (isDirty) {
         setPendingFilePath(path);
         return;
       }
       loadFile(path);
     },
-    [isDirty, loadFile],
+    [openFiles, isDirty, loadFile],
   );
 
   const handleTreeFileClick = useCallback(
@@ -340,6 +353,8 @@ export function SplitPanelFiles({
           </button>
         </div>
       )}
+
+      <SplitPanelFileTabs />
 
       {currentFilePath && !error && (
         <div className="flex items-center gap-2 border-b px-3 py-1.5">

@@ -1,20 +1,24 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import type { OpenFile } from "@/types";
+
 interface SplitPanelState {
   isOpen: boolean;
   activeTab: "files";
-  currentFilePath: string | null;
-  currentFileContent: string | null;
-  currentFileLanguage: string | null;
-  originalContent: string | null;
-  isDirty: boolean;
+  openFiles: OpenFile[];
+  activeFilePath: string | null;
   isFilePickerOpen: boolean;
   isLoading: boolean;
   error: string | null;
   expandedPaths: string[];
 
+  openFileInTab: (path: string, content: string, language: string) => void;
   openFile: (path: string, content: string, language: string) => void;
+  closeTab: (path: string) => void;
+  setActiveTab: (path: string) => void;
+  updateFileContent: (path: string, content: string) => void;
+  markFileSaved: (path: string) => void;
   closePanel: () => void;
   togglePanel: () => void;
   setContent: (content: string) => void;
@@ -30,53 +34,103 @@ interface SplitPanelState {
 
 export const useSplitPanelStore = create<SplitPanelState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       isOpen: false,
       activeTab: "files",
-      currentFilePath: null,
-      currentFileContent: null,
-      currentFileLanguage: null,
-      originalContent: null,
-      isDirty: false,
+      openFiles: [],
+      activeFilePath: null,
       isFilePickerOpen: false,
       isLoading: false,
       error: null,
       expandedPaths: [],
 
-      openFile: (path, content, language) =>
+      openFileInTab: (path, content, language) => {
+        const { openFiles } = get();
+        const existing = openFiles.find((f) => f.path === path);
+        if (existing) {
+          set({ isOpen: true, activeFilePath: path, error: null });
+          return;
+        }
+        const name = path.split("/").pop() ?? path;
+        const newFile: OpenFile = {
+          path,
+          name,
+          content,
+          language,
+          isDirty: false,
+          originalContent: content,
+        };
         set({
           isOpen: true,
-          currentFilePath: path,
-          currentFileContent: content,
-          currentFileLanguage: language,
-          originalContent: content,
-          isDirty: false,
+          openFiles: [...openFiles, newFile],
+          activeFilePath: path,
           error: null,
-        }),
+        });
+      },
+
+      openFile: (path, content, language) => {
+        get().openFileInTab(path, content, language);
+      },
+
+      closeTab: (path) => {
+        const { openFiles, activeFilePath } = get();
+        const index = openFiles.findIndex((f) => f.path === path);
+        const nextFiles = openFiles.filter((f) => f.path !== path);
+        let nextActive = activeFilePath;
+        if (activeFilePath === path) {
+          if (nextFiles.length === 0) {
+            nextActive = null;
+          } else if (index >= nextFiles.length) {
+            nextActive = nextFiles[nextFiles.length - 1].path;
+          } else {
+            nextActive = nextFiles[index].path;
+          }
+        }
+        set({ openFiles: nextFiles, activeFilePath: nextActive });
+      },
+
+      setActiveTab: (path) => set({ activeFilePath: path }),
+
+      updateFileContent: (path, content) =>
+        set((state) => ({
+          openFiles: state.openFiles.map((f) =>
+            f.path === path
+              ? { ...f, content, isDirty: content !== f.originalContent }
+              : f,
+          ),
+        })),
+
+      markFileSaved: (path) =>
+        set((state) => ({
+          openFiles: state.openFiles.map((f) =>
+            f.path === path
+              ? { ...f, originalContent: f.content, isDirty: false }
+              : f,
+          ),
+        })),
 
       closePanel: () => set({ isOpen: false }),
 
       togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
 
-      setContent: (content) =>
-        set((state) => ({
-          currentFileContent: content,
-          isDirty: content !== state.originalContent,
-        })),
+      setContent: (content) => {
+        const { activeFilePath } = get();
+        if (activeFilePath) {
+          get().updateFileContent(activeFilePath, content);
+        }
+      },
 
-      markSaved: () =>
-        set((state) => ({
-          originalContent: state.currentFileContent,
-          isDirty: false,
-        })),
+      markSaved: () => {
+        const { activeFilePath } = get();
+        if (activeFilePath) {
+          get().markFileSaved(activeFilePath);
+        }
+      },
 
       clearFile: () =>
         set({
-          currentFilePath: null,
-          currentFileContent: null,
-          currentFileLanguage: null,
-          originalContent: null,
-          isDirty: false,
+          openFiles: [],
+          activeFilePath: null,
           error: null,
         }),
 
@@ -116,7 +170,8 @@ export const useSplitPanelStore = create<SplitPanelState>()(
       name: "dev-hub:split-panel",
       partialize: (state) => ({
         isOpen: state.isOpen,
-        currentFilePath: state.currentFilePath,
+        openFilePaths: state.openFiles.map((f) => f.path),
+        activeFilePath: state.activeFilePath,
         isFilePickerOpen: state.isFilePickerOpen,
         expandedPaths: state.expandedPaths,
       }),

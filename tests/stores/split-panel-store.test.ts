@@ -4,19 +4,28 @@ import { useSplitPanelStore } from "@/stores/split-panel-store";
 const initialState = {
   isOpen: false,
   activeTab: "files" as const,
-  currentFilePath: null,
-  currentFileContent: null,
-  currentFileLanguage: null,
-  originalContent: null,
-  isDirty: false,
+  openFiles: [] as {
+    path: string;
+    name: string;
+    content: string;
+    language: string;
+    isDirty: boolean;
+    originalContent: string;
+  }[],
+  activeFilePath: null as string | null,
   isFilePickerOpen: false,
   isLoading: false,
-  error: null,
+  error: null as string | null,
   expandedPaths: [] as string[],
 };
 
 function resetStore() {
   useSplitPanelStore.setState(initialState);
+}
+
+function getActiveFile() {
+  const { openFiles, activeFilePath } = useSplitPanelStore.getState();
+  return openFiles.find((f) => f.path === activeFilePath) ?? null;
 }
 
 describe("default state", () => {
@@ -25,78 +34,256 @@ describe("default state", () => {
   it("has correct default values", () => {
     const state = useSplitPanelStore.getState();
     expect(state.isOpen).toBe(false);
-    expect(state.currentFilePath).toBeNull();
-    expect(state.currentFileContent).toBeNull();
-    expect(state.isDirty).toBe(false);
+    expect(state.openFiles).toEqual([]);
+    expect(state.activeFilePath).toBeNull();
     expect(state.error).toBeNull();
     expect(state.isLoading).toBe(false);
     expect(state.activeTab).toBe("files");
     expect(state.isFilePickerOpen).toBe(false);
-    expect(state.originalContent).toBeNull();
-    expect(state.currentFileLanguage).toBeNull();
   });
 });
 
-describe("openFile", () => {
+describe("openFileInTab", () => {
   beforeEach(resetStore);
 
-  it("sets state and opens panel", () => {
+  it("adds a new tab and sets it active", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
+
+    const state = useSplitPanelStore.getState();
+    expect(state.isOpen).toBe(true);
+    expect(state.activeFilePath).toBe("src/utils.ts");
+    expect(state.openFiles).toHaveLength(1);
+    expect(state.openFiles[0].path).toBe("src/utils.ts");
+    expect(state.openFiles[0].content).toBe("const x = 1;");
+    expect(state.openFiles[0].originalContent).toBe("const x = 1;");
+    expect(state.openFiles[0].isDirty).toBe(false);
+    expect(state.openFiles[0].language).toBe("typescript");
+    expect(state.openFiles[0].name).toBe("utils.ts");
+    expect(state.error).toBeNull();
+  });
+
+  it("switches to existing tab without reloading content", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "aaa", "typescript");
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/b.ts", "bbb", "typescript");
+    useSplitPanelStore.getState().updateFileContent("src/a.ts", "aaa-modified");
+
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "fresh-content", "typescript");
+
+    const state = useSplitPanelStore.getState();
+    expect(state.activeFilePath).toBe("src/a.ts");
+    expect(state.openFiles).toHaveLength(2);
+    const aFile = state.openFiles.find((f) => f.path === "src/a.ts");
+    expect(aFile?.content).toBe("aaa-modified");
+  });
+
+  it("opens multiple tabs", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "aaa", "typescript");
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/b.ts", "bbb", "typescript");
+
+    const state = useSplitPanelStore.getState();
+    expect(state.openFiles).toHaveLength(2);
+    expect(state.activeFilePath).toBe("src/b.ts");
+  });
+});
+
+describe("openFile (backward compat)", () => {
+  beforeEach(resetStore);
+
+  it("delegates to openFileInTab", () => {
     useSplitPanelStore
       .getState()
       .openFile("src/utils.ts", "const x = 1;", "typescript");
 
     const state = useSplitPanelStore.getState();
     expect(state.isOpen).toBe(true);
-    expect(state.currentFilePath).toBe("src/utils.ts");
-    expect(state.currentFileContent).toBe("const x = 1;");
-    expect(state.originalContent).toBe("const x = 1;");
-    expect(state.isDirty).toBe(false);
-    expect(state.currentFileLanguage).toBe("typescript");
-    expect(state.error).toBeNull();
+    expect(state.activeFilePath).toBe("src/utils.ts");
+    expect(state.openFiles).toHaveLength(1);
   });
 });
 
-describe("setContent", () => {
+describe("closeTab", () => {
+  beforeEach(resetStore);
+
+  it("removes the tab", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "aaa", "typescript");
+    useSplitPanelStore.getState().closeTab("src/a.ts");
+
+    const state = useSplitPanelStore.getState();
+    expect(state.openFiles).toHaveLength(0);
+    expect(state.activeFilePath).toBeNull();
+  });
+
+  it("activates right neighbor when closing active tab", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "aaa", "typescript");
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/b.ts", "bbb", "typescript");
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/c.ts", "ccc", "typescript");
+    useSplitPanelStore.getState().setActiveTab("src/b.ts");
+
+    useSplitPanelStore.getState().closeTab("src/b.ts");
+
+    const state = useSplitPanelStore.getState();
+    expect(state.openFiles).toHaveLength(2);
+    expect(state.activeFilePath).toBe("src/c.ts");
+  });
+
+  it("activates left neighbor when closing last tab in list", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "aaa", "typescript");
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/b.ts", "bbb", "typescript");
+
+    useSplitPanelStore.getState().closeTab("src/b.ts");
+
+    const state = useSplitPanelStore.getState();
+    expect(state.openFiles).toHaveLength(1);
+    expect(state.activeFilePath).toBe("src/a.ts");
+  });
+
+  it("does not change activeFilePath when closing non-active tab", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "aaa", "typescript");
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/b.ts", "bbb", "typescript");
+
+    useSplitPanelStore.getState().closeTab("src/a.ts");
+
+    const state = useSplitPanelStore.getState();
+    expect(state.activeFilePath).toBe("src/b.ts");
+    expect(state.openFiles).toHaveLength(1);
+  });
+});
+
+describe("setActiveTab", () => {
+  beforeEach(resetStore);
+
+  it("sets activeFilePath", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "aaa", "typescript");
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/b.ts", "bbb", "typescript");
+
+    useSplitPanelStore.getState().setActiveTab("src/a.ts");
+    expect(useSplitPanelStore.getState().activeFilePath).toBe("src/a.ts");
+  });
+});
+
+describe("updateFileContent", () => {
   beforeEach(resetStore);
 
   it("updates content and marks dirty when different from original", () => {
     useSplitPanelStore
       .getState()
-      .openFile("src/utils.ts", "const x = 1;", "typescript");
-    useSplitPanelStore.getState().setContent("const x = 2;");
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
+    useSplitPanelStore
+      .getState()
+      .updateFileContent("src/utils.ts", "const x = 2;");
 
-    const state = useSplitPanelStore.getState();
-    expect(state.currentFileContent).toBe("const x = 2;");
-    expect(state.isDirty).toBe(true);
+    const file = getActiveFile();
+    expect(file?.content).toBe("const x = 2;");
+    expect(file?.isDirty).toBe(true);
   });
 
   it("clears dirty when content reverts to original", () => {
     useSplitPanelStore
       .getState()
-      .openFile("src/utils.ts", "const x = 1;", "typescript");
-    useSplitPanelStore.getState().setContent("const x = 2;");
-    expect(useSplitPanelStore.getState().isDirty).toBe(true);
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
+    useSplitPanelStore
+      .getState()
+      .updateFileContent("src/utils.ts", "const x = 2;");
+    expect(getActiveFile()?.isDirty).toBe(true);
 
-    useSplitPanelStore.getState().setContent("const x = 1;");
-    expect(useSplitPanelStore.getState().isDirty).toBe(false);
+    useSplitPanelStore
+      .getState()
+      .updateFileContent("src/utils.ts", "const x = 1;");
+    expect(getActiveFile()?.isDirty).toBe(false);
   });
 });
 
-describe("markSaved", () => {
+describe("setContent (operates on active tab)", () => {
+  beforeEach(resetStore);
+
+  it("updates active tab content", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
+    useSplitPanelStore.getState().setContent("const x = 2;");
+
+    const file = getActiveFile();
+    expect(file?.content).toBe("const x = 2;");
+    expect(file?.isDirty).toBe(true);
+  });
+
+  it("clears dirty when content reverts to original", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
+    useSplitPanelStore.getState().setContent("const x = 2;");
+    expect(getActiveFile()?.isDirty).toBe(true);
+
+    useSplitPanelStore.getState().setContent("const x = 1;");
+    expect(getActiveFile()?.isDirty).toBe(false);
+  });
+});
+
+describe("markFileSaved", () => {
+  beforeEach(resetStore);
+
+  it("resets dirty and updates originalContent for specific file", () => {
+    useSplitPanelStore
+      .getState()
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
+    useSplitPanelStore.getState().updateFileContent("src/utils.ts", "modified");
+    expect(getActiveFile()?.isDirty).toBe(true);
+
+    useSplitPanelStore.getState().markFileSaved("src/utils.ts");
+
+    const file = getActiveFile();
+    expect(file?.isDirty).toBe(false);
+    expect(file?.originalContent).toBe("modified");
+  });
+});
+
+describe("markSaved (operates on active tab)", () => {
   beforeEach(resetStore);
 
   it("resets dirty and updates originalContent to current content", () => {
     useSplitPanelStore
       .getState()
-      .openFile("src/utils.ts", "const x = 1;", "typescript");
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
     useSplitPanelStore.getState().setContent("modified");
-    expect(useSplitPanelStore.getState().isDirty).toBe(true);
+    expect(getActiveFile()?.isDirty).toBe(true);
 
     useSplitPanelStore.getState().markSaved();
 
-    const state = useSplitPanelStore.getState();
-    expect(state.isDirty).toBe(false);
-    expect(state.originalContent).toBe("modified");
+    const file = getActiveFile();
+    expect(file?.isDirty).toBe(false);
+    expect(file?.originalContent).toBe("modified");
   });
 });
 
@@ -106,32 +293,29 @@ describe("closePanel", () => {
   it("sets isOpen to false while preserving file state", () => {
     useSplitPanelStore
       .getState()
-      .openFile("src/utils.ts", "const x = 1;", "typescript");
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
     useSplitPanelStore.getState().closePanel();
 
     const state = useSplitPanelStore.getState();
     expect(state.isOpen).toBe(false);
-    expect(state.currentFilePath).toBe("src/utils.ts");
-    expect(state.currentFileContent).toBe("const x = 1;");
+    expect(state.activeFilePath).toBe("src/utils.ts");
+    expect(state.openFiles).toHaveLength(1);
   });
 });
 
 describe("clearFile", () => {
   beforeEach(resetStore);
 
-  it("resets all file-related fields", () => {
+  it("resets openFiles and activeFilePath", () => {
     useSplitPanelStore
       .getState()
-      .openFile("src/utils.ts", "const x = 1;", "typescript");
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
     useSplitPanelStore.getState().setContent("modified");
     useSplitPanelStore.getState().clearFile();
 
     const state = useSplitPanelStore.getState();
-    expect(state.currentFilePath).toBeNull();
-    expect(state.currentFileContent).toBeNull();
-    expect(state.currentFileLanguage).toBeNull();
-    expect(state.originalContent).toBeNull();
-    expect(state.isDirty).toBe(false);
+    expect(state.openFiles).toEqual([]);
+    expect(state.activeFilePath).toBeNull();
     expect(state.error).toBeNull();
   });
 });
@@ -241,23 +425,25 @@ describe("expandPathToFile", () => {
 describe("persistence partialize", () => {
   beforeEach(resetStore);
 
-  it("only persists isOpen, currentFilePath, isFilePickerOpen, and expandedPaths", () => {
+  it("only persists isOpen, openFilePaths, activeFilePath, isFilePickerOpen, and expandedPaths", () => {
     useSplitPanelStore
       .getState()
-      .openFile("src/utils.ts", "const x = 1;", "typescript");
+      .openFileInTab("src/utils.ts", "const x = 1;", "typescript");
 
     const partialize = useSplitPanelStore.persist.getOptions().partialize!;
     const persisted = partialize(useSplitPanelStore.getState());
 
     expect(persisted).toHaveProperty("isOpen");
-    expect(persisted).toHaveProperty("currentFilePath");
+    expect(persisted).toHaveProperty("openFilePaths");
+    expect(persisted).toHaveProperty("activeFilePath");
     expect(persisted).toHaveProperty("isFilePickerOpen");
     expect(persisted).toHaveProperty("expandedPaths");
 
-    expect(persisted).not.toHaveProperty("currentFileContent");
-    expect(persisted).not.toHaveProperty("originalContent");
-    expect(persisted).not.toHaveProperty("isDirty");
-    expect(persisted).not.toHaveProperty("currentFileLanguage");
+    expect((persisted as { openFilePaths: string[] }).openFilePaths).toEqual([
+      "src/utils.ts",
+    ]);
+
+    expect(persisted).not.toHaveProperty("openFiles");
     expect(persisted).not.toHaveProperty("isLoading");
     expect(persisted).not.toHaveProperty("error");
   });

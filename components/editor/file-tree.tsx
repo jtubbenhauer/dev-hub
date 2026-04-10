@@ -2,10 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useWorkspaceStore } from "@/stores/workspace-store";
-import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceFiles } from "@/components/file-picker/file-picker";
-import { useFileTabsSetting } from "@/hooks/use-settings";
 import {
   fuzzySearch,
   basenamePositions,
@@ -41,6 +38,7 @@ interface FileTreeNodeProps {
   depth: number;
   expandedPaths: Set<string>;
   selectedPath: string | null;
+  activeFilePath: string | null;
   onToggleExpand: (path: string) => void;
   onFileClick: (entry: FileTreeEntry) => void;
 }
@@ -50,11 +48,11 @@ function FileTreeNode({
   depth,
   expandedPaths,
   selectedPath,
+  activeFilePath,
   onToggleExpand,
   onFileClick,
 }: FileTreeNodeProps) {
   const isExpanded = expandedPaths.has(entry.path);
-  const activeFilePath = useEditorStore((s) => s.activeFilePath);
   const isActive = entry.type === "file" && entry.path === activeFilePath;
   const isSelected = entry.path === selectedPath;
   const gitColorClass = entry.gitStatus
@@ -114,6 +112,7 @@ function FileTreeNode({
               depth={depth + 1}
               expandedPaths={expandedPaths}
               selectedPath={selectedPath}
+              activeFilePath={activeFilePath}
               onToggleExpand={onToggleExpand}
               onFileClick={onFileClick}
             />
@@ -214,48 +213,50 @@ function FuzzyResultList({
   );
 }
 
+export interface FileTreeProps {
+  workspaceId: string | null;
+  expandedPaths: Set<string>;
+  activeFilePath: string | null;
+  onToggleExpand: (path: string) => void;
+  onExpandPathToFile: (path: string) => void;
+  onFileClick: (entry: FileTreeEntry) => void;
+  onSearchResultClick: (filePath: string) => void;
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
+}
+
 export function FileTree({
   searchInputRef,
-}: {
-  searchInputRef?: React.RefObject<HTMLInputElement | null>;
-}) {
+  workspaceId,
+  expandedPaths,
+  activeFilePath,
+  onToggleExpand: onToggleExpandProp,
+  onExpandPathToFile,
+  onFileClick: onFileClickProp,
+  onSearchResultClick: onSearchResultClickProp,
+}: FileTreeProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const openFile = useEditorStore((s) => s.openFile);
-  const closeAllFiles = useEditorStore((s) => s.closeAllFiles);
-  const toggleExpandedPath = useEditorStore((s) => s.toggleExpandedPath);
-  const expandPathToFile = useEditorStore((s) => s.expandPathToFile);
-  const workspaceFileStates = useEditorStore((s) => s.workspaceFileStates);
-
-  const { isFileTabsDisabled } = useFileTabsSetting();
-
-  const expandedPaths = useMemo(() => {
-    if (!activeWorkspaceId) return new Set<string>();
-    const ws = workspaceFileStates[activeWorkspaceId];
-    return new Set(ws?.expandedPaths ?? []);
-  }, [activeWorkspaceId, workspaceFileStates]);
 
   const { data: rootEntries, isLoading } = useQuery<FileTreeEntry[]>({
-    queryKey: ["file-tree", activeWorkspaceId, "root"],
+    queryKey: ["file-tree", workspaceId, "root"],
     queryFn: async () => {
       const response = await fetch(
-        `/api/files/tree?workspaceId=${activeWorkspaceId}&path=.&depth=1`,
+        `/api/files/tree?workspaceId=${workspaceId}&path=.&depth=1`,
       );
       if (!response.ok) throw new Error("Failed to load file tree");
       return response.json();
     },
-    enabled: !!activeWorkspaceId,
+    enabled: !!workspaceId,
   });
 
   const fetchChildren = useCallback(
     async (dirPath: string): Promise<FileTreeEntry[]> => {
       const response = await fetch(
-        `/api/files/tree?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(dirPath)}&depth=1`,
+        `/api/files/tree?workspaceId=${workspaceId}&path=${encodeURIComponent(dirPath)}&depth=1`,
       );
       if (!response.ok) throw new Error("Failed to load directory");
       return response.json();
     },
-    [activeWorkspaceId],
+    [workspaceId],
   );
 
   const [lazyEntries, setLazyEntries] = useState<Map<string, FileTreeEntry[]>>(
@@ -264,22 +265,20 @@ export function FileTree({
 
   const onToggleExpand = useCallback(
     async (dirPath: string) => {
-      if (activeWorkspaceId) {
-        toggleExpandedPath(activeWorkspaceId, dirPath);
-      }
+      onToggleExpandProp(dirPath);
 
       if (!lazyEntries.has(dirPath)) {
         const children = await fetchChildren(dirPath);
         setLazyEntries((prev) => new Map(prev).set(dirPath, children));
       }
     },
-    [activeWorkspaceId, toggleExpandedPath, fetchChildren, lazyEntries],
+    [onToggleExpandProp, fetchChildren, lazyEntries],
   );
 
   const fetchingRef = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!activeWorkspaceId) return;
+    if (!workspaceId) return;
     const missing: string[] = [];
     for (const p of expandedPaths) {
       if (!lazyEntries.has(p) && !fetchingRef.current.has(p)) {
@@ -304,41 +303,14 @@ export function FileTree({
         return next;
       });
     });
-  }, [activeWorkspaceId, expandedPaths, lazyEntries, fetchChildren]);
+  }, [workspaceId, expandedPaths, lazyEntries, fetchChildren]);
 
   const onFileClick = useCallback(
-    async (entry: FileTreeEntry) => {
-      if (activeWorkspaceId) {
-        expandPathToFile(activeWorkspaceId, entry.path);
-      }
-
-      const response = await fetch(
-        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(entry.path)}`,
-      );
-
-      if (!response.ok) {
-        return;
-      }
-
-      const data = await response.json();
-
-      if (isFileTabsDisabled) closeAllFiles();
-      openFile({
-        path: entry.path,
-        name: entry.name,
-        content: data.content,
-        language: data.language,
-        isDirty: false,
-        originalContent: data.content,
-      });
+    (entry: FileTreeEntry) => {
+      onFileClickProp(entry);
+      onExpandPathToFile(entry.path);
     },
-    [
-      activeWorkspaceId,
-      openFile,
-      closeAllFiles,
-      isFileTabsDisabled,
-      expandPathToFile,
-    ],
+    [onFileClickProp, onExpandPathToFile],
   );
 
   // Merge lazy-loaded children into root entries
@@ -364,7 +336,7 @@ export function FileTree({
   }, [rootEntries, lazyEntries]);
 
   // Fzf-powered search across ALL workspace files
-  const { data: allFiles } = useWorkspaceFiles(activeWorkspaceId);
+  const { data: allFiles } = useWorkspaceFiles(workspaceId);
   const isSearching = searchQuery.length > 0;
 
   // Flat list of visible tree entries for j/k keyboard navigation
@@ -394,23 +366,10 @@ export function FileTree({
     if (el) el.scrollIntoView({ block: "nearest" });
   }, [selectedPath, isSearching]);
 
-  // Stable refs for the keyboard handler
-  const flatVisibleRef = useRef(flatVisible);
-  const selectedPathRef = useRef(selectedPath);
-  const onFileClickRef = useRef(onFileClick);
-  const onToggleExpandRef = useRef(onToggleExpand);
-  const isSearchingRef = useRef(isSearching);
-  useEffect(() => {
-    flatVisibleRef.current = flatVisible;
-    selectedPathRef.current = selectedPath;
-    onFileClickRef.current = onFileClick;
-    onToggleExpandRef.current = onToggleExpand;
-    isSearchingRef.current = isSearching;
-  });
-
+  // Keyboard navigation for tree entries (j/k/Enter)
   useEffect(() => {
     function handleTreeKeyboard(e: KeyboardEvent) {
-      if (isSearchingRef.current) return;
+      if (isSearching) return;
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
@@ -419,35 +378,36 @@ export function FileTree({
         return;
       }
 
-      const flat = flatVisibleRef.current;
-      if (flat.length === 0) return;
+      if (flatVisible.length === 0) return;
 
-      const currentIdx = flat.findIndex(
-        (entry) => entry.path === selectedPathRef.current,
+      const currentIdx = flatVisible.findIndex(
+        (entry) => entry.path === selectedPath,
       );
 
       switch (e.key) {
         case "j": {
           e.preventDefault();
           const nextIdx =
-            currentIdx === -1 ? 0 : Math.min(currentIdx + 1, flat.length - 1);
-          setSelectedPath(flat[nextIdx].path);
+            currentIdx === -1
+              ? 0
+              : Math.min(currentIdx + 1, flatVisible.length - 1);
+          setSelectedPath(flatVisible[nextIdx].path);
           break;
         }
         case "k": {
           e.preventDefault();
           const prevIdx = currentIdx === -1 ? 0 : Math.max(currentIdx - 1, 0);
-          setSelectedPath(flat[prevIdx].path);
+          setSelectedPath(flatVisible[prevIdx].path);
           break;
         }
         case "Enter": {
           if (currentIdx === -1) break;
           e.preventDefault();
-          const entry = flat[currentIdx];
+          const entry = flatVisible[currentIdx];
           if (entry.type === "directory") {
-            onToggleExpandRef.current(entry.path);
+            onToggleExpand(entry.path);
           } else {
-            onFileClickRef.current(entry);
+            onFileClick(entry);
           }
           break;
         }
@@ -456,7 +416,7 @@ export function FileTree({
 
     window.addEventListener("keydown", handleTreeKeyboard);
     return () => window.removeEventListener("keydown", handleTreeKeyboard);
-  }, []);
+  }, [flatVisible, selectedPath, isSearching, onToggleExpand, onFileClick]);
 
   const searchResults = useMemo(() => {
     if (!isSearching || !allFiles) return [];
@@ -492,36 +452,10 @@ export function FileTree({
 
   // Open a file by path (used by fzf search results)
   const onSearchResultClick = useCallback(
-    async (filePath: string) => {
-      const name = filePath.split("/").pop() ?? filePath;
-
-      if (activeWorkspaceId) {
-        expandPathToFile(activeWorkspaceId, filePath);
-      }
-
-      const response = await fetch(
-        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(filePath)}`,
-      );
-      if (!response.ok) return;
-
-      const data = await response.json();
-      if (isFileTabsDisabled) closeAllFiles();
-      openFile({
-        path: filePath,
-        name,
-        content: data.content,
-        language: data.language,
-        isDirty: false,
-        originalContent: data.content,
-      });
+    (filePath: string) => {
+      onSearchResultClickProp(filePath);
     },
-    [
-      activeWorkspaceId,
-      openFile,
-      closeAllFiles,
-      isFileTabsDisabled,
-      expandPathToFile,
-    ],
+    [onSearchResultClickProp],
   );
 
   const handleSearchKeyDown = useCallback(
@@ -547,7 +481,7 @@ export function FileTree({
     [isSearching, searchResults, selectedIndex, onSearchResultClick],
   );
 
-  if (!activeWorkspaceId) {
+  if (!workspaceId) {
     return (
       <div className="flex h-full items-center justify-center p-4">
         <p className="text-muted-foreground text-sm">Select a workspace</p>
@@ -599,6 +533,7 @@ export function FileTree({
                   depth={0}
                   expandedPaths={expandedPaths}
                   selectedPath={selectedPath}
+                  activeFilePath={activeFilePath}
                   onToggleExpand={onToggleExpand}
                   onFileClick={onFileClick}
                 />

@@ -1,24 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
-  File,
   FolderOpen,
   Loader2,
   Save,
-  Search,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { CommentsSidebar } from "@/components/editor/comments-sidebar";
+import { FileTree } from "@/components/editor/file-tree";
 import { useSplitPanelStore } from "@/stores/split-panel-store";
 import { useChatStore } from "@/stores/chat-store";
 import {
@@ -75,19 +72,6 @@ const BINARY_EXTENSIONS = [
   ".eot",
 ];
 
-function flattenTree(entries: FileTreeEntry[]): string[] {
-  const result: string[] = [];
-  for (const entry of entries) {
-    if (entry.type === "file") {
-      result.push(entry.path);
-    }
-    if (entry.children) {
-      result.push(...flattenTree(entry.children));
-    }
-  }
-  return result;
-}
-
 export function SplitPanelFiles({
   workspaceId,
   workspacePath: _workspacePath,
@@ -111,32 +95,22 @@ export function SplitPanelFiles({
 
   const activeSessionId = useChatStore((s) => s.activeSessionId);
 
-  const [filterText, setFilterText] = useState("");
+  const expandedPaths = useSplitPanelStore((s) => s.expandedPaths);
+  const toggleExpandedPath = useSplitPanelStore((s) => s.toggleExpandedPath);
+  const expandPathToFile = useSplitPanelStore((s) => s.expandPathToFile);
+
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const expandedPathsSet = useMemo(
+    () => new Set(expandedPaths),
+    [expandedPaths],
+  );
+
   useEffect(() => {
     clearFile();
   }, [workspaceId, clearFile]);
-
-  const { data: treeData } = useQuery<FileTreeEntry[]>({
-    queryKey: ["file-tree", workspaceId],
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/files/tree?workspaceId=${workspaceId}&depth=10`,
-      );
-      if (!res.ok) throw new Error("Failed to fetch file tree");
-      return res.json();
-    },
-    staleTime: 30_000,
-    enabled: !!workspaceId,
-  });
-
-  const allFiles = treeData ? flattenTree(treeData) : [];
-  const filteredFiles = filterText
-    ? allFiles.filter((f) => f.toLowerCase().includes(filterText.toLowerCase()))
-    : allFiles;
 
   const { data: comments = [] } = useFileComments(
     workspaceId,
@@ -200,6 +174,22 @@ export function SplitPanelFiles({
       loadFile(path);
     },
     [isDirty, loadFile],
+  );
+
+  const handleTreeFileClick = useCallback(
+    (entry: FileTreeEntry) => {
+      if (entry.type === "file") {
+        handleFileClick(entry.path);
+      }
+    },
+    [handleFileClick],
+  );
+
+  const handleTreeSearchResultClick = useCallback(
+    (filePath: string) => {
+      handleFileClick(filePath);
+    },
+    [handleFileClick],
   );
 
   const saveFileMutation = useMutation({
@@ -303,60 +293,53 @@ export function SplitPanelFiles({
 
   return (
     <div className="flex h-[calc(100%-2.5rem)] flex-col">
-      <div className="border-b">
-        <button
-          type="button"
-          className="text-muted-foreground hover:bg-accent flex w-full items-center gap-1.5 px-3 py-1.5 text-xs"
-          onClick={toggleFilePicker}
+      {isFilePickerOpen && (
+        <div
+          className="flex min-h-0 shrink-0 flex-col border-b"
+          style={{
+            maxHeight:
+              currentFilePath && !error && !isLoading ? "40%" : undefined,
+          }}
         >
-          {isFilePickerOpen ? (
-            <ChevronDown className="size-3" />
-          ) : (
-            <ChevronRight className="size-3" />
-          )}
-          <FolderOpen className="size-3" />
-          <span>Browse files</span>
-        </button>
-
-        {isFilePickerOpen && (
-          <div className="border-t px-2 pb-2">
-            <div className="relative mt-1.5 mb-1.5">
-              <Search className="text-muted-foreground absolute top-1/2 left-2 size-3 -translate-y-1/2" />
-              <Input
-                placeholder="Filter files…"
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-                className="h-7 pl-7 text-xs"
-              />
-            </div>
-            <ScrollArea className="max-h-48">
-              {filteredFiles.length === 0 ? (
-                <p className="text-muted-foreground px-2 py-3 text-center text-xs">
-                  {treeData ? "No files match filter" : "Loading…"}
-                </p>
-              ) : (
-                <div className="space-y-px">
-                  {filteredFiles.map((filePath) => (
-                    <button
-                      key={filePath}
-                      type="button"
-                      className={`hover:bg-accent flex w-full items-center gap-1.5 rounded-sm px-2 py-1 text-left text-xs ${
-                        filePath === currentFilePath
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground"
-                      }`}
-                      onClick={() => handleFileClick(filePath)}
-                    >
-                      <File className="size-3 shrink-0" />
-                      <span className="truncate">{filePath}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+          <div className="flex shrink-0 items-center justify-between px-3 py-1">
+            <span className="text-muted-foreground text-xs font-medium">
+              Explorer
+            </span>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={toggleFilePicker}
+            >
+              <ChevronDown className="size-3" />
+            </button>
           </div>
-        )}
-      </div>
+          <div className="min-h-0 flex-1">
+            <FileTree
+              workspaceId={workspaceId}
+              expandedPaths={expandedPathsSet}
+              activeFilePath={currentFilePath}
+              onToggleExpand={toggleExpandedPath}
+              onExpandPathToFile={expandPathToFile}
+              onFileClick={handleTreeFileClick}
+              onSearchResultClick={handleTreeSearchResultClick}
+            />
+          </div>
+        </div>
+      )}
+
+      {!isFilePickerOpen && (
+        <div className="border-b">
+          <button
+            type="button"
+            className="text-muted-foreground hover:bg-accent flex w-full items-center gap-1.5 px-3 py-1.5 text-xs"
+            onClick={toggleFilePicker}
+          >
+            <ChevronRight className="size-3" />
+            <FolderOpen className="size-3" />
+            <span>Browse files</span>
+          </button>
+        </div>
+      )}
 
       {currentFilePath && !error && (
         <div className="flex items-center gap-2 border-b px-3 py-1.5">

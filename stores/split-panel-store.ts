@@ -12,6 +12,7 @@ interface SplitPanelState {
   isFilePickerOpen: boolean;
   isLoading: boolean;
   error: string | null;
+  expandedPaths: string[];
 
   openFile: (path: string, content: string, language: string) => void;
   closePanel: () => void;
@@ -23,6 +24,8 @@ interface SplitPanelState {
   clearError: () => void;
   toggleFilePicker: () => void;
   setIsLoading: (loading: boolean) => void;
+  toggleExpandedPath: (path: string) => void;
+  expandPathToFile: (filePath: string) => void;
 }
 
 export const useSplitPanelStore = create<SplitPanelState>()(
@@ -38,6 +41,7 @@ export const useSplitPanelStore = create<SplitPanelState>()(
       isFilePickerOpen: false,
       isLoading: false,
       error: null,
+      expandedPaths: [],
 
       openFile: (path, content, language) =>
         set({
@@ -84,6 +88,29 @@ export const useSplitPanelStore = create<SplitPanelState>()(
         set((state) => ({ isFilePickerOpen: !state.isFilePickerOpen })),
 
       setIsLoading: (loading) => set({ isLoading: loading }),
+
+      toggleExpandedPath: (path) =>
+        set((state) => {
+          const paths = new Set(state.expandedPaths);
+          if (paths.has(path)) {
+            paths.delete(path);
+          } else {
+            paths.add(path);
+          }
+          return { expandedPaths: [...paths] };
+        }),
+
+      expandPathToFile: (filePath) =>
+        set((state) => {
+          const parts = filePath.split("/");
+          const paths = new Set(state.expandedPaths);
+          let current = "";
+          for (let i = 0; i < parts.length - 1; i++) {
+            current = current ? `${current}/${parts[i]}` : parts[i];
+            paths.add(current);
+          }
+          return { expandedPaths: [...paths] };
+        }),
     }),
     {
       name: "dev-hub:split-panel",
@@ -91,6 +118,7 @@ export const useSplitPanelStore = create<SplitPanelState>()(
         isOpen: state.isOpen,
         currentFilePath: state.currentFilePath,
         isFilePickerOpen: state.isFilePickerOpen,
+        expandedPaths: state.expandedPaths,
       }),
     },
   ),

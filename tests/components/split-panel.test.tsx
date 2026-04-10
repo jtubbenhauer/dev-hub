@@ -12,6 +12,7 @@ const initialState = {
   isFilePickerOpen: false,
   isLoading: false,
   error: null,
+  expandedPaths: [] as string[],
 };
 
 function resetStore() {

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
 import { FileTree } from "@/components/editor/file-tree";
+import type { FileTreeEntry } from "@/types";
 import { OpenEditors } from "@/components/editor/open-editors";
 import { FileTabs } from "@/components/editor/file-tabs";
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
@@ -71,8 +72,93 @@ function FilesContent() {
   const expandPathToFile = useEditorStore((s) => s.expandPathToFile);
   const expandFolder = useEditorStore((s) => s.expandFolder);
   const closeAllFiles = useEditorStore((s) => s.closeAllFiles);
+  const toggleExpandedPath = useEditorStore((s) => s.toggleExpandedPath);
+  const workspaceFileStates = useEditorStore((s) => s.workspaceFileStates);
 
   const { isFileTabsDisabled } = useFileTabsSetting();
+
+  const expandedPaths = useMemo(() => {
+    if (!activeWorkspaceId) return new Set<string>();
+    const ws = workspaceFileStates[activeWorkspaceId];
+    return new Set(ws?.expandedPaths ?? []);
+  }, [activeWorkspaceId, workspaceFileStates]);
+
+  const handleToggleExpand = useCallback(
+    (path: string) => {
+      if (activeWorkspaceId) {
+        toggleExpandedPath(activeWorkspaceId, path);
+      }
+    },
+    [activeWorkspaceId, toggleExpandedPath],
+  );
+
+  const handleExpandPathToFile = useCallback(
+    (path: string) => {
+      if (activeWorkspaceId) {
+        expandPathToFile(activeWorkspaceId, path);
+      }
+    },
+    [activeWorkspaceId, expandPathToFile],
+  );
+
+  const handleFileTreeFileClick = useCallback(
+    async (entry: FileTreeEntry) => {
+      if (activeWorkspaceId) {
+        expandPathToFile(activeWorkspaceId, entry.path);
+      }
+      const response = await fetch(
+        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(entry.path)}`,
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      if (isFileTabsDisabled) closeAllFiles();
+      editorOpenFile({
+        path: entry.path,
+        name: entry.name,
+        content: data.content,
+        language: data.language,
+        isDirty: false,
+        originalContent: data.content,
+      });
+    },
+    [
+      activeWorkspaceId,
+      editorOpenFile,
+      closeAllFiles,
+      isFileTabsDisabled,
+      expandPathToFile,
+    ],
+  );
+
+  const handleFileTreeSearchResultClick = useCallback(
+    async (filePath: string) => {
+      const name = filePath.split("/").pop() ?? filePath;
+      if (activeWorkspaceId) {
+        expandPathToFile(activeWorkspaceId, filePath);
+      }
+      const response = await fetch(
+        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(filePath)}`,
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      if (isFileTabsDisabled) closeAllFiles();
+      editorOpenFile({
+        path: filePath,
+        name,
+        content: data.content,
+        language: data.language,
+        isDirty: false,
+        originalContent: data.content,
+      });
+    },
+    [
+      activeWorkspaceId,
+      editorOpenFile,
+      closeAllFiles,
+      isFileTabsDisabled,
+      expandPathToFile,
+    ],
+  );
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -339,7 +425,16 @@ function FilesContent() {
               </SheetHeader>
               <div className="h-[calc(100%-41px)]">
                 {!isFileTabsDisabled && <OpenEditors />}
-                <FileTree searchInputRef={searchInputRef} />
+                <FileTree
+                  workspaceId={activeWorkspaceId}
+                  expandedPaths={expandedPaths}
+                  activeFilePath={activeFilePath}
+                  onToggleExpand={handleToggleExpand}
+                  onExpandPathToFile={handleExpandPathToFile}
+                  onFileClick={handleFileTreeFileClick}
+                  onSearchResultClick={handleFileTreeSearchResultClick}
+                  searchInputRef={searchInputRef}
+                />
               </div>
             </SheetContent>
           </Sheet>
@@ -369,7 +464,16 @@ function FilesContent() {
               </Button>
             </div>
             {!isFileTabsDisabled && <OpenEditors />}
-            <FileTree searchInputRef={searchInputRef} />
+            <FileTree
+              workspaceId={activeWorkspaceId}
+              expandedPaths={expandedPaths}
+              activeFilePath={activeFilePath}
+              onToggleExpand={handleToggleExpand}
+              onExpandPathToFile={handleExpandPathToFile}
+              onFileClick={handleFileTreeFileClick}
+              onSearchResultClick={handleFileTreeSearchResultClick}
+              searchInputRef={searchInputRef}
+            />
           </div>
         )}
 

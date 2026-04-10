@@ -12,6 +12,7 @@ const initialState = {
   isFilePickerOpen: false,
   isLoading: false,
   error: null,
+  expandedPaths: [] as string[],
 };
 
 function resetStore() {
@@ -191,10 +192,56 @@ describe("setIsLoading", () => {
   });
 });
 
+describe("toggleExpandedPath", () => {
+  beforeEach(resetStore);
+
+  it("adds a path to expandedPaths", () => {
+    useSplitPanelStore.getState().toggleExpandedPath("src");
+    expect(useSplitPanelStore.getState().expandedPaths).toEqual(["src"]);
+  });
+
+  it("removes a path that is already expanded", () => {
+    useSplitPanelStore.getState().toggleExpandedPath("src");
+    useSplitPanelStore.getState().toggleExpandedPath("src");
+    expect(useSplitPanelStore.getState().expandedPaths).toEqual([]);
+  });
+
+  it("handles multiple distinct paths", () => {
+    useSplitPanelStore.getState().toggleExpandedPath("src");
+    useSplitPanelStore.getState().toggleExpandedPath("lib");
+    expect(useSplitPanelStore.getState().expandedPaths).toContain("src");
+    expect(useSplitPanelStore.getState().expandedPaths).toContain("lib");
+  });
+});
+
+describe("expandPathToFile", () => {
+  beforeEach(resetStore);
+
+  it("expands all parent directories of a file path", () => {
+    useSplitPanelStore.getState().expandPathToFile("src/lib/utils.ts");
+    const paths = useSplitPanelStore.getState().expandedPaths;
+    expect(paths).toContain("src");
+    expect(paths).toContain("src/lib");
+    expect(paths).not.toContain("src/lib/utils.ts");
+  });
+
+  it("does not duplicate already-expanded paths", () => {
+    useSplitPanelStore.getState().toggleExpandedPath("src");
+    useSplitPanelStore.getState().expandPathToFile("src/lib/utils.ts");
+    const paths = useSplitPanelStore.getState().expandedPaths;
+    expect(paths.filter((p) => p === "src")).toHaveLength(1);
+  });
+
+  it("handles a file at root level (no parent dirs)", () => {
+    useSplitPanelStore.getState().expandPathToFile("README.md");
+    expect(useSplitPanelStore.getState().expandedPaths).toEqual([]);
+  });
+});
+
 describe("persistence partialize", () => {
   beforeEach(resetStore);
 
-  it("only persists isOpen, currentFilePath, and isFilePickerOpen", () => {
+  it("only persists isOpen, currentFilePath, isFilePickerOpen, and expandedPaths", () => {
     useSplitPanelStore
       .getState()
       .openFile("src/utils.ts", "const x = 1;", "typescript");
@@ -205,6 +252,7 @@ describe("persistence partialize", () => {
     expect(persisted).toHaveProperty("isOpen");
     expect(persisted).toHaveProperty("currentFilePath");
     expect(persisted).toHaveProperty("isFilePickerOpen");
+    expect(persisted).toHaveProperty("expandedPaths");
 
     expect(persisted).not.toHaveProperty("currentFileContent");
     expect(persisted).not.toHaveProperty("originalContent");

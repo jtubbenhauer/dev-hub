@@ -35,6 +35,11 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "chat:focus-prompt", label: "Focus prompt input", page: "chat" },
   { id: "chat:toggle-variant", label: "Toggle variant selector", page: "chat" },
   { id: "chat:toggle-tasks", label: "Toggle side panel", page: "chat" },
+  {
+    id: "chat:toggle-split-panel",
+    label: "Toggle split view",
+    page: "chat",
+  },
   { id: "chat:toggle-thinking", label: "Toggle thinking", page: "chat" },
   {
     id: "chat:toggle-tool-calls",
@@ -124,6 +129,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "chat:focus-prompt": "i",
   "chat:toggle-variant": "v",
   "chat:toggle-tasks": "b",
+  "chat:toggle-split-panel": "B",
   "chat:toggle-thinking": "T",
   "chat:toggle-tool-calls": "x",
   "chat:toggle-tokens": "$",

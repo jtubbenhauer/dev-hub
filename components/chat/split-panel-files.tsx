@@ -111,13 +111,85 @@ export function SplitPanelFiles({
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const EXPLORER_STORAGE_KEY = "dev-hub:split-panel-explorer-height";
+  const EXPLORER_MIN_HEIGHT = 80;
+  const EXPLORER_MAX_HEIGHT = 600;
+  const EXPLORER_DEFAULT_HEIGHT = 200;
+
+  const [explorerHeight, setExplorerHeight] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem(EXPLORER_STORAGE_KEY);
+      if (stored === null) return EXPLORER_DEFAULT_HEIGHT;
+      const parsed = parseInt(stored, 10);
+      if (isNaN(parsed)) return EXPLORER_DEFAULT_HEIGHT;
+      return Math.max(
+        EXPLORER_MIN_HEIGHT,
+        Math.min(EXPLORER_MAX_HEIGHT, parsed),
+      );
+    } catch {
+      return EXPLORER_DEFAULT_HEIGHT;
+    }
+  });
+
+  const explorerHeightRef = useRef(explorerHeight);
+  explorerHeightRef.current = explorerHeight;
+
+  const explorerDragRef = useRef({
+    isDragging: false,
+    startY: 0,
+    startHeight: 0,
+  });
+
+  const handleExplorerDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const drag = explorerDragRef.current;
+    drag.isDragging = true;
+    drag.startY = e.clientY;
+    drag.startHeight = explorerHeightRef.current;
+
+    const handleMove = (me: MouseEvent) => {
+      if (!drag.isDragging) return;
+      const delta = me.clientY - drag.startY;
+      const next = Math.max(
+        EXPLORER_MIN_HEIGHT,
+        Math.min(EXPLORER_MAX_HEIGHT, drag.startHeight + delta),
+      );
+      explorerHeightRef.current = next;
+      setExplorerHeight(next);
+    };
+
+    const handleUp = () => {
+      if (!drag.isDragging) return;
+      drag.isDragging = false;
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem(
+          EXPLORER_STORAGE_KEY,
+          String(explorerHeightRef.current),
+        );
+      } catch {}
+    };
+
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleUp);
+  }, []);
+
   const expandedPathsSet = useMemo(
     () => new Set(expandedPaths),
     [expandedPaths],
   );
 
+  const prevWorkspaceIdRef = useRef(workspaceId);
   useEffect(() => {
-    clearFile();
+    if (prevWorkspaceIdRef.current !== workspaceId) {
+      prevWorkspaceIdRef.current = workspaceId;
+      clearFile();
+    }
   }, [workspaceId, clearFile]);
 
   const { data: comments = [] } = useFileComments(
@@ -307,37 +379,43 @@ export function SplitPanelFiles({
   return (
     <div className="flex h-[calc(100%-2.5rem)] flex-col">
       {isFilePickerOpen && (
-        <div
-          className="flex min-h-0 shrink-0 flex-col border-b"
-          style={{
-            maxHeight:
-              currentFilePath && !error && !isLoading ? "40%" : undefined,
-          }}
-        >
-          <div className="flex shrink-0 items-center justify-between px-3 py-1">
-            <span className="text-muted-foreground text-xs font-medium">
-              Explorer
-            </span>
+        <>
+          <div
+            className="flex min-h-0 shrink-0 flex-col"
+            style={
+              currentFilePath && !error && !isLoading
+                ? { height: explorerHeight }
+                : undefined
+            }
+          >
             <button
               type="button"
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:bg-accent flex w-full shrink-0 items-center gap-1.5 px-3 py-1 text-xs font-medium"
               onClick={toggleFilePicker}
             >
               <ChevronDown className="size-3" />
+              <FolderOpen className="size-3" />
+              <span>Explorer</span>
             </button>
+            <div className="min-h-0 flex-1">
+              <FileTree
+                workspaceId={workspaceId}
+                expandedPaths={expandedPathsSet}
+                activeFilePath={currentFilePath}
+                onToggleExpand={toggleExpandedPath}
+                onExpandPathToFile={expandPathToFile}
+                onFileClick={handleTreeFileClick}
+                onSearchResultClick={handleTreeSearchResultClick}
+              />
+            </div>
           </div>
-          <div className="min-h-0 flex-1">
-            <FileTree
-              workspaceId={workspaceId}
-              expandedPaths={expandedPathsSet}
-              activeFilePath={currentFilePath}
-              onToggleExpand={toggleExpandedPath}
-              onExpandPathToFile={expandPathToFile}
-              onFileClick={handleTreeFileClick}
-              onSearchResultClick={handleTreeSearchResultClick}
+          {currentFilePath && !error && !isLoading && (
+            <div
+              className="hover:bg-accent/50 active:bg-accent flex h-1.5 shrink-0 cursor-row-resize items-center justify-center border-y transition-colors"
+              onMouseDown={handleExplorerDragStart}
             />
-          </div>
-        </div>
+          )}
+        </>
       )}
 
       {!isFilePickerOpen && (

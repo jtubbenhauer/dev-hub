@@ -241,6 +241,23 @@ export function useChatCommands(
       },
       {
         action: {
+          id: "chat:toggle-split-panel",
+          label: "Toggle split view",
+          page: "chat" as const,
+        },
+        handler: () => {
+          useSplitPanelStore.getState().togglePanel();
+          if (useSplitPanelStore.getState().isOpen) {
+            refs.setIsTaskPanelOpen.current((prev) => {
+              if (prev)
+                localStorage.setItem("dev-hub:chat-task-panel", "false");
+              return false;
+            });
+          }
+        },
+      },
+      {
+        action: {
           id: "chat:toggle-thinking",
           label: "Toggle thinking",
           page: "chat" as const,

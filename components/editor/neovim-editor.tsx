@@ -23,6 +23,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 export interface NeovimEditorHandle {
   focus: () => void;
   blur: () => void;
+  revealLine: (line: number) => void;
 }
 
 interface NeovimEditorProps {
@@ -86,6 +87,7 @@ export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
       () => ({
         focus: () => terminalHandle?.focus(),
         blur: () => terminalHandle?.blur(),
+        revealLine: (_line: number) => {},
       }),
       [terminalHandle],
     );

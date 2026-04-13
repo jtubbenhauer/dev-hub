@@ -32,11 +32,15 @@ import {
   FolderOpen,
   FileCode2,
   GitCompare,
+  CircleX,
+  TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGitStatus } from "@/hooks/use-git";
+import { useLintOnSave, useDiagnosticsForFile } from "@/hooks/use-diagnostics";
+import { ProblemsPanel } from "@/components/editor/problems-panel";
 
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = 500;
@@ -312,6 +316,15 @@ function FilesContent() {
     [openFiles, activeFilePath],
   );
 
+  const { lintFile } = useLintOnSave(
+    activeWorkspaceId ?? undefined,
+    activeFilePath ?? undefined,
+  );
+  const { errorCount, warningCount } = useDiagnosticsForFile(
+    activeWorkspaceId ?? undefined,
+    activeFilePath ?? undefined,
+  );
+
   const handleSave = useCallback(async () => {
     if (!activeFile || !activeWorkspaceId) return;
 
@@ -331,13 +344,14 @@ function FilesContent() {
         throw new Error(err.error || "Save failed");
       }
       markFileSaved(activeFile.path);
+      void lintFile();
       toast.success("Saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Save failed");
     } finally {
       setSavingPath(null);
     }
-  }, [activeFile, activeWorkspaceId, markFileSaved]);
+  }, [activeFile, activeWorkspaceId, markFileSaved, lintFile]);
 
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
@@ -526,6 +540,19 @@ function FilesContent() {
               {activeFile?.path ?? "No file open"}
             </span>
 
+            {errorCount > 0 && (
+              <span className="text-destructive flex items-center gap-1 text-xs">
+                <CircleX className="size-3" />
+                {errorCount}
+              </span>
+            )}
+            {warningCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-yellow-500">
+                <TriangleAlert className="size-3" />
+                {warningCount}
+              </span>
+            )}
+
             {activeFile && isActiveFileUnstaged && (
               <Button
                 variant="ghost"
@@ -572,17 +599,28 @@ function FilesContent() {
           {!isFileTabsDisabled && <FileTabs />}
 
           {/* Editor area */}
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {activeFile ? (
-              <EditorSwitcher
-                ref={editorHandleRef}
-                content={activeFile.content}
-                language={activeFile.language}
-                onChange={handleChange}
-                onSave={() => void handleSaveRef.current()}
-                workspaceId={activeWorkspaceId ?? undefined}
-                filePath={activeFile.path}
-              />
+              <>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <EditorSwitcher
+                    ref={editorHandleRef}
+                    content={activeFile.content}
+                    language={activeFile.language}
+                    onChange={handleChange}
+                    onSave={() => void handleSaveRef.current()}
+                    workspaceId={activeWorkspaceId ?? undefined}
+                    filePath={activeFile.path}
+                  />
+                </div>
+                <ProblemsPanel
+                  workspaceId={activeWorkspaceId ?? undefined}
+                  filePath={activeFile.path}
+                  onNavigate={(line) =>
+                    editorHandleRef.current?.revealLine(line)
+                  }
+                />
+              </>
             ) : (
               <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-3">
                 <FileCode2 className="text-muted-foreground/20 h-12 w-12" />

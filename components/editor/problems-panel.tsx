@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -81,7 +81,7 @@ export function ProblemsPanel({
   filePath,
   onNavigate,
 }: ProblemsPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [userCollapsed, setUserCollapsed] = useState(false);
 
   const diagnostics = useDiagnosticsStore((s) =>
     workspaceId && filePath
@@ -96,18 +96,18 @@ export function ProblemsPanel({
     (d) => d.severity === DiagnosticSeverity.Warning,
   ).length;
 
-  useEffect(() => {
-    if (errorCount > 0 && !isExpanded) {
-      setIsExpanded(true);
-    }
-  }, [diagnostics, errorCount, isExpanded]);
+  const isExpanded = errorCount > 0 ? !userCollapsed : userCollapsed;
+
+  const handleToggle = () => {
+    setUserCollapsed((prev) => !prev);
+  };
 
   return (
     <div className="flex flex-col border-t">
       <button
         type="button"
         className="hover:bg-muted/50 flex h-8 w-full items-center gap-2 px-3 text-xs"
-        onClick={() => setIsExpanded((prev) => !prev)}
+        onClick={handleToggle}
         aria-expanded={isExpanded}
       >
         {isExpanded ? (

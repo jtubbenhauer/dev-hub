@@ -101,6 +101,33 @@ describe("useDiagnosticsStore", () => {
     ).toBeUndefined();
   });
 
+  // Regression: inline `?? []` in Zustand selectors creates new references
+  // per render, causing useSyncExternalStore infinite loops.
+  describe("selector referential stability", () => {
+    it("raw ?? [] returns different references per call (proves instability)", () => {
+      const unstableSelector = (s: {
+        diagnosticsByFile: Map<string, unknown[]>;
+      }) => s.diagnosticsByFile.get("ws1:missing.ts") ?? [];
+
+      const a = unstableSelector(useDiagnosticsStore.getState());
+      const b = unstableSelector(useDiagnosticsStore.getState());
+
+      expect(a).not.toBe(b);
+    });
+
+    it("getDiagnosticsForFile returns equal empty array for missing file", () => {
+      const a = useDiagnosticsStore
+        .getState()
+        .getDiagnosticsForFile("ws1", "missing.ts");
+      const b = useDiagnosticsStore
+        .getState()
+        .getDiagnosticsForFile("ws1", "missing.ts");
+
+      expect(a).toEqual(b);
+      expect(a).toEqual([]);
+    });
+  });
+
   it("clearAllDiagnostics resets all diagnostics to empty map", () => {
     useDiagnosticsStore
       .getState()

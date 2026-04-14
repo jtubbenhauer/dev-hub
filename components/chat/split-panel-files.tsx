@@ -27,6 +27,7 @@ import {
   useUpdateFileComment,
 } from "@/hooks/use-file-comments";
 import { attachCommentToChat } from "@/lib/comment-chat-bridge";
+import { useLintOnSave } from "@/hooks/use-diagnostics";
 import type { FileTreeEntry, FileComment } from "@/types";
 
 const MonacoEditor = dynamic(
@@ -179,6 +180,8 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
     }
   }, [workspaceId, clearFile]);
 
+  const { lintFile } = useLintOnSave(workspaceId, currentFilePath ?? undefined);
+
   const { data: comments = [] } = useFileComments(
     workspaceId,
     currentFilePath ?? undefined,
@@ -273,7 +276,10 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
       });
       if (!res.ok) throw new Error("Save failed");
     },
-    onSuccess: () => markSaved(),
+    onSuccess: () => {
+      markSaved();
+      void lintFile();
+    },
     onError: () => toast.error("Failed to save file"),
   });
 

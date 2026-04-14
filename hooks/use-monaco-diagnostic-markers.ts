@@ -2,6 +2,9 @@ import { useEffect } from "react";
 import type { editor } from "monaco-editor";
 import { useDiagnosticsStore } from "@/stores/diagnostics-store";
 import { mapToMonacoMarker } from "@/lib/editor/diagnostics";
+import type { Diagnostic } from "@/types/diagnostics";
+
+const EMPTY_DIAGNOSTICS: Diagnostic[] = [];
 
 export function useMonacoDiagnosticMarkers(
   monacoRef: React.RefObject<typeof import("monaco-editor") | null>,
@@ -12,8 +15,9 @@ export function useMonacoDiagnosticMarkers(
 ) {
   const diagnostics = useDiagnosticsStore((s) =>
     workspaceId && filePath
-      ? (s.diagnosticsByFile.get(`${workspaceId}:${filePath}`) ?? [])
-      : [],
+      ? (s.diagnosticsByFile.get(`${workspaceId}:${filePath}`) ??
+        EMPTY_DIAGNOSTICS)
+      : EMPTY_DIAGNOSTICS,
   );
 
   useEffect(() => {

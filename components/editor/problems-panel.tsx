@@ -13,6 +13,8 @@ import { useDiagnosticsStore } from "@/stores/diagnostics-store";
 import { DiagnosticSeverity } from "@/types/diagnostics";
 import type { Diagnostic } from "@/types/diagnostics";
 
+const EMPTY_DIAGNOSTICS: Diagnostic[] = [];
+
 interface ProblemsPanelProps {
   workspaceId: string | undefined;
   filePath: string | undefined;
@@ -85,8 +87,9 @@ export function ProblemsPanel({
 
   const diagnostics = useDiagnosticsStore((s) =>
     workspaceId && filePath
-      ? (s.diagnosticsByFile.get(`${workspaceId}:${filePath}`) ?? [])
-      : [],
+      ? (s.diagnosticsByFile.get(`${workspaceId}:${filePath}`) ??
+        EMPTY_DIAGNOSTICS)
+      : EMPTY_DIAGNOSTICS,
   );
 
   const errorCount = diagnostics.filter(

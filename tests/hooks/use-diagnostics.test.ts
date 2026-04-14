@@ -98,6 +98,66 @@ describe("useDiagnosticsForFile", () => {
   });
 });
 
+describe("useDiagnosticsForFile — referential stability", () => {
+  beforeEach(() => {
+    useDiagnosticsStore.getState().clearAllDiagnostics();
+  });
+
+  it("returns the same reference across re-renders when no diagnostics exist", () => {
+    const { result, rerender } = renderHook(() =>
+      useDiagnosticsForFile("ws-1", "/src/app.ts"),
+    );
+
+    const first = result.current.diagnostics;
+    rerender();
+    const second = result.current.diagnostics;
+
+    expect(first).toBe(second);
+  });
+
+  it("returns the same reference when workspaceId is undefined across re-renders", () => {
+    const { result, rerender } = renderHook(() =>
+      useDiagnosticsForFile(undefined, "/src/app.ts"),
+    );
+
+    const first = result.current.diagnostics;
+    rerender();
+    const second = result.current.diagnostics;
+
+    expect(first).toBe(second);
+  });
+
+  it("returns the same reference when filePath is undefined across re-renders", () => {
+    const { result, rerender } = renderHook(() =>
+      useDiagnosticsForFile("ws-1", undefined),
+    );
+
+    const first = result.current.diagnostics;
+    rerender();
+    const second = result.current.diagnostics;
+
+    expect(first).toBe(second);
+  });
+
+  it("returns the same reference when unrelated store state changes", () => {
+    const { result } = renderHook(() =>
+      useDiagnosticsForFile("ws-1", "/src/app.ts"),
+    );
+
+    const first = result.current.diagnostics;
+
+    act(() => {
+      useDiagnosticsStore
+        .getState()
+        .setDiagnostics("ws-other", "/src/other.ts", [errorDiagnostic]);
+    });
+
+    const second = result.current.diagnostics;
+
+    expect(first).toBe(second);
+  });
+});
+
 describe("useLintOnSave", () => {
   beforeEach(() => {
     mockFetch.mockClear();

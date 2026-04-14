@@ -1,8 +1,14 @@
 import { useState, useRef, useCallback } from "react";
 
+type WidthValue = number | (() => number);
+
+function resolve(v: WidthValue): number {
+  return typeof v === "function" ? v() : v;
+}
+
 interface UseResizablePanelOptions {
-  minWidth: number;
-  maxWidth: number;
+  minWidth: WidthValue;
+  maxWidth: WidthValue;
   defaultWidth: number;
   storageKey?: string;
   reverse?: boolean;
@@ -16,15 +22,15 @@ interface UseResizablePanelResult {
 function readStoredWidth(
   storageKey: string,
   defaultWidth: number,
-  minWidth: number,
-  maxWidth: number,
+  minWidth: WidthValue,
+  maxWidth: WidthValue,
 ): number {
   try {
     const stored = localStorage.getItem(storageKey);
     if (stored === null) return defaultWidth;
     const parsed = parseInt(stored, 10);
     if (isNaN(parsed)) return defaultWidth;
-    return Math.max(minWidth, Math.min(maxWidth, parsed));
+    return Math.max(resolve(minWidth), Math.min(resolve(maxWidth), parsed));
   } catch {
     return defaultWidth;
   }
@@ -59,9 +65,11 @@ export function useResizablePanel({
       const handleDragMove = (me: MouseEvent) => {
         if (!isDragging.current) return;
         const delta = (me.clientX - dragStartX.current) * (reverse ? -1 : 1);
+        const min = resolve(minWidth);
+        const max = resolve(maxWidth);
         const newWidth = Math.max(
-          minWidth,
-          Math.min(maxWidth, dragStartWidth.current + delta),
+          min,
+          Math.min(max, dragStartWidth.current + delta),
         );
         currentWidthRef.current = newWidth;
         setWidth(newWidth);

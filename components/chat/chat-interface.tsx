@@ -136,7 +136,7 @@ export function ChatInterface() {
   const { width: splitPanelWidth, handleDragStart: handleSplitPanelDragStart } =
     useResizablePanel({
       minWidth: 400,
-      maxWidth: 1400,
+      maxWidth: () => Math.max(1400, window.innerWidth * 0.75),
       defaultWidth: 500,
       storageKey: "dev-hub:split-panel-width",
       reverse: true,

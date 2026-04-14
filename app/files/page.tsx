@@ -43,7 +43,7 @@ import { useLintOnSave, useDiagnosticsForFile } from "@/hooks/use-diagnostics";
 import { ProblemsPanel } from "@/components/editor/problems-panel";
 
 const MIN_PANEL_WIDTH = 180;
-const MAX_PANEL_WIDTH = 500;
+const MAX_PANEL_WIDTH = () => Math.max(500, window.innerWidth * 0.5);
 const DEFAULT_PANEL_WIDTH = 260;
 
 export default function FilesPage() {

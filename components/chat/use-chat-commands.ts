@@ -7,7 +7,6 @@ import {
   Brain,
   Clock,
   Coins,
-  ListTodo,
   PanelRight,
   Plus,
   ScrollText,
@@ -15,7 +14,7 @@ import {
 } from "lucide-react";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useMemo, useState } from "react";
-import { useSplitPanelStore } from "@/stores/split-panel-store";
+import { useSidePanelStore } from "@/stores/side-panel-store";
 
 interface ChatCommandRefs {
   handleCreateSession: RefObject<() => void>;
@@ -23,14 +22,12 @@ interface ChatCommandRefs {
   setIsSessionListOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
   setIsModelSelectorOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
   setIsAgentSelectorOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
-  setIsTaskPanelOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
   promptInput: RefObject<PromptInputHandle | null>;
 }
 
 interface ChatCommandLabels {
   isPlanPanelOpen: boolean;
-  isTaskPanelOpen: boolean;
-  isSplitPanelOpen: boolean;
+  isSidePanelOpen: boolean;
   showThinking: boolean;
   showToolCalls: boolean;
   showTokens: boolean;
@@ -108,32 +105,11 @@ export function useChatCommands(
         onSelect: () => refs.handleCreateSession.current(),
       },
       {
-        id: "chat:toggle-task-panel",
-        label: labels.isTaskPanelOpen ? "Hide Side Panel" : "Show Side Panel",
-        group: "Chat",
-        icon: ListTodo,
-        onSelect: () =>
-          refs.setIsTaskPanelOpen.current((prev) => {
-            const next = !prev;
-            localStorage.setItem("dev-hub:chat-task-panel", String(next));
-            return next;
-          }),
-      },
-      {
-        id: "chat:toggle-split-panel",
-        label: labels.isSplitPanelOpen ? "Hide Split View" : "Show Split View",
+        id: "chat:toggle-side-panel",
+        label: labels.isSidePanelOpen ? "Hide Side Panel" : "Show Side Panel",
         group: "Chat",
         icon: PanelRight,
-        onSelect: () => {
-          useSplitPanelStore.getState().togglePanel();
-          if (useSplitPanelStore.getState().isOpen) {
-            refs.setIsTaskPanelOpen.current((prev) => {
-              if (prev)
-                localStorage.setItem("dev-hub:chat-task-panel", "false");
-              return false;
-            });
-          }
-        },
+        onSelect: () => useSidePanelStore.getState().togglePanel(),
       },
       {
         id: "chat:toggle-thinking",
@@ -174,11 +150,9 @@ export function useChatCommands(
       labels.showTokens,
       labels.showTimestamps,
       labels.isPlanPanelOpen,
-      labels.isTaskPanelOpen,
-      labels.isSplitPanelOpen,
+      labels.isSidePanelOpen,
       refs.setIsPlanPanelOpen,
       refs.handleCreateSession,
-      refs.setIsTaskPanelOpen,
     ],
   );
 
@@ -228,33 +202,11 @@ export function useChatCommands(
       },
       {
         action: {
-          id: "chat:toggle-tasks",
+          id: "chat:toggle-side-panel",
           label: "Toggle side panel",
           page: "chat" as const,
         },
-        handler: () =>
-          refs.setIsTaskPanelOpen.current((prev) => {
-            const next = !prev;
-            localStorage.setItem("dev-hub:chat-task-panel", String(next));
-            return next;
-          }),
-      },
-      {
-        action: {
-          id: "chat:toggle-split-panel",
-          label: "Toggle split view",
-          page: "chat" as const,
-        },
-        handler: () => {
-          useSplitPanelStore.getState().togglePanel();
-          if (useSplitPanelStore.getState().isOpen) {
-            refs.setIsTaskPanelOpen.current((prev) => {
-              if (prev)
-                localStorage.setItem("dev-hub:chat-task-panel", "false");
-              return false;
-            });
-          }
-        },
+        handler: () => useSidePanelStore.getState().togglePanel(),
       },
       {
         action: {
@@ -317,7 +269,6 @@ export function useChatCommands(
     refs.handleCreateSession,
     refs.setIsSessionListOpen,
     refs.setIsPlanPanelOpen,
-    refs.setIsTaskPanelOpen,
     refs.promptInput,
   ]);
 

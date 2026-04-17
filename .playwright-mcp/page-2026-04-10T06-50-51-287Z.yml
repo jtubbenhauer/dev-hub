@@ -1,0 +1,82 @@
+- generic [ref=e1]:
+    - generic [ref=e4]:
+        - heading "Command Palette" [level=2] [ref=e5]
+        - paragraph [ref=e6]: Search for a command to run...
+    - region "Notifications alt+T"
+    - generic [active]:
+        - generic [ref=e9]:
+            - generic [ref=e10]:
+                - generic [ref=e11]:
+                    - navigation [ref=e12]:
+                        - button "previous" [disabled] [ref=e13]:
+                            - img "previous" [ref=e14]
+                        - generic [ref=e16]:
+                            - generic [ref=e17]: 1/
+                            - text: "1"
+                        - button "next" [disabled] [ref=e18]:
+                            - img "next" [ref=e19]
+                    - img
+                - generic [ref=e21]:
+                    - link "Next.js 16.1.6 (stale) Turbopack" [ref=e22] [cursor=pointer]:
+                        - /url: https://nextjs.org/docs/messages/version-staleness
+                        - img [ref=e23]
+                        - generic "There is a newer version (16.2.3) available, upgrade recommended!" [ref=e25]: Next.js 16.1.6 (stale)
+                        - generic [ref=e26]: Turbopack
+                    - img
+            - dialog "Build Error" [ref=e28]:
+                - generic [ref=e31]:
+                    - generic [ref=e32]:
+                        - generic [ref=e33]:
+                            - generic [ref=e35]: Build Error
+                            - generic [ref=e36]:
+                                - button "Copy Error Info" [ref=e37] [cursor=pointer]:
+                                    - img [ref=e38]
+                                - link "Go to related documentation" [ref=e40] [cursor=pointer]:
+                                    - /url: https://nextjs.org/docs/messages/module-not-found
+                                    - img [ref=e41]
+                                - button "Attach Node.js inspector" [ref=e43] [cursor=pointer]:
+                                    - img [ref=e44]
+                        - generic [ref=e53]: "Module not found: Can't resolve 'gemoji'"
+                    - generic [ref=e55]:
+                        - generic [ref=e57]:
+                            - img [ref=e59]
+                            - generic [ref=e63]: ./code/dev-hub/lib/emoji.ts (1:1)
+                            - button "Open in editor" [ref=e64] [cursor=pointer]:
+                                - img [ref=e66]
+                        - generic [ref=e69]:
+                            - generic [ref=e70]: Module not found
+                            - generic [ref=e71]: ": Can't resolve"
+                            - text: "'gemoji' >"
+                            - generic [ref=e72]: 1 |
+                            - text: import
+                            - generic [ref=e73]: "{ gemoji }"
+                            - text: from "gemoji";
+                            - generic [ref=e74]: "|"
+                            - text: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                            - generic [ref=e75]: 2 |
+                            - generic [ref=e76]: 3 |
+                            - text: const SHORTCODE_MAP = new Map<string,
+                            - generic [ref=e77]: string
+                            - text: ">();"
+                            - generic [ref=e78]: 4 |
+                            - text: for
+                            - generic [ref=e79]: (
+                            - text: const
+                            - generic [ref=e80]: entry
+                            - text: of
+                            - generic [ref=e81]: "gemoji) {"
+                            - generic [ref=e82]:
+                                - text: "Import traces: Client Component Browser: ./code/dev-hub/lib/emoji.ts [Client Component Browser] ./code/dev-hub/components/git/github-markdown.tsx [Client Component Browser] ./code/dev-hub/components/git/pr-panel.tsx [Client Component Browser] ./code/dev-hub/components/git/git-panel.tsx [Client Component Browser] ./code/dev-hub/app/git/page.tsx [Client Component Browser] ./code/dev-hub/app/git/page.tsx [Server Component] Client Component SSR: ./code/dev-hub/lib/emoji.ts [Client Component SSR] ./code/dev-hub/components/git/github-markdown.tsx [Client Component SSR] ./code/dev-hub/components/git/pr-panel.tsx [Client Component SSR] ./code/dev-hub/components/git/git-panel.tsx [Client Component SSR] ./code/dev-hub/app/git/page.tsx [Client Component SSR] ./code/dev-hub/app/git/page.tsx [Server Component]"
+                                - link "https://nextjs.org/docs/messages/module-not-found" [ref=e83] [cursor=pointer]:
+                                    - /url: https://nextjs.org/docs/messages/module-not-found
+                - generic [ref=e84]: "1"
+                - generic [ref=e85]: "2"
+        - generic [ref=e90] [cursor=pointer]:
+            - button "Open Next.js Dev Tools" [ref=e91]:
+                - img [ref=e92]
+            - button "Open issues overlay" [ref=e96]:
+                - generic [ref=e97]:
+                    - generic [ref=e98]: "0"
+                    - generic [ref=e99]: "1"
+                - generic [ref=e100]: Issue
+    - alert [ref=e101]

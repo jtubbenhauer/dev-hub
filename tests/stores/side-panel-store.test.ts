@@ -477,10 +477,3 @@ describe("persist key", () => {
     expect(name).toBe("dev-hub:side-panel");
   });
 });
-
-describe("compatibility shim", () => {
-  it("re-exports useSidePanelStore as useSplitPanelStore", async () => {
-    const { useSplitPanelStore } = await import("@/stores/split-panel-store");
-    expect(useSplitPanelStore).toBe(useSidePanelStore);
-  });
-});

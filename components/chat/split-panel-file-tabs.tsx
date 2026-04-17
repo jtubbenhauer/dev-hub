@@ -1,6 +1,6 @@
 "use client";
 
-import { useSplitPanelStore } from "@/stores/split-panel-store";
+import { useSidePanelStore as useSplitPanelStore } from "@/stores/side-panel-store";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";

@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { CommentsSidebar } from "@/components/editor/comments-sidebar";
 import { FileTree } from "@/components/editor/file-tree";
 import { SplitPanelFileTabs } from "@/components/chat/split-panel-file-tabs";
-import { useSplitPanelStore } from "@/stores/split-panel-store";
+import { useSidePanelStore as useSplitPanelStore } from "@/stores/side-panel-store";
 import { useChatStore } from "@/stores/chat-store";
 import {
   useFileComments,

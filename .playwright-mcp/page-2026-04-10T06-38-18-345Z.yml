@@ -1,0 +1,22 @@
+- generic [active] [ref=e1]:
+    - generic [ref=e3]:
+        - generic [ref=e4]:
+            - img [ref=e6]
+            - generic [ref=e8]: Dev Hub
+            - generic [ref=e9]: Sign in to your development hub
+        - generic [ref=e10]:
+            - generic [ref=e23]: Invalid username or password
+            - generic [ref=e11]:
+                - text: Username
+                - textbox "Username" [ref=e12]: admin
+            - generic [ref=e13]:
+                - text: Password
+                - textbox "Password" [ref=e14]: admin
+            - button "Sign In" [ref=e15]:
+                - img [ref=e16]
+                - text: Sign In
+    - generic [ref=e19]:
+        - heading "Command Palette" [level=2] [ref=e20]
+        - paragraph [ref=e21]: Search for a command to run...
+    - region "Notifications alt+T"
+    - alert [ref=e22]

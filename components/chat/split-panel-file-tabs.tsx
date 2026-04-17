@@ -1,15 +1,15 @@
 "use client";
 
-import { useSidePanelStore as useSplitPanelStore } from "@/stores/side-panel-store";
+import { useSidePanelStore } from "@/stores/side-panel-store";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
 export function SplitPanelFileTabs() {
-  const openFiles = useSplitPanelStore((s) => s.openFiles);
-  const activeFilePath = useSplitPanelStore((s) => s.activeFilePath);
-  const setActiveTab = useSplitPanelStore((s) => s.setActiveTab);
-  const closeTab = useSplitPanelStore((s) => s.closeTab);
+  const openFiles = useSidePanelStore((s) => s.openFiles);
+  const activeFilePath = useSidePanelStore((s) => s.activeFilePath);
+  const setActiveTab = useSidePanelStore((s) => s.setActiveTab);
+  const closeTab = useSidePanelStore((s) => s.closeTab);
 
   if (openFiles.length === 0) return null;
 

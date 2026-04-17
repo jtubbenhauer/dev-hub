@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { CommentsSidebar } from "@/components/editor/comments-sidebar";
 import { FileTree } from "@/components/editor/file-tree";
 import { SplitPanelFileTabs } from "@/components/chat/split-panel-file-tabs";
-import { useSidePanelStore as useSplitPanelStore } from "@/stores/side-panel-store";
+import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useChatStore } from "@/stores/chat-store";
 import {
   useFileComments,
@@ -64,26 +64,26 @@ const BINARY_EXTENSIONS = [
 ];
 
 export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
-  const openFiles = useSplitPanelStore((s) => s.openFiles);
-  const activeFilePath = useSplitPanelStore((s) => s.activeFilePath);
-  const isFilePickerOpen = useSplitPanelStore((s) => s.isFilePickerOpen);
-  const isLoading = useSplitPanelStore((s) => s.isLoading);
-  const error = useSplitPanelStore((s) => s.error);
+  const openFiles = useSidePanelStore((s) => s.openFiles);
+  const activeFilePath = useSidePanelStore((s) => s.activeFilePath);
+  const isFilePickerOpen = useSidePanelStore((s) => s.isFilePickerOpen);
+  const isLoading = useSidePanelStore((s) => s.isLoading);
+  const error = useSidePanelStore((s) => s.error);
 
-  const openFileInTab = useSplitPanelStore((s) => s.openFileInTab);
-  const setContent = useSplitPanelStore((s) => s.setContent);
-  const markSaved = useSplitPanelStore((s) => s.markSaved);
-  const setError = useSplitPanelStore((s) => s.setError);
-  const clearError = useSplitPanelStore((s) => s.clearError);
-  const toggleFilePicker = useSplitPanelStore((s) => s.toggleFilePicker);
-  const setIsLoading = useSplitPanelStore((s) => s.setIsLoading);
-  const clearFile = useSplitPanelStore((s) => s.clearFile);
+  const openFileInTab = useSidePanelStore((s) => s.openFileInTab);
+  const setContent = useSidePanelStore((s) => s.setContent);
+  const markSaved = useSidePanelStore((s) => s.markSaved);
+  const setError = useSidePanelStore((s) => s.setError);
+  const clearError = useSidePanelStore((s) => s.clearError);
+  const toggleFilePicker = useSidePanelStore((s) => s.toggleFilePicker);
+  const setIsLoading = useSidePanelStore((s) => s.setIsLoading);
+  const clearFile = useSidePanelStore((s) => s.clearFile);
 
   const activeSessionId = useChatStore((s) => s.activeSessionId);
 
-  const expandedPaths = useSplitPanelStore((s) => s.expandedPaths);
-  const toggleExpandedPath = useSplitPanelStore((s) => s.toggleExpandedPath);
-  const expandPathToFile = useSplitPanelStore((s) => s.expandPathToFile);
+  const expandedPaths = useSidePanelStore((s) => s.expandedPaths);
+  const toggleExpandedPath = useSidePanelStore((s) => s.toggleExpandedPath);
+  const expandPathToFile = useSidePanelStore((s) => s.expandPathToFile);
 
   const activeFile = useMemo(
     () => openFiles.find((f) => f.path === activeFilePath) ?? null,
@@ -239,7 +239,7 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
     (path: string) => {
       const existingTab = openFiles.find((f) => f.path === path);
       if (existingTab) {
-        useSplitPanelStore.getState().setActiveTab(path);
+        useSidePanelStore.getState().setActiveTab(path);
         return;
       }
       loadFile(path);

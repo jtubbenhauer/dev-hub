@@ -6,7 +6,7 @@ import { FileCode2, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { openFileInSplitPanel } from "@/lib/split-panel-open-file";
+import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 
 const FILE_EXTENSIONS = new Set([
   ".ts",
@@ -171,7 +171,7 @@ export function FilePathCode({ children, text }: FilePathCodeProps) {
         router.push(href);
         return;
       }
-      await openFileInSplitPanel(activeWorkspaceId ?? "", cleanPath, () =>
+      await openFileInSidePanel(activeWorkspaceId ?? "", cleanPath, () =>
         router.push(href),
       );
     },

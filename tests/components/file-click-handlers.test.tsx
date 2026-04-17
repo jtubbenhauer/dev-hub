@@ -22,13 +22,15 @@ vi.mock("@/stores/workspace-store", () => ({
 const mockOpenFile = vi.fn();
 const mockSetIsLoading = vi.fn();
 const mockClearError = vi.fn();
+const mockSetActivePanelTab = vi.fn();
 
-vi.mock("@/stores/split-panel-store", () => ({
-  useSplitPanelStore: Object.assign(vi.fn(), {
+vi.mock("@/stores/side-panel-store", () => ({
+  useSidePanelStore: Object.assign(vi.fn(), {
     getState: vi.fn(() => ({
       openFile: mockOpenFile,
       setIsLoading: mockSetIsLoading,
       clearError: mockClearError,
+      setActivePanelTab: mockSetActivePanelTab,
     })),
   }),
 }));

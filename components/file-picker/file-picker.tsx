@@ -12,7 +12,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { openFileInSplitPanel } from "@/lib/split-panel-open-file";
+import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import {
   fuzzySearch,
   basenamePositions,
@@ -189,7 +189,7 @@ export function FilePickerDialog() {
         setActiveWorkspaceId(pickerWorkspaceId);
       }
       close();
-      openFileInSplitPanel(wsId, match.path, () =>
+      openFileInSidePanel(wsId, match.path, () =>
         router.push(`/files?open=${encodeURIComponent(match.path)}`),
       );
     },

@@ -16,7 +16,7 @@ import {
 import type { MessageWithParts } from "@/lib/opencode/types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { openFileInSplitPanel } from "@/lib/split-panel-open-file";
+import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 
 function stripWorkspacePrefix(filePath: string, workspacePath: string): string {
   if (!workspacePath) return filePath;
@@ -44,7 +44,7 @@ const FileRow = memo(function FileRow({
       router.push(`/files?open=${encodeURIComponent(relativePath)}`);
       return;
     }
-    await openFileInSplitPanel(activeWorkspaceId ?? "", relativePath, () =>
+    await openFileInSidePanel(activeWorkspaceId ?? "", relativePath, () =>
       router.push(`/files?open=${encodeURIComponent(relativePath)}`),
     );
   }, [router, relativePath, isMobile, activeWorkspaceId]);

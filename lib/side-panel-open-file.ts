@@ -1,11 +1,11 @@
-import { useSplitPanelStore } from "@/stores/split-panel-store";
+import { useSidePanelStore } from "@/stores/side-panel-store";
 
-export async function openFileInSplitPanel(
+export async function openFileInSidePanel(
   workspaceId: string,
   path: string,
   fallback: () => void,
 ): Promise<void> {
-  const { setIsLoading, clearError, openFile } = useSplitPanelStore.getState();
+  const { setIsLoading, clearError, openFile } = useSidePanelStore.getState();
   setIsLoading(true);
   clearError();
   try {
@@ -18,6 +18,7 @@ export async function openFileInSplitPanel(
     }
     const data = (await res.json()) as { content: string; language?: string };
     openFile(path, data.content, data.language ?? "plaintext");
+    useSidePanelStore.getState().setActivePanelTab("files");
   } catch {
     fallback();
   } finally {

@@ -1,0 +1,4 @@
+Test: close button calls closePanel
+Result: PASS
+
+Close button (data-testid="side-panel-close") correctly calls useSidePanelStore.closePanel() on click.

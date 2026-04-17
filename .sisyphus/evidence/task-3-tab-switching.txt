@@ -1,0 +1,12 @@
+Test: clicking Files tab calls setActivePanelTab('files')
+Result: PASS
+Test: clicking Status tab calls setActivePanelTab('status')
+Result: PASS
+Test: renders SplitPanelFiles when activePanelTab is files
+Result: PASS
+Test: renders Status content when activePanelTab is status
+Result: PASS
+Test: highlights active tab with font-medium
+Result: PASS
+
+All tab switching tests pass. SidePanel component correctly delegates tab state to useSidePanelStore.

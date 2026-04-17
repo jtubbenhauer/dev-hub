@@ -3,6 +3,24 @@ import { persist } from "zustand/middleware";
 
 import type { OpenFile } from "@/types";
 
+export interface PersistedFile {
+  path: string;
+  name: string;
+  language: string;
+}
+
+interface WorkspaceFilesState {
+  files: PersistedFile[];
+  activeFilePath: string | null;
+}
+
+function getWsFiles(
+  states: Record<string, WorkspaceFilesState>,
+  id: string,
+): WorkspaceFilesState {
+  return states[id] ?? { files: [], activeFilePath: null };
+}
+
 interface SidePanelState {
   isOpen: boolean;
   activeTab: "files";
@@ -13,6 +31,7 @@ interface SidePanelState {
   isLoading: boolean;
   error: string | null;
   expandedPaths: string[];
+  workspaceFileStates: Record<string, WorkspaceFilesState>;
 
   openFileInTab: (path: string, content: string, language: string) => void;
   openFile: (path: string, content: string, language: string) => void;
@@ -32,6 +51,8 @@ interface SidePanelState {
   setIsLoading: (loading: boolean) => void;
   toggleExpandedPath: (path: string) => void;
   expandPathToFile: (filePath: string) => void;
+  saveWorkspaceFiles: (workspaceId: string) => void;
+  getPersistedFiles: (workspaceId: string) => WorkspaceFilesState;
 }
 
 export const useSidePanelStore = create<SidePanelState>()(
@@ -46,6 +67,7 @@ export const useSidePanelStore = create<SidePanelState>()(
       isLoading: false,
       error: null,
       expandedPaths: [],
+      workspaceFileStates: {},
 
       openFileInTab: (path, content, language) => {
         const { openFiles } = get();
@@ -176,6 +198,27 @@ export const useSidePanelStore = create<SidePanelState>()(
           }
           return { expandedPaths: [...paths] };
         }),
+
+      saveWorkspaceFiles: (workspaceId) => {
+        const { openFiles, activeFilePath } = get();
+        set((state) => ({
+          workspaceFileStates: {
+            ...state.workspaceFileStates,
+            [workspaceId]: {
+              files: openFiles.map((f) => ({
+                path: f.path,
+                name: f.name,
+                language: f.language,
+              })),
+              activeFilePath,
+            },
+          },
+        }));
+      },
+
+      getPersistedFiles: (workspaceId) => {
+        return getWsFiles(get().workspaceFileStates, workspaceId);
+      },
     }),
     {
       name: "dev-hub:side-panel",
@@ -184,6 +227,7 @@ export const useSidePanelStore = create<SidePanelState>()(
         isFilePickerOpen: state.isFilePickerOpen,
         expandedPaths: state.expandedPaths,
         activePanelTab: state.activePanelTab,
+        workspaceFileStates: state.workspaceFileStates,
       }),
     },
   ),

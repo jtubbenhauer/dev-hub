@@ -78,6 +78,8 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
   const toggleFilePicker = useSidePanelStore((s) => s.toggleFilePicker);
   const setIsLoading = useSidePanelStore((s) => s.setIsLoading);
   const clearFile = useSidePanelStore((s) => s.clearFile);
+  const saveWorkspaceFiles = useSidePanelStore((s) => s.saveWorkspaceFiles);
+  const getPersistedFiles = useSidePanelStore((s) => s.getPersistedFiles);
 
   const activeSessionId = useChatStore((s) => s.activeSessionId);
 
@@ -173,12 +175,7 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
   );
 
   const prevWorkspaceIdRef = useRef(workspaceId);
-  useEffect(() => {
-    if (prevWorkspaceIdRef.current !== workspaceId) {
-      prevWorkspaceIdRef.current = workspaceId;
-      clearFile();
-    }
-  }, [workspaceId, clearFile]);
+  const isRestoringRef = useRef(false);
 
   const { lintFile } = useLintOnSave(workspaceId, currentFilePath ?? undefined);
 
@@ -234,6 +231,66 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
     },
     [workspaceId, setIsLoading, clearError, setError, openFileInTab],
   );
+
+  const restoreFilesForWorkspace = useCallback(
+    async (wsId: string) => {
+      const { files, activeFilePath: savedActive } = getPersistedFiles(wsId);
+      if (files.length === 0) return;
+      isRestoringRef.current = true;
+      const results = await Promise.all(
+        files.map(async (f) => {
+          try {
+            const res = await fetch(
+              `/api/files/content?workspaceId=${wsId}&path=${encodeURIComponent(f.path)}`,
+            );
+            if (!res.ok) return null;
+            const data = await res.json();
+            return {
+              path: f.path,
+              content: data.content as string,
+              language: (data.language ?? f.language) as string,
+            };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      for (const file of results) {
+        if (file) openFileInTab(file.path, file.content, file.language);
+      }
+      if (savedActive) {
+        const restored = results.find((r) => r?.path === savedActive);
+        if (restored) useSidePanelStore.getState().setActiveTab(savedActive);
+      }
+      isRestoringRef.current = false;
+    },
+    [getPersistedFiles, openFileInTab],
+  );
+
+  useEffect(() => {
+    if (prevWorkspaceIdRef.current === workspaceId) return;
+    const prevId = prevWorkspaceIdRef.current;
+    prevWorkspaceIdRef.current = workspaceId;
+    saveWorkspaceFiles(prevId);
+    clearFile();
+    restoreFilesForWorkspace(workspaceId);
+  }, [workspaceId, saveWorkspaceFiles, clearFile, restoreFilesForWorkspace]);
+
+  const restoredForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (restoredForRef.current === workspaceId) return;
+    if (openFiles.length > 0) {
+      restoredForRef.current = workspaceId;
+      return;
+    }
+    restoredForRef.current = workspaceId;
+    restoreFilesForWorkspace(workspaceId);
+  }, [workspaceId, openFiles.length, restoreFilesForWorkspace]);
+
+  useEffect(() => {
+    if (isRestoringRef.current) return;
+    saveWorkspaceFiles(workspaceId);
+  }, [workspaceId, openFiles, activeFilePath, saveWorkspaceFiles]);
 
   const handleFileClick = useCallback(
     (path: string) => {

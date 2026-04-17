@@ -18,6 +18,13 @@ const initialState = {
   isLoading: false,
   error: null as string | null,
   expandedPaths: [] as string[],
+  workspaceFileStates: {} as Record<
+    string,
+    {
+      files: { path: string; name: string; language: string }[];
+      activeFilePath: string | null;
+    }
+  >,
 };
 
 function resetStore() {
@@ -475,5 +482,87 @@ describe("persist key", () => {
   it("uses dev-hub:side-panel as persist key", () => {
     const name = useSidePanelStore.persist.getOptions().name;
     expect(name).toBe("dev-hub:side-panel");
+  });
+});
+
+describe("saveWorkspaceFiles / getPersistedFiles", () => {
+  beforeEach(resetStore);
+
+  it("saves current openFiles metadata (no content) for a workspace", () => {
+    useSidePanelStore
+      .getState()
+      .openFileInTab("src/app.ts", "const x = 1;", "typescript");
+    useSidePanelStore.getState().saveWorkspaceFiles("ws-1");
+
+    const { files, activeFilePath } = useSidePanelStore
+      .getState()
+      .getPersistedFiles("ws-1");
+    expect(files).toHaveLength(1);
+    expect(files[0]).toEqual({
+      path: "src/app.ts",
+      name: "app.ts",
+      language: "typescript",
+    });
+    expect(files[0]).not.toHaveProperty("content");
+    expect(files[0]).not.toHaveProperty("originalContent");
+    expect(activeFilePath).toBe("src/app.ts");
+  });
+
+  it("returns empty state for unknown workspace", () => {
+    const { files, activeFilePath } = useSidePanelStore
+      .getState()
+      .getPersistedFiles("ws-unknown");
+    expect(files).toEqual([]);
+    expect(activeFilePath).toBeNull();
+  });
+
+  it("round-trip: save ws-1 and ws-2, restore both independently", () => {
+    useSidePanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "// a", "typescript");
+    useSidePanelStore.getState().saveWorkspaceFiles("ws-1");
+
+    useSidePanelStore.getState().clearFile();
+    useSidePanelStore
+      .getState()
+      .openFileInTab("src/b.ts", "// b", "typescript");
+    useSidePanelStore.getState().saveWorkspaceFiles("ws-2");
+
+    const ws1 = useSidePanelStore.getState().getPersistedFiles("ws-1");
+    const ws2 = useSidePanelStore.getState().getPersistedFiles("ws-2");
+
+    expect(ws1.files).toHaveLength(1);
+    expect(ws1.files[0].path).toBe("src/a.ts");
+    expect(ws2.files).toHaveLength(1);
+    expect(ws2.files[0].path).toBe("src/b.ts");
+  });
+
+  it("overwrite: re-saving same workspace updates state", () => {
+    useSidePanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "// a", "typescript");
+    useSidePanelStore.getState().saveWorkspaceFiles("ws-1");
+
+    useSidePanelStore.getState().clearFile();
+    useSidePanelStore
+      .getState()
+      .openFileInTab("src/b.ts", "// b", "typescript");
+    useSidePanelStore.getState().saveWorkspaceFiles("ws-1");
+
+    const { files } = useSidePanelStore.getState().getPersistedFiles("ws-1");
+    expect(files).toHaveLength(1);
+    expect(files[0].path).toBe("src/b.ts");
+  });
+
+  it("workspaceFileStates is included in partialize output", () => {
+    useSidePanelStore
+      .getState()
+      .openFileInTab("src/a.ts", "// a", "typescript");
+    useSidePanelStore.getState().saveWorkspaceFiles("ws-1");
+
+    const state = useSidePanelStore.getState();
+    expect(state.workspaceFileStates).toBeDefined();
+    expect(state.workspaceFileStates["ws-1"]).toBeDefined();
+    expect(state.workspaceFileStates["ws-1"].files[0].path).toBe("src/a.ts");
   });
 });

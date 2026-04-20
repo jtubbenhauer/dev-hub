@@ -51,7 +51,6 @@ import {
   ArrowDown,
   ChevronDown,
   ChevronRight,
-  GitBranch,
   GripVertical,
   LayoutList,
   Loader2,
@@ -952,12 +951,6 @@ export function ChatInterface() {
                   Untitled
                 </span>
               ) : null}
-              {gitStatus?.branch && (
-                <span className="text-muted-foreground hidden shrink-0 items-center gap-1 text-xs md:inline-flex">
-                  <GitBranch className="size-3" />
-                  {gitStatus.branch}
-                </span>
-              )}
             </div>
 
             <Button

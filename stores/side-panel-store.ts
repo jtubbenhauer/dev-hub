@@ -53,6 +53,10 @@ interface SidePanelState {
   expandPathToFile: (filePath: string) => void;
   saveWorkspaceFiles: (workspaceId: string) => void;
   getPersistedFiles: (workspaceId: string) => WorkspaceFilesState;
+  reloadFileFromDisk: (
+    workspaceId: string,
+    path: string,
+  ) => Promise<"reloaded" | "dirty-skipped" | "not-open" | "fetch-failed">;
 }
 
 export const useSidePanelStore = create<SidePanelState>()(
@@ -218,6 +222,37 @@ export const useSidePanelStore = create<SidePanelState>()(
 
       getPersistedFiles: (workspaceId) => {
         return getWsFiles(get().workspaceFileStates, workspaceId);
+      },
+
+      reloadFileFromDisk: async (workspaceId, path) => {
+        const { openFiles } = get();
+        const file = openFiles.find((f) => f.path === path);
+        if (!file) return "not-open";
+        if (file.isDirty) return "dirty-skipped";
+
+        let content: string;
+        try {
+          const res = await fetch(
+            `/api/files/content?workspaceId=${workspaceId}&path=${encodeURIComponent(path)}`,
+          );
+          if (!res.ok) return "fetch-failed";
+          const data = (await res.json()) as {
+            content: string;
+            language?: string;
+          };
+          content = data.content;
+        } catch {
+          return "fetch-failed";
+        }
+
+        set((state) => ({
+          openFiles: state.openFiles.map((f) =>
+            f.path === path
+              ? { ...f, content, originalContent: content, isDirty: false }
+              : f,
+          ),
+        }));
+        return "reloaded";
       },
     }),
     {

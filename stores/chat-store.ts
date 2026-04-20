@@ -17,6 +17,9 @@ import type {
 import { playSoundForEvent } from "@/lib/sounds";
 import { sendBrowserNotification } from "@/lib/notifications";
 import { toast } from "sonner";
+import { extractFilePathFromToolPart } from "@/lib/chat/extract-tool-file-path";
+import { useSidePanelStore } from "@/stores/side-panel-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export type StreamingStatus =
   | "idle"
@@ -192,6 +195,8 @@ export function _resetModuleCaches() {
 }
 const flushingQueuedWorkspaces = new Set<string>();
 
+const reloadDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 function flushPendingPartUpdates(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void,
 ): void {
@@ -255,6 +260,40 @@ function flushPendingPartUpdates(
 
     return { workspaceStates: nextWorkspaceStates };
   });
+
+  for (const [sessionId, byMessage] of snapshot) {
+    const wsId =
+      sessionSourceWorkspace.get(sessionId) ??
+      useWorkspaceStore.getState().activeWorkspaceId;
+    if (!wsId) continue;
+    for (const [, byPart] of byMessage) {
+      for (const [, part] of byPart) {
+        const filePath = extractFilePathFromToolPart(part);
+        if (!filePath) continue;
+        const { openFiles } = useSidePanelStore.getState();
+        if (!openFiles.some((f) => f.path === filePath)) continue;
+        const existing = reloadDebounceTimers.get(filePath);
+        if (existing) clearTimeout(existing);
+        reloadDebounceTimers.set(
+          filePath,
+          setTimeout(() => {
+            reloadDebounceTimers.delete(filePath);
+            useSidePanelStore
+              .getState()
+              .reloadFileFromDisk(wsId, filePath)
+              .then((status) => {
+                if (status === "dirty-skipped") {
+                  const filename = filePath.split("/").pop() ?? filePath;
+                  toast.warning(
+                    `File ${filename} was modified externally. Save or discard your changes to see the update.`,
+                  );
+                }
+              });
+          }, 500),
+        );
+      }
+    }
+  }
 }
 
 function schedulePendingPartFlush(

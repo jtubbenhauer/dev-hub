@@ -59,13 +59,13 @@ export function SidePanel({
         <div className="flex h-10 items-center justify-between border-b px-3">
           <div className="flex gap-3">
             <button
-              className={`text-xs ${activePanelTab === "status" ? "text-foreground font-medium" : "text-muted-foreground"}`}
+              className={`border-b-2 px-1 pb-1.5 text-xs transition-colors ${activePanelTab === "status" ? "text-foreground border-primary font-medium" : "text-muted-foreground hover:text-foreground/70 border-transparent"}`}
               onClick={() => setActivePanelTab("status")}
             >
               Status
             </button>
             <button
-              className={`text-xs ${activePanelTab === "files" ? "text-foreground font-medium" : "text-muted-foreground"}`}
+              className={`border-b-2 px-1 pb-1.5 text-xs transition-colors ${activePanelTab === "files" ? "text-foreground border-primary font-medium" : "text-muted-foreground hover:text-foreground/70 border-transparent"}`}
               onClick={() => setActivePanelTab("files")}
             >
               Files

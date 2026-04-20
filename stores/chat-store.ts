@@ -266,10 +266,19 @@ function flushPendingPartUpdates(
       sessionSourceWorkspace.get(sessionId) ??
       useWorkspaceStore.getState().activeWorkspaceId;
     if (!wsId) continue;
+    const workspace = useWorkspaceStore
+      .getState()
+      .workspaces.find((w) => w.id === wsId);
+    const wsPath = workspace?.path ?? "";
+    const wsPrefix = wsPath.endsWith("/") ? wsPath : wsPath + "/";
     for (const [, byPart] of byMessage) {
       for (const [, part] of byPart) {
-        const filePath = extractFilePathFromToolPart(part);
-        if (!filePath) continue;
+        const rawFilePath = extractFilePathFromToolPart(part);
+        if (!rawFilePath) continue;
+        const filePath =
+          wsPath && rawFilePath.startsWith(wsPrefix)
+            ? rawFilePath.slice(wsPrefix.length)
+            : rawFilePath;
         const { openFiles } = useSidePanelStore.getState();
         if (!openFiles.some((f) => f.path === filePath)) continue;
         const existing = reloadDebounceTimers.get(filePath);

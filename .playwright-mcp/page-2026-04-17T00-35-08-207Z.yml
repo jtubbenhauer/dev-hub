@@ -1,4 +1,0 @@
-- generic [ref=e2]:
-    - heading "Something went wrong" [level=2] [ref=e3]
-    - paragraph
-    - button "Try again" [ref=e4] [cursor=pointer]

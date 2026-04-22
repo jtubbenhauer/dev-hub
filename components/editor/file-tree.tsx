@@ -357,6 +357,18 @@ export function FileTree({
     setSelectedPath(clampedSelectedPath);
   }
 
+  // Scroll active file into view when activeFilePath changes (e.g. tab click)
+  useEffect(() => {
+    if (!activeFilePath || isSearching) return;
+    // Use requestAnimationFrame to allow the DOM to update after expanding dirs
+    requestAnimationFrame(() => {
+      const el = treeListRef.current?.querySelector(
+        `[data-tree-path="${CSS.escape(activeFilePath)}"]`,
+      );
+      if (el) el.scrollIntoView({ block: "nearest" });
+    });
+  }, [activeFilePath, isSearching]);
+
   // Scroll keyboard-selected tree entry into view
   useEffect(() => {
     if (!selectedPath || isSearching) return;

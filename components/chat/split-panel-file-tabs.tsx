@@ -10,6 +10,7 @@ export function SplitPanelFileTabs() {
   const activeFilePath = useSidePanelStore((s) => s.activeFilePath);
   const setActiveTab = useSidePanelStore((s) => s.setActiveTab);
   const closeTab = useSidePanelStore((s) => s.closeTab);
+  const expandPathToFile = useSidePanelStore((s) => s.expandPathToFile);
 
   if (openFiles.length === 0) return null;
 
@@ -27,7 +28,10 @@ export function SplitPanelFileTabs() {
                   ? "bg-background text-foreground"
                   : "bg-muted/50 text-muted-foreground hover:bg-muted",
               )}
-              onClick={() => setActiveTab(file.path)}
+              onClick={() => {
+                setActiveTab(file.path);
+                expandPathToFile(file.path);
+              }}
             >
               <span className="max-w-[120px] truncate">
                 {file.isDirty && (

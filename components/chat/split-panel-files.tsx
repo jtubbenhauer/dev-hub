@@ -406,9 +406,7 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
           <div
             className="flex min-h-0 shrink-0 flex-col"
             style={
-              currentFilePath && !error && !isLoading
-                ? { height: explorerHeight }
-                : undefined
+              openFiles.length > 0 ? { height: explorerHeight } : undefined
             }
           >
             <button
@@ -432,7 +430,7 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
               />
             </div>
           </div>
-          {currentFilePath && !error && !isLoading && (
+          {openFiles.length > 0 && (
             <div
               className="hover:bg-accent/50 active:bg-accent flex h-1.5 shrink-0 cursor-row-resize items-center justify-center border-y transition-colors"
               onMouseDown={handleExplorerDragStart}

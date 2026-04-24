@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
 import { FileTree } from "@/components/editor/file-tree";
+import type { FileTreeEntry } from "@/types";
 import { OpenEditors } from "@/components/editor/open-editors";
 import { FileTabs } from "@/components/editor/file-tabs";
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
@@ -31,14 +32,18 @@ import {
   FolderOpen,
   FileCode2,
   GitCompare,
+  CircleX,
+  TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGitStatus } from "@/hooks/use-git";
+import { useLintOnSave, useDiagnosticsForFile } from "@/hooks/use-diagnostics";
+import { ProblemsPanel } from "@/components/editor/problems-panel";
 
 const MIN_PANEL_WIDTH = 180;
-const MAX_PANEL_WIDTH = 500;
+const MAX_PANEL_WIDTH = () => Math.max(500, window.innerWidth * 0.5);
 const DEFAULT_PANEL_WIDTH = 260;
 
 export default function FilesPage() {
@@ -71,8 +76,93 @@ function FilesContent() {
   const expandPathToFile = useEditorStore((s) => s.expandPathToFile);
   const expandFolder = useEditorStore((s) => s.expandFolder);
   const closeAllFiles = useEditorStore((s) => s.closeAllFiles);
+  const toggleExpandedPath = useEditorStore((s) => s.toggleExpandedPath);
+  const workspaceFileStates = useEditorStore((s) => s.workspaceFileStates);
 
   const { isFileTabsDisabled } = useFileTabsSetting();
+
+  const expandedPaths = useMemo(() => {
+    if (!activeWorkspaceId) return new Set<string>();
+    const ws = workspaceFileStates[activeWorkspaceId];
+    return new Set(ws?.expandedPaths ?? []);
+  }, [activeWorkspaceId, workspaceFileStates]);
+
+  const handleToggleExpand = useCallback(
+    (path: string) => {
+      if (activeWorkspaceId) {
+        toggleExpandedPath(activeWorkspaceId, path);
+      }
+    },
+    [activeWorkspaceId, toggleExpandedPath],
+  );
+
+  const handleExpandPathToFile = useCallback(
+    (path: string) => {
+      if (activeWorkspaceId) {
+        expandPathToFile(activeWorkspaceId, path);
+      }
+    },
+    [activeWorkspaceId, expandPathToFile],
+  );
+
+  const handleFileTreeFileClick = useCallback(
+    async (entry: FileTreeEntry) => {
+      if (activeWorkspaceId) {
+        expandPathToFile(activeWorkspaceId, entry.path);
+      }
+      const response = await fetch(
+        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(entry.path)}`,
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      if (isFileTabsDisabled) closeAllFiles();
+      editorOpenFile({
+        path: entry.path,
+        name: entry.name,
+        content: data.content,
+        language: data.language,
+        isDirty: false,
+        originalContent: data.content,
+      });
+    },
+    [
+      activeWorkspaceId,
+      editorOpenFile,
+      closeAllFiles,
+      isFileTabsDisabled,
+      expandPathToFile,
+    ],
+  );
+
+  const handleFileTreeSearchResultClick = useCallback(
+    async (filePath: string) => {
+      const name = filePath.split("/").pop() ?? filePath;
+      if (activeWorkspaceId) {
+        expandPathToFile(activeWorkspaceId, filePath);
+      }
+      const response = await fetch(
+        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(filePath)}`,
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      if (isFileTabsDisabled) closeAllFiles();
+      editorOpenFile({
+        path: filePath,
+        name,
+        content: data.content,
+        language: data.language,
+        isDirty: false,
+        originalContent: data.content,
+      });
+    },
+    [
+      activeWorkspaceId,
+      editorOpenFile,
+      closeAllFiles,
+      isFileTabsDisabled,
+      expandPathToFile,
+    ],
+  );
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -226,6 +316,15 @@ function FilesContent() {
     [openFiles, activeFilePath],
   );
 
+  const { lintFile } = useLintOnSave(
+    activeWorkspaceId ?? undefined,
+    activeFilePath ?? undefined,
+  );
+  const { errorCount, warningCount } = useDiagnosticsForFile(
+    activeWorkspaceId ?? undefined,
+    activeFilePath ?? undefined,
+  );
+
   const handleSave = useCallback(async () => {
     if (!activeFile || !activeWorkspaceId) return;
 
@@ -245,13 +344,14 @@ function FilesContent() {
         throw new Error(err.error || "Save failed");
       }
       markFileSaved(activeFile.path);
+      void lintFile();
       toast.success("Saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Save failed");
     } finally {
       setSavingPath(null);
     }
-  }, [activeFile, activeWorkspaceId, markFileSaved]);
+  }, [activeFile, activeWorkspaceId, markFileSaved, lintFile]);
 
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
@@ -339,7 +439,16 @@ function FilesContent() {
               </SheetHeader>
               <div className="h-[calc(100%-41px)]">
                 {!isFileTabsDisabled && <OpenEditors />}
-                <FileTree searchInputRef={searchInputRef} />
+                <FileTree
+                  workspaceId={activeWorkspaceId}
+                  expandedPaths={expandedPaths}
+                  activeFilePath={activeFilePath}
+                  onToggleExpand={handleToggleExpand}
+                  onExpandPathToFile={handleExpandPathToFile}
+                  onFileClick={handleFileTreeFileClick}
+                  onSearchResultClick={handleFileTreeSearchResultClick}
+                  searchInputRef={searchInputRef}
+                />
               </div>
             </SheetContent>
           </Sheet>
@@ -369,7 +478,16 @@ function FilesContent() {
               </Button>
             </div>
             {!isFileTabsDisabled && <OpenEditors />}
-            <FileTree searchInputRef={searchInputRef} />
+            <FileTree
+              workspaceId={activeWorkspaceId}
+              expandedPaths={expandedPaths}
+              activeFilePath={activeFilePath}
+              onToggleExpand={handleToggleExpand}
+              onExpandPathToFile={handleExpandPathToFile}
+              onFileClick={handleFileTreeFileClick}
+              onSearchResultClick={handleFileTreeSearchResultClick}
+              searchInputRef={searchInputRef}
+            />
           </div>
         )}
 
@@ -422,6 +540,19 @@ function FilesContent() {
               {activeFile?.path ?? "No file open"}
             </span>
 
+            {errorCount > 0 && (
+              <span className="text-destructive flex items-center gap-1 text-xs">
+                <CircleX className="size-3" />
+                {errorCount}
+              </span>
+            )}
+            {warningCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-yellow-500">
+                <TriangleAlert className="size-3" />
+                {warningCount}
+              </span>
+            )}
+
             {activeFile && isActiveFileUnstaged && (
               <Button
                 variant="ghost"
@@ -468,17 +599,28 @@ function FilesContent() {
           {!isFileTabsDisabled && <FileTabs />}
 
           {/* Editor area */}
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {activeFile ? (
-              <EditorSwitcher
-                ref={editorHandleRef}
-                content={activeFile.content}
-                language={activeFile.language}
-                onChange={handleChange}
-                onSave={() => void handleSaveRef.current()}
-                workspaceId={activeWorkspaceId ?? undefined}
-                filePath={activeFile.path}
-              />
+              <>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <EditorSwitcher
+                    ref={editorHandleRef}
+                    content={activeFile.content}
+                    language={activeFile.language}
+                    onChange={handleChange}
+                    onSave={() => void handleSaveRef.current()}
+                    workspaceId={activeWorkspaceId ?? undefined}
+                    filePath={activeFile.path}
+                  />
+                </div>
+                <ProblemsPanel
+                  workspaceId={activeWorkspaceId ?? undefined}
+                  filePath={activeFile.path}
+                  onNavigate={(line) =>
+                    editorHandleRef.current?.revealLine(line)
+                  }
+                />
+              </>
             ) : (
               <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-3">
                 <FileCode2 className="text-muted-foreground/20 h-12 w-12" />

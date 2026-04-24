@@ -4,6 +4,9 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { FileCode2, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 
 const FILE_EXTENSIONS = new Set([
   ".ts",
@@ -152,6 +155,8 @@ interface FilePathCodeProps {
 
 export function FilePathCode({ children, text }: FilePathCodeProps) {
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   const cleanPath = stripPath(text);
   const isFolder = !isFilePath(text) && isFolderPath(text);
@@ -160,11 +165,17 @@ export function FilePathCode({ children, text }: FilePathCodeProps) {
     : `/files?open=${encodeURIComponent(cleanPath)}`;
 
   const handleClick = useCallback(
-    (e: React.MouseEvent) => {
+    async (e: React.MouseEvent) => {
       e.preventDefault();
-      router.push(href);
+      if (isMobile || isFolder) {
+        router.push(href);
+        return;
+      }
+      await openFileInSidePanel(activeWorkspaceId ?? "", cleanPath, () =>
+        router.push(href),
+      );
     },
-    [router, href],
+    [router, href, isMobile, isFolder, cleanPath, activeWorkspaceId],
   );
 
   const Icon = isFolder ? FolderOpen : FileCode2;

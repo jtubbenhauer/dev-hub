@@ -42,16 +42,9 @@ export function useAgentModelSync({
   const { primaryAgents } = useAgents(activeWorkspaceId);
   const orderedAgents = useMemo(() => {
     const utilityNames = new Set(["compaction", "title", "summary"]);
-    const regular: typeof primaryAgents = [];
-    const utility: typeof primaryAgents = [];
-    for (const agent of primaryAgents) {
-      if (utilityNames.has(agent.name.toLowerCase())) {
-        utility.push(agent);
-      } else {
-        regular.push(agent);
-      }
-    }
-    return [...regular, ...utility];
+    return primaryAgents.filter(
+      (agent) => !utilityNames.has(agent.name.toLowerCase()),
+    );
   }, [primaryAgents]);
 
   const { bindings: agentModelBindings } = useModelAgentBindings();

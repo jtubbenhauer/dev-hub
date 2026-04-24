@@ -36,6 +36,7 @@ import { attachCommentToChat } from "@/lib/comment-chat-bridge";
 import { useChatStore } from "@/stores/chat-store";
 import type { FileComment } from "@/types";
 import { MessageCircle } from "lucide-react";
+import { useMonacoDiagnosticMarkers } from "@/hooks/use-monaco-diagnostic-markers";
 
 const Editor = dynamic(
   () => import("@monaco-editor/react").then((mod) => mod.default),
@@ -84,6 +85,7 @@ function getMonacoLanguage(language: string): string {
 export interface MonacoEditorHandle {
   focus: () => void;
   blur: () => void;
+  revealLine: (line: number) => void;
 }
 
 interface MonacoEditorProps {
@@ -109,6 +111,7 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
         const textarea = dom?.querySelector<HTMLTextAreaElement>("textarea");
         textarea?.blur();
       },
+      revealLine: (line: number) => editorRef.current?.revealLineInCenter(line),
     }));
 
     const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
@@ -205,6 +208,14 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     }, [commentInput]);
 
     const [isEditorReady, setIsEditorReady] = useState(false);
+
+    useMonacoDiagnosticMarkers(
+      monacoRef,
+      editorRef,
+      workspaceId,
+      filePath,
+      isEditorReady,
+    );
 
     const handleBeforeMount = useCallback(
       (monacoInstance: typeof import("monaco-editor")) => {

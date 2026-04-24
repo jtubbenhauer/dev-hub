@@ -27,6 +27,8 @@ import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
+import { SidePanel } from "@/components/chat/side-panel";
+import { useSidePanelStore } from "@/stores/side-panel-store";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -49,7 +51,6 @@ import {
   ArrowDown,
   ChevronDown,
   ChevronRight,
-  GitBranch,
   GripVertical,
   LayoutList,
   Loader2,
@@ -119,18 +120,15 @@ export function ChatInterface() {
     () => ({ showThinking, showToolCalls, showTokens, showTimestamps }),
     [showThinking, showToolCalls, showTokens, showTimestamps],
   );
-  const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("dev-hub:chat-task-panel") === "true";
-  });
-  const { width: taskPanelWidth, handleDragStart: handleTaskPanelDragStart } =
+  const { width: sidePanelWidth, handleDragStart: handleSidePanelDragStart } =
     useResizablePanel({
-      minWidth: 200,
-      maxWidth: 400,
-      defaultWidth: 280,
-      storageKey: "dev-hub:chat-task-panel-width",
+      minWidth: 400,
+      maxWidth: () => Math.max(1400, window.innerWidth * 0.75),
+      defaultWidth: 500,
+      storageKey: "dev-hub:split-panel-width",
       reverse: true,
     });
+  const isSidePanelOpen = useSidePanelStore((s) => s.isOpen);
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false);
   const [, setHasPlanFiles] = useState(false);
   const [isMobileRightPanelOpen, setIsMobileRightPanelOpen] = useState(false);
@@ -143,7 +141,6 @@ export function ChatInterface() {
   const promptInputRef = useRef<PromptInputHandle>(null);
   const sessionListFocusRef = useRef<HTMLDivElement>(null);
   const messagesPanelFocusRef = useRef<HTMLDivElement>(null);
-  const taskPanelFocusRef = useRef<HTMLDivElement>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const activeWorkspaceId = useWorkspaceStore(
@@ -479,6 +476,23 @@ export function ChatInterface() {
     setIsEditingSessionNote(false);
   }, [activeSessionId]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
+        e.preventDefault();
+        useSidePanelStore.getState().togglePanel();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile && isSidePanelOpen) {
+      useSidePanelStore.getState().closePanel();
+    }
+  }, [isMobile, isSidePanelOpen]);
+
   const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
     setShowJumpToBottom(!atBottom);
   }, []);
@@ -674,8 +688,6 @@ export function ChatInterface() {
   setIsModelSelectorOpenRef.current = setIsModelSelectorOpen;
   const setIsAgentSelectorOpenRef = useRef(setIsAgentSelectorOpen);
   setIsAgentSelectorOpenRef.current = setIsAgentSelectorOpen;
-  const setIsTaskPanelOpenRef = useRef(setIsTaskPanelOpen);
-  setIsTaskPanelOpenRef.current = setIsTaskPanelOpen;
 
   const { isVariantSelectorOpen, setIsVariantSelectorOpen } = useChatCommands(
     {
@@ -684,12 +696,11 @@ export function ChatInterface() {
       setIsSessionListOpen: setIsSessionListOpenRef,
       setIsModelSelectorOpen: setIsModelSelectorOpenRef,
       setIsAgentSelectorOpen: setIsAgentSelectorOpenRef,
-      setIsTaskPanelOpen: setIsTaskPanelOpenRef,
       promptInput: promptInputRef,
     },
     {
       isPlanPanelOpen,
-      isTaskPanelOpen,
+      isSidePanelOpen,
       showThinking,
       showToolCalls,
       showTokens,
@@ -940,12 +951,6 @@ export function ChatInterface() {
                   Untitled
                 </span>
               ) : null}
-              {gitStatus?.branch && (
-                <span className="text-muted-foreground hidden shrink-0 items-center gap-1 text-xs md:inline-flex">
-                  <GitBranch className="size-3" />
-                  {gitStatus.branch}
-                </span>
-              )}
             </div>
 
             <Button
@@ -968,6 +973,20 @@ export function ChatInterface() {
             >
               <ScrollText className="size-4" />
             </Button>
+
+            <div className="hidden md:flex">
+              <Button
+                size="icon-sm"
+                variant={isSidePanelOpen ? "secondary" : "outline"}
+                data-testid="split-panel-toggle"
+                onClick={() => {
+                  useSidePanelStore.getState().togglePanel();
+                }}
+                title="Side panel"
+              >
+                <PanelRight className="size-4" />
+              </Button>
+            </div>
 
             <Button
               size="icon-sm"
@@ -1289,7 +1308,7 @@ export function ChatInterface() {
             workspaceId={activeWorkspaceId}
             sessionId={activeSessionId}
             commands={commands}
-            agents={primaryAgents}
+            agents={orderedAgents}
             selectedAgent={selectedAgent}
             onAgentChange={(agent) => {
               setSelectedAgent(agent);
@@ -1325,77 +1344,18 @@ export function ChatInterface() {
         </div>
       </ChatDisplayContext.Provider>
 
-      {isTaskPanelOpen && (
-        <>
-          <div
-            className="hover:bg-accent/50 active:bg-accent hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors md:flex"
-            onMouseDown={handleTaskPanelDragStart}
-          >
-            <GripVertical className="text-muted-foreground/30 size-3.5" />
-          </div>
-          <div
-            ref={(el) => {
-              taskPanelFocusRef.current = el;
-            }}
-            tabIndex={-1}
-            className="relative hidden shrink-0 overflow-y-auto border-l md:block"
-            style={{ width: taskPanelWidth }}
-          >
-            <div className="flex h-10 items-center justify-between border-b px-3">
-              <span className="text-muted-foreground text-xs font-medium">
-                Side Panel
-              </span>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                onClick={() => {
-                  setIsTaskPanelOpen(false);
-                  localStorage.setItem("dev-hub:chat-task-panel", "false");
-                }}
-              >
-                <X className="size-3" />
-              </Button>
-            </div>
-            {activeWorkspaceId && activeWorkspace && (
-              <WorkspaceContextPanel
-                workspaceId={activeWorkspaceId}
-                workspace={activeWorkspace}
-              />
-            )}
-            {activeTodos.length > 0 && (
-              <>
-                <div className="border-t px-3 py-2">
-                  <span className="text-muted-foreground text-xs font-medium">
-                    Task Progress
-                  </span>
-                </div>
-                <div className="px-3 pb-3">
-                  <TaskProgressPanel todos={activeTodos} />
-                </div>
-              </>
-            )}
-            <div className="border-t px-3 py-2">
-              <span className="text-muted-foreground text-xs font-medium">
-                MCP Servers
-              </span>
-            </div>
-            <div className="px-3 pb-3">
-              <McpStatusPanel />
-            </div>
-            <div className="border-t px-3 py-2">
-              <span className="text-muted-foreground text-xs font-medium">
-                Session Files
-              </span>
-            </div>
-            <div className="px-3 pb-3">
-              <SessionFilesPanel
-                messages={activeMessagesRaw}
-                workspacePath={activeWorkspacePath}
-              />
-            </div>
-          </div>
-        </>
-      )}
+      {isSidePanelOpen && activeWorkspace ? (
+        <SidePanel
+          width={sidePanelWidth}
+          handleDragStart={handleSidePanelDragStart}
+          workspaceId={activeWorkspaceId ?? ""}
+          workspace={activeWorkspace}
+          activeTodos={activeTodos}
+          messages={activeMessagesRaw}
+          workspacePath={activeWorkspacePath}
+          onEscape={() => promptInputRef.current?.focus()}
+        />
+      ) : null}
     </div>
   );
 }

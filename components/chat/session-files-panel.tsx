@@ -14,6 +14,9 @@ import {
   type SessionFile,
 } from "@/lib/chat/extract-session-files";
 import type { MessageWithParts } from "@/lib/opencode/types";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 
 function stripWorkspacePrefix(filePath: string, workspacePath: string): string {
   if (!workspacePath) return filePath;
@@ -32,11 +35,19 @@ const FileRow = memo(function FileRow({
   workspacePath: string;
 }) {
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const relativePath = stripWorkspacePrefix(file.path, workspacePath);
 
-  const handleClick = useCallback(() => {
-    router.push(`/files?open=${encodeURIComponent(relativePath)}`);
-  }, [router, relativePath]);
+  const handleClick = useCallback(async () => {
+    if (isMobile) {
+      router.push(`/files?open=${encodeURIComponent(relativePath)}`);
+      return;
+    }
+    await openFileInSidePanel(activeWorkspaceId ?? "", relativePath, () =>
+      router.push(`/files?open=${encodeURIComponent(relativePath)}`),
+    );
+  }, [router, relativePath, isMobile, activeWorkspaceId]);
 
   const handleOpenGitDiff = useCallback(
     (e: React.MouseEvent) => {

@@ -544,3 +544,11 @@ export interface WorkspaceProviderCreateResult {
 
 export type FileComment = typeof fileComments.$inferSelect;
 export type NewFileComment = typeof fileComments.$inferInsert;
+
+export type {
+  Diagnostic,
+  DiagnosticRange,
+  LintResponse,
+  LintErrorResponse,
+} from "@/types/diagnostics";
+export { DiagnosticSeverity } from "@/types/diagnostics";

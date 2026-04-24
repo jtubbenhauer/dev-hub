@@ -12,6 +12,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import {
   fuzzySearch,
   basenamePositions,
@@ -180,6 +181,21 @@ export function FilePickerDialog() {
     [close, router, pickerWorkspaceId, activeWorkspaceId, setActiveWorkspaceId],
   );
 
+  const handleSelectInPanel = useCallback(
+    (match: FuzzyMatch) => {
+      const wsId = pickerWorkspaceId ?? activeWorkspaceId;
+      if (!wsId) return;
+      if (pickerWorkspaceId && pickerWorkspaceId !== activeWorkspaceId) {
+        setActiveWorkspaceId(pickerWorkspaceId);
+      }
+      close();
+      openFileInSidePanel(wsId, match.path, () =>
+        router.push(`/files?open=${encodeURIComponent(match.path)}`),
+      );
+    },
+    [close, router, pickerWorkspaceId, activeWorkspaceId, setActiveWorkspaceId],
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       switch (e.key) {
@@ -200,7 +216,11 @@ export function FilePickerDialog() {
         case "Enter":
           e.preventDefault();
           if (results[selectedIndex]) {
-            handleSelect(results[selectedIndex]);
+            if (e.metaKey || e.ctrlKey) {
+              handleSelectInPanel(results[selectedIndex]);
+            } else {
+              handleSelect(results[selectedIndex]);
+            }
           }
           break;
         case "Escape":
@@ -228,6 +248,7 @@ export function FilePickerDialog() {
       results,
       selectedIndex,
       handleSelect,
+      handleSelectInPanel,
       close,
       workspaces,
       pickerWorkspaceId,
@@ -319,7 +340,13 @@ export function FilePickerDialog() {
                         ? "bg-accent text-accent-foreground"
                         : "hover:bg-accent/50",
                     )}
-                    onClick={() => handleSelect(match)}
+                    onClick={(e) => {
+                      if (e.metaKey || e.ctrlKey) {
+                        handleSelectInPanel(match);
+                      } else {
+                        handleSelect(match);
+                      }
+                    }}
                     onMouseEnter={() => setSelectedIndex(index)}
                   >
                     <File className="text-muted-foreground size-3.5 shrink-0" />
@@ -350,6 +377,7 @@ export function FilePickerDialog() {
         <div className="text-muted-foreground/60 flex items-center gap-3 border-t px-3 py-1.5 text-[10px]">
           <span>↑↓ navigate</span>
           <span>↵ open</span>
+          <span>⌘↵ side panel</span>
           <span>esc close</span>
           {workspaces.length > 1 && <span>tab switch workspace</span>}
         </div>

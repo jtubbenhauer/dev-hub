@@ -39,21 +39,32 @@ export function TerminalDrawer() {
   );
   const [hasEverOpened, setHasEverOpened] = useState(false);
 
-  // Track if the drawer has ever opened (during render)
-  if (isOpen && !hasEverOpened) {
-    setHasEverOpened(true);
-  }
+  // Track if the drawer has ever opened
+  useEffect(() => {
+    if (isOpen && !hasEverOpened) {
+      setHasEverOpened(true);
+    }
+  }, [isOpen, hasEverOpened]);
 
-  // Detect workspace change during render and reset to loading state
-  const isNewWorkspace = activeWorkspaceId !== resolvedWorkspaceId;
-  const needsFetch =
-    isOpen && !!activeWorkspaceId && (isNewWorkspace || (!config && !error));
-  if (needsFetch && !isLoading) {
-    setIsLoading(true);
-    setError(null);
-    setConfig(null);
-    setResolvedWorkspaceId(activeWorkspaceId);
-  }
+  // Detect workspace change and reset to loading state
+  useEffect(() => {
+    const isNewWorkspace = activeWorkspaceId !== resolvedWorkspaceId;
+    const needsFetch =
+      isOpen && !!activeWorkspaceId && (isNewWorkspace || (!config && !error));
+    if (needsFetch && !isLoading) {
+      setIsLoading(true);
+      setError(null);
+      setConfig(null);
+      setResolvedWorkspaceId(activeWorkspaceId);
+    }
+  }, [
+    isOpen,
+    activeWorkspaceId,
+    resolvedWorkspaceId,
+    config,
+    error,
+    isLoading,
+  ]);
 
   useEffect(() => {
     if (!isOpen || !activeWorkspaceId) return;

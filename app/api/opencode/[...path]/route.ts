@@ -128,7 +128,12 @@ async function proxyToOpenCode(
     const upstream = await fetch(targetUrl.toString(), fetchOptions);
     return proxyResponse(upstream, isSSE);
   } catch (error) {
-    if (workspaceId && workspace?.backend === "remote" && !isSSE) {
+    if (
+      workspaceId &&
+      workspace?.backend === "remote" &&
+      !isSSE &&
+      request.method !== "GET"
+    ) {
       const supportsAutoSuspend = await workspaceSupportsAutoSuspend(
         workspace,
         session.user.id,

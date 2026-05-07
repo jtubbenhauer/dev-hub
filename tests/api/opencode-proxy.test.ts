@@ -128,9 +128,16 @@ describe("OpenCode proxy route retry", () => {
         },
       ]);
 
-    const promise = GET(
+    const mod = await import("@/app/api/opencode/[...path]/route");
+
+    const promise = mod.POST(
       new NextRequest(
         "http://localhost:3000/api/opencode/session?workspaceId=ws-1",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({}),
+        },
       ),
       { params: Promise.resolve({ path: ["session"] }) },
     );
@@ -141,6 +148,36 @@ describe("OpenCode proxy route retry", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry GET requests for remote auto-suspend workspace", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+    );
+
+    mockWhere
+      .mockResolvedValueOnce([makeRemoteWorkspaceRow()])
+      .mockResolvedValueOnce([
+        {
+          value: [
+            {
+              id: "provider-1",
+              behaviour: { supportsAutoSuspend: true },
+            },
+          ],
+        },
+      ]);
+
+    const response = await GET(
+      new NextRequest(
+        "http://localhost:3000/api/opencode/session?workspaceId=ws-1",
+      ),
+      { params: Promise.resolve({ path: ["session"] }) },
+    );
+
+    expect(response.status).toBe(502);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   });
 
   it("does not retry SSE requests when upstream fetch fails", async () => {

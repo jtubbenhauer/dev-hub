@@ -420,21 +420,31 @@ function AgentBindingsCard({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">No binding</SelectItem>
-                  {providers.map((p) => (
-                    <SelectGroup key={p.provider.id}>
-                      <SelectLabel>
-                        {p.provider.name || p.provider.id}
-                      </SelectLabel>
-                      {p.models.map((m) => (
-                        <SelectItem
-                          key={`${p.provider.id}::${m.id}`}
-                          value={`${p.provider.id}::${m.id}`}
-                        >
-                          {m.name || m.id}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
+                  {[...providers]
+                    .sort((a, b) =>
+                      (a.provider.name || a.provider.id).localeCompare(
+                        b.provider.name || b.provider.id,
+                      ),
+                    )
+                    .map((p) => (
+                      <SelectGroup key={p.provider.id}>
+                        <SelectLabel>
+                          {p.provider.name || p.provider.id}
+                        </SelectLabel>
+                        {[...p.models]
+                          .sort((a, b) =>
+                            (a.name || a.id).localeCompare(b.name || b.id),
+                          )
+                          .map((m) => (
+                            <SelectItem
+                              key={`${p.provider.id}::${m.id}`}
+                              value={`${p.provider.id}::${m.id}`}
+                            >
+                              {m.name || m.id}
+                            </SelectItem>
+                          ))}
+                      </SelectGroup>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

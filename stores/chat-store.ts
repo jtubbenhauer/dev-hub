@@ -135,6 +135,16 @@ let _activeQuestionSessionIdsCacheRef: QuestionRequest[] = EMPTY_QUESTIONS;
 let _unifiedQuestionSessionIdsCache: Set<string> = EMPTY_QUESTION_SESSION_IDS;
 let _unifiedQuestionSessionIdsCacheRefs = new Map<string, QuestionRequest[]>();
 
+type ReconcileResource = "permission" | "question";
+
+interface ReconcileBackoffState {
+  inFlight: Promise<void> | null;
+  failureCount: number;
+  nextAllowedAt: number;
+}
+
+const reconcileBackoff = new Map<string, ReconcileBackoffState>();
+
 // RAF-batched buffer for message.part.updated events.
 // Keyed: sessionId → messageId → partId → Part
 const pendingPartUpdates = new Map<string, Map<string, Map<string, Part>>>();
@@ -147,6 +157,9 @@ let sseOnopenAbortController: AbortController | null = null;
 
 // Dedup in-flight fetchSessions calls to prevent duplicate API requests
 const _fetchSessionsInFlight = new Set<string>();
+
+// Dedup in-flight remote message refreshes (keyed by "workspaceId:sessionId")
+const _refreshMessagesInFlight = new Map<string, Promise<void>>();
 
 // RAF-batched buffer for message.updated events.
 // Keyed: sessionId → Message (latest info wins)
@@ -187,8 +200,10 @@ export function _resetModuleCaches() {
   _activeQuestionSessionIdsCacheRef = EMPTY_QUESTIONS;
   _unifiedQuestionSessionIdsCache = EMPTY_QUESTION_SESSION_IDS;
   _unifiedQuestionSessionIdsCacheRefs = new Map();
+  reconcileBackoff.clear();
 
   _fetchSessionsInFlight.clear();
+  _refreshMessagesInFlight.clear();
   pendingPartUpdates.clear();
   pendingMessageUpdates.clear();
   sessionSourceWorkspace.clear();
@@ -196,6 +211,107 @@ export function _resetModuleCaches() {
 const flushingQueuedWorkspaces = new Set<string>();
 
 const reloadDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const MESSAGE_CACHE_FRESH_MS = 60_000;
+
+function getReconcileBackoffKey(
+  workspaceId: string,
+  resource: ReconcileResource,
+): string {
+  return `${workspaceId}:${resource}`;
+}
+
+function getOrCreateReconcileBackoffState(
+  workspaceId: string,
+  resource: ReconcileResource,
+): ReconcileBackoffState {
+  const key = getReconcileBackoffKey(workspaceId, resource);
+  const existing = reconcileBackoff.get(key);
+  if (existing) return existing;
+
+  const initialState: ReconcileBackoffState = {
+    inFlight: null,
+    failureCount: 0,
+    nextAllowedAt: 0,
+  };
+  reconcileBackoff.set(key, initialState);
+  return initialState;
+}
+
+function getReconcileBackoffDelay(failureCount: number): number {
+  return Math.min(5000 * 2 ** Math.max(failureCount - 1, 0), 60000);
+}
+
+function reconcileWorkspacePrompts(
+  workspaceId: string,
+  resource: ReconcileResource,
+  signal: AbortSignal | undefined,
+  set: (fn: (state: ChatState) => Partial<ChatState>) => void,
+): Promise<void> {
+  const state = getOrCreateReconcileBackoffState(workspaceId, resource);
+  if (state.inFlight) {
+    return state.inFlight;
+  }
+
+  const now = Date.now();
+  if (state.nextAllowedAt > now) {
+    return Promise.resolve();
+  }
+
+  const request = fetch(
+    buildProxyUrl(resource, workspaceId),
+    signal ? { signal } : {},
+  )
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to reconcile ${resource}: ${response.status}`);
+      }
+
+      const payload = (await response.json()) as unknown;
+      if (!Array.isArray(payload)) {
+        throw new Error(`Invalid ${resource} reconciliation payload`);
+      }
+
+      set((chatState) =>
+        updateWorkspace(chatState, workspaceId, (ws) => {
+          if (resource === "permission") {
+            const permissions = payload as PermissionRequest[];
+            const serverIds = new Set(permissions.map((p) => p.id));
+            const known = new Set(ws.permissions.map((p) => p.id));
+            const incoming = permissions.filter((p) => !known.has(p.id));
+            const reconciled = ws.permissions.filter((p) =>
+              serverIds.has(p.id),
+            );
+            return { permissions: [...reconciled, ...incoming] };
+          }
+
+          const questions = payload as QuestionRequest[];
+          const serverIds = new Set(questions.map((q) => q.id));
+          const known = new Set(ws.questions.map((q) => q.id));
+          const incoming = questions.filter((q) => !known.has(q.id));
+          const reconciled = ws.questions.filter((q) => serverIds.has(q.id));
+          return { questions: [...reconciled, ...incoming] };
+        }),
+      );
+
+      state.failureCount = 0;
+      state.nextAllowedAt = 0;
+    })
+    .catch((error) => {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      state.failureCount += 1;
+      state.nextAllowedAt =
+        Date.now() + getReconcileBackoffDelay(state.failureCount);
+    })
+    .finally(() => {
+      state.inFlight = null;
+    });
+
+  state.inFlight = request;
+  return request;
+}
 
 function flushPendingPartUpdates(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void,
@@ -501,6 +617,10 @@ interface ChatState {
   ) => SessionSnapshot | null;
   restoreSessionLocal: (snapshot: SessionSnapshot) => void;
   fetchMessages: (sessionId: string, workspaceId: string) => Promise<void>;
+  _refreshMessagesFromRemote: (
+    sessionId: string,
+    workspaceId: string,
+  ) => Promise<void>;
   fetchCommands: (workspaceId: string) => Promise<void>;
   summarizeSession: (
     sessionId: string,
@@ -759,10 +879,48 @@ export const useChatStore = create<ChatState>()(
         const current = get().activeWorkspaceId;
         if (current === workspaceId) return;
 
-        set({
-          activeWorkspaceId: workspaceId,
-          activeSessionId: null,
-          streamingError: null,
+        set((state) => {
+          const base: Partial<ChatState> = {
+            activeWorkspaceId: workspaceId,
+            activeSessionId: null,
+            streamingError: null,
+          };
+
+          // Strip fromCache flag so sessions render at full opacity immediately
+          const ws = workspaceId
+            ? state.workspaceStates[workspaceId]
+            : undefined;
+          if (ws && Object.keys(ws.sessions).length > 0) {
+            const hasCached = Object.values(ws.sessions).some(
+              (s) =>
+                "fromCache" in s &&
+                (s as Record<string, unknown>).fromCache === true,
+            );
+            if (hasCached) {
+              const cleaned: Record<string, Session> = {};
+              for (const [id, s] of Object.entries(ws.sessions)) {
+                if (
+                  "fromCache" in s &&
+                  (s as Record<string, unknown>).fromCache === true
+                ) {
+                  const { fromCache: _, ...rest } = s as Session &
+                    Record<string, unknown>;
+                  cleaned[id] = rest as Session;
+                } else {
+                  cleaned[id] = s;
+                }
+              }
+              return {
+                ...base,
+                workspaceStates: {
+                  ...state.workspaceStates,
+                  [workspaceId!]: { ...ws, sessions: cleaned },
+                },
+              };
+            }
+          }
+
+          return base;
         });
 
         if (workspaceId) {
@@ -777,6 +935,8 @@ export const useChatStore = create<ChatState>()(
         if (_fetchSessionsInFlight.has(workspaceId)) return;
         _fetchSessionsInFlight.add(workspaceId);
         try {
+          await get().fetchCachedSessions(workspaceId);
+
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10_000);
           const response = await fetch(buildProxyUrl("session", workspaceId), {
@@ -787,7 +947,6 @@ export const useChatStore = create<ChatState>()(
             console.warn(
               `[chat] fetchSessions failed: ${response.status}, falling back to cache`,
             );
-            await get().fetchCachedSessions(workspaceId);
             set((state) => {
               if (state.workspaceStates[workspaceId]?.sessionsLoaded)
                 return state;
@@ -854,7 +1013,6 @@ export const useChatStore = create<ChatState>()(
           }
         } catch (error) {
           console.warn("[chat] fetchSessions error:", error);
-          await get().fetchCachedSessions(workspaceId);
           set((state) => {
             if (state.workspaceStates[workspaceId]?.sessionsLoaded)
               return state;
@@ -1104,9 +1262,13 @@ export const useChatStore = create<ChatState>()(
       },
 
       fetchMessages: async (sessionId, workspaceId) => {
+        const tag = `[chat] fetchMessages ${sessionId.slice(0, 12)}`;
+        console.time(tag);
         const hasInMemory =
           (get().workspaceStates[workspaceId]?.messages[sessionId]?.length ??
             0) > 0;
+        let shouldRefreshFromRemote = true;
+        let hasCachedMessages = hasInMemory;
 
         if (!hasInMemory) {
           try {
@@ -1116,7 +1278,9 @@ export const useChatStore = create<ChatState>()(
             if (cacheResponse.ok) {
               const cached = await cacheResponse.json();
               if (cached?.messages?.length > 0) {
-                // Only populate if still empty (avoid overwriting SSE-delivered data)
+                hasCachedMessages = true;
+                const cachedAt =
+                  typeof cached.cachedAt === "number" ? cached.cachedAt : null;
                 set((state) => {
                   const ws = state.workspaceStates[workspaceId];
                   if (ws?.messages[sessionId]?.length) return state;
@@ -1134,6 +1298,13 @@ export const useChatStore = create<ChatState>()(
                   );
                   return { ...wsUpdate, ...lruUpdate };
                 });
+
+                if (
+                  cachedAt !== null &&
+                  Date.now() - cachedAt < MESSAGE_CACHE_FRESH_MS
+                ) {
+                  shouldRefreshFromRemote = false;
+                }
               }
             }
           } catch {
@@ -1141,11 +1312,108 @@ export const useChatStore = create<ChatState>()(
           }
         }
 
-        try {
-          const response = await fetch(
-            buildProxyUrl(`session/${sessionId}/message`, workspaceId),
-          );
-          if (!response.ok) {
+        if (!hasInMemory) {
+          set((state) => {
+            const ws = state.workspaceStates[workspaceId];
+            if (ws?.messages[sessionId]?.length) return state;
+            if (sessionId in (ws?.messages ?? {})) return state;
+            return updateWorkspace(state, workspaceId, (wsInner) => ({
+              messages: { ...wsInner.messages, [sessionId]: [] },
+            }));
+          });
+        }
+
+        if (!shouldRefreshFromRemote) {
+          console.timeEnd(tag);
+          return;
+        }
+
+        if (hasCachedMessages) {
+          console.timeEnd(tag);
+          void get()._refreshMessagesFromRemote(sessionId, workspaceId);
+          return;
+        }
+
+        await get()._refreshMessagesFromRemote(sessionId, workspaceId);
+        console.timeEnd(tag);
+      },
+
+      _refreshMessagesFromRemote: (sessionId, workspaceId) => {
+        const key = `${workspaceId}:${sessionId}`;
+        const existing = _refreshMessagesInFlight.get(key);
+        if (existing) return existing;
+
+        const request = (async () => {
+          const rTag = `[chat] _refreshMessagesFromRemote ${sessionId.slice(0, 12)}`;
+          console.time(rTag);
+          try {
+            const msgController = new AbortController();
+            const msgTimeoutId = setTimeout(
+              () => msgController.abort(),
+              10_000,
+            );
+            const response = await fetch(
+              buildProxyUrl(`session/${sessionId}/message`, workspaceId),
+              { signal: msgController.signal },
+            );
+            clearTimeout(msgTimeoutId);
+            if (!response.ok) {
+              set((state) =>
+                updateWorkspace(state, workspaceId, (ws) => ({
+                  messages: {
+                    ...ws.messages,
+                    [sessionId]: ws.messages[sessionId] ?? [],
+                  },
+                })),
+              );
+              return;
+            }
+
+            const data: MessageWithParts[] = await response.json();
+            set((state) => {
+              const wsUpdate = updateWorkspace(state, workspaceId, (ws) => {
+                const { [sessionId]: _, ...remainingOptimistic } =
+                  ws.optimisticMessageIds;
+                const seededAgent = ws.sessionAgents[sessionId]
+                  ? {}
+                  : (() => {
+                      const lastUserMessage = [...data]
+                        .reverse()
+                        .find((m) => m.info.role === "user");
+                      const agent =
+                        lastUserMessage?.info.role === "user"
+                          ? lastUserMessage.info.agent
+                          : undefined;
+                      return agent
+                        ? {
+                            sessionAgents: {
+                              ...ws.sessionAgents,
+                              [sessionId]: agent,
+                            },
+                          }
+                        : {};
+                    })();
+                return {
+                  optimisticMessageIds: remainingOptimistic,
+                  messages: { ...ws.messages, [sessionId]: data },
+                  ...seededAgent,
+                };
+              });
+              const stateAfterWsUpdate = { ...state, ...wsUpdate };
+              const lruUpdate = touchLru(
+                stateAfterWsUpdate,
+                sessionId,
+                workspaceId,
+              );
+              return { ...wsUpdate, ...lruUpdate };
+            });
+
+            fetch("/api/sessions/cache/messages", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ sessionId, workspaceId, messages: data }),
+            }).catch(() => {});
+          } catch {
             set((state) =>
               updateWorkspace(state, workspaceId, (ws) => ({
                 messages: {
@@ -1154,64 +1422,14 @@ export const useChatStore = create<ChatState>()(
                 },
               })),
             );
-            return;
+          } finally {
+            console.timeEnd(rTag);
+            _refreshMessagesInFlight.delete(key);
           }
+        })();
 
-          const data: MessageWithParts[] = await response.json();
-          set((state) => {
-            const wsUpdate = updateWorkspace(state, workspaceId, (ws) => {
-              const { [sessionId]: _, ...remainingOptimistic } =
-                ws.optimisticMessageIds;
-              // Seed session agent from the last user message if not already tracked
-              const seededAgent = ws.sessionAgents[sessionId]
-                ? {}
-                : (() => {
-                    const lastUserMessage = [...data]
-                      .reverse()
-                      .find((m) => m.info.role === "user");
-                    const agent =
-                      lastUserMessage?.info.role === "user"
-                        ? lastUserMessage.info.agent
-                        : undefined;
-                    return agent
-                      ? {
-                          sessionAgents: {
-                            ...ws.sessionAgents,
-                            [sessionId]: agent,
-                          },
-                        }
-                      : {};
-                  })();
-              return {
-                optimisticMessageIds: remainingOptimistic,
-                messages: { ...ws.messages, [sessionId]: data },
-                ...seededAgent,
-              };
-            });
-            const stateAfterWsUpdate = { ...state, ...wsUpdate };
-            const lruUpdate = touchLru(
-              stateAfterWsUpdate,
-              sessionId,
-              workspaceId,
-            );
-            return { ...wsUpdate, ...lruUpdate };
-          });
-
-          fetch("/api/sessions/cache/messages", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ sessionId, workspaceId, messages: data }),
-          }).catch(() => {});
-        } catch {
-          set((state) =>
-            updateWorkspace(state, workspaceId, (ws) => ({
-              messages: {
-                ...ws.messages,
-                [sessionId]: ws.messages[sessionId] ?? [],
-              },
-            })),
-          );
-        }
+        _refreshMessagesInFlight.set(key, request);
+        return request;
       },
 
       summarizeSession: async (sessionId, workspaceId, model) => {
@@ -1822,44 +2040,19 @@ export const useChatStore = create<ChatState>()(
             get().refreshActiveSessionStatus(activeWorkspaceId);
           }
 
-          for (const wsId of workspaceIds) {
-            fetch(buildProxyUrl("permission", wsId), { signal })
-              .then((res) => res.json())
-              .then((permissions: PermissionRequest[]) => {
-                if (!Array.isArray(permissions)) return;
-                const serverIds = new Set(permissions.map((p) => p.id));
-                set((state) =>
-                  updateWorkspace(state, wsId, (ws) => {
-                    const known = new Set(ws.permissions.map((p) => p.id));
-                    const incoming = permissions.filter(
-                      (p) => !known.has(p.id),
-                    );
-                    const reconciled = ws.permissions.filter((p) =>
-                      serverIds.has(p.id),
-                    );
-                    return { permissions: [...reconciled, ...incoming] };
-                  }),
-                );
-              })
-              .catch(() => {});
-
-            fetch(buildProxyUrl("question", wsId), { signal })
-              .then((res) => res.json())
-              .then((questions: QuestionRequest[]) => {
-                if (!Array.isArray(questions)) return;
-                const serverIds = new Set(questions.map((q) => q.id));
-                set((state) =>
-                  updateWorkspace(state, wsId, (ws) => {
-                    const known = new Set(ws.questions.map((q) => q.id));
-                    const incoming = questions.filter((q) => !known.has(q.id));
-                    const reconciled = ws.questions.filter((q) =>
-                      serverIds.has(q.id),
-                    );
-                    return { questions: [...reconciled, ...incoming] };
-                  }),
-                );
-              })
-              .catch(() => {});
+          if (activeWorkspaceId) {
+            void reconcileWorkspacePrompts(
+              activeWorkspaceId,
+              "permission",
+              signal,
+              set,
+            );
+            void reconcileWorkspacePrompts(
+              activeWorkspaceId,
+              "question",
+              signal,
+              set,
+            );
           }
         };
 
@@ -2020,44 +2213,10 @@ export const useChatStore = create<ChatState>()(
         } else if (es && es.readyState === EventSource.OPEN) {
           // SSE stayed open while backgrounded — reconcile questions/permissions
           // in case events were missed or arrived before the tab could process them.
-          for (const wsId of get().sseWorkspaceIds) {
-            fetch(buildProxyUrl("permission", wsId))
-              .then((res) => res.json())
-              .then((permissions: PermissionRequest[]) => {
-                if (!Array.isArray(permissions)) return;
-                const serverIds = new Set(permissions.map((p) => p.id));
-                set((state) =>
-                  updateWorkspace(state, wsId, (ws) => {
-                    const known = new Set(ws.permissions.map((p) => p.id));
-                    const incoming = permissions.filter(
-                      (p) => !known.has(p.id),
-                    );
-                    const reconciled = ws.permissions.filter((p) =>
-                      serverIds.has(p.id),
-                    );
-                    return { permissions: [...reconciled, ...incoming] };
-                  }),
-                );
-              })
-              .catch(() => {});
-
-            fetch(buildProxyUrl("question", wsId))
-              .then((res) => res.json())
-              .then((questions: QuestionRequest[]) => {
-                if (!Array.isArray(questions)) return;
-                const serverIds = new Set(questions.map((q) => q.id));
-                set((state) =>
-                  updateWorkspace(state, wsId, (ws) => {
-                    const known = new Set(ws.questions.map((q) => q.id));
-                    const incoming = questions.filter((q) => !known.has(q.id));
-                    const reconciled = ws.questions.filter((q) =>
-                      serverIds.has(q.id),
-                    );
-                    return { questions: [...reconciled, ...incoming] };
-                  }),
-                );
-              })
-              .catch(() => {});
+          const wsId = get().activeWorkspaceId;
+          if (wsId) {
+            void reconcileWorkspacePrompts(wsId, "permission", undefined, set);
+            void reconcileWorkspacePrompts(wsId, "question", undefined, set);
           }
         }
       },

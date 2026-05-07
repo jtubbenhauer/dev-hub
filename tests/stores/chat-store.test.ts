@@ -136,7 +136,10 @@ function _emitEvent(
 
 import { useChatStore, _resetModuleCaches } from "../../stores/chat-store";
 
-/** Reset the store to a pristine state between tests. */
+async function flushMicrotasks(ticks = 8) {
+  for (let i = 0; i < ticks; i++) await Promise.resolve();
+}
+
 function resetStore() {
   _resetModuleCaches();
   useChatStore.setState({
@@ -1860,8 +1863,7 @@ describe("SSE connection management", () => {
           sessionsLoaded: true,
         },
       },
-      // Not the active workspace — avoids fetchMessages/refreshActiveSessionStatus side effects
-      activeWorkspaceId: null,
+      activeWorkspaceId: "ws-a",
       activeSessionId: null,
     });
 
@@ -1913,7 +1915,7 @@ describe("SSE connection management", () => {
           sessionsLoaded: true,
         },
       },
-      activeWorkspaceId: null,
+      activeWorkspaceId: "ws-a",
       activeSessionId: null,
     });
 
@@ -1961,7 +1963,7 @@ describe("SSE connection management", () => {
           sessionsLoaded: true,
         },
       },
-      activeWorkspaceId: null,
+      activeWorkspaceId: "ws-a",
       activeSessionId: null,
     });
 
@@ -2270,6 +2272,82 @@ describe("handleVisibilityRestored", () => {
     );
     expect(questionFetch).toBeTruthy();
     expect(permissionFetch).toBeTruthy();
+  });
+
+  it("skips immediate visibility restore retries after reconciliation failures", async () => {
+    vi.useFakeTimers();
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/permission") || url.includes("/question")) {
+        return Promise.resolve({ ok: false, status: 502 });
+      }
+
+      if (url.includes("/session/status")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }
+
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    useChatStore.getState().connectGlobalSSE(["ws-a"]);
+    const es = useChatStore.getState().globalEventSource!;
+    Object.defineProperty(es, "readyState", {
+      value: EventSource.OPEN,
+      writable: true,
+    });
+
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          sessionsLoaded: true,
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+        },
+      },
+    });
+
+    useChatStore.getState().handleVisibilityRestored();
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    const reconcileCallsAfterFirstRestore = fetchMock.mock.calls.filter(
+      (args) =>
+        typeof args[0] === "string" &&
+        (args[0].includes("/permission") || args[0].includes("/question")),
+    ).length;
+
+    useChatStore.getState().handleVisibilityRestored();
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const reconcileCallsAfterSecondRestore = fetchMock.mock.calls.filter(
+      (args) =>
+        typeof args[0] === "string" &&
+        (args[0].includes("/permission") || args[0].includes("/question")),
+    ).length;
+
+    expect(reconcileCallsAfterFirstRestore).toBeGreaterThan(0);
+    expect(reconcileCallsAfterSecondRestore).toBe(
+      reconcileCallsAfterFirstRestore,
+    );
+
+    vi.useRealTimers();
   });
 });
 
@@ -2719,9 +2797,138 @@ describe("fetchMessages — stale-while-revalidate caching", () => {
 
     await useChatStore.getState().fetchMessages("sess-a", "ws-a");
 
+    // fetchMessages returns immediately after populating cache; the
+    // background refresh is fire-and-forget, so flush microtasks.
+    await flushMicrotasks();
+
     const ws = useChatStore.getState().workspaceStates["ws-a"];
     expect(ws.messages["sess-a"]).toHaveLength(2);
     expect(ws.messages["sess-a"][1].info.id).toBe("remote-2");
+  });
+
+  it("skips immediate remote refresh when cached messages are fresh", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(30_000);
+
+    const cachedMessages = [
+      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/sessions/cache/messages")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ messages: cachedMessages, cachedAt: 5_000 }),
+        });
+      }
+      if (url.includes("/api/opencode/")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [],
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+    });
+
+    await useChatStore.getState().fetchMessages("sess-a", "ws-a");
+
+    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const remoteCalls = fetchCalls.filter(
+      (args: unknown[]) =>
+        typeof args[0] === "string" && args[0].includes("/api/opencode/"),
+    );
+    expect(remoteCalls).toHaveLength(0);
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"];
+    expect(ws.messages["sess-a"]).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
+  it("refreshes from remote when cached messages are stale", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(120_000);
+
+    const cachedMessages = [
+      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
+    ];
+    const remoteMessages = [
+      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("remote-2", "sess-a"), parts: [] },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/sessions/cache/messages")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ messages: cachedMessages, cachedAt: 5_000 }),
+        });
+      }
+      if (url.includes("/api/opencode/")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => remoteMessages,
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+    });
+
+    await useChatStore.getState().fetchMessages("sess-a", "ws-a");
+    await flushMicrotasks();
+
+    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const remoteCalls = fetchCalls.filter(
+      (args: unknown[]) =>
+        typeof args[0] === "string" && args[0].includes("/api/opencode/"),
+    );
+    expect(remoteCalls).toHaveLength(1);
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"];
+    expect(ws.messages["sess-a"]).toHaveLength(2);
+
+    vi.useRealTimers();
   });
 
   it("skips SQLite cache when in-memory messages already exist", async () => {
@@ -2764,6 +2971,7 @@ describe("fetchMessages — stale-while-revalidate caching", () => {
     });
 
     await useChatStore.getState().fetchMessages("sess-a", "ws-a");
+    await flushMicrotasks();
 
     const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
     const cacheReadCalls = fetchCalls.filter(
@@ -2880,6 +3088,61 @@ describe("fetchMessages — stale-while-revalidate caching", () => {
     const ws = useChatStore.getState().workspaceStates["ws-a"];
     expect(ws.messages["sess-a"]).toHaveLength(1);
     expect(ws.messages["sess-a"][0].info.id).toBe("remote-1");
+  });
+
+  it("sets messages key to empty array before remote fetch so isMessagesLoaded resolves early", async () => {
+    let remoteResolve: (v: unknown) => void;
+    const remotePromise = new Promise((r) => {
+      remoteResolve = r;
+    });
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/sessions/cache/messages"))
+        return Promise.resolve({ ok: true, json: async () => null });
+      if (url.includes("/api/opencode/")) return remotePromise;
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+    });
+
+    const fetchPromise = useChatStore
+      .getState()
+      .fetchMessages("sess-a", "ws-a");
+
+    await vi.waitFor(() => {
+      const ws = useChatStore.getState().workspaceStates["ws-a"];
+      expect("sess-a" in ws.messages).toBe(true);
+    });
+
+    remoteResolve!({
+      ok: true,
+      json: async () => [
+        { info: makeUserMessage("msg-1", "sess-a"), parts: [] },
+      ],
+    });
+    await fetchPromise;
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"];
+    expect(ws.messages["sess-a"]).toHaveLength(1);
   });
 });
 
@@ -3486,6 +3749,61 @@ describe("pinned sessions", () => {
 describe("fetchSessions fallback to cache", () => {
   beforeEach(resetStore);
 
+  it("loads cached sessions before a slow live fetch completes", async () => {
+    const cachedSessions = [
+      {
+        id: "cached-1",
+        title: "Cached Session 1",
+        parentID: null,
+        time: { created: 1000, updated: 2000 },
+        fromCache: true,
+      },
+    ];
+
+    let resolveLiveFetch: ((value: ResponseLike) => void) | null = null;
+    type ResponseLike = {
+      ok: boolean;
+      status?: number;
+      json: () => Promise<unknown>;
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/api/sessions/cache?workspaceId=")) {
+        return Promise.resolve({ ok: true, json: async () => cachedSessions });
+      }
+      if ((url as string).includes("/api/opencode/session")) {
+        return new Promise<ResponseLike>((resolve) => {
+          resolveLiveFetch = resolve;
+        });
+      }
+      if ((url as string).includes("/api/sessions/cache")) {
+        return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    const fetchPromise = useChatStore.getState().fetchSessions("ws-local");
+
+    await vi.waitFor(() => expect(resolveLiveFetch).not.toBeNull());
+
+    let ws = useChatStore.getState().workspaceStates["ws-local"];
+    expect(ws.sessionsLoaded).toBe(true);
+    expect(Object.keys(ws.sessions)).toHaveLength(1);
+    expect(ws.sessions["cached-1"].title).toBe("Cached Session 1");
+
+    expect(resolveLiveFetch).not.toBeNull();
+    resolveLiveFetch!({
+      ok: true,
+      json: async () => [makeSession("live-1", { updated: 3000 })],
+    });
+
+    await fetchPromise;
+
+    ws = useChatStore.getState().workspaceStates["ws-local"];
+    expect(Object.keys(ws.sessions)).toHaveLength(1);
+    expect(ws.sessions["live-1"]).toBeDefined();
+  });
+
   it("falls back to cached sessions when live fetch returns 502", async () => {
     const cachedSessions = [
       {
@@ -3605,14 +3923,13 @@ describe("fetchSessions fallback to cache", () => {
     expect(Object.keys(ws.sessions)).toHaveLength(2);
     expect(ws.sessions["live-1"]).toBeDefined();
     expect(ws.sessions["live-2"]).toBeDefined();
-    // Cache should not have been read (GET with ?workspaceId=), only written (POST to /api/sessions/cache)
     const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
     const cacheReads = fetchCalls.filter(
       (args: unknown[]) =>
         typeof args[0] === "string" &&
         args[0].includes("/api/sessions/cache?workspaceId="),
     );
-    expect(cacheReads).toHaveLength(0);
+    expect(cacheReads).toHaveLength(1);
   });
 });
 

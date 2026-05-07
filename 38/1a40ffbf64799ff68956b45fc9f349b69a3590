@@ -1,0 +1,22 @@
+components/terminal/terminal-drawer.tsx
+  276b312944df79c4 42-47,49-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "381a40ffbf64799ff68956b45fc9f349b69a3590",
+  "prompts": {
+    "276b312944df79c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_20ac115a8ffe7C60kKA9dDarhy-e486c501-9c2a-47e4-b48c-6d944f1bad96",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 25,
+      "overriden_lines": 0
+    }
+  }
+}

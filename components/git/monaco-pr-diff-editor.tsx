@@ -489,6 +489,8 @@ interface PrDiffEditorProps {
   outdatedLines: Set<number>;
   isLoading: boolean;
   isSubmittingComment: boolean;
+  additions?: number;
+  deletions?: number;
   onAddComment: (
     body: string,
     line: number,
@@ -517,6 +519,8 @@ export const MonacoPrDiffEditor = forwardRef<
     resolvedLines,
     isLoading,
     isSubmittingComment,
+    additions,
+    deletions,
     onAddComment,
     onReplyToComment,
     onEditComment,
@@ -1177,6 +1181,18 @@ export const MonacoPrDiffEditor = forwardRef<
         <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
           {fileName}
         </span>
+
+        {(additions != null || deletions != null) &&
+          ((additions ?? 0) > 0 || (deletions ?? 0) > 0) && (
+            <span className="flex shrink-0 items-center gap-1 font-mono text-[10px]">
+              {(additions ?? 0) > 0 && (
+                <span className="text-green-500">+{additions}</span>
+              )}
+              {(deletions ?? 0) > 0 && (
+                <span className="text-red-500">-{deletions}</span>
+              )}
+            </span>
+          )}
 
         <DiffViewToggle />
 

@@ -35,6 +35,29 @@ function parseStatusLetter(letter: string): ReviewFileStatus {
   return STATUS_MAP[clean] ?? "modified";
 }
 
+function parseNumstat(
+  output: string,
+): Map<string, { additions: number; deletions: number; isBinary: boolean }> {
+  const map = new Map<
+    string,
+    { additions: number; deletions: number; isBinary: boolean }
+  >();
+  for (const line of output.trim().split("\n")) {
+    if (!line) continue;
+    const parts = line.split("\t");
+    if (parts.length < 3) continue;
+    const [addStr, delStr, ...pathParts] = parts;
+    const filePath = pathParts[pathParts.length - 1];
+    const isBinary = addStr === "-";
+    map.set(filePath, {
+      additions: isBinary ? 0 : parseInt(addStr, 10),
+      deletions: isBinary ? 0 : parseInt(delStr, 10),
+      isBinary,
+    });
+  }
+  return map;
+}
+
 function readFileContentSafe(workspacePath: string, filePath: string): string {
   try {
     const resolvedWorkspace = path.resolve(workspacePath);
@@ -527,18 +550,32 @@ export function gitRoutes(workspacePath: string): Hono {
       return c.json({ error: "baseRef query parameter required" }, 400);
     }
 
-    const output = await git.raw(["diff", "--name-status", baseRef]);
+    const [nameStatusOutput, numstatOutput] = await Promise.all([
+      git.raw(["diff", "--name-status", baseRef]),
+      git.raw(["diff", "--numstat", baseRef]),
+    ]);
+
+    const stats = parseNumstat(numstatOutput);
     const files: ReviewChangedFile[] = [];
-    for (const line of output.trim().split("\n")) {
+    for (const line of nameStatusOutput.trim().split("\n")) {
       if (!line) continue;
       const parts = line.split("\t");
       const status = parseStatusLetter(parts[0]);
 
-      if (status === "renamed" || status === "copied") {
-        files.push({ path: parts[2], status, oldPath: parts[1] });
-      } else {
-        files.push({ path: parts[1], status });
-      }
+      const filePath =
+        status === "renamed" || status === "copied" ? parts[2] : parts[1];
+      const oldPath =
+        status === "renamed" || status === "copied" ? parts[1] : undefined;
+      const stat = stats.get(filePath);
+
+      files.push({
+        path: filePath,
+        status,
+        oldPath,
+        additions: stat?.additions,
+        deletions: stat?.deletions,
+        isBinary: stat?.isBinary,
+      });
     }
 
     return c.json(files);
@@ -547,7 +584,12 @@ export function gitRoutes(workspacePath: string): Hono {
   // GET /git/uncommitted-files
   app.get("/uncommitted-files", async (c) => {
     const git = createGit(workspacePath);
-    const status = await git.status();
+    const [status, numstatOutput] = await Promise.all([
+      git.status(),
+      git.raw(["diff", "--numstat", "HEAD"]).catch(() => ""),
+    ]);
+
+    const stats = parseNumstat(numstatOutput);
     const files: ReviewChangedFile[] = [];
     const seen = new Set<string>();
 
@@ -557,18 +599,28 @@ export function gitRoutes(workspacePath: string): Hono {
 
       const idx = file.index;
       const wd = file.working_dir;
+      const stat = stats.get(file.path);
 
+      let fileStatus: ReviewFileStatus;
       if (idx === "?" && wd === "?") {
-        files.push({ path: file.path, status: "untracked" });
+        fileStatus = "untracked";
       } else if (idx === "A" || wd === "A") {
-        files.push({ path: file.path, status: "added" });
+        fileStatus = "added";
       } else if (idx === "D" || wd === "D") {
-        files.push({ path: file.path, status: "deleted" });
+        fileStatus = "deleted";
       } else if (idx === "R" || wd === "R") {
-        files.push({ path: file.path, status: "renamed" });
+        fileStatus = "renamed";
       } else {
-        files.push({ path: file.path, status: "modified" });
+        fileStatus = "modified";
       }
+
+      files.push({
+        path: file.path,
+        status: fileStatus,
+        additions: stat?.additions,
+        deletions: stat?.deletions,
+        isBinary: stat?.isBinary,
+      });
     }
 
     return c.json(files);

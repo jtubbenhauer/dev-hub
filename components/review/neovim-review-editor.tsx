@@ -44,6 +44,8 @@ interface NeovimReviewEditorProps {
   file?: ReviewFile;
   workspaceId: string;
   isLoading: boolean;
+  additions?: number;
+  deletions?: number;
   onToggleReviewed?: (file: ReviewFile) => void;
   onMarkAndNext?: (file: ReviewFile) => void;
   onOpenFileList?: () => void;
@@ -88,6 +90,8 @@ export const NeovimReviewEditor = forwardRef<
     file,
     workspaceId,
     isLoading,
+    additions,
+    deletions,
     onToggleReviewed,
     onMarkAndNext,
     onOpenFileList,
@@ -265,6 +269,18 @@ export const NeovimReviewEditor = forwardRef<
         <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
           {fileName}
         </span>
+
+        {(additions != null || deletions != null) &&
+          ((additions ?? 0) > 0 || (deletions ?? 0) > 0) && (
+            <span className="flex shrink-0 items-center gap-1 font-mono text-[10px]">
+              {(additions ?? 0) > 0 && (
+                <span className="text-green-500">+{additions}</span>
+              )}
+              {(deletions ?? 0) > 0 && (
+                <span className="text-red-500">-{deletions}</span>
+              )}
+            </span>
+          )}
 
         {onOpenInEditor && (
           <Button

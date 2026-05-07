@@ -29,6 +29,8 @@ interface PrDiffEditorProps {
   outdatedLines: Set<number>;
   isLoading: boolean;
   isSubmittingComment: boolean;
+  additions?: number;
+  deletions?: number;
   onAddComment: (
     body: string,
     line: number,

@@ -56,6 +56,11 @@ function sortByMode<T extends { path: string }>(
   }
 }
 
+interface DiffStat {
+  additions: number;
+  deletions: number;
+}
+
 interface FileStatusListProps {
   staged: GitFileStatus[];
   unstaged: GitFileStatus[];
@@ -65,6 +70,7 @@ interface FileStatusListProps {
   selectedStaged: boolean;
   reviewedFiles: Set<string>;
   sortMode?: SortMode;
+  diffStats?: Map<string, DiffStat>;
   onSelectFile: (file: string, staged: boolean) => void;
   onStageFiles: (files: string[]) => void;
   onUnstageFiles: (files: string[]) => void;
@@ -83,6 +89,7 @@ export function FileStatusList({
   selectedStaged,
   reviewedFiles,
   sortMode = "path",
+  diffStats,
   onSelectFile,
   onStageFiles,
   onUnstageFiles,
@@ -217,6 +224,7 @@ export function FileStatusList({
               statusColor="text-green-500"
               isSelected={selectedFile === file.path && selectedStaged}
               isReviewed={reviewedFiles.has(file.path)}
+              diffStat={diffStats?.get(`staged:${file.path}`)}
               onClick={() => onSelectFile(file.path, true)}
               onToggleReviewed={() => onToggleReviewed(file.path)}
               actions={
@@ -267,6 +275,7 @@ export function FileStatusList({
               statusColor="text-yellow-500"
               isSelected={selectedFile === file.path && !selectedStaged}
               isReviewed={reviewedFiles.has(file.path)}
+              diffStat={diffStats?.get(`unstaged:${file.path}`)}
               onClick={() => onSelectFile(file.path, false)}
               onToggleReviewed={() => onToggleReviewed(file.path)}
               actions={
@@ -392,6 +401,7 @@ function FileRow({
   statusColor,
   isSelected,
   isReviewed,
+  diffStat,
   onClick,
   onToggleReviewed,
   actions,
@@ -401,6 +411,7 @@ function FileRow({
   statusColor: string;
   isSelected: boolean;
   isReviewed: boolean;
+  diffStat?: DiffStat;
   onClick: () => void;
   onToggleReviewed: () => void;
   actions?: React.ReactNode;
@@ -435,6 +446,16 @@ function FileRow({
         )}
       </span>
       <div className="flex shrink-0 items-center gap-0.5">
+        {diffStat && (diffStat.additions > 0 || diffStat.deletions > 0) && (
+          <span className="text-muted-foreground/60 mr-0.5 flex items-center gap-1 font-mono text-[10px]">
+            {diffStat.additions > 0 && (
+              <span className="text-green-500">+{diffStat.additions}</span>
+            )}
+            {diffStat.deletions > 0 && (
+              <span className="text-red-500">-{diffStat.deletions}</span>
+            )}
+          </span>
+        )}
         {actions}
         <Tooltip>
           <TooltipTrigger asChild>

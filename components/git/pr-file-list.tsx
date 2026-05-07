@@ -183,6 +183,16 @@ export function PrFileList({
           )}
         </span>
         <div className="flex shrink-0 items-center gap-1">
+          {(file.additions > 0 || file.deletions > 0) && (
+            <span className="text-muted-foreground/60 flex items-center gap-1 font-mono text-[10px]">
+              {file.additions > 0 && (
+                <span className="text-green-500">+{file.additions}</span>
+              )}
+              {file.deletions > 0 && (
+                <span className="text-red-500">-{file.deletions}</span>
+              )}
+            </span>
+          )}
           {commentCount > 0 && (
             <span className="text-muted-foreground/60 flex items-center gap-0.5">
               <MessageSquare className="size-3" />

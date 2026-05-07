@@ -13,6 +13,7 @@ import type {
   GitLogEntry,
   GitBranch,
   GitStashEntry,
+  GitDiffResult,
   ReviewFileContent,
   ReviewChangedFile,
   WorktreeInfo,
@@ -165,6 +166,52 @@ export function useGitChangedFiles(
       }),
     enabled: !!workspaceId && !!baseRef,
   });
+}
+
+export function useGitFileDiffs(
+  workspaceId: string | null,
+  enabled: boolean = true,
+) {
+  const { data: stagedDiffs } = useQuery<GitDiffResult[]>({
+    queryKey: ["git-file-diffs", workspaceId, "staged"],
+    queryFn: () =>
+      gitGet<GitDiffResult[]>(workspaceId!, "file-diffs", { staged: "true" }),
+    enabled: !!workspaceId && enabled,
+    staleTime: 5_000,
+  });
+  const { data: unstagedDiffs } = useQuery<GitDiffResult[]>({
+    queryKey: ["git-file-diffs", workspaceId, "unstaged"],
+    queryFn: () =>
+      gitGet<GitDiffResult[]>(workspaceId!, "file-diffs", { staged: "false" }),
+    enabled: !!workspaceId && enabled,
+    staleTime: 5_000,
+  });
+
+  return useMemo(() => {
+    const map = new Map<
+      string,
+      { additions: number; deletions: number; staged: boolean }
+    >();
+    if (stagedDiffs) {
+      for (const d of stagedDiffs) {
+        map.set(`staged:${d.file}`, {
+          additions: d.additions,
+          deletions: d.deletions,
+          staged: true,
+        });
+      }
+    }
+    if (unstagedDiffs) {
+      for (const d of unstagedDiffs) {
+        map.set(`unstaged:${d.file}`, {
+          additions: d.additions,
+          deletions: d.deletions,
+          staged: false,
+        });
+      }
+    }
+    return map;
+  }, [stagedDiffs, unstagedDiffs]);
 }
 
 export function useGitCommitDiff(

@@ -76,6 +76,7 @@ import {
   useGitStashList,
   useGitStashPop,
   useGitStashDrop,
+  useGitFileDiffs,
 } from "@/hooks/use-git";
 import type { Workspace } from "@/types";
 
@@ -188,6 +189,8 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   const { data: branches = [] } = useGitBranches(workspace.id);
   const { data: stashes = [] } = useGitStashList(workspace.id);
 
+  const fileDiffStats = useGitFileDiffs(workspace.id, viewMode === "working");
+
   const commitRef = selectedCommitHash ?? "HEAD";
   const lastCommitBaseRef =
     viewMode === "last-commit" ? `${commitRef}~1` : null;
@@ -200,6 +203,21 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
     () => sortFiles(changedFiles, sortMode),
     [changedFiles, sortMode],
   );
+
+  const selectedFileDiffStat = useMemo(() => {
+    if (!selectedFile) return undefined;
+    if (viewMode === "working") {
+      const key = selectedStaged
+        ? `staged:${selectedFile}`
+        : `unstaged:${selectedFile}`;
+      return fileDiffStats.get(key);
+    }
+    const file = changedFiles.find((f) => f.path === selectedFile);
+    if (file?.additions != null || file?.deletions != null) {
+      return { additions: file.additions ?? 0, deletions: file.deletions ?? 0 };
+    }
+    return undefined;
+  }, [selectedFile, selectedStaged, viewMode, fileDiffStats, changedFiles]);
 
   const activeBaseRef = branchBaseRef ?? lastCommitBaseRef;
   const lastCommitCurrentRef = viewMode === "last-commit" ? commitRef : null;
@@ -1038,6 +1056,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
                         selectedStaged={selectedStaged}
                         reviewedFiles={reviewedFiles}
                         sortMode={sortMode}
+                        diffStats={fileDiffStats}
                         onSelectFile={handleSelectFile}
                         onStageFiles={handleStageFiles}
                         onUnstageFiles={handleUnstageFiles}
@@ -1110,6 +1129,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
                     selectedStaged={selectedStaged}
                     reviewedFiles={reviewedFiles}
                     sortMode={sortMode}
+                    diffStats={fileDiffStats}
                     onSelectFile={handleSelectFile}
                     onStageFiles={handleStageFiles}
                     onUnstageFiles={handleUnstageFiles}
@@ -1167,6 +1187,8 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
                 fileContent={fileContent}
                 workspaceId={workspace.id}
                 isLoading={isFileContentLoading}
+                additions={selectedFileDiffStat?.additions}
+                deletions={selectedFileDiffStat?.deletions}
                 onOpenInEditor={() => {
                   if (selectedFile) {
                     router.push(

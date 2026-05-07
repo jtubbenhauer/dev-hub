@@ -149,6 +149,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json(files);
       }
 
+      case "file-diffs": {
+        const staged = url.searchParams.get("staged") === "true";
+        const diffs = await backend.getFileDiffs(staged);
+        return NextResponse.json(diffs);
+      }
+
       case "worktree-list": {
         const worktrees = await backend.listWorktrees();
         return NextResponse.json(worktrees);

@@ -723,6 +723,8 @@ export function PrPanel({ onClose }: PrPanelProps) {
               outdatedLines={outdatedLines}
               isLoading={isFileContentLoading}
               isSubmittingComment={isSubmittingComment}
+              additions={selectedFile?.additions}
+              deletions={selectedFile?.deletions}
               onAddComment={handleAddComment}
               onReplyToComment={handleReplyToComment}
               onEditComment={handleEditComment}

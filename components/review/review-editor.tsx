@@ -42,6 +42,8 @@ interface ReviewEditorProps {
   file?: ReviewFile;
   workspaceId: string;
   isLoading: boolean;
+  additions?: number;
+  deletions?: number;
   onToggleReviewed?: (file: ReviewFile) => void;
   onMarkAndNext?: (file: ReviewFile) => void;
   onOpenFileList?: () => void;

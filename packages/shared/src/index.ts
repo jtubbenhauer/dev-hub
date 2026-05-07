@@ -94,6 +94,9 @@ export interface ReviewChangedFile {
   path: string;
   status: ReviewFileStatus;
   oldPath?: string;
+  additions?: number;
+  deletions?: number;
+  isBinary?: boolean;
 }
 
 export interface AllBranch {

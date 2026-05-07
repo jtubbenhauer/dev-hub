@@ -320,7 +320,7 @@ async function handlePostSpawn({
 
   emit("status", { message: "Waiting for agent to become reachable..." });
 
-  const maxAttempts = 15;
+  const maxAttempts = 45;
   const retryDelayMs = 4_000;
   let isHealthy = false;
 
@@ -338,7 +338,7 @@ async function handlePostSpawn({
 
   if (!isHealthy) {
     throw new Error(
-      "Provider created workspace but agent is not reachable after 60s. It may need more time — try connecting manually.",
+      "Provider created workspace but agent is not reachable after 180s. It may need more time — try connecting manually.",
     );
   }
 

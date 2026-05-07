@@ -1,0 +1,36 @@
+app/api/opencode/[...path]/route.ts
+  dca162b314aaa8a7 131-136
+tests/api/opencode-proxy.test.ts
+  01a5ab3785b4e723 131-133,136-140,153-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "f644ac37a830538ac04d95ed840165ba1c6bbcd1",
+  "prompts": {
+    "01a5ab3785b4e723": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_250acb1e7ffeCiuFHAVApMi8Mo-e0d9be98-0970-46dc-a38c-cfb30d1b2270",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 38,
+      "overriden_lines": 0
+    },
+    "dca162b314aaa8a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_250acb1e7ffeCiuFHAVApMi8Mo-f98a38a4-da9f-43c0-9b66-a35cb9650251",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}

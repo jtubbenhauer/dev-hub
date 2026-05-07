@@ -1,0 +1,35 @@
+components/chat/use-session-management.ts
+  1a759f43f00c0e76 277
+  989917c320d7fa3c 371,380-381,385
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "b9d716d44c2e1631ff9292433b28adc75827f30f",
+  "prompts": {
+    "1a759f43f00c0e76": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_250acb1e7ffeCiuFHAVApMi8Mo-baf70e29-916f-4309-a256-8b2d3254af22",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "989917c320d7fa3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_250acb1e7ffeCiuFHAVApMi8Mo-b2144ec5-a7c7-4028-8ad7-a36d048759cb",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,22 @@
+components/settings/model-settings.tsx
+  74574a7d6b3985cb 423-447
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "2be051a2ea8fc25df1a484d5e77505647ad0f6e4",
+  "prompts": {
+    "74574a7d6b3985cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_250acb1e7ffeCiuFHAVApMi8Mo-aec08100-ee1b-4323-a039-7502a00f4d1c",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 25,
+      "overriden_lines": 0
+    }
+  }
+}

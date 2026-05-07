@@ -1,0 +1,35 @@
+app/api/providers/create-workspace/route.ts
+  043cc1efd7df89f2 323
+  be0fbc2d0ea92e9c 341
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "c0977c70aea090c189ebb55559405ff9a2d21553",
+  "prompts": {
+    "043cc1efd7df89f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_209e3bbfeffen67SC6vP30VFT6-7c4954ef-30d6-4f35-9967-1cded6170a66",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "be0fbc2d0ea92e9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "opencode-transcript-ses_209e3bbfeffen67SC6vP30VFT6-57ee4755-17e1-4d9d-b4fc-465a231d7c41",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -274,11 +274,7 @@ export function useSessionManagement({
           } else {
             const delay = ++delayIndex * 150;
             setTimeout(() => {
-              if (shouldSSEConnect(ws, activeWorkspaceId)) {
-                fetchSessions(ws.id);
-              } else {
-                fetchCachedSessions(ws.id);
-              }
+              fetchCachedSessions(ws.id);
             }, delay);
           }
         }
@@ -372,7 +368,7 @@ export function useSessionManagement({
       const isActive = ws.id === activeWorkspaceId;
 
       if (isActive) {
-        // Fetch active workspace immediately
+        // Fetch active workspace immediately — live fetch
         if (isSSE) {
           fetchSessions(ws.id);
           fetchPinnedSessions(ws.id);
@@ -381,16 +377,12 @@ export function useSessionManagement({
         }
         fetchSessionNotes(ws.id);
       } else {
-        // Stagger non-active workspaces by 150ms each
+        // Non-active workspaces: always use cache to avoid proxy storm.
+        // Live data will load when the user switches to that workspace.
         const delay = ++delayIndex * 150;
         const timer = setTimeout(() => {
           if (cancelled) return;
-          if (isSSE) {
-            fetchSessions(ws.id);
-            fetchPinnedSessions(ws.id);
-          } else {
-            fetchCachedSessions(ws.id);
-          }
+          fetchCachedSessions(ws.id);
           fetchSessionNotes(ws.id);
         }, delay);
         timeouts.push(timer);

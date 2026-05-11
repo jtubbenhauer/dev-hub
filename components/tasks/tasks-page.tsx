@@ -14,8 +14,13 @@ import { TaskSidebar } from "@/components/tasks/task-sidebar";
 import { TaskList } from "@/components/tasks/task-list";
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
 import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog";
-import { useClickUpSearch, useClickUpViewTasks } from "@/hooks/use-clickup";
+import {
+  useClickUpSearch,
+  useClickUpViewTasks,
+  useMyClickUpTasks,
+} from "@/hooks/use-clickup";
 import { useClickUpSettings } from "@/hooks/use-settings";
+import { fuzzySearch } from "@/lib/fuzzy-match";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLeaderAction } from "@/hooks/use-leader-action";
@@ -124,6 +129,44 @@ export function TasksPage() {
     { enabled: isSearch || isListBrowse },
   );
 
+  const { data: myTasks } = useMyClickUpTasks({ enabled: isConfigured });
+
+  const activeSearchQuery =
+    selection?.type === "search"
+      ? selection.query
+      : isSearch
+        ? searchQuery
+        : "";
+
+  const mergedSearchTasks = useMemo(() => {
+    const serverTasks = searchResults.data;
+    if (!activeSearchQuery) return serverTasks;
+
+    const taskNames = (myTasks ?? []).map((t) => t.name);
+    const fuzzyResults = fuzzySearch(activeSearchQuery, taskNames, 100);
+
+    const nameToTasks = new Map<string, ClickUpTask[]>();
+    for (const task of myTasks ?? []) {
+      const list = nameToTasks.get(task.name) ?? [];
+      list.push(task);
+      nameToTasks.set(task.name, list);
+    }
+    const consumed = new Map<string, number>();
+    const localResults = fuzzyResults.map((match) => {
+      const list = nameToTasks.get(match.path) ?? [];
+      const idx = consumed.get(match.path) ?? 0;
+      consumed.set(match.path, idx + 1);
+      return list[idx] ?? list[0];
+    });
+
+    if (!serverTasks?.length)
+      return localResults.length ? localResults : serverTasks;
+
+    const localIds = new Set(localResults.map((t) => t.id));
+    const serverOnly = serverTasks.filter((t) => !localIds.has(t.id));
+    return [...localResults, ...serverOnly];
+  }, [activeSearchQuery, myTasks, searchResults.data]);
+
   let tasks: ClickUpTask[] | undefined;
   let isLoading = false;
   let error: Error | null = null;
@@ -140,7 +183,7 @@ export function TasksPage() {
     error = searchResults.error;
     contextLabel = selection.listName;
   } else if (isSearch) {
-    tasks = searchResults.data;
+    tasks = mergedSearchTasks;
     isLoading = searchResults.isLoading;
     error = searchResults.error;
     contextLabel = "Search results";
@@ -507,6 +550,7 @@ export function TasksPage() {
                 contextLabel={isMobile ? undefined : contextLabel}
                 selectedTaskId={selectedTask?.id ?? null}
                 onSelectTask={handleSelectTask}
+                sortByScore={!isSearch}
                 focusContainerRef={taskListFocusRef}
               />
             )}

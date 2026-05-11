@@ -191,6 +191,7 @@ interface TaskListProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   focusContainerRef?: React.RefObject<HTMLElement | null>;
+  sortByScore?: boolean;
 }
 
 export function TaskList({
@@ -204,6 +205,7 @@ export function TaskList({
   hasMore,
   isLoadingMore,
   focusContainerRef,
+  sortByScore = true,
 }: TaskListProps) {
   // Check if any task has a score custom field
   const hasScores = useMemo(
@@ -212,16 +214,24 @@ export function TaskList({
   );
 
   // Sort by score (highest first) when scores are present
-  const sortedTasks = useMemo(
-    () =>
-      hasScores
-        ? [...(tasks ?? [])].sort(
-            (a, b) =>
-              (getScoreValue(b) ?? -Infinity) - (getScoreValue(a) ?? -Infinity),
-          )
-        : (tasks ?? []),
-    [tasks, hasScores],
-  );
+  // and sorting is enabled (disabled for search results to preserve relevance order)
+  const sortedTasks = useMemo(() => {
+    const all = tasks ?? [];
+    if (!sortByScore || !hasScores) return all;
+
+    const pinned = all.filter(
+      (t) => "_exactMatch" in t && (t as Record<string, unknown>)._exactMatch,
+    );
+    const rest = all.filter(
+      (t) =>
+        !("_exactMatch" in t && (t as Record<string, unknown>)._exactMatch),
+    );
+    rest.sort(
+      (a, b) =>
+        (getScoreValue(b) ?? -Infinity) - (getScoreValue(a) ?? -Infinity),
+    );
+    return [...pinned, ...rest];
+  }, [tasks, hasScores, sortByScore]);
 
   const selectedIndex = sortedTasks.findIndex((t) => t.id === selectedTaskId);
 

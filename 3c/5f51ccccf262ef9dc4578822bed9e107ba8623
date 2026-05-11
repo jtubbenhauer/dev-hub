@@ -1,0 +1,21 @@
+components/git/monaco-pr-diff-editor.tsx
+  s_ce749d34d0c9a8::t_165d1806d657c9 38,993-1002,1244
+components/review/monaco-review-editor.tsx
+  s_ce749d34d0c9a8::t_165d1806d657c9 32,400-409,665
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "3c5f51ccccf262ef9dc4578822bed9e107ba8623",
+  "prompts": {},
+  "sessions": {
+    "s_ce749d34d0c9a8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1ec2aa686ffeb5CwyMqTS9SLkR",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

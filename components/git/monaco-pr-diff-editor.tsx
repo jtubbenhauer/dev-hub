@@ -35,6 +35,7 @@ import {
   getMonacoThemeName,
   MONACO_FONT_FAMILY,
 } from "@/lib/editor/monaco-themes";
+import { WRAPPED_DIFF_EDITOR_OPTIONS } from "@/lib/editor/monaco-diff-options";
 import {
   useFontSizeSetting,
   useMobileFontSizeSetting,
@@ -989,12 +990,16 @@ export const MonacoPrDiffEditor = forwardRef<
   useEffect(() => {
     if (!diffEditorRef.current) return;
     const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
-    diffEditorRef.current
-      .getOriginalEditor()
-      .updateOptions({ fontSize: effectiveFontSize, tabSize });
-    diffEditorRef.current
-      .getModifiedEditor()
-      .updateOptions({ fontSize: effectiveFontSize, tabSize });
+    diffEditorRef.current.getOriginalEditor().updateOptions({
+      fontSize: effectiveFontSize,
+      tabSize,
+      wordWrap: WRAPPED_DIFF_EDITOR_OPTIONS.wordWrap,
+    });
+    diffEditorRef.current.getModifiedEditor().updateOptions({
+      fontSize: effectiveFontSize,
+      tabSize,
+      wordWrap: WRAPPED_DIFF_EDITOR_OPTIONS.wordWrap,
+    });
   }, [fontSize, mobileFontSize, tabSize, isMobile]);
 
   const currentContent = fileContent.current;
@@ -1236,7 +1241,7 @@ export const MonacoPrDiffEditor = forwardRef<
               lineHeight: Math.round(effectiveFontSize * 1.5),
               fontFamily: MONACO_FONT_FAMILY,
               fontLigatures: false,
-              wordWrap: "on",
+              ...WRAPPED_DIFF_EDITOR_OPTIONS,
               renderSideBySide: diffViewMode === "side-by-side",
               hideUnchangedRegions: { enabled: true },
               renderIndicators: true,

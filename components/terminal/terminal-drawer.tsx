@@ -33,38 +33,31 @@ export function TerminalDrawer() {
 
   const [config, setConfig] = useState<TerminalConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(
     null,
   );
   const [hasEverOpened, setHasEverOpened] = useState(false);
 
-  // Track if the drawer has ever opened
-  useEffect(() => {
-    if (isOpen && !hasEverOpened) {
-      setHasEverOpened(true);
-    }
-  }, [isOpen, hasEverOpened]);
+  if (isOpen && !hasEverOpened) {
+    setHasEverOpened(true);
+  }
 
-  // Detect workspace change and reset to loading state
-  useEffect(() => {
-    const isNewWorkspace = activeWorkspaceId !== resolvedWorkspaceId;
-    const needsFetch =
-      isOpen && !!activeWorkspaceId && (isNewWorkspace || (!config && !error));
-    if (needsFetch && !isLoading) {
-      setIsLoading(true);
-      setError(null);
-      setConfig(null);
-      setResolvedWorkspaceId(activeWorkspaceId);
-    }
-  }, [
-    isOpen,
-    activeWorkspaceId,
-    resolvedWorkspaceId,
-    config,
-    error,
-    isLoading,
-  ]);
+  if (
+    isOpen &&
+    activeWorkspaceId &&
+    activeWorkspaceId !== resolvedWorkspaceId
+  ) {
+    setResolvedWorkspaceId(activeWorkspaceId);
+    setConfig(null);
+    setError(null);
+  }
+
+  const isLoading =
+    isOpen &&
+    !!activeWorkspaceId &&
+    resolvedWorkspaceId === activeWorkspaceId &&
+    !config &&
+    !error;
 
   useEffect(() => {
     if (!isOpen || !activeWorkspaceId) return;
@@ -87,13 +80,11 @@ export function TerminalDrawer() {
       .then((data) => {
         if (!cancelled) {
           setConfig(data);
-          setIsLoading(false);
         }
       })
       .catch((err: Error) => {
         if (!cancelled) {
           setError(err.message);
-          setIsLoading(false);
         }
       });
 

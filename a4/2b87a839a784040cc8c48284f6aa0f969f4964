@@ -1,0 +1,19 @@
+components/terminal/terminal-drawer.tsx
+  s_393804a14de16d::t_a862aea4edc512 41-43,45-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "a42b87a839a784040cc8c48284f6aa0f969f4964",
+  "prompts": {},
+  "sessions": {
+    "s_393804a14de16d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1eef25739ffeqE1w4aET07PrIc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

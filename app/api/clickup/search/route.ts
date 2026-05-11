@@ -11,6 +11,53 @@ interface ClickUpTasksResponse {
   tasks: ClickUpTask[];
 }
 
+async function fetchTaskById(
+  token: string,
+  taskId: string,
+): Promise<ClickUpTask | null> {
+  const url = new URL(`${CLICKUP_API_BASE}/task/${taskId}`);
+  url.searchParams.set("include_markdown_description", "true");
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: { Authorization: token },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return (await response.json()) as ClickUpTask;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchTaskByCustomId(
+  token: string,
+  teamId: string,
+  taskId: string,
+): Promise<ClickUpTask | null> {
+  const url = new URL(`${CLICKUP_API_BASE}/task/${taskId}`);
+  url.searchParams.set("custom_task_ids", "true");
+  url.searchParams.set("team_id", teamId);
+  url.searchParams.set("include_markdown_description", "true");
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: { Authorization: token },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return (await response.json()) as ClickUpTask;
+  } catch {
+    return null;
+  }
+}
+
 async function getSetting(userId: string, key: string): Promise<string | null> {
   const [row] = await db
     .select()
@@ -41,7 +88,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const searchParams = request.nextUrl.searchParams;
   const url = new URL(`${CLICKUP_API_BASE}/team/${teamId}/task`);
 
-  const query = searchParams.get("query");
+  const query = searchParams.get("query")?.trim() ?? "";
   if (query) url.searchParams.set("name", query);
 
   const page = searchParams.get("page") ?? "0";
@@ -67,6 +114,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   if (orderBy) url.searchParams.set("order_by", orderBy);
 
   try {
+    const taskLookupPromise = query ? fetchTaskById(token, query) : null;
     const upstream = await fetch(url.toString(), {
       headers: { Authorization: token },
     });
@@ -80,7 +128,23 @@ export async function GET(request: NextRequest): Promise<Response> {
     }
 
     const data = (await upstream.json()) as ClickUpTasksResponse;
-    return NextResponse.json({ tasks: data.tasks ?? [] });
+    const searchTasks = data.tasks ?? [];
+
+    let resolvedTask = taskLookupPromise ? await taskLookupPromise : null;
+    if (!resolvedTask && query) {
+      resolvedTask = await fetchTaskByCustomId(token, teamId, query);
+    }
+
+    if (!resolvedTask) {
+      return NextResponse.json({ tasks: searchTasks });
+    }
+
+    const tagged = { ...resolvedTask, _exactMatch: true };
+    const tasks = [
+      tagged,
+      ...searchTasks.filter((task) => task.id !== resolvedTask.id),
+    ];
+    return NextResponse.json({ tasks });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Request failed";
     console.error(`[clickup] search fetch failed: ${message}`);

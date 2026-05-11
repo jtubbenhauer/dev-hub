@@ -542,7 +542,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
     addCommentMutation.isPending || replyToCommentMutation.isPending;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {/* PR header */}
       <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
         <Tooltip>
@@ -599,7 +599,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
       />
 
       {/* Main area */}
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {/* Mobile file list sheet */}
         {isMobile && (
           <Sheet
@@ -712,7 +712,7 @@ export function PrPanel({ onClose }: PrPanelProps) {
         )}
 
         {/* Diff editor */}
-        <div className="flex h-full min-h-0 flex-1 flex-col">
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {fileContent ? (
             <PrDiffEditor
               ref={editorHandleRef}

@@ -176,13 +176,40 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
       ? formatDuration(state.time.end - state.time.start)
       : null;
 
-  const childSessionId =
-    ("metadata" in part.state &&
-      ((part.state.metadata as Record<string, unknown>)?.sessionId as
+  const childSessionId = useMemo(() => {
+    if ("metadata" in part.state) {
+      const sid = (part.state.metadata as Record<string, unknown>)
+        ?.sessionId as string | undefined;
+      if (sid) return sid;
+    }
+    if (part.metadata) {
+      const sid = (part.metadata as Record<string, unknown>)?.sessionId as
         | string
-        | undefined)) ??
-    null;
+        | undefined;
+      if (sid) return sid;
+    }
+    return null;
+  }, [part.state, part.metadata]);
   const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId);
+
+  const storeSessionId = useChatStore((s) => {
+    if (childSessionId) return null;
+    if (!activeWorkspaceId || state.status === "pending") return null;
+    const toolStart = "time" in state ? state.time.start : 0;
+    if (!toolStart) return null;
+    const sessions = s.workspaceStates[activeWorkspaceId]?.sessions;
+    if (!sessions) return null;
+    let best: { id: string; dist: number } | null = null;
+    for (const sess of Object.values(sessions)) {
+      if (sess.parentID !== part.sessionID) continue;
+      const dist = Math.abs(sess.time.created - toolStart);
+      if (dist > 120_000) continue;
+      if (!best || dist < best.dist) best = { id: sess.id, dist };
+    }
+    return best?.id ?? null;
+  });
+
+  const resolvedSessionId = childSessionId ?? storeSessionId;
 
   const description =
     typeof state.input?.description === "string"
@@ -231,9 +258,9 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
         )}
       </button>
 
-      {childSessionId && activeWorkspaceId && (
+      {activeWorkspaceId && (
         <SubAgentDialog
-          childSessionId={childSessionId}
+          childSessionId={resolvedSessionId}
           workspaceId={activeWorkspaceId}
           description={
             typeof description === "string" ? description : "Sub-agent"

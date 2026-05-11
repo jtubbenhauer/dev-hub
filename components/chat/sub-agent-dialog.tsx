@@ -19,7 +19,7 @@ import type {
 } from "@/lib/opencode/types";
 
 interface SubAgentDialogProps {
-  childSessionId: string;
+  childSessionId: string | null;
   workspaceId: string;
   description: string;
   isActive: boolean;
@@ -285,7 +285,14 @@ export function SubAgentDialog({
             )}
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto">
-              {visibleMessages.length === 0 ? (
+              {!childSessionId ? (
+                <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 py-12">
+                  <Bot className="size-5 opacity-40" />
+                  <span className="text-sm">
+                    Could not locate the sub-agent session.
+                  </span>
+                </div>
+              ) : visibleMessages.length === 0 ? (
                 <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 py-12">
                   <Loader2 className="size-5 animate-spin" />
                   <span className="text-sm">

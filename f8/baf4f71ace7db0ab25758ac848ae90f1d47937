@@ -1,0 +1,26 @@
+components/tasks/task-list.tsx
+  s_f369ba9812f425::t_a6bbbbe6f55aa9 194
+  s_f369ba9812f425::t_cca5a6a294ebfb 218-219,221-233
+  s_f369ba9812f425::t_c0df89e6a0dea2 217,220,234
+  s_f369ba9812f425::t_b72367c70d7607 208
+components/tasks/tasks-page.tsx
+  s_f369ba9812f425::t_1b01ef62d37bcb 553
+  s_f369ba9812f425::t_171362aa53db1e 17-21,23
+  s_f369ba9812f425::t_f2b393e44388f2 132-169,186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "f8baf4f71ace7db0ab25758ac848ae90f1d47937",
+  "prompts": {},
+  "sessions": {
+    "s_f369ba9812f425": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_1eef25739ffeqE1w4aET07PrIc",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

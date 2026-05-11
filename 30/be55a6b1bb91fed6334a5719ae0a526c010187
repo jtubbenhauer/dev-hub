@@ -1,0 +1,29 @@
+components/git/pr-panel.tsx
+  s_ce749d34d0c9a8::t_46f912ecc72009 545
+  s_ecc584a6828036::t_e143f787fca9d8 715
+  s_ecc584a6828036::t_93fedc85f42245 602
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "30be55a6b1bb91fed6334a5719ae0a526c010187",
+  "prompts": {},
+  "sessions": {
+    "s_ce749d34d0c9a8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1ec2aa686ffeb5CwyMqTS9SLkR",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_ecc584a6828036": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_1ec2cc33dffe09qZfCvyEYWQ8Q",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

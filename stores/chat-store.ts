@@ -616,7 +616,11 @@ interface ChatState {
     workspaceId: string,
   ) => SessionSnapshot | null;
   restoreSessionLocal: (snapshot: SessionSnapshot) => void;
-  fetchMessages: (sessionId: string, workspaceId: string) => Promise<void>;
+  fetchMessages: (
+    sessionId: string,
+    workspaceId: string,
+    options?: { force?: boolean },
+  ) => Promise<void>;
   _refreshMessagesFromRemote: (
     sessionId: string,
     workspaceId: string,
@@ -1261,8 +1265,9 @@ export const useChatStore = create<ChatState>()(
         });
       },
 
-      fetchMessages: async (sessionId, workspaceId) => {
-        const tag = `[chat] fetchMessages ${sessionId.slice(0, 12)}`;
+      fetchMessages: async (sessionId, workspaceId, options) => {
+        const force = options?.force === true;
+        const tag = `[chat] fetchMessages ${sessionId.slice(0, 12)}${force ? " (force)" : ""}`;
         console.time(tag);
         const hasInMemory =
           (get().workspaceStates[workspaceId]?.messages[sessionId]?.length ??
@@ -1299,7 +1304,10 @@ export const useChatStore = create<ChatState>()(
                   return { ...wsUpdate, ...lruUpdate };
                 });
 
+                // Cache freshness check — skipped when force=true so SSE
+                // reconnects always backfill events missed during the gap.
                 if (
+                  !force &&
                   cachedAt !== null &&
                   Date.now() - cachedAt < MESSAGE_CACHE_FRESH_MS
                 ) {
@@ -2036,7 +2044,9 @@ export const useChatStore = create<ChatState>()(
 
           const { activeWorkspaceId, activeSessionId } = get();
           if (activeWorkspaceId && activeSessionId) {
-            get().fetchMessages(activeSessionId, activeWorkspaceId);
+            get().fetchMessages(activeSessionId, activeWorkspaceId, {
+              force: true,
+            });
             get().refreshActiveSessionStatus(activeWorkspaceId);
           }
 
@@ -2212,11 +2222,15 @@ export const useChatStore = create<ChatState>()(
           get().connectGlobalSSE(get().sseWorkspaceIds);
         } else if (es && es.readyState === EventSource.OPEN) {
           // SSE stayed open while backgrounded — reconcile questions/permissions
-          // in case events were missed or arrived before the tab could process them.
+          // and force-refresh messages in case the upstream SSE dropped events
+          // (common on remote workspaces over tunnels: Tailscale, VPN, etc.).
           const wsId = get().activeWorkspaceId;
           if (wsId) {
             void reconcileWorkspacePrompts(wsId, "permission", undefined, set);
             void reconcileWorkspacePrompts(wsId, "question", undefined, set);
+            if (activeSessionId) {
+              void get().fetchMessages(activeSessionId, wsId, { force: true });
+            }
           }
         }
       },

@@ -2866,6 +2866,73 @@ describe("fetchMessages — stale-while-revalidate caching", () => {
     vi.useRealTimers();
   });
 
+  it("force=true bypasses cache-freshness skip and refetches from remote", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(30_000);
+
+    const cachedMessages = [
+      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
+    ];
+    const remoteMessages = [
+      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("remote-2", "sess-a"), parts: [] },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/sessions/cache/messages")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ messages: cachedMessages, cachedAt: 5_000 }),
+        });
+      }
+      if (url.includes("/api/opencode/")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => remoteMessages,
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+    });
+
+    await useChatStore
+      .getState()
+      .fetchMessages("sess-a", "ws-a", { force: true });
+    await flushMicrotasks();
+
+    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const remoteCalls = fetchCalls.filter(
+      (args: unknown[]) =>
+        typeof args[0] === "string" && args[0].includes("/api/opencode/"),
+    );
+    expect(remoteCalls).toHaveLength(1);
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"];
+    expect(ws.messages["sess-a"]).toHaveLength(2);
+
+    vi.useRealTimers();
+  });
+
   it("refreshes from remote when cached messages are stale", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(120_000);

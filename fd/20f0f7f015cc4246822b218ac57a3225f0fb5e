@@ -1,0 +1,37 @@
+components/chat/message.tsx
+  s_845899583dd7a2::t_bef43744ee2ad7 278-281
+  s_845899583dd7a2::t_05d3aaf4d8a945 147
+  s_845899583dd7a2::t_1753b7650b9fb6 166
+  s_845899583dd7a2::t_648fef36b39ee3 377
+  s_845899583dd7a2::t_dd0cad11c482d0 15
+  s_845899583dd7a2::t_59acb2920f3f14 110,126
+  s_845899583dd7a2::t_33fd6a58713db1 111-117,120,146,148-165,167-169
+  s_845899583dd7a2::t_41ffc4b91c421a 277,282-284
+components/chat/prompt-input.tsx
+  s_845899583dd7a2::t_e331a372b46d27 1082
+  s_845899583dd7a2::t_6aa5e5d4363fe2 739,741-744,748,750
+  s_845899583dd7a2::t_59cacbd94de459 964,970-978
+  s_845899583dd7a2::t_1753b7650b9fb6 11-18
+lib/attachment-utils.ts
+  s_845899583dd7a2::t_e09dc26ac2c565 32
+  s_845899583dd7a2::t_56f6536dbcf002 14
+tests/lib/attachment-utils.test.ts
+  s_845899583dd7a2::t_3b38c059c486f5 25,30-31
+  s_845899583dd7a2::t_5446b6640e5990 56-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "fd20f0f7f015cc4246822b218ac57a3225f0fb5e",
+  "prompts": {},
+  "sessions": {
+    "s_845899583dd7a2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_178c9b7d0ffeQOySr0HKLVOQbj",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+tests/lib/monaco-diff-options.test.ts
+  s_ce749d34d0c9a8::t_165d1806d657c9 1-14
+lib/editor/monaco-diff-options.ts
+  s_ce749d34d0c9a8::t_165d1806d657c9 1-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "4520b95c08d511433137536e15a869f7fe94bb4f",
+  "prompts": {},
+  "sessions": {
+    "s_ce749d34d0c9a8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1ec2aa686ffeb5CwyMqTS9SLkR",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

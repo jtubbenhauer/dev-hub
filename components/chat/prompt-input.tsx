@@ -8,7 +8,14 @@ import {
   useImperativeHandle,
   useEffect,
 } from "react";
-import { Send, Square, X, MessageSquare, Paperclip } from "lucide-react";
+import {
+  Send,
+  Square,
+  X,
+  MessageSquare,
+  Paperclip,
+  FileText,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FilePicker } from "@/components/chat/file-picker";
 import {
@@ -729,15 +736,18 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     const handlePaste = useCallback(
       (e: React.ClipboardEvent) => {
         const items = Array.from(e.clipboardData.items);
-        const imageFiles = items
+        const pastedFiles = items
           .filter(
-            (item) => item.kind === "file" && item.type.startsWith("image/"),
+            (item) =>
+              item.kind === "file" &&
+              (item.type.startsWith("image/") ||
+                item.type === "application/pdf"),
           )
           .map((item) => item.getAsFile())
           .filter((f): f is File => f !== null);
-        if (imageFiles.length > 0) {
+        if (pastedFiles.length > 0) {
           e.preventDefault();
-          addFiles(imageFiles);
+          addFiles(pastedFiles);
         }
       },
       [addFiles],
@@ -951,16 +961,21 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
                   attachment.filename.length > 20
                     ? attachment.filename.slice(0, 17) + "..."
                     : attachment.filename;
+                const isImage = attachment.mime.startsWith("image/");
                 return (
                   <span
                     key={attachment.id}
                     className="bg-muted flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs"
                   >
-                    <img
-                      src={attachment.dataUrl}
-                      alt={attachment.filename}
-                      className="size-6 shrink-0 rounded object-cover"
-                    />
+                    {isImage ? (
+                      <img
+                        src={attachment.dataUrl}
+                        alt={attachment.filename}
+                        className="size-6 shrink-0 rounded object-cover"
+                      />
+                    ) : (
+                      <FileText className="text-muted-foreground size-4 shrink-0" />
+                    )}
                     <span className="truncate">{truncatedName}</span>
                     <button
                       onClick={() => handleRemoveAttachment(attachment.id)}
@@ -1064,7 +1079,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
+          accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
           multiple
           className="hidden"
           onChange={handleFileInputChange}

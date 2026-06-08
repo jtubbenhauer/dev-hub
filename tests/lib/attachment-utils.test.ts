@@ -22,12 +22,13 @@ describe("constants", () => {
     expect(MAX_ATTACHMENTS).toBe(5);
   });
 
-  it("ALLOWED_MIME_TYPES includes all 4 image types", () => {
+  it("ALLOWED_MIME_TYPES includes all supported types", () => {
     expect(ALLOWED_MIME_TYPES).toContain("image/png");
     expect(ALLOWED_MIME_TYPES).toContain("image/jpeg");
     expect(ALLOWED_MIME_TYPES).toContain("image/gif");
     expect(ALLOWED_MIME_TYPES).toContain("image/webp");
-    expect(ALLOWED_MIME_TYPES).toHaveLength(4);
+    expect(ALLOWED_MIME_TYPES).toContain("application/pdf");
+    expect(ALLOWED_MIME_TYPES).toHaveLength(5);
   });
 });
 
@@ -50,6 +51,20 @@ describe("validateAttachment", () => {
   it("returns valid: true for WebP file", () => {
     const file = createMockFile("image.webp", 1024, "image/webp");
     expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
+  it("returns valid: true for PDF file", () => {
+    const file = createMockFile("document.pdf", 1024, "application/pdf");
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
+  it("returns valid: false for PDF file exceeding 10MB limit", () => {
+    const size = MAX_FILE_SIZE + 1;
+    const file = createMockFile("big.pdf", size, "application/pdf");
+    const result = validateAttachment(file);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("big.pdf");
+    expect(result.error).toContain("10MB");
   });
 
   it("returns valid: false for unsupported file type", () => {

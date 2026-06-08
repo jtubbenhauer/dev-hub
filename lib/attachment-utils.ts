@@ -11,6 +11,7 @@ export const ALLOWED_MIME_TYPES = [
   "image/jpeg",
   "image/gif",
   "image/webp",
+  "application/pdf",
 ] as const;
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -28,7 +29,7 @@ export function validateAttachment(file: File): {
   ) {
     return {
       valid: false,
-      error: `Unsupported file type "${file.type || "unknown"}". Allowed: PNG, JPEG, GIF, WebP.`,
+      error: `Unsupported file type "${file.type || "unknown"}". Allowed: PNG, JPEG, GIF, WebP, PDF.`,
     };
   }
   if (file.size > MAX_FILE_SIZE) {

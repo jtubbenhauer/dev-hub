@@ -12,6 +12,7 @@ import {
   Copy,
   Check,
   Minimize2,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -106,13 +107,23 @@ function isSystemReminder(messageParts: readonly { type: string }[]): boolean {
   return false;
 }
 
+interface FilePartData {
+  id: string;
+  type: "file";
+  mime: string;
+  filename?: string;
+  url: string;
+}
+
 function UserMessageBubble({
   textContent,
+  fileParts,
   workspaceId,
   owner,
   repo,
 }: {
   textContent: string;
+  fileParts: FilePartData[];
   workspaceId: string | null;
   owner?: string;
   repo?: string;
@@ -130,6 +141,32 @@ function UserMessageBubble({
               workspaceId={workspaceId}
             />
           ))}
+        </div>
+      )}
+      {fileParts.length > 0 && (
+        <div className="flex flex-col items-end gap-1.5 pb-1">
+          {fileParts.map((fp) => {
+            const isImage = fp.mime.startsWith("image/");
+            if (isImage) {
+              return (
+                <img
+                  key={fp.id}
+                  src={fp.url}
+                  alt={fp.filename ?? "attached image"}
+                  className="max-h-40 max-w-[200px] rounded-lg border object-cover"
+                />
+              );
+            }
+            return (
+              <span
+                key={fp.id}
+                className="bg-muted/80 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
+              >
+                <FileText className="size-4 shrink-0" />
+                <span className="truncate">{fp.filename ?? "attachment"}</span>
+              </span>
+            );
+          })}
         </div>
       )}
       <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2.5">
@@ -237,6 +274,14 @@ export const ChatMessage = memo(
       [parts],
     );
 
+    const fileParts = useMemo(
+      () =>
+        parts
+          .filter((p) => p.type === "file")
+          .map((p) => p as unknown as FilePartData),
+      [parts],
+    );
+
     const { reasoningParts, reasoningOverflow } = useMemo(() => {
       const allReasoning = [
         ...parts.filter((p): p is ReasoningPart => p.type === "reasoning"),
@@ -329,6 +374,7 @@ export const ChatMessage = memo(
                 )}
                 <UserMessageBubble
                   textContent={textContent}
+                  fileParts={fileParts}
                   workspaceId={activeWorkspaceId}
                   owner={githubRepo?.owner}
                   repo={githubRepo?.repo}

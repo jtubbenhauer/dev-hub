@@ -84,8 +84,18 @@ async function readUpstream(
       buffer += decoder.decode(value, { stream: true });
 
       if (buffer.length > MAX_BUFFER_SIZE) {
-        buffer = "";
-        continue;
+        // Buffer exceeded safety cap with no event boundary in sight.
+        // Preserve the trailing window so a future "\n\n" can still close
+        // a normal-sized event instead of nuking everything.
+        const lastBoundary = buffer.lastIndexOf("\n\n");
+        if (lastBoundary !== -1) {
+          buffer = buffer.slice(lastBoundary + 2);
+        } else {
+          buffer = buffer.slice(-MAX_BUFFER_SIZE / 2);
+        }
+        console.warn(
+          `[sse-mux] Upstream buffer for workspace ${target.workspaceId} exceeded ${MAX_BUFFER_SIZE} bytes — truncated to ${buffer.length}`,
+        );
       }
 
       for (
@@ -189,6 +199,7 @@ export async function GET(request: NextRequest) {
       "content-type": "text/event-stream",
       "cache-control": "no-cache",
       connection: "keep-alive",
+      "x-accel-buffering": "no",
     },
   });
 }

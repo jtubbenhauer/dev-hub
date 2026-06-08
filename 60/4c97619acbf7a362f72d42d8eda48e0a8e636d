@@ -1,0 +1,14 @@
+.gitignore
+  h_c7f8735263030f 56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "604c97619acbf7a362f72d42d8eda48e0a8e636d",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

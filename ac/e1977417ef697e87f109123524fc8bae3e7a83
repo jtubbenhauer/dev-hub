@@ -1,0 +1,20 @@
+app/api/opencode/events/route.ts
+  s_9f4487ccd9f48b::t_787cd99d29d96c 87-98
+  s_9f4487ccd9f48b::t_54c912d0497434 202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "ace1977417ef697e87f109123524fc8bae3e7a83",
+  "prompts": {},
+  "sessions": {
+    "s_9f4487ccd9f48b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_17d0b58eaffe8Jy4DoLFZ9IvbD",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

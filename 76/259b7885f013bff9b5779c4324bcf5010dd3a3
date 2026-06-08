@@ -1,0 +1,24 @@
+tests/stores/chat-store.test.ts
+  s_9f4487ccd9f48b::t_83d84896b50fbb 2869-2935
+stores/chat-store.ts
+  s_9f4487ccd9f48b::t_2a31ebfc861385 1268-1270,1307-1308,1310
+  s_9f4487ccd9f48b::t_697ebcf192953f 2225-2226,2231-2233
+  s_9f4487ccd9f48b::t_da87f86ece5e8e 619-623
+  s_9f4487ccd9f48b::t_40134901ff4cd6 2047-2049
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "76259b7885f013bff9b5779c4324bcf5010dd3a3",
+  "prompts": {},
+  "sessions": {
+    "s_9f4487ccd9f48b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_17d0b58eaffe8Jy4DoLFZ9IvbD",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

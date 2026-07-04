@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as {
     workspaceId: string;
     sessions: IncomingSession[];
+    force?: boolean;
   };
 
   if (!body.workspaceId || !Array.isArray(body.sessions)) {
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
   const now = Date.now();
   const userId = session.user.id;
   const { workspaceId, sessions: incoming } = body;
+  const forcePrune = body.force === true;
 
   // Single transaction: turns N individual fsync'd writes into one
   db.transaction((tx) => {
@@ -105,7 +107,6 @@ export async function POST(request: NextRequest) {
         )
         .run();
 
-      // Clean up cached messages for sessions that no longer exist
       tx.delete(cachedMessages)
         .where(
           and(
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
           ),
         )
         .run();
-    } else {
+    } else if (forcePrune) {
       tx.delete(cachedSessions)
         .where(
           and(
@@ -125,7 +126,6 @@ export async function POST(request: NextRequest) {
         )
         .run();
 
-      // No sessions remain — remove all cached messages for this workspace
       tx.delete(cachedMessages)
         .where(
           and(
@@ -135,6 +135,10 @@ export async function POST(request: NextRequest) {
         )
         .run();
     }
+    // An empty incoming list without force=true is treated as an unreliable
+    // signal (e.g. remote container briefly restarted, returned no sessions
+    // during startup) and does not wipe the existing cache. The next fetch
+    // that returns real sessions will run the normal prune above.
   });
 
   return NextResponse.json({ ok: true });

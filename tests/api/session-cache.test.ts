@@ -99,7 +99,7 @@ describe("POST /api/sessions/cache", () => {
     expect(notInArray).toHaveBeenCalledWith("cm_sessionId", ["s1", "s2"]);
   });
 
-  it("deletes all cachedMessages when no sessions remain", async () => {
+  it("does NOT delete cached data when incoming is empty without force flag", async () => {
     const { POST } = await import("@/app/api/sessions/cache/route");
 
     const req = makeRequest({
@@ -110,8 +110,27 @@ describe("POST /api/sessions/cache", () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
 
-    expect(mockDelete).toHaveBeenCalledTimes(2);
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
 
+  it("deletes all cached data when incoming is empty AND force=true", async () => {
+    const { POST } = await import("@/app/api/sessions/cache/route");
+
+    const req = makeRequest({
+      workspaceId: "ws-1",
+      sessions: [],
+      force: true,
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    expect(mockDelete).toHaveBeenCalledTimes(2);
+    expect(mockDelete).toHaveBeenNthCalledWith(1, {
+      id: "cs_id",
+      workspaceId: "cs_workspaceId",
+      userId: "cs_userId",
+    });
     expect(mockDelete).toHaveBeenNthCalledWith(2, {
       sessionId: "cm_sessionId",
       workspaceId: "cm_workspaceId",
@@ -120,9 +139,6 @@ describe("POST /api/sessions/cache", () => {
 
     const { notInArray } = await import("drizzle-orm");
     const notInArrayCalls = vi.mocked(notInArray).mock.calls;
-    const messageNotInArrayCalls = notInArrayCalls.filter(
-      ([col]) => (col as unknown as string) === "cm_sessionId",
-    );
-    expect(messageNotInArrayCalls).toHaveLength(0);
+    expect(notInArrayCalls).toHaveLength(0);
   });
 });

@@ -1,0 +1,25 @@
+tests/api/session-cache.test.ts
+  s_08272c371851b0::t_2f3c5982d01e75 102,113-123,125-133,142
+app/api/sessions/cache/route.ts
+  s_08272c371851b0::t_f6058684098e17 57
+  s_08272c371851b0::t_8fecc990425d35 67,119,138-141
+tests/stores/chat-store-queue.test.ts
+  s_08272c371851b0::t_569a9807609168 392-529
+  s_08272c371851b0::t_174118b90d7502 86-308
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a263e4608efe78ad1af28c0033b77bc2f7925578",
+  "prompts": {},
+  "sessions": {
+    "s_08272c371851b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0d0f7b152ffeWwJ4xTzip324Or",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

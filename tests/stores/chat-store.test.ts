@@ -4011,6 +4011,137 @@ describe("fetchSessions fallback to cache", () => {
     );
     expect(cacheReads).toHaveLength(1);
   });
+
+  it("requests a large limit so top-level sessions aren't crowded out by subagent children", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/api/opencode/session")) {
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+      if ((url as string).includes("/api/sessions/cache")) {
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await useChatStore.getState().fetchSessions("ws-local");
+
+    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const liveCall = fetchCalls.find(
+      (args: unknown[]) =>
+        typeof args[0] === "string" &&
+        args[0].startsWith("/api/opencode/session"),
+    );
+    expect(liveCall).toBeDefined();
+    const url = new URL(liveCall![0] as string, "http://localhost");
+    const limit = Number(url.searchParams.get("limit"));
+    expect(limit).toBeGreaterThanOrEqual(500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchCachedSessions — auto-promote to live fetch when cache is empty
+// ---------------------------------------------------------------------------
+
+describe("fetchCachedSessions empty-cache promotion", () => {
+  beforeEach(async () => {
+    resetStore();
+    const { useWorkspaceStore } = await import("@/stores/workspace-store");
+    useWorkspaceStore.setState({ workspaces: [], activeWorkspaceId: null });
+  });
+
+  afterEach(async () => {
+    const { useWorkspaceStore } = await import("@/stores/workspace-store");
+    useWorkspaceStore.setState({ workspaces: [], activeWorkspaceId: null });
+  });
+
+  function makeWorkspace(id: string, backend: "local" | "remote") {
+    return {
+      id,
+      userId: "u1",
+      name: id,
+      path: `/tmp/${id}`,
+      type: "repo" as const,
+      parentRepoPath: null,
+      packageManager: null,
+      quickCommands: null,
+      backend,
+      provider: null,
+      opencodeUrl: null,
+      agentUrl: null,
+      providerMeta: null,
+      shellCommand: null,
+      worktreeSymlinks: null,
+      linkedTaskId: null,
+      linkedTaskMeta: null,
+      color: null,
+      createdAt: new Date(0),
+      lastAccessedAt: new Date(0),
+    };
+  }
+
+  it("promotes to a live fetch when cache is empty for a local workspace", async () => {
+    const { useWorkspaceStore } = await import("@/stores/workspace-store");
+    useWorkspaceStore.setState({
+      workspaces: [makeWorkspace("ws-local", "local")],
+    });
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/api/sessions/cache?workspaceId=")) {
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+      if ((url as string).startsWith("/api/opencode/session")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [makeSession("live-1", { updated: 3000 })],
+        });
+      }
+      if ((url as string).includes("/api/sessions/cache")) {
+        return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await useChatStore.getState().fetchCachedSessions("ws-local");
+    await vi.waitFor(() => {
+      const ws = useChatStore.getState().workspaceStates["ws-local"];
+      expect(ws?.sessions["live-1"]).toBeDefined();
+    });
+
+    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const liveCall = fetchCalls.find(
+      (args: unknown[]) =>
+        typeof args[0] === "string" &&
+        args[0].startsWith("/api/opencode/session"),
+    );
+    expect(liveCall).toBeDefined();
+  });
+
+  it("does NOT promote to a live fetch when cache is empty for a remote workspace", async () => {
+    const { useWorkspaceStore } = await import("@/stores/workspace-store");
+    useWorkspaceStore.setState({
+      workspaces: [makeWorkspace("ws-remote", "remote")],
+    });
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/api/sessions/cache?workspaceId=")) {
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await useChatStore.getState().fetchCachedSessions("ws-remote");
+
+    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const liveCall = fetchCalls.find(
+      (args: unknown[]) =>
+        typeof args[0] === "string" &&
+        args[0].startsWith("/api/opencode/session"),
+    );
+    expect(liveCall).toBeUndefined();
+
+    const ws = useChatStore.getState().workspaceStates["ws-remote"];
+    expect(ws?.sessionsLoaded).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -30,6 +30,13 @@ export type StreamingStatus =
 
 const MAX_CACHED_SESSIONS = 15;
 
+// OpenCode's /session endpoint defaults to returning 100 sessions ordered by
+// recency, and includes subagent child sessions in that window. Workspaces with
+// heavy subagent activity can have hundreds of children in the most-recent 100,
+// crowding out the top-level sessions the UI actually renders (`!parentID`).
+// Bumping this ensures older top-level sessions still surface in the list.
+const SESSION_FETCH_LIMIT = 500;
+
 interface LruEntry {
   sessionId: string;
   workspaceId: string;
@@ -864,6 +871,78 @@ interface PersistedChatState {
       lastViewedAt: Record<string, number>;
     }
   >;
+  // Serialized queuedMessages Map + queuedWorkspaceIds Set. These survive
+  // refresh so a message the user typed doesn't vanish if the workspace
+  // was suspended, the browser was closed, or the request was aborted
+  // mid-flight. Replayed via flushQueuedMessages when the workspace becomes
+  // healthy, with dedup against recent server messages to avoid duplicates.
+  queuedMessages?: Array<[string, QueuedMessage[]]>;
+  queuedWorkspaceIds?: string[];
+}
+
+function addQueuedMessage(
+  state: Pick<ChatState, "queuedMessages" | "queuedWorkspaceIds">,
+  workspaceId: string,
+  message: QueuedMessage,
+): Pick<ChatState, "queuedMessages" | "queuedWorkspaceIds"> {
+  const nextQueuedMessages = new Map(state.queuedMessages);
+  const existing = nextQueuedMessages.get(workspaceId) ?? [];
+  nextQueuedMessages.set(workspaceId, [...existing, message]);
+  const nextQueuedWorkspaceIds = new Set(state.queuedWorkspaceIds);
+  nextQueuedWorkspaceIds.add(workspaceId);
+  return {
+    queuedMessages: nextQueuedMessages,
+    queuedWorkspaceIds: nextQueuedWorkspaceIds,
+  };
+}
+
+function removeQueuedMessage(
+  state: Pick<ChatState, "queuedMessages" | "queuedWorkspaceIds">,
+  workspaceId: string,
+  optimisticMessageId: string,
+): Pick<ChatState, "queuedMessages" | "queuedWorkspaceIds"> {
+  const existing = state.queuedMessages.get(workspaceId);
+  if (!existing) return state;
+  const filtered = existing.filter(
+    (m) => m.optimisticMessageId !== optimisticMessageId,
+  );
+  const nextQueuedMessages = new Map(state.queuedMessages);
+  const nextQueuedWorkspaceIds = new Set(state.queuedWorkspaceIds);
+  if (filtered.length === 0) {
+    nextQueuedMessages.delete(workspaceId);
+    nextQueuedWorkspaceIds.delete(workspaceId);
+  } else {
+    nextQueuedMessages.set(workspaceId, filtered);
+  }
+  return {
+    queuedMessages: nextQueuedMessages,
+    queuedWorkspaceIds: nextQueuedWorkspaceIds,
+  };
+}
+
+// Dedup gate for flushQueuedMessages: after fetching latest server messages,
+// treat a queued message as "already delivered" if any user message in the
+// session shares the same text AND is not the optimistic entry we're about
+// to replay. The optimistic id starts with "optimistic-" so we can exclude
+// it. No time window — server messages are inherently non-optimistic once
+// they come from a fresh fetch, and we've already dropped optimistic entries
+// tied to older queue attempts by the time we get here.
+function isMessageAlreadyOnServer(
+  state: Pick<ChatState, "workspaceStates">,
+  workspaceId: string,
+  queued: QueuedMessage,
+): boolean {
+  const ws = state.workspaceStates[workspaceId];
+  const messages = ws?.messages?.[queued.sessionId] ?? [];
+  return messages.some((entry) => {
+    if (entry.info.role !== "user") return false;
+    if (entry.info.id.startsWith("optimistic-")) return false;
+    const partText = (entry.parts ?? [])
+      .filter((p): p is Extract<Part, { type: "text" }> => p.type === "text")
+      .map((p) => p.text)
+      .join("");
+    return partText === queued.text;
+  });
 }
 
 export const useChatStore = create<ChatState>()(
@@ -965,9 +1044,14 @@ export const useChatStore = create<ChatState>()(
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10_000);
-          const response = await fetch(buildProxyUrl("session", workspaceId), {
-            signal: controller.signal,
-          });
+          const response = await fetch(
+            buildProxyUrl("session", workspaceId, {
+              limit: String(SESSION_FETCH_LIMIT),
+            }),
+            {
+              signal: controller.signal,
+            },
+          );
           clearTimeout(timeoutId);
           if (!response.ok) {
             console.warn(
@@ -1583,8 +1667,8 @@ export const useChatStore = create<ChatState>()(
           ],
         };
 
-        set((state) =>
-          updateWorkspace(state, workspaceId, (ws) => ({
+        set((state) => {
+          const wsUpdate = updateWorkspace(state, workspaceId, (ws) => ({
             optimisticMessageIds: {
               ...ws.optimisticMessageIds,
               [sessionId]: optimisticId,
@@ -1596,8 +1680,40 @@ export const useChatStore = create<ChatState>()(
                 optimisticMessage,
               ],
             },
-          })),
-        );
+          }));
+          return {
+            ...wsUpdate,
+            ...addQueuedMessage(state, workspaceId, queuedMessage),
+          };
+        });
+
+        const rollbackOptimistic = (streamingErrorMessage: string | null) => {
+          set((state) => {
+            const wsUpdate = updateWorkspace(state, workspaceId, (ws) => {
+              const { [sessionId]: _, ...remainingOptimistic } =
+                ws.optimisticMessageIds;
+              return {
+                optimisticMessageIds: remainingOptimistic,
+                messages: {
+                  ...ws.messages,
+                  [sessionId]: (ws.messages[sessionId] ?? []).filter(
+                    (m) => m.info.id !== optimisticId,
+                  ),
+                },
+              };
+            });
+            return {
+              ...wsUpdate,
+              ...removeQueuedMessage(state, workspaceId, optimisticId),
+            };
+          });
+          set({
+            optimisticStreamingSessionId: isAlreadyStreaming
+              ? get().optimisticStreamingSessionId
+              : null,
+            streamingError: streamingErrorMessage,
+          });
+        };
 
         try {
           const parts: Array<Record<string, unknown>> = [
@@ -1630,84 +1746,49 @@ export const useChatStore = create<ChatState>()(
           );
 
           if (!response.ok) {
-            if (response.status === 502) {
-              set((state) => {
-                const nextQueuedMessages = new Map(state.queuedMessages);
-                const existingForWorkspace =
-                  nextQueuedMessages.get(workspaceId) ?? [];
-                nextQueuedMessages.set(workspaceId, [
-                  ...existingForWorkspace,
-                  queuedMessage,
-                ]);
-                const nextQueuedWorkspaceIds = new Set(
-                  state.queuedWorkspaceIds,
-                );
-                nextQueuedWorkspaceIds.add(workspaceId);
-                return {
-                  queuedMessages: nextQueuedMessages,
-                  queuedWorkspaceIds: nextQueuedWorkspaceIds,
-                };
-              });
+            const status = response.status;
+            // 5xx and 429 (rate limit) are treated as transient — keep the
+            // message queued and optimistic so it can be replayed once the
+            // remote workspace becomes healthy. 4xx (except 429) is a client
+            // error and won't get better on retry, so we roll back.
+            const isTransient = status === 429 || status >= 500;
+
+            if (isTransient) {
               set({
                 optimisticStreamingSessionId: isAlreadyStreaming
                   ? get().optimisticStreamingSessionId
                   : null,
               });
-              toast("Message queued - workspace is starting...");
+              toast(
+                status === 502
+                  ? "Message queued - workspace is starting..."
+                  : "Message queued - will retry when workspace is available",
+              );
               return;
             }
 
             const error = await response
               .json()
               .catch(() => ({ error: "Failed to send message" }));
-            set((state) =>
-              updateWorkspace(state, workspaceId, (ws) => {
-                const { [sessionId]: _, ...remainingOptimistic } =
-                  ws.optimisticMessageIds;
-                return {
-                  optimisticMessageIds: remainingOptimistic,
-                  messages: {
-                    ...ws.messages,
-                    [sessionId]: (ws.messages[sessionId] ?? []).filter(
-                      (m) => m.info.id !== optimisticId,
-                    ),
-                  },
-                };
-              }),
-            );
-            set({
-              optimisticStreamingSessionId: isAlreadyStreaming
-                ? get().optimisticStreamingSessionId
-                : null,
-              streamingError: extractErrorString(error),
-            });
+            rollbackOptimistic(extractErrorString(error));
             return;
           }
+          set((state) => removeQueuedMessage(state, workspaceId, optimisticId));
           get().startStreamingPoll(workspaceId);
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Failed to send message";
-          set((state) =>
-            updateWorkspace(state, workspaceId, (ws) => {
-              const { [sessionId]: _, ...remainingOptimistic } =
-                ws.optimisticMessageIds;
-              return {
-                optimisticMessageIds: remainingOptimistic,
-                messages: {
-                  ...ws.messages,
-                  [sessionId]: (ws.messages[sessionId] ?? []).filter(
-                    (m) => m.info.id !== optimisticId,
-                  ),
-                },
-              };
-            }),
-          );
+          // Network errors, timeouts, and aborts are all transient. Keep the
+          // message queued so a page refresh or intermittent connection
+          // doesn't silently drop the user's message.
+          const isAbort =
+            error instanceof DOMException && error.name === "AbortError";
           set({
             optimisticStreamingSessionId: isAlreadyStreaming
               ? get().optimisticStreamingSessionId
               : null,
-            streamingError: message,
           });
+          if (!isAbort) {
+            toast("Message queued - will retry when connection recovers");
+          }
         }
       },
 
@@ -1738,7 +1819,49 @@ export const useChatStore = create<ChatState>()(
         });
 
         try {
+          // Refresh messages once per session before replay so we can dedup
+          // against messages the server already received before the original
+          // send failed or was aborted mid-flight (common after a page refresh
+          // that interrupted an in-flight POST).
+          const uniqueSessionIds = Array.from(
+            new Set(queued.map((m) => m.sessionId)),
+          );
+          await Promise.all(
+            uniqueSessionIds.map((sessionId) =>
+              get()
+                .fetchMessages(sessionId, workspaceId, { force: true })
+                .catch(() => {}),
+            ),
+          );
+
           for (const message of queued) {
+            if (isMessageAlreadyOnServer(get(), workspaceId, message)) {
+              set((state) =>
+                updateWorkspace(state, workspaceId, (ws) => {
+                  const {
+                    [message.sessionId]: optimisticForSession,
+                    ...remaining
+                  } = ws.optimisticMessageIds;
+                  return {
+                    optimisticMessageIds:
+                      optimisticForSession === message.optimisticMessageId
+                        ? remaining
+                        : ws.optimisticMessageIds,
+                    messages: {
+                      ...ws.messages,
+                      [message.sessionId]: (
+                        ws.messages[message.sessionId] ?? []
+                      ).filter(
+                        (entry) =>
+                          entry.info.id !== message.optimisticMessageId,
+                      ),
+                    },
+                  };
+                }),
+              );
+              continue;
+            }
+
             set((state) =>
               updateWorkspace(state, workspaceId, (ws) => {
                 const {
@@ -3052,6 +3175,18 @@ export const useChatStore = create<ChatState>()(
           }
           const data = await response.json();
           if (!Array.isArray(data) || data.length === 0) {
+            // Empty cache typically means the workspace has never been active
+            // in dev-hub (no live fetch has populated the cache yet). For
+            // local workspaces the OpenCode server is cheap to hit, so
+            // promote to a live fetch. Remote workspaces stay cache-only —
+            // the caller decides when to wake them via fetchSessions.
+            const workspace = useWorkspaceStore
+              .getState()
+              .workspaces.find((w) => w.id === workspaceId);
+            if (workspace && workspace.backend !== "remote") {
+              get().fetchSessions(workspaceId);
+              return;
+            }
             set((state) => {
               if (state.workspaceStates[workspaceId]?.sessionsLoaded)
                 return state;
@@ -3281,6 +3416,8 @@ export const useChatStore = create<ChatState>()(
         return {
           activeSessionId: state.activeSessionId,
           workspaceStates: wsStates,
+          queuedMessages: Array.from(state.queuedMessages.entries()),
+          queuedWorkspaceIds: Array.from(state.queuedWorkspaceIds),
         };
       },
       merge: (persisted, current) => {
@@ -3312,6 +3449,15 @@ export const useChatStore = create<ChatState>()(
             };
           }
           merged.workspaceStates = nextWs;
+        }
+        if (Array.isArray(p.queuedMessages) && p.queuedMessages.length > 0) {
+          merged.queuedMessages = new Map(p.queuedMessages);
+        }
+        if (
+          Array.isArray(p.queuedWorkspaceIds) &&
+          p.queuedWorkspaceIds.length > 0
+        ) {
+          merged.queuedWorkspaceIds = new Set(p.queuedWorkspaceIds);
         }
         return merged;
       },

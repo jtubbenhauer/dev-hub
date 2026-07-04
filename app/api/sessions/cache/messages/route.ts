@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { gunzipSync } from "node:zlib";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db";
 import { cachedMessages } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
+
+async function readJsonBody(request: NextRequest): Promise<unknown> {
+  if (request.headers.get("content-encoding") === "gzip") {
+    const buf = Buffer.from(await request.arrayBuffer());
+    return JSON.parse(gunzipSync(buf).toString("utf-8"));
+  }
+  return request.json();
+}
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -50,7 +59,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await request.json()) as {
+  const body = (await readJsonBody(request)) as {
     sessionId: string;
     workspaceId: string;
     messages: unknown[];

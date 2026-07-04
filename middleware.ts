@@ -30,6 +30,9 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// API routes handle auth themselves via `auth()` and often receive large
+// bodies (e.g. cached chat messages). Excluding `/api/*` here avoids the
+// middleware body-size cap (~50MB) and skips redundant auth work.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

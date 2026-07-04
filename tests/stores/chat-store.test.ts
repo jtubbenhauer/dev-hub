@@ -13,6 +13,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { gunzipSync } from "node:zlib";
+
+function decodeCompressedBody(body: BodyInit | null | undefined): unknown {
+  if (!(body instanceof ArrayBuffer)) {
+    throw new Error("Expected ArrayBuffer body from gzip-compressed POST");
+  }
+  const decompressed = gunzipSync(Buffer.from(body)).toString("utf-8");
+  return JSON.parse(decompressed);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -3058,12 +3067,15 @@ describe("fetchMessages — stale-while-revalidate caching", () => {
     ];
 
     let savedPayload: unknown = null;
+    let savedEncoding: string | null = null;
     global.fetch = vi
       .fn()
       .mockImplementation((url: string, opts?: RequestInit) => {
         if (url.includes("/api/sessions/cache/messages")) {
           if (opts?.method === "POST") {
-            savedPayload = JSON.parse(opts.body as string);
+            const headers = new Headers(opts.headers);
+            savedEncoding = headers.get("content-encoding");
+            savedPayload = decodeCompressedBody(opts.body);
             return Promise.resolve({
               ok: true,
               json: async () => ({ ok: true }),
@@ -3108,6 +3120,7 @@ describe("fetchMessages — stale-while-revalidate caching", () => {
       workspaceId: string;
       messages: unknown[];
     };
+    expect(savedEncoding).toBe("gzip");
     expect(payload.sessionId).toBe("sess-a");
     expect(payload.workspaceId).toBe("ws-a");
     expect(payload.messages).toHaveLength(1);

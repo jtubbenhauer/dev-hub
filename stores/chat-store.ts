@@ -764,6 +764,28 @@ function buildProxyUrl(
   return `/api/opencode/${path}${query ? `?${query}` : ""}`;
 }
 
+// gzip-compress a JSON payload before POST. Chat message arrays for long
+// sessions can exceed 30MB uncompressed; gzip typically shrinks that ~5-10x
+// and keeps the request well under any proxy/middleware body-size caps.
+async function postCompressedJson(
+  url: string,
+  payload: unknown,
+): Promise<Response> {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  const stream = new Response(bytes).body!.pipeThrough(
+    new CompressionStream("gzip"),
+  );
+  const compressed = await new Response(stream).arrayBuffer();
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "content-encoding": "gzip",
+    },
+    body: compressed,
+  });
+}
+
 function extractErrorString(error: unknown): string {
   if (typeof error === "string") return error;
   if (error && typeof error === "object") {
@@ -1416,10 +1438,10 @@ export const useChatStore = create<ChatState>()(
               return { ...wsUpdate, ...lruUpdate };
             });
 
-            fetch("/api/sessions/cache/messages", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ sessionId, workspaceId, messages: data }),
+            postCompressedJson("/api/sessions/cache/messages", {
+              sessionId,
+              workspaceId,
+              messages: data,
             }).catch(() => {});
           } catch {
             set((state) =>

@@ -1,0 +1,55 @@
+stores/chat-store.ts
+  s_08272c371851b0::t_364555f4bd2cee 874-921
+  s_08272c371851b0::t_85c5c6746edebd 1776
+  s_08272c371851b0::t_7f56d6f361e68b 1822-1836,1838-1864
+  s_08272c371851b0::t_10e00938ce5cba 3178-3189
+  s_08272c371851b0::t_a1bde0a825b483 33-39
+  s_08272c371851b0::t_245366b4692c53 3419-3420,3453-3461
+  s_08272c371851b0::t_14e4f75fb88ac6 1047-1054
+  s_08272c371851b0::t_10cc8cde25a5ae 923-945
+  s_08272c371851b0::t_3088ad1da4a04e 1670-1671,1683-1716,1749-1756,1762-1766,1773,1779-1783,1789-1791
+  s_010e3e24bbb185::t_68d863058cc460 922
+tests/stores/chat-store.test.ts
+  s_08272c371851b0::t_4cddb39da82ac0 4014-4038
+  s_08272c371851b0::t_803f4054583382 4060,4063,4065-4068,4072-4074,4076-4078
+  s_08272c371851b0::t_befc558a6e6b72 4041-4056,4058-4059,4061-4062,4064,4069-4071,4075,4079-4144
+  s_08272c371851b0::t_d72087a5a9cf73 4057
+  s_1960ae258dfdf2::t_77238fc3a50275 4039-4040
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "65ad602b0329aeb8eb57864c0043d0afb698d28e",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_010e3e24bbb185": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0d0f7b152ffeWwJ4xTzip324Or",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_08272c371851b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0d0f7b152ffeWwJ4xTzip324Or",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_1960ae258dfdf2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0d12eac2cffeDeQ2XBLGVCnRVG",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

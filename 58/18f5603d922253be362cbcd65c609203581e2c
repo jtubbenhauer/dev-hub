@@ -1,0 +1,43 @@
+stores/chat-store.ts
+  s_c93782011227dc::t_4965fa862cbad6 767-788
+  s_c93782011227dc::t_7a62e972820a67 1441-1444
+app/api/sessions/cache/messages/route.ts
+  s_c93782011227dc::t_8b9bd370414ae7 2,8-14
+  s_c93782011227dc::t_d00b3a9e719fc8 62
+  s_f1e7680a3e9063::t_d007e72cf327da 15
+tests/stores/chat-store.test.ts
+  s_c93782011227dc::t_680b7fa23a7e9f 3070,3076-3078
+  s_c93782011227dc::t_34cb7f99a32005 16-24
+  s_c93782011227dc::t_bab02d848fc4d7 3123
+middleware.ts
+  s_c93782011227dc::t_1d2077ac73fb18 33-35,37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "5818f5603d922253be362cbcd65c609203581e2c",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_c93782011227dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0d1069628ffe8viO1zXiuq2Xc0",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_f1e7680a3e9063": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_107339cccffeZziV3IrwhJv3CJ",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

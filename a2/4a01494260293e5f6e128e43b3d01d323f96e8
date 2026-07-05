@@ -1,0 +1,52 @@
+components/chat/use-session-management.ts
+  s_c93782011227dc::t_fe79d43aaa5396 216,227,249
+  s_c93782011227dc::t_c33b1917b6d974 267
+  s_c93782011227dc::t_088a0b1a8d9f61 25-26
+  s_c93782011227dc::t_5cba6b93fd8f6c 4
+  s_f5c8e35e34433a::t_c14222351caabf 217-218
+  s_f5c8e35e34433a::t_c7c69bcf18cc8d 228-229
+  s_f5c8e35e34433a::t_7995a025a3c9ab 250-251
+  s_f5c8e35e34433a::t_1f4ecb791587c8 24
+  s_c93782011227dc::t_1190fac416fa41 220,231
+components/chat/prompt-input.tsx
+  s_c93782011227dc::t_2d9afacd045c96 585,590-597
+  s_c93782011227dc::t_71488e367832e3 48
+  s_c93782011227dc::t_4b1a993e76bd2f 190
+tests/components/chat/use-session-management.test.ts
+  s_f5c8e35e34433a::t_c861e24b5670be 68,89
+  s_f5c8e35e34433a::t_46fc13af2f6969 58-60
+  s_f5c8e35e34433a::t_2f6be2a9a01d20 4-5
+  s_c93782011227dc::t_e83dcf523b697c 3,9
+  s_f5c8e35e34433a::t_8755d208c57a1c 1-2,6-8,10-55,57,61-67,69-76,78,82-88,90-93,115-116
+  s_f5c8e35e34433a::t_a2517c86641f82 79-81
+  s_c93782011227dc::t_b98abf9d1115c8 56,77,94-114
+hooks/use-mobile.ts
+  s_c93782011227dc::t_cb8856a25b6e6b 11,28
+  s_c93782011227dc::t_5330369d10c4f8 23-27,29-37
+tests/components/chat/prompt-input-mobile-enter.test.tsx
+  s_c93782011227dc::t_da33b3cda180f6 1-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a24a01494260293e5f6e128e43b3d01d323f96e8",
+  "prompts": {},
+  "sessions": {
+    "s_c93782011227dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0d1069628ffe8viO1zXiuq2Xc0",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_f5c8e35e34433a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0d03bce07ffeATwczTc8CAOqeM",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

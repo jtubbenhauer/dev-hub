@@ -101,12 +101,16 @@ export function QuestionBanner({
     onReply(answers);
   };
 
-  const hasAnySelection =
-    selections.some((s) => s.length > 0) ||
-    customInputs.some((c) => c.trim().length > 0);
+  const isAllAnswered =
+    questionList.length > 0 &&
+    questionList.every(
+      (_, i) =>
+        (selections[i]?.length ?? 0) > 0 ||
+        (customInputs[i]?.trim().length ?? 0) > 0,
+    );
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && hasAnySelection) {
+    if (e.key === "Enter" && !e.shiftKey && isAllAnswered) {
       e.preventDefault();
       handleSubmit();
     }
@@ -198,7 +202,7 @@ export function QuestionBanner({
         <Button
           size="sm"
           onClick={handleSubmit}
-          disabled={!hasAnySelection}
+          disabled={!isAllAnswered}
           className="gap-1"
         >
           <Check className="size-3" />

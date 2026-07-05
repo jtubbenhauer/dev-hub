@@ -1,6 +1,7 @@
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useChatStore } from "@/stores/chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useIsMobile, useHasCoarsePointer } from "@/hooks/use-mobile";
 import type { Workspace } from "@/types";
 import type { RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,6 +21,9 @@ export function useSessionManagement({
   healthStatus,
   promptInputRef,
 }: UseSessionManagementArgs) {
+  const isMobile = useIsMobile();
+  const hasCoarsePointer = useHasCoarsePointer();
+  const shouldSuppressAutoFocus = isMobile || hasCoarsePointer;
   const {
     setActiveSession,
     setActiveWorkspaceId,
@@ -209,18 +213,22 @@ export function useSessionManagement({
   const handleSelectSession = useCallback(
     (sessionId: string) => {
       setActiveSession(sessionId);
-      requestAnimationFrame(() => promptInputRef.current?.focus());
+      if (!shouldSuppressAutoFocus) {
+        requestAnimationFrame(() => promptInputRef.current?.focus());
+      }
     },
-    [setActiveSession, promptInputRef],
+    [setActiveSession, promptInputRef, shouldSuppressAutoFocus],
   );
 
   const handleMobileSelectSession = useCallback(
     (sessionId: string) => {
       setActiveSession(sessionId);
       setIsMobileSessionsOpen(false);
-      requestAnimationFrame(() => promptInputRef.current?.focus());
+      if (!shouldSuppressAutoFocus) {
+        requestAnimationFrame(() => promptInputRef.current?.focus());
+      }
     },
-    [setActiveSession, promptInputRef],
+    [setActiveSession, promptInputRef, shouldSuppressAutoFocus],
   );
 
   const handleMobileCreateSession = useCallback(() => {
@@ -238,7 +246,9 @@ export function useSessionManagement({
       setActiveWorkspaceId(workspaceId);
       setActiveSession(sessionId);
       setIsMobileSessionsOpen(false);
-      requestAnimationFrame(() => promptInputRef.current?.focus());
+      if (!shouldSuppressAutoFocus) {
+        requestAnimationFrame(() => promptInputRef.current?.focus());
+      }
 
       if (isSleeping) {
         toast("Waking workspace…", {
@@ -254,6 +264,7 @@ export function useSessionManagement({
       setActiveSession,
       fetchSessions,
       promptInputRef,
+      shouldSuppressAutoFocus,
     ],
   );
 

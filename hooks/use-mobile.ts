@@ -8,6 +8,7 @@ export function useIsMobile() {
   );
 
   React.useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
     const onChange = () => {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
@@ -18,4 +19,19 @@ export function useIsMobile() {
   }, []);
 
   return !!isMobile;
+}
+
+export function useHasCoarsePointer() {
+  const [coarse, setCoarse] = React.useState<boolean | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mql = window.matchMedia("(pointer: coarse)");
+    const onChange = () => setCoarse(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  return !!coarse;
 }

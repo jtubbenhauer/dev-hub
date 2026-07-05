@@ -45,6 +45,7 @@ import {
 import { isPrTrigger } from "@/lib/pr-mention";
 import { fetchPrContext, formatPrContextForAI } from "@/lib/pr-context";
 import { useWorkspaceGitHub } from "@/hooks/use-git";
+import { useHasCoarsePointer } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -186,6 +187,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
   ) {
     const queryClient = useQueryClient();
     const githubRepo = useWorkspaceGitHub(workspaceId);
+    const hasCoarsePointer = useHasCoarsePointer();
     const [value, setValue] = useState(() => {
       const draft = sessionId ? sessionDrafts.get(sessionId) : undefined;
       return draft?.text ?? "";
@@ -580,12 +582,19 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           event.preventDefault();
           return;
         }
-        if (event.key === "Enter" && !event.shiftKey) {
+        if (event.key === "Enter" && !event.shiftKey && !hasCoarsePointer) {
           event.preventDefault();
           handleSubmit();
         }
       },
-      [handleSubmit, pickerQuery, commandQuery, planArgQuery, prPickerQuery],
+      [
+        handleSubmit,
+        pickerQuery,
+        commandQuery,
+        planArgQuery,
+        prPickerQuery,
+        hasCoarsePointer,
+      ],
     );
 
     const handleFileSelect = useCallback(

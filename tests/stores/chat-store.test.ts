@@ -299,13 +299,70 @@ describe("workspace state isolation", () => {
 describe("workspace switching", () => {
   beforeEach(resetStore);
 
-  it("switching workspace resets activeSessionId to null", () => {
+  it("switching to a workspace with no view history sets activeSessionId to null", () => {
     useChatStore.setState({
       activeWorkspaceId: "ws-a",
       activeSessionId: "sess-a",
     });
     useChatStore.getState().setActiveWorkspaceId("ws-b");
     expect(useChatStore.getState().activeSessionId).toBeNull();
+  });
+
+  it("switching to a workspace with view history restores its last-viewed session", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-b": {
+          sessions: {
+            "sess-b1": makeSession("sess-b1"),
+            "sess-b2": makeSession("sess-b2"),
+          },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: { "sess-b1": 1000, "sess-b2": 2000 },
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+    useChatStore.getState().setActiveWorkspaceId("ws-b");
+    expect(useChatStore.getState().activeSessionId).toBe("sess-b2");
+  });
+
+  it("hydration path (current null) restores the persisted last-viewed session", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {},
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: { "sess-a-old": 500, "sess-a-recent": 5000 },
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: false,
+        },
+      },
+      activeWorkspaceId: null,
+      activeSessionId: null,
+    });
+    useChatStore.getState().setActiveWorkspaceId("ws-a");
+    expect(useChatStore.getState().activeSessionId).toBe("sess-a-recent");
   });
 
   it("switching workspace clears a streaming error from the previous workspace", () => {

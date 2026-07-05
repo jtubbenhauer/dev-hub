@@ -985,9 +985,27 @@ export const useChatStore = create<ChatState>()(
         if (current === workspaceId) return;
 
         set((state) => {
+          // Restore last-viewed session for this workspace. Reached on both
+          // initial hydration (persisted activeWorkspaceId synced in via
+          // use-chat-effects) and user-initiated switches; both must survive
+          // page refresh, so we never blindly clear activeSessionId here.
+          let nextSessionId: string | null = null;
+          if (workspaceId) {
+            const targetWs = state.workspaceStates[workspaceId];
+            if (targetWs) {
+              let maxTs = 0;
+              for (const [sid, ts] of Object.entries(targetWs.lastViewedAt)) {
+                if (ts > maxTs) {
+                  maxTs = ts;
+                  nextSessionId = sid;
+                }
+              }
+            }
+          }
+
           const base: Partial<ChatState> = {
             activeWorkspaceId: workspaceId,
-            activeSessionId: null,
+            activeSessionId: nextSessionId,
             streamingError: null,
           };
 

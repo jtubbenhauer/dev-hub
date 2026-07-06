@@ -1,0 +1,29 @@
+packages/agent/src/routes/opencode.ts
+  s_c263446aa01111::t_3f527d58a82a93 1-47
+packages/agent/src/index.ts
+  s_08272c371851b0::t_fe341fcc71dac8 6,25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9379f2d3a9b04c31ab7e7fa1ff05901586cdd78d",
+  "prompts": {},
+  "sessions": {
+    "s_08272c371851b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0d0f7b152ffeWwJ4xTzip324Or",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_c263446aa01111": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_1592faa05ffeyrnROz9rEQa8sX",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

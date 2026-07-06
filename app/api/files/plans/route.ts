@@ -11,7 +11,7 @@ import {
   toWorkspace,
 } from "@/lib/workspaces/backend";
 
-const PLAN_DIRECTORIES = [".opencode/plans", ".sisyphus/plans"];
+const PLAN_DIRECTORIES = [".opencode/plans", ".sisyphus/plans", ".omo/plans"];
 
 export interface PlanFile {
   name: string;

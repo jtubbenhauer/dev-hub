@@ -50,3 +50,7 @@ globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => {
   return 0;
 };
 globalThis.cancelAnimationFrame = () => {};
+
+if (typeof Element !== "undefined") {
+  Element.prototype.scrollIntoView = function scrollIntoView() {};
+}

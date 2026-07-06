@@ -31,6 +31,12 @@ import { SidePanel } from "@/components/chat/side-panel";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -40,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useAgentHealth, useGitStatus } from "@/hooks/use-git";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useOpencodeRestart } from "@/hooks/use-opencode-restart";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 
 import type { Command } from "@/lib/opencode/types";
@@ -56,9 +63,11 @@ import {
   Loader2,
   MessageCircleQuestion,
   MessageSquare,
+  MoreHorizontal,
   PanelRight,
   PanelTop,
   Plus,
+  RotateCw,
   ScrollText,
   StickyNote,
   X,
@@ -146,6 +155,8 @@ export function ChatInterface() {
   const activeWorkspaceId = useWorkspaceStore(
     (state) => state.activeWorkspaceId,
   );
+  const { restart: restartOpencode, isRestarting } =
+    useOpencodeRestart(activeWorkspaceId);
   const activeWorkspaceName = useWorkspaceStore(
     (state) => state.activeWorkspace?.name ?? "",
   );
@@ -987,6 +998,32 @@ export function ChatInterface() {
                 <PanelRight className="size-4" />
               </Button>
             </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon-sm"
+                  variant="outline"
+                  title="Workspace actions"
+                  disabled={isRestarting}
+                >
+                  {isRestarting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <MoreHorizontal className="size-4" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={() => restartOpencode()}
+                  disabled={isRestarting}
+                >
+                  <RotateCw className="mr-2 size-4" />
+                  Restart OpenCode
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Button
               size="icon-sm"

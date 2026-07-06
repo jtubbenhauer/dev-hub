@@ -1,0 +1,19 @@
+app/api/files/plans/route.ts
+  s_08272c371851b0::t_fe341fcc71dac8 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f365f158e3a93e3edb948b27127a7895c86e860a",
+  "prompts": {},
+  "sessions": {
+    "s_08272c371851b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0d0f7b152ffeWwJ4xTzip324Or",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

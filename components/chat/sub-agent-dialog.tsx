@@ -253,6 +253,17 @@ export function SubAgentDialog({
     [messages],
   );
 
+  const model = useMemo(() => {
+    const first = messages.find((m) => {
+      if (m.info.role !== "assistant") return false;
+      return m.info.modelID.length > 0 && m.info.providerID.length > 0;
+    });
+    if (!first) return null;
+    const info = first.info;
+    if (info.role !== "assistant") return null;
+    return { modelID: info.modelID, providerID: info.providerID };
+  }, [messages]);
+
   const displaySettings = useMemo(
     () => ({
       showThinking: true,
@@ -270,6 +281,14 @@ export function SubAgentDialog({
           <DialogTitle className="flex items-center gap-2 pr-6 text-sm">
             <Bot className="size-4 shrink-0 text-violet-500" />
             <span className="truncate">{description || "Sub-agent"}</span>
+            {model && (
+              <span
+                title={`${model.providerID} / ${model.modelID}`}
+                className="text-muted-foreground shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] tracking-wide normal-case"
+              >
+                {model.modelID}
+              </span>
+            )}
             {isActive && (
               <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />
             )}

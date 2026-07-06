@@ -1,0 +1,24 @@
+tests/components/chat/sub-agent-dialog.test.tsx
+  s_efe67b86560494::t_1d871a0e94d6cd 2-100,103-130
+  s_efe67b86560494::t_64ba9581450882 1,101-102
+components/chat/sub-agent-dialog.tsx
+  s_efe67b86560494::t_35195895fdbc3d 284-291
+  s_efe67b86560494::t_8a17f133e01e4e 256,265-266
+  s_efe67b86560494::t_61e13117713a9f 257-264
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c38a3bea4f2c34412e6ec8e6bfdfffdf0663e58d",
+  "prompts": {},
+  "sessions": {
+    "s_efe67b86560494": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0ce65cc7fffeCPcSvKF1NEpiQz",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

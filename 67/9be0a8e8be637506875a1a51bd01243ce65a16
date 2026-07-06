@@ -1,0 +1,40 @@
+components/chat/chat-interface.tsx
+  s_08272c371851b0::t_fe341fcc71dac8 34-38,49,66,70,158-159,1002-1026
+  s_b575d412023f69::t_11a6a49c7b9d78 33,1027
+tests/setup.ts
+  s_08272c371851b0::t_fe341fcc71dac8 53-56
+hooks/use-opencode-restart.ts
+  s_c263446aa01111::t_618c390123ab11 1-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "679be0a8e8be637506875a1a51bd01243ce65a16",
+  "prompts": {},
+  "sessions": {
+    "s_08272c371851b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0d0f7b152ffeWwJ4xTzip324Or",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_b575d412023f69": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0d1069628ffe8viO1zXiuq2Xc0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_c263446aa01111": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_1592faa05ffeyrnROz9rEQa8sX",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

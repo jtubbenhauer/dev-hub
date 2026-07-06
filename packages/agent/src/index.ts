@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { fileRoutes } from "./routes/files.js";
 import { gitRoutes } from "./routes/git.js";
 import { commandRoutes } from "./routes/commands.js";
+import { opencodeRoutes } from "./routes/opencode.js";
 
 const workspacePath = process.env.WORKSPACE_PATH;
 if (!workspacePath) {
@@ -21,6 +22,7 @@ app.get("/health", (c) => {
 app.route("/files", fileRoutes(workspacePath));
 app.route("/git", gitRoutes(workspacePath));
 app.route("/commands", commandRoutes(workspacePath));
+app.route("/opencode", opencodeRoutes());
 
 app.onError((error, c) => {
   console.error(`[agent] ${c.req.method} ${c.req.path} error:`, error.message);

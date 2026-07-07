@@ -1,0 +1,24 @@
+tests/components/chat/message-tool-use.test.tsx
+  s_efe67b86560494::t_5317c03989b596 1-47,50-57
+  s_efe67b86560494::t_906c5aceb5e307 48-49
+components/chat/message-tool-use.tsx
+  s_efe67b86560494::t_906c5aceb5e307 337
+  s_efe67b86560494::t_a2ddb740b05309 338
+  s_efe67b86560494::t_ef7ec7a8c4db2f 529-536
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8ec458990a42caa8d2447670575708e4280b8bd5",
+  "prompts": {},
+  "sessions": {
+    "s_efe67b86560494": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0ce65cc7fffeCPcSvKF1NEpiQz",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

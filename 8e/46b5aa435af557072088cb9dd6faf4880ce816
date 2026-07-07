@@ -1,0 +1,42 @@
+components/chat/chat-interface.tsx
+  s_afe81596766aab::t_637d3717c22d3d 1236
+  s_afe81596766aab::t_ffc0cf054cdb8b 161
+  s_afe81596766aab::t_2f7875710ce904 765-772
+  s_afe81596766aab::t_d90f0f705b6b2c 782-785
+  s_afe81596766aab::t_20d13a2e275ec4 672
+  s_afe81596766aab::t_4ee66fd00d2677 160
+  s_afe81596766aab::t_973599cae3c86a 661
+  s_afe81596766aab::t_76bb3857b79319 46-51
+  s_afe81596766aab::t_eaffa444c4be25 652-660,662-664,666,668-671,681-683,685-691,693-706
+  s_afe81596766aab::t_df1596a5f74812 665,667,673-676,678-680,684,692
+  s_afe81596766aab::t_02461627efcc12 677
+lib/leader-key-defaults.ts
+  s_afe81596766aab::t_8bea1369e98264 151-152
+  s_afe81596766aab::t_918906c9b73ffe 153-154
+  s_afe81596766aab::t_eb53ee91b461e3 50-69
+components/chat/use-chat-commands.ts
+  s_afe81596766aab::t_afb895e5d842e4 150-177,192-195
+  s_afe81596766aab::t_fd4a99c55fc5bc 299-330,345-348
+  s_afe81596766aab::t_1f88ef1f9c7372 8-11,30-33
+lib/chat-navigation.ts
+  s_afe81596766aab::t_57f8eec663334b 1-2,4-43
+  s_afe81596766aab::t_f85c04b46a7c0a 3
+tests/lib/chat-navigation.test.ts
+  s_afe81596766aab::t_bb64e5859f4fc9 1-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8e46b5aa435af557072088cb9dd6faf4880ce816",
+  "prompts": {},
+  "sessions": {
+    "s_afe81596766aab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0c4ad9ae6ffenusFFo5tgUosP4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -47,6 +47,26 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
     label: "Toggle timestamps",
     page: "chat",
   },
+  {
+    id: "chat:next-user-message",
+    label: "Jump to next user message",
+    page: "chat",
+  },
+  {
+    id: "chat:prev-user-message",
+    label: "Jump to previous user message",
+    page: "chat",
+  },
+  {
+    id: "chat:first-user-message",
+    label: "Jump to first user message",
+    page: "chat",
+  },
+  {
+    id: "chat:last-user-message",
+    label: "Jump to last user message",
+    page: "chat",
+  },
 
   // Files page
   { id: "files:save", label: "Save file", page: "files" },
@@ -128,6 +148,10 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "chat:toggle-tool-calls": "x",
   "chat:toggle-tokens": "$",
   "chat:toggle-timestamps": "z",
+  "chat:next-user-message": "j",
+  "chat:prev-user-message": "k",
+  "chat:first-user-message": "[",
+  "chat:last-user-message": "]",
 
   // Git page
   "git:toggle-reviewed": "r",

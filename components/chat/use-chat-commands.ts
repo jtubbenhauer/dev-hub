@@ -5,6 +5,10 @@ import { useLeaderAction } from "@/hooks/use-leader-action";
 import type { PromptInputHandle } from "@/components/chat/prompt-input";
 import {
   Brain,
+  ChevronDown,
+  ChevronUp,
+  ChevronsDown,
+  ChevronsUp,
   Clock,
   Coins,
   PanelRight,
@@ -23,6 +27,10 @@ interface ChatCommandRefs {
   setIsModelSelectorOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
   setIsAgentSelectorOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
   promptInput: RefObject<PromptInputHandle | null>;
+  jumpToNextUserMessage: RefObject<() => void>;
+  jumpToPrevUserMessage: RefObject<() => void>;
+  jumpToFirstUserMessage: RefObject<() => void>;
+  jumpToLastUserMessage: RefObject<() => void>;
 }
 
 interface ChatCommandLabels {
@@ -139,6 +147,34 @@ export function useChatCommands(
         icon: Clock,
         onSelect: toggleTimestamps,
       },
+      {
+        id: "chat:next-user-message",
+        label: "Jump to Next User Message",
+        group: "Chat",
+        icon: ChevronDown,
+        onSelect: () => refs.jumpToNextUserMessage.current(),
+      },
+      {
+        id: "chat:prev-user-message",
+        label: "Jump to Previous User Message",
+        group: "Chat",
+        icon: ChevronUp,
+        onSelect: () => refs.jumpToPrevUserMessage.current(),
+      },
+      {
+        id: "chat:first-user-message",
+        label: "Jump to First User Message",
+        group: "Chat",
+        icon: ChevronsUp,
+        onSelect: () => refs.jumpToFirstUserMessage.current(),
+      },
+      {
+        id: "chat:last-user-message",
+        label: "Jump to Last User Message",
+        group: "Chat",
+        icon: ChevronsDown,
+        onSelect: () => refs.jumpToLastUserMessage.current(),
+      },
     ],
     [
       toggleThinking,
@@ -153,6 +189,10 @@ export function useChatCommands(
       labels.isSidePanelOpen,
       refs.setIsPlanPanelOpen,
       refs.handleCreateSession,
+      refs.jumpToNextUserMessage,
+      refs.jumpToPrevUserMessage,
+      refs.jumpToFirstUserMessage,
+      refs.jumpToLastUserMessage,
     ],
   );
 
@@ -256,6 +296,38 @@ export function useChatCommands(
         },
         handler: () => setIsVariantSelectorOpen((prev) => !prev),
       },
+      {
+        action: {
+          id: "chat:next-user-message",
+          label: "Jump to next user message",
+          page: "chat" as const,
+        },
+        handler: () => refs.jumpToNextUserMessage.current(),
+      },
+      {
+        action: {
+          id: "chat:prev-user-message",
+          label: "Jump to previous user message",
+          page: "chat" as const,
+        },
+        handler: () => refs.jumpToPrevUserMessage.current(),
+      },
+      {
+        action: {
+          id: "chat:first-user-message",
+          label: "Jump to first user message",
+          page: "chat" as const,
+        },
+        handler: () => refs.jumpToFirstUserMessage.current(),
+      },
+      {
+        action: {
+          id: "chat:last-user-message",
+          label: "Jump to last user message",
+          page: "chat" as const,
+        },
+        handler: () => refs.jumpToLastUserMessage.current(),
+      },
     ];
 
     return actions;
@@ -270,6 +342,10 @@ export function useChatCommands(
     refs.setIsSessionListOpen,
     refs.setIsPlanPanelOpen,
     refs.promptInput,
+    refs.jumpToNextUserMessage,
+    refs.jumpToPrevUserMessage,
+    refs.jumpToFirstUserMessage,
+    refs.jumpToLastUserMessage,
   ]);
 
   useLeaderAction(chatLeaderActions);

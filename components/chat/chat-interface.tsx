@@ -43,6 +43,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import {
+  computeFirstUserMessageIndex,
+  computeLastUserMessageIndex,
+  computeNextUserMessageIndex,
+  computePrevUserMessageIndex,
+} from "@/lib/chat-navigation";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useAgentHealth, useGitStatus } from "@/hooks/use-git";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -151,6 +157,8 @@ export function ChatInterface() {
   const sessionListFocusRef = useRef<HTMLDivElement>(null);
   const messagesPanelFocusRef = useRef<HTMLDivElement>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const visibleRangeRef = useRef({ startIndex: 0, endIndex: 0 });
+  const lastJumpedUserIdxRef = useRef<number | null>(null);
 
   const activeWorkspaceId = useWorkspaceStore(
     (state) => state.activeWorkspaceId,
@@ -641,6 +649,61 @@ export function ChatInterface() {
     });
   }, []);
 
+  const handleRangeChanged = useCallback(
+    (range: { startIndex: number; endIndex: number }) => {
+      visibleRangeRef.current = range;
+    },
+    [],
+  );
+
+  const jumpToMessageAt = useCallback(
+    (index: number) => {
+      if (!activeMessages[index]) return;
+      virtuosoRef.current?.scrollToIndex({
+        index,
+        align: "start",
+        behavior: "auto",
+      });
+      lastJumpedUserIdxRef.current = index;
+    },
+    [activeMessages],
+  );
+
+  // Prefer last jumped-to over range.startIndex — Virtuoso's off-by-one otherwise stalls j/k on the current message.
+  const getRelativeJumpAnchor = () => {
+    const range = visibleRangeRef.current;
+    const cursor = lastJumpedUserIdxRef.current;
+    const cursorVisible =
+      cursor !== null && cursor >= range.startIndex && cursor <= range.endIndex;
+    return cursorVisible ? (cursor as number) : range.startIndex;
+  };
+
+  const handleJumpToNextUserMessage = useCallback(() => {
+    const idx = computeNextUserMessageIndex(
+      activeMessages,
+      getRelativeJumpAnchor(),
+    );
+    if (idx !== null) jumpToMessageAt(idx);
+  }, [activeMessages, jumpToMessageAt]);
+
+  const handleJumpToPrevUserMessage = useCallback(() => {
+    const idx = computePrevUserMessageIndex(
+      activeMessages,
+      getRelativeJumpAnchor(),
+    );
+    if (idx !== null) jumpToMessageAt(idx);
+  }, [activeMessages, jumpToMessageAt]);
+
+  const handleJumpToFirstUserMessage = useCallback(() => {
+    const idx = computeFirstUserMessageIndex(activeMessages);
+    if (idx !== null) jumpToMessageAt(idx);
+  }, [activeMessages, jumpToMessageAt]);
+
+  const handleJumpToLastUserMessage = useCallback(() => {
+    const idx = computeLastUserMessageIndex(activeMessages);
+    if (idx !== null) jumpToMessageAt(idx);
+  }, [activeMessages, jumpToMessageAt]);
+
   const handleStartEditSessionNote = useCallback(() => {
     setSessionNoteValue(activeNote ?? "");
     setIsEditingSessionNote(true);
@@ -699,6 +762,14 @@ export function ChatInterface() {
   setIsModelSelectorOpenRef.current = setIsModelSelectorOpen;
   const setIsAgentSelectorOpenRef = useRef(setIsAgentSelectorOpen);
   setIsAgentSelectorOpenRef.current = setIsAgentSelectorOpen;
+  const handleJumpToNextUserMessageRef = useRef(handleJumpToNextUserMessage);
+  handleJumpToNextUserMessageRef.current = handleJumpToNextUserMessage;
+  const handleJumpToPrevUserMessageRef = useRef(handleJumpToPrevUserMessage);
+  handleJumpToPrevUserMessageRef.current = handleJumpToPrevUserMessage;
+  const handleJumpToFirstUserMessageRef = useRef(handleJumpToFirstUserMessage);
+  handleJumpToFirstUserMessageRef.current = handleJumpToFirstUserMessage;
+  const handleJumpToLastUserMessageRef = useRef(handleJumpToLastUserMessage);
+  handleJumpToLastUserMessageRef.current = handleJumpToLastUserMessage;
 
   const { isVariantSelectorOpen, setIsVariantSelectorOpen } = useChatCommands(
     {
@@ -708,6 +779,10 @@ export function ChatInterface() {
       setIsModelSelectorOpen: setIsModelSelectorOpenRef,
       setIsAgentSelectorOpen: setIsAgentSelectorOpenRef,
       promptInput: promptInputRef,
+      jumpToNextUserMessage: handleJumpToNextUserMessageRef,
+      jumpToPrevUserMessage: handleJumpToPrevUserMessageRef,
+      jumpToFirstUserMessage: handleJumpToFirstUserMessageRef,
+      jumpToLastUserMessage: handleJumpToLastUserMessageRef,
     },
     {
       isPlanPanelOpen,
@@ -1158,6 +1233,7 @@ export function ChatInterface() {
                     }}
                     followOutput={handleFollowOutput}
                     atBottomStateChange={handleAtBottomStateChange}
+                    rangeChanged={handleRangeChanged}
                     atBottomThreshold={80}
                     increaseViewportBy={{
                       top: 200,

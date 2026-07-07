@@ -334,8 +334,8 @@ function ToolParams({ input }: { input: Record<string, unknown> }) {
       {Object.entries(input).map(([key, value]) => (
         <div key={key} className="flex gap-2 text-xs leading-relaxed">
           <span className="text-muted-foreground/70 shrink-0">{key}:</span>
-          <span className="text-muted-foreground truncate">
-            {formatValue(value)}
+          <span className="text-muted-foreground min-w-0 flex-1 font-mono break-words whitespace-pre-wrap">
+            {formatValueExpanded(value)}
           </span>
         </div>
       ))}
@@ -524,6 +524,14 @@ function formatValue(value: unknown): string {
   if (typeof value === "boolean" || typeof value === "number")
     return String(value);
   return JSON.stringify(value);
+}
+
+function formatValueExpanded(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "boolean" || typeof value === "number")
+    return String(value);
+  return JSON.stringify(value, null, 2);
 }
 
 function getStatusIcon(status: string) {

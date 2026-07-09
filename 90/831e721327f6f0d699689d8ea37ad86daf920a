@@ -1,0 +1,26 @@
+tests/components/chat/question-banner.test.tsx
+  s_afe81596766aab::t_655d2a05462548 141-193
+  s_afe81596766aab::t_7724bd2576a837 2
+components/chat/question-banner.tsx
+  s_afe81596766aab::t_ebc29ff60ff2c6 12
+  s_afe81596766aab::t_769e2abc28a3e7 285
+  s_afe81596766aab::t_d16dd9ace6ddbf 111
+  s_afe81596766aab::t_1b082a7ea4a47f 228,232-239
+  s_afe81596766aab::t_ac2f9345192e38 275-276,280-284,286-288
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "90831e721327f6f0d699689d8ea37ad86daf920a",
+  "prompts": {},
+  "sessions": {
+    "s_afe81596766aab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0c4ad9ae6ffenusFFo5tgUosP4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

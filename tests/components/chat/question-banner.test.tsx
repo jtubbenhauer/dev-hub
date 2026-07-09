@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { QuestionBanner } from "@/components/chat/question-banner";
@@ -137,5 +137,58 @@ describe("QuestionBanner - Reply gating", () => {
     await user.type(firstInput, "partial{Enter}");
 
     expect(onReply).not.toHaveBeenCalled();
+  });
+
+  it("does not submit on Shift+Enter — allows inserting a newline", async () => {
+    const user = userEvent.setup();
+    const onReply = vi.fn();
+    render(
+      <QuestionBanner
+        request={makeRequest(1)}
+        onReply={onReply}
+        onReject={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText(/custom answer/i);
+    await user.click(input);
+    await user.keyboard("first{Shift>}{Enter}{/Shift}second");
+
+    expect(onReply).not.toHaveBeenCalled();
+  });
+
+  it("preserves newlines in the submitted custom answer", async () => {
+    const user = userEvent.setup();
+    const onReply = vi.fn();
+    render(
+      <QuestionBanner
+        request={makeRequest(1)}
+        onReply={onReply}
+        onReject={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText(
+      /custom answer/i,
+    ) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "line1\nline2" } });
+
+    await user.click(screen.getByRole("button", { name: /reply/i }));
+
+    expect(onReply).toHaveBeenCalledTimes(1);
+    expect(onReply).toHaveBeenCalledWith([["line1\nline2"]]);
+  });
+
+  it("renders the custom answer as a textarea (supports multi-line input)", () => {
+    render(
+      <QuestionBanner
+        request={makeRequest(1)}
+        onReply={vi.fn()}
+        onReject={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText(/custom answer/i);
+    expect(input.tagName).toBe("TEXTAREA");
   });
 });

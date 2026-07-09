@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type {
   QuestionAnswer,
@@ -10,7 +9,7 @@ import type {
 } from "@/lib/opencode/types";
 import { Check, MessageCircleQuestion, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { Component, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
 
 export class QuestionErrorBoundary extends Component<
   { children: ReactNode; onDismissAll: () => void },
@@ -109,7 +108,7 @@ export function QuestionBanner({
         (customInputs[i]?.trim().length ?? 0) > 0,
     );
 
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && isAllAnswered) {
       e.preventDefault();
       handleSubmit();
@@ -226,10 +225,18 @@ function QuestionItem({
   customInput: string;
   onToggleOption: (label: string) => void;
   onCustomInputChange: (value: string) => void;
-  onSubmitOnEnter: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onSubmitOnEnter: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 }) {
   const allowCustom = question.custom !== false;
   const options = question.options ?? [];
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
+  }, [customInput]);
 
   return (
     <div className="space-y-2">
@@ -265,12 +272,20 @@ function QuestionItem({
 
       {allowCustom && (
         <div className="pl-7">
-          <Input
+          <textarea
+            ref={textareaRef}
             value={customInput}
             onChange={(e) => onCustomInputChange(e.target.value)}
             onKeyDown={onSubmitOnEnter}
-            placeholder="Type a custom answer..."
-            className="h-8 text-xs"
+            placeholder="Type a custom answer... (Shift+Enter for newline)"
+            rows={1}
+            className={cn(
+              "border-input placeholder:text-muted-foreground dark:bg-input/30",
+              "max-h-[120px] min-h-8 w-full resize-none rounded-md border bg-transparent px-3 py-1.5 text-xs shadow-xs",
+              "transition-[color,box-shadow] outline-none",
+              "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+              "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+            )}
           />
         </div>
       )}

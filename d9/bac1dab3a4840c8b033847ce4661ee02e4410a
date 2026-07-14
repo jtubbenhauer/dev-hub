@@ -1,0 +1,32 @@
+components/chat/sub-agent-dialog.tsx
+  s_b13cd11988de81::t_47e2299abebe3b 272
+tests/components/chat/sub-agent-dialog.test.tsx
+  s_b13cd11988de81::t_14e4b18a7846f3 168,172,188
+  s_b13cd11988de81::t_c9680e8cadf3cd 167,169-171,173-187,189-208
+  s_b13cd11988de81::t_9b8421dd7480c7 5-8,11-18,23,30,44-67
+  s_138f88590bf3cf::t_7ac75987b9a2a4 209-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "d9bac1dab3a4840c8b033847ce4661ee02e4410a",
+  "prompts": {},
+  "sessions": {
+    "s_138f88590bf3cf": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0e37661c6ffecyEX6Rb4RLTRKN",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_b13cd11988de81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0aa3b277affeRbK3C4JRuQwi0j",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

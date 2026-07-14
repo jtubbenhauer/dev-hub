@@ -1,0 +1,23 @@
+components/chat/markdown-content.tsx
+  s_b13cd11988de81::t_87f305efa6d1fe 16-17
+  s_b13cd11988de81::t_dfa57815fc495b 3
+  s_b13cd11988de81::t_7f317c2dea5040 108-114,117,121
+tests/components/markdown-nested-anchor.test.tsx
+  s_b13cd11988de81::t_85c26b2db7a8e3 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "7c9b7198a5d2fef893090bd1a68f5596cefd560d",
+  "prompts": {},
+  "sessions": {
+    "s_b13cd11988de81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0aa3b277affeRbK3C4JRuQwi0j",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

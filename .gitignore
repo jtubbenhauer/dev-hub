@@ -54,3 +54,4 @@ next-env.d.ts
 # sisyphus
 .sisyphus/
 .omo/
+.playwright-mcp/

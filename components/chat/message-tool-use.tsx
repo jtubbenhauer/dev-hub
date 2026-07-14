@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
 import { SubAgentDialog } from "@/components/chat/sub-agent-dialog";
 import type { ToolPart } from "@/lib/opencode/types";
+import { getPartTruncation } from "@/lib/opencode/truncate-messages";
 
 const MAX_OUTPUT_LINES = 10;
 const AGENT_TOOL_NAMES = new Set(["agent", "task"]);
@@ -135,20 +136,14 @@ function StandardToolCall({
 
       {isExpanded && (
         <div className="mt-1 space-y-1.5 text-xs">
-          {state.status === "error" && (
-            <p className="text-destructive truncate px-1">
-              Error:{" "}
-              {typeof state.error === "string"
-                ? state.error.replaceAll("\n", " ")
-                : JSON.stringify(state.error)}
-            </p>
-          )}
+          {state.status === "error" && <ToolError part={part} />}
 
           {state.status === "completed" && state.output && (
             <ToolOutput
               toolName={part.tool}
               output={state.output}
               input={state.input}
+              part={part}
             />
           )}
 
@@ -278,14 +273,23 @@ function ToolOutput({
   toolName,
   output,
   input,
+  part,
 }: {
   toolName: string;
   output: string;
   input: Record<string, unknown>;
+  part: ToolPart;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [isLoadingFull, setIsLoadingFull] = useState(false);
+  const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId);
+  const loadFullToolOutput = useChatStore((s) => s.loadFullToolOutput);
+
+  const truncation = getPartTruncation(part);
+  const isServerTruncated = truncation?.output !== undefined;
+
   const lines = output.split("\n");
-  const isTruncated = lines.length > MAX_OUTPUT_LINES;
+  const isTruncated = isServerTruncated || lines.length > MAX_OUTPUT_LINES;
   const displayOutput = showAll
     ? output
     : lines.slice(0, MAX_OUTPUT_LINES).join("\n");
@@ -295,6 +299,25 @@ function ToolOutput({
     () => (hasAnsi ? ansiConverter.toHtml(displayOutput) : ""),
     [hasAnsi, displayOutput],
   );
+
+  const handleShowAll = async () => {
+    if (isServerTruncated && !showAll) {
+      if (!activeWorkspaceId) return;
+      setIsLoadingFull(true);
+      try {
+        await loadFullToolOutput(
+          part.sessionID,
+          activeWorkspaceId,
+          part.messageID,
+        );
+      } finally {
+        setIsLoadingFull(false);
+      }
+      setShowAll(true);
+    } else {
+      setShowAll((prev) => !prev);
+    }
+  };
 
   return (
     <div className="bg-muted/50 overflow-hidden rounded">
@@ -318,10 +341,90 @@ function ToolOutput({
       {isTruncated && (
         <button
           type="button"
-          onClick={() => setShowAll((prev) => !prev)}
-          className="border-muted text-muted-foreground hover:bg-muted/80 w-full border-t px-2 py-1 text-[10px] font-medium transition-colors"
+          onClick={handleShowAll}
+          disabled={isLoadingFull}
+          className="border-muted text-muted-foreground hover:bg-muted/80 flex w-full items-center justify-center gap-1.5 border-t px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50"
         >
-          {showAll ? "Show less" : `Show all (${lines.length} lines)`}
+          {isLoadingFull && <Loader2 className="size-3 animate-spin" />}
+          {showAll
+            ? "Show less"
+            : isServerTruncated
+              ? `Show all (${truncation.output} chars)`
+              : `Show all (${lines.length} lines)`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ToolError({ part }: { part: ToolPart }) {
+  const { state } = part;
+
+  const [showAll, setShowAll] = useState(false);
+  const [isLoadingFull, setIsLoadingFull] = useState(false);
+  const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId);
+  const loadFullToolOutput = useChatStore((s) => s.loadFullToolOutput);
+
+  if (state.status !== "error") return null;
+
+  const truncation = getPartTruncation(part);
+  const isServerTruncated = truncation?.error !== undefined;
+
+  const errorText =
+    typeof state.error === "string" ? state.error : JSON.stringify(state.error);
+
+  const lines = errorText.split("\n");
+  const isTruncated = isServerTruncated || lines.length > MAX_OUTPUT_LINES;
+
+  if (!isTruncated && !showAll) {
+    return (
+      <p className="text-destructive truncate px-1">
+        Error: {errorText.replaceAll("\n", " ")}
+      </p>
+    );
+  }
+
+  const displayError = showAll
+    ? errorText
+    : lines.slice(0, MAX_OUTPUT_LINES).join("\n");
+
+  const handleShowAll = async () => {
+    if (isServerTruncated && !showAll) {
+      if (!activeWorkspaceId) return;
+      setIsLoadingFull(true);
+      try {
+        await loadFullToolOutput(
+          part.sessionID,
+          activeWorkspaceId,
+          part.messageID,
+        );
+      } finally {
+        setIsLoadingFull(false);
+      }
+      setShowAll(true);
+    } else {
+      setShowAll((prev) => !prev);
+    }
+  };
+
+  return (
+    <div className="bg-destructive/10 overflow-hidden rounded">
+      <pre className="text-destructive overflow-x-auto p-2 font-mono text-xs break-words whitespace-pre-wrap">
+        Error: {displayError}
+      </pre>
+      {isTruncated && (
+        <button
+          type="button"
+          onClick={handleShowAll}
+          disabled={isLoadingFull}
+          className="border-destructive/20 text-destructive hover:bg-destructive/20 flex w-full items-center justify-center gap-1.5 border-t px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50"
+        >
+          {isLoadingFull && <Loader2 className="size-3 animate-spin" />}
+          {showAll
+            ? "Show less"
+            : isServerTruncated
+              ? `Show all (${truncation.error} chars)`
+              : `Show all (${lines.length} lines)`}
         </button>
       )}
     </div>

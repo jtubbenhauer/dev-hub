@@ -488,6 +488,72 @@ export function ChatInterface() {
     return () => clearTimeout(timer);
   }, [isMessagesLoaded, activeSessionId]);
 
+  const loadOlderMessages = useChatStore((s) => s.loadOlderMessages);
+  const fetchMessages = useChatStore((s) => s.fetchMessages);
+  const messageLoadError = useChatStore((s) => {
+    if (!activeWorkspaceId || !activeSessionId) return undefined;
+    return s.messageLoadErrorBySession[
+      `${activeWorkspaceId}:${activeSessionId}`
+    ];
+  });
+
+  const isLoadingOlder = useChatStore((s) => {
+    if (!activeWorkspaceId || !activeSessionId) return false;
+    return s.isLoadingOlderBySession[`${activeWorkspaceId}:${activeSessionId}`];
+  });
+
+  const virtuosoComponents = useMemo(() => {
+    const base =
+      streamingStatus === "streaming" ? STREAMING_COMPONENTS : EMPTY_COMPONENTS;
+    if (!isLoadingOlder) return base;
+    return {
+      ...base,
+      Header: () => (
+        <div className="flex justify-center py-4">
+          <Loader2 className="text-muted-foreground size-5 animate-spin" />
+        </div>
+      ),
+    };
+  }, [streamingStatus, isLoadingOlder]);
+
+  // firstItemIndex lets Virtuoso keep the scroll position stable when older
+  // pages are prepended on scroll-up: it starts high and drops by the number
+  // of messages added at the head.
+  const START_ITEM_INDEX = 100_000;
+  const [firstItemIndex, setFirstItemIndex] = useState(START_ITEM_INDEX);
+  const prevFirstMessageIdRef = useRef<string | null>(null);
+  const windowSessionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const newFirstId = activeMessages[0]?.info.id ?? null;
+    if (windowSessionRef.current !== activeSessionId) {
+      windowSessionRef.current = activeSessionId;
+      prevFirstMessageIdRef.current = newFirstId;
+      setFirstItemIndex(START_ITEM_INDEX);
+      return;
+    }
+    const prevFirstId = prevFirstMessageIdRef.current;
+    if (newFirstId && prevFirstId && newFirstId !== prevFirstId) {
+      const prependedCount = activeMessages.findIndex(
+        (m) => m.info.id === prevFirstId,
+      );
+      if (prependedCount > 0) {
+        setFirstItemIndex((prev) => prev - prependedCount);
+      }
+    }
+    prevFirstMessageIdRef.current = newFirstId;
+  }, [activeMessages, activeSessionId]);
+
+  const handleStartReached = useCallback(() => {
+    if (!activeSessionId || !activeWorkspaceId) return;
+    void loadOlderMessages(activeSessionId, activeWorkspaceId);
+  }, [activeSessionId, activeWorkspaceId, loadOlderMessages]);
+
+  const handleRetryLoadMessages = useCallback(() => {
+    if (!activeSessionId || !activeWorkspaceId) return;
+    void fetchMessages(activeSessionId, activeWorkspaceId, { force: true });
+  }, [activeSessionId, activeWorkspaceId, fetchMessages]);
+
   // Virtuoso handles auto-scroll via followOutput and atBottomStateChange.
   // Reset jump-to-bottom when switching sessions.
   useEffect(() => {
@@ -651,22 +717,25 @@ export function ChatInterface() {
 
   const handleRangeChanged = useCallback(
     (range: { startIndex: number; endIndex: number }) => {
-      visibleRangeRef.current = range;
+      visibleRangeRef.current = {
+        startIndex: range.startIndex - firstItemIndex,
+        endIndex: range.endIndex - firstItemIndex,
+      };
     },
-    [],
+    [firstItemIndex],
   );
 
   const jumpToMessageAt = useCallback(
     (index: number) => {
       if (!activeMessages[index]) return;
       virtuosoRef.current?.scrollToIndex({
-        index,
+        index: index + firstItemIndex,
         align: "start",
         behavior: "auto",
       });
       lastJumpedUserIdxRef.current = index;
     },
-    [activeMessages],
+    [activeMessages, firstItemIndex],
   );
 
   // Prefer last jumped-to over range.startIndex — Virtuoso's off-by-one otherwise stalls j/k on the current message.
@@ -1196,7 +1265,20 @@ export function ChatInterface() {
             ) : (
               <div className="flex h-full flex-col">
                 {activeMessages.length === 0 ? (
-                  showLoader ? (
+                  messageLoadError ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-3">
+                      <div className="text-muted-foreground text-sm">
+                        {messageLoadError}
+                      </div>
+                      <button
+                        onClick={handleRetryLoadMessages}
+                        className="bg-background hover:bg-muted flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-md transition-opacity"
+                      >
+                        <RotateCw className="size-3" />
+                        Retry
+                      </button>
+                    </div>
+                  ) : showLoader ? (
                     <div className="flex h-full items-center justify-center">
                       <Loader2 className="text-muted-foreground size-5 animate-spin" />
                     </div>
@@ -1210,18 +1292,22 @@ export function ChatInterface() {
                     key={activeSessionId}
                     ref={virtuosoRef}
                     data={activeMessages}
-                    initialTopMostItemIndex={Math.max(
-                      0,
-                      activeMessages.length - 1,
-                    )}
+                    firstItemIndex={firstItemIndex}
+                    startReached={handleStartReached}
+                    computeItemKey={(_, msg) => msg.info.id}
+                    initialTopMostItemIndex={
+                      firstItemIndex + Math.max(0, activeMessages.length - 1)
+                    }
                     itemContent={(index, msg) => {
-                      const prev = index > 0 ? activeMessages[index - 1] : null;
+                      const dataIndex = index - firstItemIndex;
+                      const prev =
+                        dataIndex > 0 ? activeMessages[dataIndex - 1] : null;
                       const showAvatar =
                         !prev || prev.info.role !== msg.info.role;
                       const canRevert =
                         streamingStatus !== "streaming" &&
                         msg.info.role === "user" &&
-                        index > 0;
+                        dataIndex > 0;
                       return (
                         <ChatMessage
                           key={msg.info.id}
@@ -1240,11 +1326,7 @@ export function ChatInterface() {
                       bottom: isMobile ? 100 : 400,
                     }}
                     className="h-full"
-                    components={
-                      streamingStatus === "streaming"
-                        ? STREAMING_COMPONENTS
-                        : EMPTY_COMPONENTS
-                    }
+                    components={virtuosoComponents}
                   />
                 )}
               </div>

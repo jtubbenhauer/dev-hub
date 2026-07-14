@@ -201,4 +201,71 @@ describe("OpenCode proxy route retry", () => {
     expect(response.status).toBe(502);
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   });
+
+  it("returns 504 when upstream never sends response headers within the timeout", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, opts?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            opts?.signal?.addEventListener("abort", () => {
+              reject(
+                (opts.signal as AbortSignal).reason ??
+                  new DOMException("Aborted", "AbortError"),
+              );
+            });
+          }),
+      ),
+    );
+
+    mockWhere.mockResolvedValueOnce([makeRemoteWorkspaceRow()]);
+
+    const promise = GET(
+      new NextRequest(
+        "http://localhost:3000/api/opencode/session/s1/message?workspaceId=ws-1",
+      ),
+      { params: Promise.resolve({ path: ["session", "s1", "message"] }) },
+    );
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    const response = await promise;
+
+    expect(response.status).toBe(504);
+  });
+
+  it("does not abort the body stream once headers arrive (slow mobile client)", async () => {
+    vi.useFakeTimers();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("chunk"));
+        controller.close();
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(body, {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    );
+
+    mockWhere.mockResolvedValueOnce([makeRemoteWorkspaceRow()]);
+
+    const response = await GET(
+      new NextRequest(
+        "http://localhost:3000/api/opencode/session/s1/message?workspaceId=ws-1",
+      ),
+      { params: Promise.resolve({ path: ["session", "s1", "message"] }) },
+    );
+
+    expect(response.status).toBe(200);
+
+    // Past the 15s header timeout: a cleared timer means the stream survives.
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(await response.text()).toBe("chunk");
+  });
 });

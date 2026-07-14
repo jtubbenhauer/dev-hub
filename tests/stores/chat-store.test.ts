@@ -13,15 +13,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { gunzipSync } from "node:zlib";
-
-function decodeCompressedBody(body: BodyInit | null | undefined): unknown {
-  if (!(body instanceof ArrayBuffer)) {
-    throw new Error("Expected ArrayBuffer body from gzip-compressed POST");
-  }
-  const decompressed = gunzipSync(Buffer.from(body)).toString("utf-8");
-  return JSON.parse(decompressed);
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -158,6 +149,9 @@ function resetStore() {
     streamingError: null,
     streamingPollInterval: null,
     optimisticStreamingSessionId: null,
+    hasMoreBeforeBySession: {},
+    isLoadingOlderBySession: {},
+    messageLoadErrorBySession: {},
   });
 }
 
@@ -2814,37 +2808,23 @@ describe("fetchMessages — error handling", () => {
 // fetchMessages — stale-while-revalidate caching
 // ---------------------------------------------------------------------------
 
-describe("fetchMessages — stale-while-revalidate caching", () => {
+describe("fetchMessages — windowed loading", () => {
   beforeEach(resetStore);
 
-  it("loads cached messages from SQLite when no in-memory messages exist", async () => {
-    const cachedMessages = [
-      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
-    ];
-    const remoteMessages = [
-      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
-      { info: makeAssistantMessage("remote-2", "sess-a"), parts: [] },
-    ];
-
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/api/sessions/cache/messages"))
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ messages: cachedMessages, cachedAt: 1000 }),
-        });
-      if (url.includes("/api/opencode/"))
-        return Promise.resolve({
-          ok: true,
-          json: async () => remoteMessages,
-        });
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-    });
-
+  function seedSession(
+    messages: Record<
+      string,
+      Array<{
+        info: ReturnType<typeof makeMessage>;
+        parts: ReturnType<typeof makePart>[];
+      }>
+    >,
+  ) {
     useChatStore.setState({
       workspaceStates: {
         "ws-a": {
           sessions: { "sess-a": makeSession("sess-a") },
-          messages: {},
+          messages,
           optimisticMessageIds: {},
           sessionStatuses: {},
           permissions: [],
@@ -2860,426 +2840,171 @@ describe("fetchMessages — stale-while-revalidate caching", () => {
         },
       },
     });
+  }
+
+  it("loads a windowed page from /api/sessions/messages", async () => {
+    const messages = [
+      { info: makeUserMessage("m-1", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("m-2", "sess-a"), parts: [] },
+    ];
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ messages, hasMore: true, total: 42 }),
+    });
+    seedSession({});
 
     await useChatStore.getState().fetchMessages("sess-a", "ws-a");
 
-    // fetchMessages returns immediately after populating cache; the
-    // background refresh is fire-and-forget, so flush microtasks.
+    const state = useChatStore.getState();
+    expect(state.workspaceStates["ws-a"].messages["sess-a"]).toHaveLength(2);
+    expect(state.hasMoreBeforeBySession["ws-a:sess-a"]).toBe(true);
+
+    const url = (global.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
+    expect(url).toContain("/api/sessions/messages");
+    expect(url).toContain("sessionId=sess-a");
+  });
+
+  it("merges a tail refresh into existing messages instead of replacing", async () => {
+    const existing = [
+      { info: makeUserMessage("a", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("b", "sess-a"), parts: [] },
+      { info: makeUserMessage("c", "sess-a"), parts: [] },
+    ];
+    const windowResp = [
+      { info: makeAssistantMessage("b", "sess-a"), parts: [] },
+      { info: makeUserMessage("c", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("d", "sess-a"), parts: [] },
+    ];
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ messages: windowResp, hasMore: false, total: 4 }),
+    });
+    seedSession({ "sess-a": existing });
+
+    await useChatStore.getState().fetchMessages("sess-a", "ws-a");
     await flushMicrotasks();
 
     const ws = useChatStore.getState().workspaceStates["ws-a"];
-    expect(ws.messages["sess-a"]).toHaveLength(2);
-    expect(ws.messages["sess-a"][1].info.id).toBe("remote-2");
+    expect(ws.messages["sess-a"].map((m) => m.info.id)).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+    ]);
   });
 
-  it("skips immediate remote refresh when cached messages are fresh", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(30_000);
-
-    const cachedMessages = [
-      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
+  it("surfaces an error instead of blanking when the window request fails", async () => {
+    const existing = [
+      { info: makeAssistantMessage("keep-1", "sess-a"), parts: [] },
     ];
-
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/api/sessions/cache/messages")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ messages: cachedMessages, cachedAt: 5_000 }),
-        });
-      }
-      if (url.includes("/api/opencode/")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => [],
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-    });
-
-    useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: { "sess-a": makeSession("sess-a") },
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          sessionAgents: {},
-          sessionModels: {},
-          lastViewedAt: {},
-          pinnedSessionIds: new Set(),
-          sessionVariants: {},
-          sessionNotes: {},
-          sessionsLoaded: true,
-        },
-      },
-    });
-
-    await useChatStore.getState().fetchMessages("sess-a", "ws-a");
-
-    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-    const remoteCalls = fetchCalls.filter(
-      (args: unknown[]) =>
-        typeof args[0] === "string" && args[0].includes("/api/opencode/"),
-    );
-    expect(remoteCalls).toHaveLength(0);
-
-    const ws = useChatStore.getState().workspaceStates["ws-a"];
-    expect(ws.messages["sess-a"]).toHaveLength(1);
-
-    vi.useRealTimers();
-  });
-
-  it("force=true bypasses cache-freshness skip and refetches from remote", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(30_000);
-
-    const cachedMessages = [
-      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
-    ];
-    const remoteMessages = [
-      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
-      { info: makeAssistantMessage("remote-2", "sess-a"), parts: [] },
-    ];
-
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/api/sessions/cache/messages")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ messages: cachedMessages, cachedAt: 5_000 }),
-        });
-      }
-      if (url.includes("/api/opencode/")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => remoteMessages,
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-    });
-
-    useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: { "sess-a": makeSession("sess-a") },
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          sessionAgents: {},
-          sessionModels: {},
-          lastViewedAt: {},
-          pinnedSessionIds: new Set(),
-          sessionVariants: {},
-          sessionNotes: {},
-          sessionsLoaded: true,
-        },
-      },
-    });
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 502 });
+    seedSession({ "sess-a": existing });
 
     await useChatStore
       .getState()
       .fetchMessages("sess-a", "ws-a", { force: true });
-    await flushMicrotasks();
 
-    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-    const remoteCalls = fetchCalls.filter(
-      (args: unknown[]) =>
-        typeof args[0] === "string" && args[0].includes("/api/opencode/"),
-    );
-    expect(remoteCalls).toHaveLength(1);
-
-    const ws = useChatStore.getState().workspaceStates["ws-a"];
-    expect(ws.messages["sess-a"]).toHaveLength(2);
-
-    vi.useRealTimers();
+    const state = useChatStore.getState();
+    expect(state.workspaceStates["ws-a"].messages["sess-a"]).toHaveLength(1);
+    expect(state.messageLoadErrorBySession["ws-a:sess-a"]).toBeTruthy();
   });
 
-  it("refreshes from remote when cached messages are stale", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(120_000);
-
-    const cachedMessages = [
-      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
+  it("skips the background refresh for an actively streaming session", async () => {
+    const existing = [
+      { info: makeAssistantMessage("m-1", "sess-a"), parts: [] },
     ];
-    const remoteMessages = [
-      { info: makeUserMessage("cached-1", "sess-a"), parts: [] },
-      { info: makeAssistantMessage("remote-2", "sess-a"), parts: [] },
-    ];
-
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/api/sessions/cache/messages")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ messages: cachedMessages, cachedAt: 5_000 }),
-        });
-      }
-      if (url.includes("/api/opencode/")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => remoteMessages,
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-    });
-
-    useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: { "sess-a": makeSession("sess-a") },
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          sessionAgents: {},
-          sessionModels: {},
-          lastViewedAt: {},
-          pinnedSessionIds: new Set(),
-          sessionVariants: {},
-          sessionNotes: {},
-          sessionsLoaded: true,
-        },
-      },
-    });
-
-    await useChatStore.getState().fetchMessages("sess-a", "ws-a");
-    await flushMicrotasks();
-
-    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-    const remoteCalls = fetchCalls.filter(
-      (args: unknown[]) =>
-        typeof args[0] === "string" && args[0].includes("/api/opencode/"),
-    );
-    expect(remoteCalls).toHaveLength(1);
-
-    const ws = useChatStore.getState().workspaceStates["ws-a"];
-    expect(ws.messages["sess-a"]).toHaveLength(2);
-
-    vi.useRealTimers();
-  });
-
-  it("skips SQLite cache when in-memory messages already exist", async () => {
-    const inMemoryMessages = [
-      { info: makeUserMessage("mem-1", "sess-a"), parts: [] },
-    ];
-    const remoteMessages = [
-      { info: makeUserMessage("mem-1", "sess-a"), parts: [] },
-      { info: makeAssistantMessage("remote-2", "sess-a"), parts: [] },
-    ];
-
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/api/opencode/"))
-        return Promise.resolve({
-          ok: true,
-          json: async () => remoteMessages,
-        });
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-    });
-
-    useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: { "sess-a": makeSession("sess-a") },
-          messages: { "sess-a": inMemoryMessages },
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          sessionAgents: {},
-          sessionModels: {},
-          lastViewedAt: {},
-          pinnedSessionIds: new Set(),
-          sessionVariants: {},
-          sessionNotes: {},
-          sessionsLoaded: true,
-        },
-      },
-    });
-
-    await useChatStore.getState().fetchMessages("sess-a", "ws-a");
-    await flushMicrotasks();
-
-    const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-    const cacheReadCalls = fetchCalls.filter(
-      (args: unknown[]) =>
-        typeof args[0] === "string" &&
-        args[0].includes("/api/sessions/cache/messages?"),
-    );
-    expect(cacheReadCalls).toHaveLength(0);
-
-    const ws = useChatStore.getState().workspaceStates["ws-a"];
-    expect(ws.messages["sess-a"]).toHaveLength(2);
-  });
-
-  it("persists messages to SQLite cache after successful remote fetch", async () => {
-    const remoteMessages = [
-      { info: makeUserMessage("msg-1", "sess-a"), parts: [] },
-    ];
-
-    let savedPayload: unknown = null;
-    let savedEncoding: string | null = null;
-    global.fetch = vi
-      .fn()
-      .mockImplementation((url: string, opts?: RequestInit) => {
-        if (url.includes("/api/sessions/cache/messages")) {
-          if (opts?.method === "POST") {
-            const headers = new Headers(opts.headers);
-            savedEncoding = headers.get("content-encoding");
-            savedPayload = decodeCompressedBody(opts.body);
-            return Promise.resolve({
-              ok: true,
-              json: async () => ({ ok: true }),
-            });
-          }
-          return Promise.resolve({ ok: true, json: async () => null });
-        }
-        if (url.includes("/api/opencode/"))
-          return Promise.resolve({
-            ok: true,
-            json: async () => remoteMessages,
-          });
-        return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-      });
-
-    useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: { "sess-a": makeSession("sess-a") },
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          sessionAgents: {},
-          sessionModels: {},
-          lastViewedAt: {},
-          pinnedSessionIds: new Set(),
-          sessionVariants: {},
-          sessionNotes: {},
-          sessionsLoaded: true,
-        },
-      },
-    });
+    global.fetch = vi.fn();
+    seedSession({ "sess-a": existing });
+    useChatStore.setState({ optimisticStreamingSessionId: "sess-a" });
 
     await useChatStore.getState().fetchMessages("sess-a", "ws-a");
 
-    await vi.waitFor(() => expect(savedPayload).not.toBeNull());
-    const payload = savedPayload as {
-      sessionId: string;
-      workspaceId: string;
-      messages: unknown[];
-    };
-    expect(savedEncoding).toBe("gzip");
-    expect(payload.sessionId).toBe("sess-a");
-    expect(payload.workspaceId).toBe("ws-a");
-    expect(payload.messages).toHaveLength(1);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("gracefully handles SQLite cache failure and still loads from remote", async () => {
-    const remoteMessages = [
-      { info: makeAssistantMessage("remote-1", "sess-a"), parts: [] },
-    ];
-
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/api/sessions/cache/messages"))
-        return Promise.reject(new Error("Cache unavailable"));
-      if (url.includes("/api/opencode/"))
-        return Promise.resolve({
-          ok: true,
-          json: async () => remoteMessages,
-        });
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-    });
-
-    useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: { "sess-a": makeSession("sess-a") },
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          sessionAgents: {},
-          sessionModels: {},
-          lastViewedAt: {},
-          pinnedSessionIds: new Set(),
-          sessionVariants: {},
-          sessionNotes: {},
-          sessionsLoaded: true,
-        },
-      },
-    });
-
-    await useChatStore.getState().fetchMessages("sess-a", "ws-a");
-
-    const ws = useChatStore.getState().workspaceStates["ws-a"];
-    expect(ws.messages["sess-a"]).toHaveLength(1);
-    expect(ws.messages["sess-a"][0].info.id).toBe("remote-1");
-  });
-
-  it("sets messages key to empty array before remote fetch so isMessagesLoaded resolves early", async () => {
-    let remoteResolve: (v: unknown) => void;
-    const remotePromise = new Promise((r) => {
-      remoteResolve = r;
-    });
-
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/api/sessions/cache/messages"))
-        return Promise.resolve({ ok: true, json: async () => null });
-      if (url.includes("/api/opencode/")) return remotePromise;
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
-    });
-
-    useChatStore.setState({
-      workspaceStates: {
-        "ws-a": {
-          sessions: { "sess-a": makeSession("sess-a") },
-          messages: {},
-          optimisticMessageIds: {},
-          sessionStatuses: {},
-          permissions: [],
-          questions: [],
-          todos: {},
-          sessionAgents: {},
-          sessionModels: {},
-          lastViewedAt: {},
-          pinnedSessionIds: new Set(),
-          sessionVariants: {},
-          sessionNotes: {},
-          sessionsLoaded: true,
-        },
-      },
-    });
-
-    const fetchPromise = useChatStore
-      .getState()
-      .fetchMessages("sess-a", "ws-a");
-
-    await vi.waitFor(() => {
-      const ws = useChatStore.getState().workspaceStates["ws-a"];
-      expect("sess-a" in ws.messages).toBe(true);
-    });
-
-    remoteResolve!({
+  it("requests fresh=1 when force is set", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [
-        { info: makeUserMessage("msg-1", "sess-a"), parts: [] },
-      ],
+      json: async () => ({ messages: [], hasMore: false, total: 0 }),
     });
-    await fetchPromise;
+    seedSession({});
 
-    const ws = useChatStore.getState().workspaceStates["ws-a"];
-    expect(ws.messages["sess-a"]).toHaveLength(1);
+    await useChatStore
+      .getState()
+      .fetchMessages("sess-a", "ws-a", { force: true });
+
+    const url = (global.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
+    expect(url).toContain("fresh=1");
+  });
+
+  it("loadOlderMessages prepends an older page and tracks hasMoreBefore", async () => {
+    const existing = [
+      { info: makeUserMessage("c", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("d", "sess-a"), parts: [] },
+    ];
+    const older = [
+      { info: makeUserMessage("a", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("b", "sess-a"), parts: [] },
+    ];
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ messages: older, hasMore: true }),
+    });
+    seedSession({ "sess-a": existing });
+
+    await useChatStore.getState().loadOlderMessages("sess-a", "ws-a");
+
+    const state = useChatStore.getState();
+    expect(
+      state.workspaceStates["ws-a"].messages["sess-a"].map((m) => m.info.id),
+    ).toEqual(["a", "b", "c", "d"]);
+    expect(state.hasMoreBeforeBySession["ws-a:sess-a"]).toBe(true);
+
+    const url = (global.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
+    expect(url).toContain("before=c");
+  });
+
+  it("loadOlderMessages stops paginating on a 409 anchor-gone response", async () => {
+    const existing = [{ info: makeUserMessage("c", "sess-a"), parts: [] }];
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 409 });
+    seedSession({ "sess-a": existing });
+
+    await useChatStore.getState().loadOlderMessages("sess-a", "ws-a");
+
+    expect(useChatStore.getState().hasMoreBeforeBySession["ws-a:sess-a"]).toBe(
+      false,
+    );
+  });
+
+  it("loadFullToolOutput merges the full message from the single-message endpoint", async () => {
+    const existing = [
+      {
+        info: makeAssistantMessage("m-1", "sess-a"),
+        parts: [makePart("p-1", "sess-a", "m-1")],
+      },
+    ];
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        info: makeAssistantMessage("m-1", "sess-a"),
+        parts: [{ ...makePart("p-1", "sess-a", "m-1"), text: "FULL OUTPUT" }],
+      }),
+    });
+    seedSession({ "sess-a": existing });
+
+    await useChatStore.getState().loadFullToolOutput("sess-a", "ws-a", "m-1");
+
+    const part =
+      useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"][0]
+        .parts[0];
+    expect((part as { text: string }).text).toBe("FULL OUTPUT");
+
+    const url = (global.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
+    expect(url).toContain("/message/m-1");
   });
 });
 

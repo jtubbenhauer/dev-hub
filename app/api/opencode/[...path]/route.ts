@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db";
-import { settings, workspaces } from "@/drizzle/schema";
+import { settings } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { getBackend, toWorkspace } from "@/lib/workspaces/backend";
+import {
+  resolveOpenCodeTarget,
+  OpenCodeTargetError,
+} from "@/lib/opencode/proxy-target";
+import { fetchWithHeaderTimeout } from "@/lib/opencode/fetch-timeout";
 import type { Workspace, WorkspaceProvider } from "@/types";
 
 interface RouteParams {
@@ -28,60 +32,21 @@ async function proxyToOpenCode(
   let serverUrl: string;
   let directory: string | undefined;
   let workspace: Workspace | null = null;
-
-  if (workspaceId) {
-    const [row] = await db
-      .select()
-      .from(workspaces)
-      .where(
-        and(
-          eq(workspaces.id, workspaceId),
-          eq(workspaces.userId, session.user.id),
-        ),
-      );
-    if (!row) {
+  try {
+    const target = await resolveOpenCodeTarget(session.user.id, workspaceId);
+    serverUrl = target.serverUrl;
+    directory = target.directory;
+    workspace = target.workspace;
+  } catch (error) {
+    if (error instanceof OpenCodeTargetError) {
       return NextResponse.json(
-        { error: "Workspace not found" },
-        { status: 404 },
+        error.detail
+          ? { error: error.message, detail: error.detail }
+          : { error: error.message },
+        { status: error.status },
       );
     }
-
-    workspace = toWorkspace(row);
-    const backend = getBackend(workspace);
-
-    try {
-      serverUrl = await backend.getOpenCodeUrl();
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to start OpenCode server";
-      return NextResponse.json(
-        { error: "OpenCode server unavailable", detail: message },
-        { status: 503 },
-      );
-    }
-
-    // Local workspaces need directory param; remote containers are pre-scoped
-    if (workspace.backend !== "remote") {
-      directory = workspace.path;
-    }
-  } else {
-    // No workspace specified — fall back to local OpenCode server
-    try {
-      const { getOrStartServer } = await import("@/lib/opencode/server-pool");
-      const { url: localUrl } = await getOrStartServer();
-      serverUrl = localUrl;
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to start OpenCode server";
-      return NextResponse.json(
-        { error: "OpenCode server unavailable", detail: message },
-        { status: 503 },
-      );
-    }
+    throw error;
   }
 
   const targetUrl = new URL(opencodePath, serverUrl);
@@ -120,12 +85,14 @@ async function proxyToOpenCode(
     fetchOptions.body = await request.text();
   }
 
-  if (!isSSE) {
-    fetchOptions.signal = AbortSignal.timeout(15_000);
-  }
-
   try {
-    const upstream = await fetch(targetUrl.toString(), fetchOptions);
+    const upstream = isSSE
+      ? await fetch(targetUrl.toString(), fetchOptions)
+      : await fetchWithHeaderTimeout(
+          targetUrl.toString(),
+          fetchOptions,
+          15_000,
+        );
     return proxyResponse(upstream, isSSE);
   } catch (error) {
     if (
@@ -144,10 +111,11 @@ async function proxyToOpenCode(
         for (const delayMs of delays) {
           await new Promise((resolve) => setTimeout(resolve, delayMs));
           try {
-            const retryResponse = await fetch(targetUrl.toString(), {
-              ...fetchOptions,
-              signal: AbortSignal.timeout(10_000),
-            });
+            const retryResponse = await fetchWithHeaderTimeout(
+              targetUrl.toString(),
+              fetchOptions,
+              10_000,
+            );
             return proxyResponse(retryResponse, false);
           } catch {
             continue;

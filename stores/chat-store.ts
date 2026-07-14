@@ -18,6 +18,11 @@ import { playSoundForEvent } from "@/lib/sounds";
 import { sendBrowserNotification } from "@/lib/notifications";
 import { toast } from "sonner";
 import { extractFilePathFromToolPart } from "@/lib/chat/extract-tool-file-path";
+import {
+  mergeTailWindow,
+  mergePrependWindow,
+  mergeFullMessage,
+} from "@/lib/opencode/merge-messages";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -218,7 +223,24 @@ export function _resetModuleCaches() {
 const flushingQueuedWorkspaces = new Set<string>();
 
 const reloadDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const MESSAGE_CACHE_FRESH_MS = 60_000;
+
+// Newest-message window sizes — windowing keeps mobile payloads small.
+const INITIAL_MESSAGE_LIMIT = 100;
+const OLDER_MESSAGE_LIMIT = 100;
+
+function sessionKey(workspaceId: string, sessionId: string): string {
+  return `${workspaceId}:${sessionId}`;
+}
+
+function isSessionStreaming(
+  state: ChatState,
+  sessionId: string,
+  workspaceId: string,
+): boolean {
+  const status = state.workspaceStates[workspaceId]?.sessionStatuses[sessionId];
+  if (status && status.type !== "idle") return true;
+  return state.optimisticStreamingSessionId === sessionId;
+}
 
 function getReconcileBackoffKey(
   workspaceId: string,
@@ -610,6 +632,11 @@ interface ChatState {
   // Set to a sessionId when sendMessage fires — gives instant "streaming" feedback before the first SSE arrives
   optimisticStreamingSessionId: string | null;
 
+  // Message-window metadata, keyed by `${workspaceId}:${sessionId}`.
+  hasMoreBeforeBySession: Record<string, boolean>;
+  isLoadingOlderBySession: Record<string, boolean>;
+  messageLoadErrorBySession: Record<string, string>;
+
   // Workspace/session setters
   setActiveSession: (sessionId: string | null) => void;
   setActiveWorkspaceId: (workspaceId: string | null) => void;
@@ -631,6 +658,13 @@ interface ChatState {
   _refreshMessagesFromRemote: (
     sessionId: string,
     workspaceId: string,
+    options?: { fresh?: boolean },
+  ) => Promise<void>;
+  loadOlderMessages: (sessionId: string, workspaceId: string) => Promise<void>;
+  loadFullToolOutput: (
+    sessionId: string,
+    workspaceId: string,
+    messageId: string,
   ) => Promise<void>;
   fetchCommands: (workspaceId: string) => Promise<void>;
   summarizeSession: (
@@ -769,28 +803,6 @@ function buildProxyUrl(
   }
   const query = params.toString();
   return `/api/opencode/${path}${query ? `?${query}` : ""}`;
-}
-
-// gzip-compress a JSON payload before POST. Chat message arrays for long
-// sessions can exceed 30MB uncompressed; gzip typically shrinks that ~5-10x
-// and keeps the request well under any proxy/middleware body-size caps.
-async function postCompressedJson(
-  url: string,
-  payload: unknown,
-): Promise<Response> {
-  const bytes = new TextEncoder().encode(JSON.stringify(payload));
-  const stream = new Response(bytes).body!.pipeThrough(
-    new CompressionStream("gzip"),
-  );
-  const compressed = await new Response(stream).arrayBuffer();
-  return fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "content-encoding": "gzip",
-    },
-    body: compressed,
-  });
 }
 
 function extractErrorString(error: unknown): string {
@@ -958,6 +970,9 @@ export const useChatStore = create<ChatState>()(
       streamingError: null,
       streamingPollInterval: null,
       optimisticStreamingSessionId: null,
+      hasMoreBeforeBySession: {},
+      isLoadingOlderBySession: {},
+      messageLoadErrorBySession: {},
       globalEventSource: null,
       sseReconnectAttempts: 0,
       sseReconnectTimer: null,
@@ -1391,125 +1406,91 @@ export const useChatStore = create<ChatState>()(
 
       fetchMessages: async (sessionId, workspaceId, options) => {
         const force = options?.force === true;
-        const tag = `[chat] fetchMessages ${sessionId.slice(0, 12)}${force ? " (force)" : ""}`;
-        console.time(tag);
+        const state = get();
         const hasInMemory =
-          (get().workspaceStates[workspaceId]?.messages[sessionId]?.length ??
+          (state.workspaceStates[workspaceId]?.messages[sessionId]?.length ??
             0) > 0;
-        let shouldRefreshFromRemote = true;
-        let hasCachedMessages = hasInMemory;
 
+        // Seed an empty entry so the UI can tell "loading" apart from "empty".
         if (!hasInMemory) {
-          try {
-            const cacheResponse = await fetch(
-              `/api/sessions/cache/messages?sessionId=${sessionId}&workspaceId=${workspaceId}`,
-            );
-            if (cacheResponse.ok) {
-              const cached = await cacheResponse.json();
-              if (cached?.messages?.length > 0) {
-                hasCachedMessages = true;
-                const cachedAt =
-                  typeof cached.cachedAt === "number" ? cached.cachedAt : null;
-                set((state) => {
-                  const ws = state.workspaceStates[workspaceId];
-                  if (ws?.messages[sessionId]?.length) return state;
-                  const wsUpdate = updateWorkspace(state, workspaceId, () => ({
-                    messages: {
-                      ...ws?.messages,
-                      [sessionId]: cached.messages,
-                    },
-                  }));
-                  const stateAfterWsUpdate = { ...state, ...wsUpdate };
-                  const lruUpdate = touchLru(
-                    stateAfterWsUpdate,
-                    sessionId,
-                    workspaceId,
-                  );
-                  return { ...wsUpdate, ...lruUpdate };
-                });
-
-                // Cache freshness check — skipped when force=true so SSE
-                // reconnects always backfill events missed during the gap.
-                if (
-                  !force &&
-                  cachedAt !== null &&
-                  Date.now() - cachedAt < MESSAGE_CACHE_FRESH_MS
-                ) {
-                  shouldRefreshFromRemote = false;
-                }
-              }
-            }
-          } catch {
-            // Best effort — proceed to remote fetch
-          }
-        }
-
-        if (!hasInMemory) {
-          set((state) => {
-            const ws = state.workspaceStates[workspaceId];
-            if (ws?.messages[sessionId]?.length) return state;
-            if (sessionId in (ws?.messages ?? {})) return state;
-            return updateWorkspace(state, workspaceId, (wsInner) => ({
+          set((s) => {
+            const ws = s.workspaceStates[workspaceId];
+            if (ws?.messages[sessionId]?.length) return s;
+            if (sessionId in (ws?.messages ?? {})) return s;
+            return updateWorkspace(s, workspaceId, (wsInner) => ({
               messages: { ...wsInner.messages, [sessionId]: [] },
             }));
           });
         }
 
-        if (!shouldRefreshFromRemote) {
-          console.timeEnd(tag);
+        // An actively streaming session is kept live by SSE — a background
+        // snapshot could momentarily roll the streaming message backwards.
+        if (
+          hasInMemory &&
+          !force &&
+          isSessionStreaming(state, sessionId, workspaceId)
+        ) {
           return;
         }
 
-        if (hasCachedMessages) {
-          console.timeEnd(tag);
+        if (hasInMemory && !force) {
           void get()._refreshMessagesFromRemote(sessionId, workspaceId);
           return;
         }
 
-        await get()._refreshMessagesFromRemote(sessionId, workspaceId);
-        console.timeEnd(tag);
+        await get()._refreshMessagesFromRemote(sessionId, workspaceId, {
+          fresh: force,
+        });
       },
 
-      _refreshMessagesFromRemote: (sessionId, workspaceId) => {
-        const key = `${workspaceId}:${sessionId}`;
+      _refreshMessagesFromRemote: (sessionId, workspaceId, options) => {
+        const key = sessionKey(workspaceId, sessionId);
         const existing = _refreshMessagesInFlight.get(key);
         if (existing) return existing;
 
         const request = (async () => {
-          const rTag = `[chat] _refreshMessagesFromRemote ${sessionId.slice(0, 12)}`;
-          console.time(rTag);
           try {
-            const msgController = new AbortController();
-            const msgTimeoutId = setTimeout(
-              () => msgController.abort(),
-              10_000,
-            );
-            const response = await fetch(
-              buildProxyUrl(`session/${sessionId}/message`, workspaceId),
-              { signal: msgController.signal },
-            );
-            clearTimeout(msgTimeoutId);
+            const params = new URLSearchParams({
+              sessionId,
+              workspaceId,
+              limit: String(INITIAL_MESSAGE_LIMIT),
+            });
+            if (options?.fresh) params.set("fresh", "1");
+
+            const response = await fetch(`/api/sessions/messages?${params}`, {
+              signal: AbortSignal.timeout(30_000),
+            });
+
+            // Keep whatever is already loaded and surface the error — never
+            // blank the chat on a failed refresh (the old mobile bug).
             if (!response.ok) {
-              set((state) =>
-                updateWorkspace(state, workspaceId, (ws) => ({
-                  messages: {
-                    ...ws.messages,
-                    [sessionId]: ws.messages[sessionId] ?? [],
-                  },
-                })),
-              );
+              set((state) => ({
+                messageLoadErrorBySession: {
+                  ...state.messageLoadErrorBySession,
+                  [key]: `Failed to load messages (${response.status})`,
+                },
+              }));
               return;
             }
 
-            const data: MessageWithParts[] = await response.json();
+            const data = (await response.json()) as {
+              messages: MessageWithParts[];
+              hasMore: boolean;
+              total: number;
+            };
+
             set((state) => {
               const wsUpdate = updateWorkspace(state, workspaceId, (ws) => {
-                const { [sessionId]: _, ...remainingOptimistic } =
+                const merged = mergeTailWindow(
+                  ws.messages[sessionId] ?? [],
+                  data.messages,
+                );
+                const { [sessionId]: _optimistic, ...remainingOptimistic } =
                   ws.optimisticMessageIds;
                 const seededAgent = ws.sessionAgents[sessionId]
                   ? {}
                   : (() => {
-                      const lastUserMessage = [...data]
+                      const lastUserMessage = [...data.messages]
                         .reverse()
                         .find((m) => m.info.role === "user");
                       const agent =
@@ -1527,7 +1508,7 @@ export const useChatStore = create<ChatState>()(
                     })();
                 return {
                   optimisticMessageIds: remainingOptimistic,
-                  messages: { ...ws.messages, [sessionId]: data },
+                  messages: { ...ws.messages, [sessionId]: merged },
                   ...seededAgent,
                 };
               });
@@ -1537,31 +1518,140 @@ export const useChatStore = create<ChatState>()(
                 sessionId,
                 workspaceId,
               );
-              return { ...wsUpdate, ...lruUpdate };
-            });
-
-            postCompressedJson("/api/sessions/cache/messages", {
-              sessionId,
-              workspaceId,
-              messages: data,
-            }).catch(() => {});
-          } catch {
-            set((state) =>
-              updateWorkspace(state, workspaceId, (ws) => ({
-                messages: {
-                  ...ws.messages,
-                  [sessionId]: ws.messages[sessionId] ?? [],
+              const { [key]: _clearedError, ...remainingErrors } =
+                state.messageLoadErrorBySession;
+              return {
+                ...wsUpdate,
+                ...lruUpdate,
+                hasMoreBeforeBySession: {
+                  ...state.hasMoreBeforeBySession,
+                  [key]: data.hasMore,
                 },
-              })),
-            );
+                messageLoadErrorBySession: remainingErrors,
+              };
+            });
+          } catch (error) {
+            const message =
+              error instanceof DOMException && error.name === "TimeoutError"
+                ? "Timed out loading messages"
+                : "Failed to load messages";
+            set((state) => ({
+              messageLoadErrorBySession: {
+                ...state.messageLoadErrorBySession,
+                [key]: message,
+              },
+            }));
           } finally {
-            console.timeEnd(rTag);
             _refreshMessagesInFlight.delete(key);
           }
         })();
 
         _refreshMessagesInFlight.set(key, request);
         return request;
+      },
+
+      loadOlderMessages: async (sessionId, workspaceId) => {
+        const state = get();
+        const key = sessionKey(workspaceId, sessionId);
+        if (state.isLoadingOlderBySession[key]) return;
+        if (state.hasMoreBeforeBySession[key] === false) return;
+
+        const current =
+          state.workspaceStates[workspaceId]?.messages[sessionId] ?? [];
+        if (current.length === 0) return;
+        const oldestId = current[0].info.id;
+
+        set((s) => ({
+          isLoadingOlderBySession: {
+            ...s.isLoadingOlderBySession,
+            [key]: true,
+          },
+        }));
+
+        try {
+          const params = new URLSearchParams({
+            sessionId,
+            workspaceId,
+            before: oldestId,
+            limit: String(OLDER_MESSAGE_LIMIT),
+          });
+          const response = await fetch(`/api/sessions/messages?${params}`, {
+            signal: AbortSignal.timeout(30_000),
+          });
+
+          // Anchor was compacted/reverted away — stop paginating; the next
+          // tail refresh will rebase the window.
+          if (response.status === 409) {
+            set((s) => ({
+              hasMoreBeforeBySession: {
+                ...s.hasMoreBeforeBySession,
+                [key]: false,
+              },
+            }));
+            return;
+          }
+          if (!response.ok) return;
+
+          const data = (await response.json()) as {
+            messages: MessageWithParts[];
+            hasMore: boolean;
+          };
+
+          set((s) =>
+            updateWorkspace(s, workspaceId, (ws) => {
+              const { messages: mergedMessages } = mergePrependWindow(
+                ws.messages[sessionId] ?? [],
+                data.messages,
+              );
+              return {
+                messages: { ...ws.messages, [sessionId]: mergedMessages },
+              };
+            }),
+          );
+          set((s) => ({
+            hasMoreBeforeBySession: {
+              ...s.hasMoreBeforeBySession,
+              [key]: data.hasMore,
+            },
+          }));
+        } catch {
+          // Best effort — leave the currently loaded messages untouched.
+        } finally {
+          set((s) => ({
+            isLoadingOlderBySession: {
+              ...s.isLoadingOlderBySession,
+              [key]: false,
+            },
+          }));
+        }
+      },
+
+      loadFullToolOutput: async (sessionId, workspaceId, messageId) => {
+        try {
+          const response = await fetch(
+            buildProxyUrl(
+              `session/${sessionId}/message/${messageId}`,
+              workspaceId,
+            ),
+            { signal: AbortSignal.timeout(30_000) },
+          );
+          if (!response.ok) return;
+          const full = (await response.json()) as MessageWithParts;
+          if (!full?.info?.id) return;
+          set((state) =>
+            updateWorkspace(state, workspaceId, (ws) => ({
+              messages: {
+                ...ws.messages,
+                [sessionId]: mergeFullMessage(
+                  ws.messages[sessionId] ?? [],
+                  full,
+                ),
+              },
+            })),
+          );
+        } catch {
+          // Best effort — the truncated preview stays in place.
+        }
       },
 
       summarizeSession: async (sessionId, workspaceId, model) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useState, useCallback } from "react";
+import React, { memo, useState, useCallback, useContext } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { isCodePath, FilePathCode } from "@/components/chat/file-path-code";
 import { PrBadge } from "@/components/chat/pr-badge";
 import { parsePrReferences } from "@/lib/pr-mention";
+
+const InsideAnchorContext = React.createContext(false);
 
 function renderPrBadges(
   text: string,
@@ -103,12 +105,20 @@ export const MarkdownContent = memo(function MarkdownContent({
           });
           return <p>{processedChildren}</p>;
         },
+        a({ children, ...props }) {
+          return (
+            <InsideAnchorContext.Provider value={true}>
+              <a {...props}>{children}</a>
+            </InsideAnchorContext.Provider>
+          );
+        },
         code({ children, className, ...props }) {
           const isInline = !className;
+          const isInsideAnchor = useContext(InsideAnchorContext);
           if (isInline) {
             const text =
               typeof children === "string" ? children : String(children ?? "");
-            if (!isBubble && isCodePath(text)) {
+            if (!isBubble && !isInsideAnchor && isCodePath(text)) {
               return <FilePathCode text={text}>{children}</FilePathCode>;
             }
             return (

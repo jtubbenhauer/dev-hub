@@ -1,0 +1,20 @@
+components/chat/message.tsx
+  s_b13cd11988de81::t_a15f79b720434a 461
+  s_b13cd11988de81::t_3ee7d718c805ad 347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "ffd03201a8e07d40366fd2423000d0e94063f83e",
+  "prompts": {},
+  "sessions": {
+    "s_b13cd11988de81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0aa3b277affeRbK3C4JRuQwi0j",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

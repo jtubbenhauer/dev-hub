@@ -2,19 +2,32 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
 
 import { SubAgentDialog } from "@/components/chat/sub-agent-dialog";
+import {
+  ChatDisplayContext,
+  type ChatDisplaySettings,
+} from "@/components/chat/chat-display-context";
 import type { MessageWithParts, Message } from "@/lib/opencode/types";
+
+vi.mock("@/stores/workspace-store", () => ({
+  useWorkspaceStore: () => "ws-1",
+}));
+
+vi.mock("@/hooks/use-git", () => ({
+  useWorkspaceGitHub: () => null,
+}));
 
 function makeAssistantMessage(
   id: string,
   modelID: string,
   providerID: string,
+  options: { text?: string; createdAt?: number } = {},
 ): MessageWithParts {
   return {
     info: {
       id,
       sessionID: "sub-1",
       role: "assistant",
-      time: { created: Date.now() },
+      time: { created: options.createdAt ?? Date.now() },
       parentID: "",
       modelID,
       providerID,
@@ -28,7 +41,30 @@ function makeAssistantMessage(
         cache: { read: 0, write: 0 },
       },
     } as Message,
-    parts: [],
+    parts:
+      options.text !== undefined
+        ? [
+            {
+              id: `${id}-part`,
+              sessionID: "sub-1",
+              messageID: id,
+              type: "text" as const,
+              text: options.text,
+            },
+          ]
+        : [],
+  };
+}
+
+function makeDisplaySettings(
+  overrides: Partial<ChatDisplaySettings> = {},
+): ChatDisplaySettings {
+  return {
+    showThinking: false,
+    showToolCalls: false,
+    showTokens: false,
+    showTimestamps: false,
+    ...overrides,
   };
 }
 
@@ -126,5 +162,49 @@ describe("SubAgentDialog - model badge", () => {
     await waitFor(() => {
       expect(screen.getByText("gpt-4")).toBeInTheDocument();
     });
+  });
+});
+
+describe("SubAgentDialog - timestamps", () => {
+  const fixedTimestamp = new Date("2099-01-15T10:30:00").getTime();
+  const timePattern = /\d{1,2}:\d{2}/;
+
+  it("renders timestamps on non-first messages regardless of parent context", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse([
+        makeAssistantMessage("msg-1", "claude", "anthropic", {
+          text: "first",
+          createdAt: fixedTimestamp,
+        }),
+        makeAssistantMessage("msg-2", "claude", "anthropic", {
+          text: "second",
+          createdAt: fixedTimestamp,
+        }),
+      ]),
+    );
+
+    render(
+      <ChatDisplayContext.Provider
+        value={makeDisplaySettings({ showTimestamps: false })}
+      >
+        <SubAgentDialog
+          childSessionId="sub-1"
+          workspaceId="ws-1"
+          description="Sub-agent task"
+          isActive={false}
+          open={true}
+          onOpenChange={vi.fn()}
+        />
+      </ChatDisplayContext.Provider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("second")).toBeInTheDocument();
+    });
+
+    const timestamps = screen
+      .getAllByText(timePattern)
+      .filter((el) => el.tagName === "SPAN");
+    expect(timestamps.length).toBeGreaterThan(0);
   });
 });

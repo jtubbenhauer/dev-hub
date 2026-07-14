@@ -269,7 +269,7 @@ export function SubAgentDialog({
       showThinking: true,
       showToolCalls: true,
       showTokens: false,
-      showTimestamps: false,
+      showTimestamps: true,
     }),
     [],
   );

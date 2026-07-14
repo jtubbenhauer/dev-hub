@@ -1,0 +1,87 @@
+lib/opencode/message-cache.ts
+  s_b13cd11988de81::t_424dba734cbfe3 1-85
+tests/lib/truncate-messages.test.ts
+  s_b13cd11988de81::t_f2e1d50f04a715 1-73,77-152,155-162
+  s_31d129ec63471d::t_3481b88efe7615 74-76,153-154
+lib/opencode/merge-messages.ts
+  s_b13cd11988de81::t_4ecd0a1d002f2a 1-108
+tests/api/opencode-proxy.test.ts
+  s_b13cd11988de81::t_ec3ea17a6fc650 204-266,268-270
+  s_b13cd11988de81::t_5842baf3aaa926 267
+tests/api/sessions-messages.test.ts
+  s_b13cd11988de81::t_c6f28a39403bc9 1-56,61-62,64-67,70-98,102-141,145-189
+  s_b13cd11988de81::t_76ddf80ace0a5b 63,68-69
+  s_31d129ec63471d::t_3481b88efe7615 57-60,99-101,142-144
+app/api/opencode/[...path]/route.ts
+  s_b13cd11988de81::t_0f79f0c0351bc5 114-118
+  s_b13cd11988de81::t_ede53b93b74f80 4,6-9
+  s_b13cd11988de81::t_3bff193e511f32 10
+  s_b13cd11988de81::t_f24adb1851f959 89-95
+  s_b13cd11988de81::t_d4061a73ebb4c6 35-41,43-46,49
+components/chat/chat-interface.tsx
+  s_31d129ec63471d::t_5725216c7c9512 500-505,508-512,514-518
+  s_b13cd11988de81::t_79c0eb58f6c4e0 491-499,519-556
+  s_31d129ec63471d::t_41e5035188c4ad 720-723,725,732,738
+  s_31d129ec63471d::t_6f9c6eb7cd1495 1268-1269,1273-1281,1295-1297,1302,1310,1329
+  s_31d129ec63471d::t_33933f5bc7a512 506-507,513,1270-1272,1298-1300,1303-1304
+tests/lib/merge-messages.test.ts
+  s_b13cd11988de81::t_25cd7e5219846d 1-150
+lib/opencode/proxy-target.ts
+  s_b13cd11988de81::t_85074fb0226314 1-82
+lib/opencode/truncate-messages.ts
+  s_b13cd11988de81::t_343b97df657b3c 1-117
+.gitignore
+  h_c7f8735263030f 57
+app/api/sessions/messages/route.ts
+  s_b13cd11988de81::t_47a7edcf444b4d 1-148
+components/chat/message-tool-use.tsx
+  s_31d129ec63471d::t_04d6ddf7d9dba5 276,281,284-290,292,303-307,313-321,344-348,354-366,369-372,375-377,379-395,401-420,422
+  s_31d129ec63471d::t_87a487c061dfac 146
+  s_31d129ec63471d::t_dc782b4547ef89 18
+  s_31d129ec63471d::t_33933f5bc7a512 139,308-312,349-353,373-374,378,396-400,423-427
+  s_31d129ec63471d::t_a1db7c4269cb20 367-368
+stores/chat-store.ts
+  s_b13cd11988de81::t_3522bbe3cef7a6 21-25
+  s_b13cd11988de81::t_5aa3b450f7aee8 227
+  s_b13cd11988de81::t_b2a5c534f11bc1 661-667
+  s_b13cd11988de81::t_f034908213d551 1446-1447,1453-1465,1467-1472,1476-1481,1484-1488,1493,1511,1521-1528,1530-1543,1553-1655
+  s_b13cd11988de81::t_c0efc8af2d7c90 226,228-243
+  s_b13cd11988de81::t_97c35979f301b7 973-975
+  s_b13cd11988de81::t_a2b6c3bd88608b 635-639
+  s_b13cd11988de81::t_8d8511578130ca 1409,1411,1414,1416-1420,1426-1432,1436,1441-1443
+  s_b13cd11988de81::t_c26e93991490eb 1656
+tests/stores/chat-store.test.ts
+  s_b13cd11988de81::t_0dded6e6bdef65 152-154
+  s_b13cd11988de81::t_f2960e07983013 2811,2814-2822,2827,2843,2845-2848,2850-2852,2854,2858-2860,2862-2865,2868-2872,2874-2877,2879-2881,2883,2885,2889-2894,2897-2899,2901-2902,2904-2906,2908-2910,2913-2915,2917-2919,2923,2926-2929,2931,2933-2935,2937-2939,2942-2945,2947-2953,2955,2957,2959-2963,2965-2967,2970-2973,2975,2977-2986,2988-2994,2996,2998,3000-3003,3005-3007
+lib/opencode/fetch-timeout.ts
+  s_b13cd11988de81::t_a7116a8463dcf3 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "3bbf4ff77dcc96b3fc13db895be5ae48607935d6",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_31d129ec63471d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0aa055a6fffePsNFVy5E0Zi9Cx",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_b13cd11988de81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0aa3b277affeRbK3C4JRuQwi0j",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

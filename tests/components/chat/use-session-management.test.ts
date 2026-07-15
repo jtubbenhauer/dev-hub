@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useSessionManagement } from "@/components/chat/use-session-management";
 import { useIsMobile, useHasCoarsePointer } from "@/hooks/use-mobile";

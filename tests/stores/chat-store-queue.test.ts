@@ -67,6 +67,8 @@ describe("chat store queued message handling", () => {
           sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
         },
       },
     });
@@ -110,6 +112,8 @@ describe("chat store queued message handling", () => {
           sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
         },
       },
     });
@@ -147,6 +151,8 @@ describe("chat store queued message handling", () => {
           sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
         },
       },
     });
@@ -180,6 +186,8 @@ describe("chat store queued message handling", () => {
           sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
         },
       },
     });
@@ -214,6 +222,8 @@ describe("chat store queued message handling", () => {
           sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
         },
       },
     });
@@ -255,6 +265,8 @@ describe("chat store queued message handling", () => {
           sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
         },
       },
     });
@@ -294,6 +306,8 @@ describe("chat store queued message handling", () => {
           sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
         },
       },
     });
@@ -355,6 +369,8 @@ describe("chat store queued message handling", () => {
           sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
         },
       },
       queuedMessages: new Map([
@@ -433,6 +449,8 @@ describe("chat store queued message handling", () => {
           sessionModels: {},
           lastViewedAt: {},
           pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
         },
       },
       queuedMessages: new Map([

@@ -55,6 +55,8 @@ function seedStores(
         sessionAgents: {},
         sessionModels: {},
         lastViewedAt: {},
+        sessionVariants: {},
+        sessionNotes: {},
       },
     },
   });

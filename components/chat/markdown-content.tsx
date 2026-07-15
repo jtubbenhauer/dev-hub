@@ -112,39 +112,50 @@ export const MarkdownContent = memo(function MarkdownContent({
             </InsideAnchorContext.Provider>
           );
         },
-        code({ children, className, ...props }) {
-          const isInline = !className;
-          const isInsideAnchor = useContext(InsideAnchorContext);
-          if (isInline) {
-            const text =
-              typeof children === "string" ? children : String(children ?? "");
-            if (!isBubble && !isInsideAnchor && isCodePath(text)) {
-              return <FilePathCode text={text}>{children}</FilePathCode>;
-            }
-            return (
-              <code
-                className={cn(
-                  "rounded px-1.5 py-0.5 font-mono text-sm",
-                  isBubble ? "user-bubble-code" : "bg-muted",
-                )}
-                {...props}
-              >
-                {children}
-              </code>
-            );
-          }
-          return (
-            <code className={className} {...props}>
-              {children}
-            </code>
-          );
-        },
+        code: (codeProps) => (
+          <CodeRenderer {...codeProps} isBubble={isBubble} />
+        ),
       }}
     >
       {content}
     </ReactMarkdown>
   );
 });
+
+function CodeRenderer({
+  children,
+  className,
+  isBubble,
+  ...props
+}: React.HTMLAttributes<HTMLElement> & {
+  isBubble: boolean;
+}) {
+  const isInline = !className;
+  const isInsideAnchor = useContext(InsideAnchorContext);
+  if (isInline) {
+    const text =
+      typeof children === "string" ? children : String(children ?? "");
+    if (!isBubble && !isInsideAnchor && isCodePath(text)) {
+      return <FilePathCode text={text}>{children}</FilePathCode>;
+    }
+    return (
+      <code
+        className={cn(
+          "rounded px-1.5 py-0.5 font-mono text-sm",
+          isBubble ? "user-bubble-code" : "bg-muted",
+        )}
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  }
+  return (
+    <code className={className} {...props}>
+      {children}
+    </code>
+  );
+}
 
 function CopyButton({
   content,

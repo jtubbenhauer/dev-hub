@@ -1,0 +1,28 @@
+tests/components/github-markdown.test.tsx
+  s_b13cd11988de81::t_2f45b7210a7783 1
+components/chat/markdown-content.tsx
+  s_b13cd11988de81::t_5ca55d3508ba87 115-117
+  s_b13cd11988de81::t_d03b635e18bff2 125-159
+tests/components/session-picker.test.tsx
+  s_b13cd11988de81::t_351e7139ebe62e 58-59
+tests/components/chat/use-session-management.test.ts
+  s_b13cd11988de81::t_d22991a0ef9a16 1
+tests/stores/chat-store-queue.test.ts
+  s_b13cd11988de81::t_171192d52c1773 70-71,115-116,154-155,189-190,225-226,268-269,309-310,372-373,452-453
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4297bbfb14c66a466580d70cdae71e514350603b",
+  "prompts": {},
+  "sessions": {
+    "s_b13cd11988de81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0aa3b277affeRbK3C4JRuQwi0j",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

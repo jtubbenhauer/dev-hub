@@ -50,6 +50,11 @@ import {
   computePrevUserMessageIndex,
 } from "@/lib/chat-navigation";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
+import {
+  filterSessionsByAge,
+  parseSessionAgeFilter,
+  type SessionAgeFilter,
+} from "@/lib/session-filters";
 import { useAgentHealth, useGitStatus } from "@/hooks/use-git";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOpencodeRestart } from "@/hooks/use-opencode-restart";
@@ -131,6 +136,19 @@ export function ChatInterface() {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("dev-hub:chat-show-timestamps") === "true";
   });
+  const [sessionAgeFilter, setSessionAgeFilterState] =
+    useState<SessionAgeFilter>(() => {
+      if (typeof window === "undefined") return "all";
+      return parseSessionAgeFilter(
+        localStorage.getItem("dev-hub:chat-session-age-filter"),
+      );
+    });
+  const handleSetSessionAgeFilter = useCallback((filter: SessionAgeFilter) => {
+    setSessionAgeFilterState(filter);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("dev-hub:chat-session-age-filter", filter);
+    }
+  }, []);
   const chatDisplaySettings = useMemo(
     () => ({ showThinking, showToolCalls, showTokens, showTimestamps }),
     [showThinking, showToolCalls, showTokens, showTimestamps],
@@ -389,6 +407,11 @@ export function ChatInterface() {
   const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
   const activePinnedIds = useChatStore(getActivePinnedSessionIds);
   const pinnedSessionIds = isUnifiedMode ? unifiedPinnedIds : activePinnedIds;
+  const filteredUnifiedSessions = useMemo(
+    () =>
+      filterSessionsByAge(unifiedSessions, sessionAgeFilter, unifiedPinnedIds),
+    [unifiedSessions, sessionAgeFilter, unifiedPinnedIds],
+  );
   const unifiedSessionNotes = useChatStore(getUnifiedSessionNotes);
   const activeSessionNotes = useChatStore(getActiveSessionNotes);
   const sessionNotes = isUnifiedMode ? unifiedSessionNotes : activeSessionNotes;
@@ -892,7 +915,9 @@ export function ChatInterface() {
 
   const sharedUnifiedProps = {
     mode: "unified" as const,
-    sessions: unifiedSessions,
+    sessions: filteredUnifiedSessions,
+    sessionAgeFilter,
+    onSetSessionAgeFilter: handleSetSessionAgeFilter,
     workspaceNames,
     workspaceBranches,
     workspaceColors,

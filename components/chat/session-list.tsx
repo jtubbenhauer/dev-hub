@@ -35,6 +35,13 @@ import {
 import { cn } from "@/lib/utils";
 import type { Session, SessionStatus } from "@/lib/opencode/types";
 import type { SessionWithWorkspace } from "@/stores/chat-store";
+import type { SessionAgeFilter } from "@/lib/session-filters";
+
+const AGE_FILTER_LABEL: Record<SessionAgeFilter, string> = {
+  "1d": "1d",
+  "1w": "1w",
+  all: "All",
+};
 
 interface BaseSessionListProps {
   activeSessionId: string | null;
@@ -85,6 +92,8 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
   onToggleWorkspaceExpanded?: (workspaceId: string) => void;
   onWakeWorkspace?: (workspaceId: string) => void;
   sleepingWorkspaceIds?: Set<string>;
+  sessionAgeFilter?: SessionAgeFilter;
+  onSetSessionAgeFilter?: (filter: SessionAgeFilter) => void;
 }
 
 type SessionListProps = WorkspaceSessionListProps | UnifiedSessionListProps;
@@ -225,6 +234,60 @@ export function SessionList(props: SessionListProps) {
           {props.mode === "unified" ? "All sessions" : "Sessions"}
         </span>
         <div className="flex items-center gap-1">
+          {props.mode === "unified" && props.onSetSessionAgeFilter && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon-xs"
+                  variant={
+                    props.sessionAgeFilter && props.sessionAgeFilter !== "all"
+                      ? "secondary"
+                      : "ghost"
+                  }
+                  title={`Filter by age (${AGE_FILTER_LABEL[props.sessionAgeFilter ?? "all"]})`}
+                  className="gap-1"
+                >
+                  <Clock className="size-3.5" />
+                  {props.sessionAgeFilter &&
+                    props.sessionAgeFilter !== "all" && (
+                      <span className="text-[10px] font-medium tabular-nums">
+                        {AGE_FILTER_LABEL[props.sessionAgeFilter]}
+                      </span>
+                    )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[140px]">
+                <DropdownMenuItem
+                  onClick={() => props.onSetSessionAgeFilter!("1d")}
+                  className="gap-2"
+                >
+                  <span className="flex-1">Last day</span>
+                  {props.sessionAgeFilter === "1d" && (
+                    <Check className="text-muted-foreground size-3.5" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => props.onSetSessionAgeFilter!("1w")}
+                  className="gap-2"
+                >
+                  <span className="flex-1">Last week</span>
+                  {props.sessionAgeFilter === "1w" && (
+                    <Check className="text-muted-foreground size-3.5" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => props.onSetSessionAgeFilter!("all")}
+                  className="gap-2"
+                >
+                  <span className="flex-1">All time</span>
+                  {(!props.sessionAgeFilter ||
+                    props.sessionAgeFilter === "all") && (
+                    <Check className="text-muted-foreground size-3.5" />
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {props.mode === "unified" && props.onToggleGroupByWorkspace && (
             <Button
               size="icon-xs"

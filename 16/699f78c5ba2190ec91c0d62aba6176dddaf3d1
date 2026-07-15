@@ -1,0 +1,32 @@
+tests/lib/session-filters.test.ts
+  s_b13cd11988de81::t_7b966c3831cef5 1-119
+components/chat/chat-interface.tsx
+  s_b13cd11988de81::t_e0eb6651523a21 410,413-414
+  s_b13cd11988de81::t_b02985e3fc5fed 411-412
+  s_b13cd11988de81::t_348ca89603e748 139-151
+  s_b13cd11988de81::t_2a2403ecffca04 53-57
+  s_b13cd11988de81::t_7295fade161662 918-920
+lib/session-filters.ts
+  s_b13cd11988de81::t_9c2e6f9c211d86 1-37
+components/chat/session-list.tsx
+  s_b13cd11988de81::t_b02985e3fc5fed 251-256
+  s_b13cd11988de81::t_9f897400727353 95-96
+  s_b13cd11988de81::t_fa70beb352abf7 38-44
+  s_b13cd11988de81::t_0e1770ace805ae 237-250,257-290
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "16699f78c5ba2190ec91c0d62aba6176dddaf3d1",
+  "prompts": {},
+  "sessions": {
+    "s_b13cd11988de81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0aa3b277affeRbK3C4JRuQwi0j",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

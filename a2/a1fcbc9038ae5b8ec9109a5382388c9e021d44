@@ -1,0 +1,20 @@
+components/chat/chat-interface.tsx
+  s_afe81596766aab::t_81641075b83c7f 756,762
+  s_afe81596766aab::t_461096b058fcb3 754
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "a2a1fcbc9038ae5b8ec9109a5382388c9e021d44",
+  "prompts": {},
+  "sessions": {
+    "s_afe81596766aab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0c4ad9ae6ffenusFFo5tgUosP4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

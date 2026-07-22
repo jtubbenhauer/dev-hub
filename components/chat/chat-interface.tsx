@@ -751,14 +751,15 @@ export function ChatInterface() {
   const jumpToMessageAt = useCallback(
     (index: number) => {
       if (!activeMessages[index]) return;
+      // scrollToIndex uses a data index (0..totalCount-1), not the firstItemIndex-offset index that rangeChanged/itemContent report.
       virtuosoRef.current?.scrollToIndex({
-        index: index + firstItemIndex,
+        index,
         align: "start",
         behavior: "auto",
       });
       lastJumpedUserIdxRef.current = index;
     },
-    [activeMessages, firstItemIndex],
+    [activeMessages],
   );
 
   // Prefer last jumped-to over range.startIndex — Virtuoso's off-by-one otherwise stalls j/k on the current message.

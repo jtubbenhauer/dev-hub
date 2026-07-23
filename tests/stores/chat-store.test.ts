@@ -2108,6 +2108,71 @@ describe("streaming poll", () => {
     );
     expect(useChatStore.getState().streamingPollInterval).not.toBeNull();
   });
+
+  it("refreshes active messages while polling a busy external session", async () => {
+    const existing = [
+      { info: makeUserMessage("msg-user", "sess-a"), parts: [] },
+    ];
+    const incoming = [
+      ...existing,
+      {
+        info: makeAssistantMessage("msg-assistant", "sess-a"),
+        parts: [makePart("part-text", "sess-a", "msg-assistant")],
+      },
+    ];
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: { "sess-a": existing },
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+    global.fetch = vi
+      .fn()
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/sessions/messages?")) {
+          return {
+            ok: true,
+            json: async () => ({
+              messages: incoming,
+              hasMore: false,
+              total: incoming.length,
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({ "sess-a": { type: "busy" } }),
+        };
+      });
+
+    useChatStore.getState().startStreamingPoll("ws-a");
+    await vi.advanceTimersByTimeAsync(4000);
+
+    expect(
+      useChatStore
+        .getState()
+        .workspaceStates[
+          "ws-a"
+        ].messages["sess-a"].map((message) => message.info.id),
+    ).toEqual(["msg-user", "msg-assistant"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -2156,6 +2221,46 @@ describe("refreshActiveSessionStatus", () => {
     expect(useChatStore.getState().getStreamingStatus()).toBe("idle");
   });
 
+  it("treats an active session omitted from the status map as idle", async () => {
+    const interval = setInterval(() => {}, 9999);
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      optimisticStreamingSessionId: "sess-a",
+      streamingPollInterval: interval,
+    });
+
+    await useChatStore.getState().refreshActiveSessionStatus("ws-a");
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].sessionStatuses["sess-a"],
+    ).toEqual({ type: "idle" });
+    expect(useChatStore.getState().optimisticStreamingSessionId).toBeNull();
+    expect(useChatStore.getState().streamingPollInterval).toBeNull();
+  });
+
   it("leaves status unchanged when server returns a non-OK response", async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false });
 
@@ -2196,6 +2301,41 @@ describe("refreshActiveSessionStatus", () => {
     await useChatStore.getState().refreshActiveSessionStatus("ws-a");
 
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("starts polling when a busy external session is discovered", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ "sess-a": { type: "busy" } }),
+    });
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: { "sess-a": [] },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      streamingPollInterval: null,
+    });
+
+    await useChatStore.getState().refreshActiveSessionStatus("ws-a");
+
+    expect(useChatStore.getState().streamingPollInterval).not.toBeNull();
+    useChatStore.getState().clearStreamingPoll();
   });
 });
 

@@ -2394,8 +2394,8 @@ export const useChatStore = create<ChatState>()(
       },
 
       refreshActiveSessionStatus: async (workspaceId) => {
-        const { activeSessionId } = get();
-        if (!activeSessionId) return;
+        const { activeSessionId, activeWorkspaceId } = get();
+        if (!activeSessionId || activeWorkspaceId !== workspaceId) return;
 
         try {
           const response = await fetch(
@@ -2437,6 +2437,8 @@ export const useChatStore = create<ChatState>()(
             // Clear optimistic flag and poll — session is confirmed done
             set({ optimisticStreamingSessionId: null });
             get().clearStreamingPoll();
+          } else if (get().streamingPollInterval === null) {
+            get().startStreamingPoll(workspaceId);
           }
         } catch {
           // Best effort — SSE events will catch up
@@ -2871,12 +2873,17 @@ export const useChatStore = create<ChatState>()(
       startStreamingPoll: (workspaceId) => {
         get().clearStreamingPoll();
         const interval = setInterval(() => {
-          const status = get().getStreamingStatus();
+          const state = get();
+          const status = state.getStreamingStatus();
           if (status === "idle") {
-            get().clearStreamingPoll();
+            state.clearStreamingPoll();
             return;
           }
-          get().refreshActiveSessionStatus(workspaceId);
+          const { activeSessionId, activeWorkspaceId } = state;
+          if (activeSessionId && activeWorkspaceId === workspaceId) {
+            void state._refreshMessagesFromRemote(activeSessionId, workspaceId);
+          }
+          void state.refreshActiveSessionStatus(workspaceId);
         }, 4000);
         set({ streamingPollInterval: interval });
       },

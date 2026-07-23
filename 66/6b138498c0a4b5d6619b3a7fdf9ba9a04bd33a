@@ -1,0 +1,33 @@
+stores/chat-store.ts
+  s_326b18de7881fc::t_07821fc7a8fad7 2877,2879,2882
+  s_326b18de7881fc::t_f3dfe9222d3f0d 2876
+  s_326b18de7881fc::t_8f7c41ca517aa7 2883-2885
+tests/stores/chat-store.test.ts
+  s_f1f368b971e1ad::t_4dc44d0f3b5981 2145-2158,2161,2163,2171-2173,2258
+  s_326b18de7881fc::t_7e789eb01d3551 2224-2257,2259-2263,2339
+  s_326b18de7881fc::t_306021e4271996 2111-2144,2159-2160,2162,2164-2170,2174-2175,2305-2338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "666b138498c0a4b5d6619b3a7fdf9ba9a04bd33a",
+  "prompts": {},
+  "sessions": {
+    "s_326b18de7881fc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_071c5a514ffeeXHBajNEHLCiOt",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_f1f368b971e1ad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_071c5a514ffeeXHBajNEHLCiOt",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

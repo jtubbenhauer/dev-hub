@@ -21,6 +21,7 @@ import {
 } from "@/components/chat/streaming-indicator";
 import { useChatCommands } from "@/components/chat/use-chat-commands";
 import { useChatEffects } from "@/components/chat/use-chat-effects";
+import { useChatUrlState } from "@/components/chat/use-chat-url-state";
 import { useSessionManagement } from "@/components/chat/use-session-management";
 import { useSessionNavigation } from "@/components/chat/use-session-navigation";
 import { TaskProgressPanel } from "@/components/chat/task-progress";
@@ -224,6 +225,11 @@ export function ChatInterface() {
     }));
   }, [allWorkspaces]);
 
+  const workspaceIds = useMemo(
+    () => new Set(allWorkspaces.map((workspace) => workspace.id)),
+    [allWorkspaces],
+  );
+
   const sleepingWorkspaceIds = useMemo(() => {
     const ids = new Set<string>();
     for (const ws of allWorkspaces) {
@@ -322,6 +328,55 @@ export function ChatInterface() {
     promptInputRef,
   });
 
+  const { pushChatState } = useChatUrlState({
+    activeWorkspaceId,
+    activeSessionId,
+    workspaceIds,
+    isUnifiedMode,
+    groupByWorkspace,
+    sessionAgeFilter,
+    onToggleUnifiedMode: handleToggleUnifiedMode,
+    onToggleGroupByWorkspace: handleToggleGroupByWorkspace,
+    onSetSessionAgeFilter: handleSetSessionAgeFilter,
+  });
+
+  const handleSelectSessionWithUrl = useCallback(
+    (sessionId: string) => {
+      handleSelectSession(sessionId);
+      pushChatState({ sessionId });
+    },
+    [handleSelectSession, pushChatState],
+  );
+  const handleMobileSelectSessionWithUrl = useCallback(
+    (sessionId: string) => {
+      handleMobileSelectSession(sessionId);
+      pushChatState({ sessionId });
+    },
+    [handleMobileSelectSession, pushChatState],
+  );
+  const handleSelectUnifiedSessionWithUrl = useCallback(
+    (sessionId: string, workspaceId: string) => {
+      handleSelectUnifiedSession(sessionId, workspaceId);
+      pushChatState({ sessionId, workspaceId });
+    },
+    [handleSelectUnifiedSession, pushChatState],
+  );
+  const handleToggleUnifiedModeWithUrl = useCallback(() => {
+    handleToggleUnifiedMode();
+    pushChatState({ view: isUnifiedMode ? "workspace" : "unified" });
+  }, [handleToggleUnifiedMode, isUnifiedMode, pushChatState]);
+  const handleToggleGroupByWorkspaceWithUrl = useCallback(() => {
+    handleToggleGroupByWorkspace();
+    pushChatState({ groupByWorkspace: !groupByWorkspace });
+  }, [groupByWorkspace, handleToggleGroupByWorkspace, pushChatState]);
+  const handleSetSessionAgeFilterWithUrl = useCallback(
+    (filter: SessionAgeFilter) => {
+      handleSetSessionAgeFilter(filter);
+      pushChatState({ age: filter });
+    },
+    [handleSetSessionAgeFilter, pushChatState],
+  );
+
   const branchQueryResults = useQueries({
     queries: allWorkspaces.map((ws) => ({
       queryKey: ["git-status", ws.id],
@@ -365,10 +420,6 @@ export function ChatInterface() {
     : unifiedLimit;
   const allUnifiedSessions = useChatStore((state) =>
     state.getRecentSessionsAcrossWorkspaces(effectiveUnifiedLimit),
-  );
-  const workspaceIds = useMemo(
-    () => new Set(allWorkspaces.map((w) => w.id)),
-    [allWorkspaces],
   );
   const unifiedSessions = useMemo(
     () => allUnifiedSessions.filter((s) => workspaceIds.has(s.workspaceId)),
@@ -918,7 +969,7 @@ export function ChatInterface() {
     mode: "unified" as const,
     sessions: filteredUnifiedSessions,
     sessionAgeFilter,
-    onSetSessionAgeFilter: handleSetSessionAgeFilter,
+    onSetSessionAgeFilter: handleSetSessionAgeFilterWithUrl,
     workspaceNames,
     workspaceBranches,
     workspaceColors,
@@ -940,9 +991,9 @@ export function ChatInterface() {
     onSetSessionNote: handleSetSessionNote,
     onClearSessionNote: handleClearSessionNote,
     isUnifiedMode,
-    onToggleMode: handleToggleUnifiedMode,
+    onToggleMode: handleToggleUnifiedModeWithUrl,
     groupByWorkspace,
-    onToggleGroupByWorkspace: handleToggleGroupByWorkspace,
+    onToggleGroupByWorkspace: handleToggleGroupByWorkspaceWithUrl,
     workspaceOrder,
     onWorkspaceOrderChange: handleWorkspaceOrderChange,
     expandedWorkspaces,
@@ -968,7 +1019,7 @@ export function ChatInterface() {
     onSetSessionNote: handleSetSessionNote,
     onClearSessionNote: handleClearSessionNote,
     isUnifiedMode,
-    onToggleMode: handleToggleUnifiedMode,
+    onToggleMode: handleToggleUnifiedModeWithUrl,
   };
 
   return (
@@ -982,13 +1033,13 @@ export function ChatInterface() {
           {isUnifiedMode ? (
             <SessionList
               {...sharedUnifiedProps}
-              onSelectSession={handleSelectUnifiedSession}
+              onSelectSession={handleSelectUnifiedSessionWithUrl}
               onCreateSession={handleMobileCreateSession}
             />
           ) : (
             <SessionList
               {...sharedWorkspaceProps}
-              onSelectSession={handleMobileSelectSession}
+              onSelectSession={handleMobileSelectSessionWithUrl}
               onCreateSession={handleMobileCreateSession}
             />
           )}
@@ -1060,13 +1111,13 @@ export function ChatInterface() {
             {isUnifiedMode ? (
               <SessionList
                 {...sharedUnifiedProps}
-                onSelectSession={handleSelectUnifiedSession}
+                onSelectSession={handleSelectUnifiedSessionWithUrl}
                 onCreateSession={handleCreateSession}
               />
             ) : (
               <SessionList
                 {...sharedWorkspaceProps}
-                onSelectSession={handleSelectSession}
+                onSelectSession={handleSelectSessionWithUrl}
                 onCreateSession={handleCreateSession}
               />
             )}

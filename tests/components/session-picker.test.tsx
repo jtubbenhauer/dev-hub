@@ -244,7 +244,7 @@ describe("SessionPickerDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("navigates to /chat when selecting from another page", async () => {
+  it("navigates to the selected chat session from another page", async () => {
     mockPathname.mockReturnValue("/git");
     seedStores([makeSession("s1", "My Session", 2000)]);
     renderPicker();
@@ -252,10 +252,12 @@ describe("SessionPickerDialog", () => {
     await userEvent.click(screen.getByText("Open Picker"));
     await userEvent.click(screen.getByText("My Session"));
 
-    expect(mockPush).toHaveBeenCalledWith("/chat");
+    expect(mockPush).toHaveBeenCalledWith(
+      "/chat?workspaceId=ws-1&sessionId=s1",
+    );
   });
 
-  it("does not navigate when already on /chat", async () => {
+  it("updates the selected session URL when already on chat", async () => {
     mockPathname.mockReturnValue("/chat");
     seedStores([makeSession("s1", "My Session", 2000)]);
     renderPicker();
@@ -263,7 +265,9 @@ describe("SessionPickerDialog", () => {
     await userEvent.click(screen.getByText("Open Picker"));
     await userEvent.click(screen.getByText("My Session"));
 
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(
+      "/chat?workspaceId=ws-1&sessionId=s1",
+    );
   });
 
   it("keyboard navigates with ArrowDown and selects with Enter", async () => {

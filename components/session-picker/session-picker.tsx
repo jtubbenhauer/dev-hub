@@ -12,6 +12,7 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import { useChatStore } from "@/stores/chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { createChatHref } from "@/lib/chat-url-state";
 import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match";
 import {
   Dialog,
@@ -261,15 +262,14 @@ export function SessionPickerDialog() {
       }
       setActiveSession(entry.session.id);
       close();
-      navigateToChat();
+      router.push(
+        createChatHref({
+          workspaceId: entry.workspaceId,
+          sessionId: entry.session.id,
+        }),
+      );
     },
-    [
-      activeWorkspaceId,
-      setActiveWorkspaceId,
-      setActiveSession,
-      close,
-      navigateToChat,
-    ],
+    [activeWorkspaceId, setActiveWorkspaceId, setActiveSession, close, router],
   );
 
   const handleNewSession = useCallback(async () => {

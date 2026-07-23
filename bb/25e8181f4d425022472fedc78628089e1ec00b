@@ -1,0 +1,42 @@
+components/chat/use-chat-url-state.ts
+  s_5351e04ffe0c34::t_49d6c99189d40f 47-48,63,94,97,153-166,173-193,196-198
+  s_5351e04ffe0c34::t_720333d0b7f001 1-5,7-10,41,43-46,49-61,68-71,73-93,95-96,98-113,138-152,194-195,199-207,211-224
+  s_5351e04ffe0c34::t_beaf8fdf5a2cbe 65,67,114-115,119-120,123-129,131,135-137
+  s_5d52848ca7d9f2::t_acb97680712811 118,132
+  s_5351e04ffe0c34::t_bb708149c2fa0f 64,66,121,130
+  s_5d52848ca7d9f2::t_c21b18bc920e85 62,133-134,209-210
+  s_5351e04ffe0c34::t_d09e2d2d688f8a 6,11-27,40,42,225
+  s_5351e04ffe0c34::t_2d50dc627b080d 28-39,72,116-117,122,167-172,208
+tests/components/chat/use-chat-url-state.test.ts
+  s_5351e04ffe0c34::t_26a17939c38ebb 4-7,41,95,112-117
+  s_5351e04ffe0c34::t_5f98457efbba81 16-19,62-65,77-90,203,245
+  s_5351e04ffe0c34::t_34ed425e5cf694 146-156,180-194
+  s_5d52848ca7d9f2::t_c21b18bc920e85 100-102,124-126
+  s_5351e04ffe0c34::t_a6bf1d02c61d23 157-179
+  s_5351e04ffe0c34::t_d09e2d2d688f8a 1-3,8-15,20-40,42-61,66-76,91-94,96-99,103-111,118-123,127-145,253
+  s_5351e04ffe0c34::t_06f62e9210519f 195-202,204-244,246-252
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "bb25e8181f4d425022472fedc78628089e1ec00b",
+  "prompts": {},
+  "sessions": {
+    "s_5351e04ffe0c34": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0725efa86ffeeZbP60uIaBuZ52",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_5d52848ca7d9f2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_0725efa86ffeeZbP60uIaBuZ52",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+app/chat/page.tsx
+  s_5351e04ffe0c34::t_6dcf8279aa8a40 5,10-12
+components/chat/chat-interface.tsx
+  s_5351e04ffe0c34::t_6dcf8279aa8a40 24,228-232,331-379,972,994,996,1022,1036,1042,1114,1120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "c17689da517ad1e348cbfed4c8d6782ff0f5ec8c",
+  "prompts": {},
+  "sessions": {
+    "s_5351e04ffe0c34": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0725efa86ffeeZbP60uIaBuZ52",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

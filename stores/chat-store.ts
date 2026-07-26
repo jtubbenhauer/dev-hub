@@ -2881,7 +2881,13 @@ export const useChatStore = create<ChatState>()(
           }
           const { activeSessionId, activeWorkspaceId } = state;
           if (activeSessionId && activeWorkspaceId === workspaceId) {
-            void state._refreshMessagesFromRemote(activeSessionId, workspaceId);
+            void state._refreshMessagesFromRemote(
+              activeSessionId,
+              workspaceId,
+              {
+                fresh: true,
+              },
+            );
           }
           void state.refreshActiveSessionStatus(workspaceId);
         }, 4000);

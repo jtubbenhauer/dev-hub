@@ -2147,12 +2147,16 @@ describe("streaming poll", () => {
       .mockImplementation(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/api/sessions/messages?")) {
+          const isFresh = new URL(url, "http://localhost").searchParams.has(
+            "fresh",
+          );
+          const messages = isFresh ? incoming : existing;
           return {
             ok: true,
             json: async () => ({
-              messages: incoming,
+              messages,
               hasMore: false,
-              total: incoming.length,
+              total: messages.length,
             }),
           };
         }

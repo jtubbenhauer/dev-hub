@@ -59,7 +59,9 @@ export function useChatEffects({
     if (!activeSessionId || !activeWorkspaceId) return;
     const interval = setInterval(() => {
       if (getStreamingStatus() !== "idle") return;
-      void refreshMessagesFromRemote(activeSessionId, activeWorkspaceId);
+      void refreshMessagesFromRemote(activeSessionId, activeWorkspaceId, {
+        fresh: true,
+      });
     }, 4000);
     return () => clearInterval(interval);
   }, [

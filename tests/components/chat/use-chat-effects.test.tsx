@@ -13,7 +13,7 @@ describe("useChatEffects active message sync", () => {
     vi.useRealTimers();
   });
 
-  it("refreshes an idle selected session so external OpenCode activity appears", async () => {
+  it("requests a fresh snapshot for an idle selected session", async () => {
     const store = useChatStore.getState();
     vi.spyOn(store, "setActiveWorkspaceId").mockImplementation(() => {});
     vi.spyOn(store, "fetchSessions").mockResolvedValue();
@@ -39,7 +39,9 @@ describe("useChatEffects active message sync", () => {
       await vi.advanceTimersByTimeAsync(4000);
     });
 
-    expect(refreshMessages).toHaveBeenCalledWith("sess-a", "ws-a");
+    expect(refreshMessages).toHaveBeenCalledWith("sess-a", "ws-a", {
+      fresh: true,
+    });
     unmount();
   });
 });

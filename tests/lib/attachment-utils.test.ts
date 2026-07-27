@@ -6,6 +6,8 @@ import {
   MAX_FILE_SIZE,
   MAX_ATTACHMENTS,
   ALLOWED_MIME_TYPES,
+  getAttachmentMimeType,
+  createAttachmentPromptPart,
 } from "@/lib/attachment-utils";
 
 function createMockFile(name: string, size: number, type: string): File {
@@ -58,6 +60,16 @@ describe("validateAttachment", () => {
     expect(validateAttachment(file)).toEqual({ valid: true });
   });
 
+  it("returns valid: true for Markdown file", () => {
+    const file = createMockFile("notes.md", 1024, "text/markdown");
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
+  it("returns valid: true for Markdown file without a MIME type", () => {
+    const file = createMockFile("notes.MD", 1024, "");
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
   it("returns valid: false for PDF file exceeding 10MB limit", () => {
     const size = MAX_FILE_SIZE + 1;
     const file = createMockFile("big.pdf", size, "application/pdf");
@@ -92,7 +104,55 @@ describe("validateAttachment", () => {
   });
 });
 
+describe("getAttachmentMimeType", () => {
+  it("uses an OpenCode-compatible MIME type for Markdown files", () => {
+    const file = createMockFile("notes.md", 1024, "text/markdown");
+    expect(getAttachmentMimeType(file)).toBe("text/plain");
+  });
+});
+
+describe("createAttachmentPromptPart", () => {
+  it("converts Markdown attachments to text context", () => {
+    const part = createAttachmentPromptPart({
+      mime: "text/plain",
+      dataUrl: "data:text/plain;base64,IyBIZWFkaW5n",
+      filename: "notes.md",
+    });
+
+    expect(part.type).toBe("text");
+    expect("text" in part && part.text).toContain("# Heading");
+    expect("text" in part && part.text).toContain("notes.md");
+  });
+});
+
 describe("fileToDataUrl", () => {
+  it("uses text/plain in Markdown data URLs", async () => {
+    const file = createMockFile("notes.md", 4, "text/markdown");
+
+    vi.stubGlobal(
+      "FileReader",
+      vi.fn(function (this: {
+        onload: (() => void) | null;
+        onerror: (() => void) | null;
+        result: string;
+        readAsDataURL: () => void;
+      }) {
+        this.onload = null;
+        this.onerror = null;
+        this.result = "data:text/markdown;base64,AAAA";
+        this.readAsDataURL = () => {
+          this.onload?.();
+        };
+      }),
+    );
+
+    await expect(fileToDataUrl(file)).resolves.toBe(
+      "data:text/plain;base64,AAAA",
+    );
+
+    vi.unstubAllGlobals();
+  });
+
   it("resolves with data URL on success", async () => {
     const file = createMockFile("image.png", 4, "image/png");
     const fakeDataUrl = "data:image/png;base64,AAAA";

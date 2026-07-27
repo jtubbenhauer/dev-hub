@@ -25,6 +25,7 @@ import {
 } from "@/lib/opencode/merge-messages";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { createAttachmentPromptPart } from "@/lib/attachment-utils";
 
 export type StreamingStatus =
   | "idle"
@@ -1829,12 +1830,7 @@ export const useChatStore = create<ChatState>()(
           ];
           if (attachments?.length) {
             for (const att of attachments) {
-              parts.push({
-                type: "file",
-                mime: att.mime,
-                url: att.dataUrl,
-                filename: att.filename,
-              });
+              parts.push(createAttachmentPromptPart(att));
             }
           }
           const body: Record<string, unknown> = {

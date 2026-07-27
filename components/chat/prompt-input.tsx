@@ -35,6 +35,7 @@ import {
   validateAttachment,
   fileToDataUrl,
   generateAttachmentId,
+  getAttachmentMimeType,
 } from "@/lib/attachment-utils";
 import {
   getPendingCommentChips,
@@ -708,7 +709,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
                   id: generateAttachmentId(),
                   file,
                   dataUrl,
-                  mime: file.type,
+                  mime: getAttachmentMimeType(file),
                   filename: file.name,
                 },
               ];
@@ -750,7 +751,8 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
             (item) =>
               item.kind === "file" &&
               (item.type.startsWith("image/") ||
-                item.type === "application/pdf"),
+                item.type === "application/pdf" ||
+                item.type === "text/markdown"),
           )
           .map((item) => item.getAsFile())
           .filter((f): f is File => f !== null);
@@ -1088,7 +1090,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
+          accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/markdown,.md"
           multiple
           className="hidden"
           onChange={handleFileInputChange}

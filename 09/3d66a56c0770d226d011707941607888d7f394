@@ -1,0 +1,28 @@
+tests/lib/chat/streaming-label.test.ts
+  s_2f5b858003555b::t_c86a33984ef748 1-75
+components/chat/streaming-indicator.tsx
+  s_2f5b858003555b::t_2b2986f76094f7 61-66
+  s_2f5b858003555b::t_68168b569bc18b 26
+  s_2f5b858003555b::t_7d205ad3123826 8
+  s_2f5b858003555b::t_8a0c109903aebb 3
+tests/components/chat/streaming-indicator.test.tsx
+  s_2f5b858003555b::t_8fc16ea4e1379e 1-34
+lib/chat/streaming-label.ts
+  s_2f5b858003555b::t_ed5b593115c24b 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "093d66a56c0770d226d011707941607888d7f394",
+  "prompts": {},
+  "sessions": {
+    "s_2f5b858003555b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_05550409cffei5j76m0jWYCZxu",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

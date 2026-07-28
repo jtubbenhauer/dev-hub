@@ -1,10 +1,11 @@
 "use client";
 
+import { formatRetryLabel } from "@/lib/chat/streaming-label";
 import type { MessageWithParts, SessionStatus } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
 import { memo, useEffect, useMemo, useState } from "react";
 
-const StreamingIndicator = memo(function StreamingIndicator({
+export const StreamingIndicator = memo(function StreamingIndicator({
   messages,
   sessionStatus,
 }: {
@@ -22,11 +23,7 @@ const StreamingIndicator = memo(function StreamingIndicator({
 
   const label = useMemo(() => {
     if (sessionStatus?.type === "retry") {
-      const secondsUntilRetry = Math.max(
-        0,
-        Math.ceil((sessionStatus.next - now) / 1000),
-      );
-      return `Retrying... attempt ${sessionStatus.attempt}${secondsUntilRetry > 0 ? ` · ${secondsUntilRetry}s` : ""}`;
+      return formatRetryLabel(sessionStatus, now);
     }
 
     const lastAssistant = [...messages]
@@ -61,7 +58,12 @@ const StreamingIndicator = memo(function StreamingIndicator({
         <span className="bg-muted-foreground/50 size-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
         <span className="bg-muted-foreground/50 size-1.5 animate-bounce rounded-full" />
       </div>
-      <span className="text-muted-foreground text-xs">{label}</span>
+      <span
+        className="text-muted-foreground min-w-0 truncate text-xs"
+        title={label}
+      >
+        {label}
+      </span>
     </div>
   );
 });

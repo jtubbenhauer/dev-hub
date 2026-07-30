@@ -1,0 +1,29 @@
+stores/chat-store.ts
+  s_326b18de7881fc::t_9d616ed6bd2f8b 1534-1535,1537,1541-1543,1596-1603,1611
+tests/stores/chat-store.test.ts
+  s_1373064a00e778::t_c9ee91a37e39fe 3414-3444
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "7ea5d23e28b5533a5b14d9de7aab60cfd184fca8",
+  "prompts": {},
+  "sessions": {
+    "s_1373064a00e778": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0554168b1ffeKdA3qNMvioE1bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_326b18de7881fc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_071c5a514ffeeXHBajNEHLCiOt",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

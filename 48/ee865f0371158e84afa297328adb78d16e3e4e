@@ -1,0 +1,21 @@
+tests/lib/chat/scroll-position.test.ts
+  s_bca38716e1e236::t_ef0412575cf33b 1-51
+lib/chat/scroll-position.ts
+  s_bca38716e1e236::t_17f93c3a1f3e3d 1-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "48ee865f0371158e84afa297328adb78d16e3e4e",
+  "prompts": {},
+  "sessions": {
+    "s_bca38716e1e236": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_07cb5b1e8ffeVrJN5IKkEfV01p",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

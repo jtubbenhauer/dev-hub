@@ -1,0 +1,42 @@
+tests/api/opencode-events.test.ts
+  s_326b18de7881fc::t_467cf7aa963c2d 108-136
+  s_326b18de7881fc::t_2a05cdbde09fe4 29-31
+  s_326b18de7881fc::t_0c9fc9de63860b 1-6,32-65,67-73,75-76,81,86-102,104-107,137
+  s_326b18de7881fc::t_aefe4c835db250 74,77-80,82-85,103
+  s_f1f368b971e1ad::t_528f4ebadd0a18 7-28,66
+app/api/opencode/events/route.ts
+  s_326b18de7881fc::t_f29ae3a9f3a571 7,62,67-69,71,73-81,108-110,114,119-120,122,124-129,133-134,146-147
+  s_f1f368b971e1ad::t_a6ea0ad35048b1 70,123
+  s_326b18de7881fc::t_9f1d335a781736 82-83
+  s_326b18de7881fc::t_ae4c20096c1e46 15,31-33,41-46,121
+tests/lib/opencode/sse-supervisor.test.ts
+  s_326b18de7881fc::t_288a72975676bc 1-110
+lib/opencode/sse-supervisor.ts
+  s_326b18de7881fc::t_288a72975676bc 1-15
+  s_326b18de7881fc::t_b09feedf5fa0c2 26,28-31
+  s_326b18de7881fc::t_dadea58f716bc7 16-25,27,32-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "b93eb92dc515e1a8648fc6bf81b5d84399f604a7",
+  "prompts": {},
+  "sessions": {
+    "s_326b18de7881fc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_071c5a514ffeeXHBajNEHLCiOt",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_f1f368b971e1ad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_071c5a514ffeeXHBajNEHLCiOt",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

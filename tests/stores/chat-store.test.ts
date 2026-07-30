@@ -535,6 +535,40 @@ describe("getStreamingStatus selector", () => {
     expect(useChatStore.getState().getStreamingStatus()).toBe("idle");
   });
 
+  it("returns streaming while a descendant session is still busy", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {
+            "sess-a": makeSession("sess-a"),
+            child: makeSession("child", { parentID: "sess-a" }),
+          },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {
+            "sess-a": { type: "idle" },
+            child: { type: "busy" },
+          },
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+      optimisticStreamingSessionId: null,
+    });
+
+    expect(useChatStore.getState().getStreamingStatus()).toBe("streaming");
+  });
+
   it("returns streaming optimistically before first SSE event arrives", () => {
     useChatStore.setState({
       workspaceStates: {

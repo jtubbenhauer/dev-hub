@@ -33,6 +33,7 @@ import {
   PartDeltaBuffer,
   reconcilePartSnapshot,
 } from "@/lib/opencode/part-delta";
+import { getDescendantActivity } from "@/lib/chat/descendant-activity";
 
 export type StreamingStatus =
   | "idle"
@@ -3065,6 +3066,22 @@ export const useChatStore = create<ChatState>()(
         // Optimistic: sendMessage fired but first SSE hasn't arrived yet
         if (optimisticStreamingSessionId === activeSessionId)
           return "streaming";
+
+        const descendantActivity = getDescendantActivity({
+          parentSessionId: activeSessionId,
+          sessions: ws.sessions,
+          statuses: ws.sessionStatuses,
+          permissions: ws.permissions,
+          questions: ws.questions,
+          now: Date.now(),
+          recentWindowMs: 30_000,
+        });
+        if (
+          descendantActivity.activeCount > 0 ||
+          descendantActivity.waitingCount > 0
+        ) {
+          return "streaming";
+        }
 
         return "idle";
       },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ChevronsUpDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,14 +46,6 @@ interface ProviderWithModels {
   models: Model[];
 }
 
-interface ModelOption {
-  value: string;
-  label: string;
-  providerName: string;
-  providerID: string;
-  modelID: string;
-}
-
 export function loadPersistedModel(): SelectedModel | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -92,10 +84,11 @@ export function ModelSelector({
   onOpenChange: controlledOnOpenChange,
 }: ModelSelectorProps) {
   const [providers, setProviders] = useState<ProviderWithModels[]>([]);
+  const [defaultModels, setDefaultModels] = useState<Record<string, string>>(
+    {},
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [internalOpen, setInternalOpen] = useState(false);
-  const selectedModelRef = useRef(selectedModel);
-  selectedModelRef.current = selectedModel;
 
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setIsOpen =
@@ -103,7 +96,10 @@ export function ModelSelector({
       ? controlledOnOpenChange
       : setInternalOpen;
   const { allowlist } = useModelAllowlist();
-  const allowlistSet = allowlist.length > 0 ? new Set(allowlist) : null;
+  const allowlistSet = useMemo(
+    () => (allowlist.length > 0 ? new Set(allowlist) : null),
+    [allowlist],
+  );
 
   const fetchProviders = useCallback(async () => {
     if (!workspaceId) return;
@@ -123,46 +119,13 @@ export function ModelSelector({
         }),
       );
       setProviders(providerList);
-
-      if (selectedModelRef.current) {
-        // Validate persisted selection still exists
-        const isValid = providerList.some(
-          (p) =>
-            p.provider.id === selectedModelRef.current!.providerID &&
-            p.models.some((m) => m.id === selectedModelRef.current!.modelID),
-        );
-        if (isValid) return;
-        // Persisted model no longer available — fall through to defaults
-      }
-
-      // Fall back to server default
-      const defaultModelKey =
-        data.default?.["code"] ?? Object.values(data.default ?? {})[0];
-      if (defaultModelKey) {
-        const [providerID, modelID] = defaultModelKey.split("/");
-        if (providerID && modelID) {
-          onModelChange({ providerID, modelID });
-          persistModel({ providerID, modelID });
-          return;
-        }
-      }
-
-      // Last resort: first available
-      const firstProvider = providerList[0];
-      if (firstProvider?.models.length > 0) {
-        const fallback = {
-          providerID: firstProvider.provider.id,
-          modelID: firstProvider.models[0].id,
-        };
-        onModelChange(fallback);
-        persistModel(fallback);
-      }
+      setDefaultModels(data.default ?? {});
     } catch {
       // Silently fail
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId, onModelChange]);
+  }, [workspaceId]);
 
   useEffect(() => {
     fetchProviders();
@@ -188,26 +151,44 @@ export function ModelSelector({
     onVariantsChange?.(variantsForSelectedModel);
   }, [variantsForSelectedModel, onVariantsChange]);
 
-  const allModelOptions: ModelOption[] = providers.flatMap((p) =>
-    p.models.map((m) => ({
-      value: `${p.provider.id}::${m.id}`,
-      label: m.name || m.id,
-      providerName: p.provider.name || p.provider.id,
-      providerID: p.provider.id,
-      modelID: m.id,
-    })),
+  const modelOptions = useMemo(
+    () =>
+      providers.flatMap((p) =>
+        p.models
+          .map((m) => ({
+            value: `${p.provider.id}::${m.id}`,
+            label: m.name || m.id,
+            providerName: p.provider.name || p.provider.id,
+            providerID: p.provider.id,
+            modelID: m.id,
+          }))
+          .filter((option) => !allowlistSet || allowlistSet.has(option.value)),
+      ),
+    [allowlistSet, providers],
   );
-
-  // Empty allowlist = show all; non-empty = restrict to listed models
-  const modelOptions = allowlistSet
-    ? allModelOptions.filter((o) => allowlistSet.has(o.value))
-    : allModelOptions;
 
   const currentValue = selectedModel
     ? `${selectedModel.providerID}::${selectedModel.modelID}`
     : undefined;
 
   const currentOption = modelOptions.find((o) => o.value === currentValue);
+
+  useEffect(() => {
+    if (isLoading || modelOptions.length === 0 || currentOption) return;
+
+    const defaultOption = modelOptions.find(
+      (option) =>
+        defaultModels[option.providerID] === option.modelID ||
+        defaultModels.code === `${option.providerID}/${option.modelID}`,
+    );
+    const fallbackOption = defaultOption ?? modelOptions[0];
+    const fallback = {
+      providerID: fallbackOption.providerID,
+      modelID: fallbackOption.modelID,
+    };
+    onModelChange(fallback);
+    persistModel(fallback);
+  }, [currentOption, defaultModels, isLoading, modelOptions, onModelChange]);
 
   if (isLoading || modelOptions.length === 0) {
     return (

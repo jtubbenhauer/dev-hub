@@ -6,6 +6,13 @@ vi.mock("@/hooks/use-mobile", () => ({
   useIsMobile: () => false,
 }));
 
+vi.mock("@/hooks/use-settings", () => ({
+  useChatFileOpenSetting: () => ({
+    fileOpenMode: "sidebar",
+    isLoading: false,
+  }),
+}));
+
 vi.mock("@/stores/workspace-store", () => ({
   useWorkspaceStore: () => "ws-1",
 }));

@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
+import { useChatFileOpenSetting } from "@/hooks/use-settings";
+import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 
 const FILE_EXTENSIONS = new Set([
   ".ts",
@@ -157,6 +159,7 @@ export function FilePathCode({ children, text }: FilePathCodeProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { fileOpenMode } = useChatFileOpenSetting();
 
   const cleanPath = stripPath(text);
   const isFolder = !isFilePath(text) && isFolderPath(text);
@@ -167,15 +170,31 @@ export function FilePathCode({ children, text }: FilePathCodeProps) {
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
       e.preventDefault();
-      if (isMobile || isFolder) {
+      if (isFolder || (isMobile && fileOpenMode === "sidebar")) {
         router.push(href);
+        return;
+      }
+      if (fileOpenMode === "dialog") {
+        await useChatFileDialogStore
+          .getState()
+          .openFile(activeWorkspaceId ?? "", cleanPath, () =>
+            router.push(href),
+          );
         return;
       }
       await openFileInSidePanel(activeWorkspaceId ?? "", cleanPath, () =>
         router.push(href),
       );
     },
-    [router, href, isMobile, isFolder, cleanPath, activeWorkspaceId],
+    [
+      router,
+      href,
+      isMobile,
+      isFolder,
+      fileOpenMode,
+      cleanPath,
+      activeWorkspaceId,
+    ],
   );
 
   const Icon = isFolder ? FolderOpen : FileCode2;

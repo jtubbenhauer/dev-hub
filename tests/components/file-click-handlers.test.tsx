@@ -2,6 +2,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { FilePathCode } from "@/components/chat/file-path-code";
 
+const mockUseChatFileOpenSetting = vi.fn<
+  () => {
+    fileOpenMode: "sidebar" | "dialog";
+    isLoading: boolean;
+  }
+>(() => ({
+  fileOpenMode: "sidebar" as const,
+  isLoading: false,
+}));
+
+vi.mock("@/hooks/use-settings", () => ({
+  useChatFileOpenSetting: () => mockUseChatFileOpenSetting(),
+}));
+
 const mockRouterPush = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockRouterPush }),
@@ -20,6 +34,7 @@ vi.mock("@/stores/workspace-store", () => ({
 }));
 
 const mockOpenFile = vi.fn();
+const mockOpenFileInDialog = vi.fn();
 const mockSetIsLoading = vi.fn();
 const mockClearError = vi.fn();
 const mockSetActivePanelTab = vi.fn();
@@ -32,6 +47,12 @@ vi.mock("@/stores/side-panel-store", () => ({
       clearError: mockClearError,
       setActivePanelTab: mockSetActivePanelTab,
     })),
+  }),
+}));
+
+vi.mock("@/stores/chat-file-dialog-store", () => ({
+  useChatFileDialogStore: Object.assign(vi.fn(), {
+    getState: vi.fn(() => ({ openFile: mockOpenFileInDialog })),
   }),
 }));
 
@@ -52,6 +73,10 @@ function renderFile(text: string) {
 describe("FilePathCode — desktop file click", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseChatFileOpenSetting.mockReturnValue({
+      fileOpenMode: "sidebar",
+      isLoading: false,
+    });
     mockUseIsMobile.mockReturnValue(false);
     global.fetch = vi
       .fn()
@@ -93,11 +118,35 @@ describe("FilePathCode — desktop file click", () => {
       expect(mockSetIsLoading).toHaveBeenCalledWith(false);
     });
   });
+
+  it("opens the file dialog instead of the sidebar when configured", async () => {
+    mockUseChatFileOpenSetting.mockReturnValue({
+      fileOpenMode: "dialog",
+      isLoading: false,
+    });
+    renderFile("src/utils.ts");
+
+    fireEvent.click(screen.getByRole("link"));
+
+    await waitFor(() => {
+      expect(mockOpenFileInDialog).toHaveBeenCalledWith(
+        "ws-1",
+        "src/utils.ts",
+        expect.any(Function),
+      );
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(mockOpenFile).not.toHaveBeenCalled();
+  });
 });
 
 describe("FilePathCode — mobile file click", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseChatFileOpenSetting.mockReturnValue({
+      fileOpenMode: "sidebar",
+      isLoading: false,
+    });
     mockUseIsMobile.mockReturnValue(true);
     global.fetch = vi.fn();
   });
@@ -121,6 +170,21 @@ describe("FilePathCode — mobile file click", () => {
     expect(mockRouterPush).toHaveBeenCalledWith(
       expect.stringContaining("open="),
     );
+  });
+
+  it("opens the dialog on mobile when configured", async () => {
+    mockUseChatFileOpenSetting.mockReturnValue({
+      fileOpenMode: "dialog",
+      isLoading: false,
+    });
+    renderFile("src/utils.ts");
+
+    fireEvent.click(screen.getByRole("link"));
+
+    await waitFor(() => {
+      expect(mockOpenFileInDialog).toHaveBeenCalledOnce();
+    });
+    expect(mockRouterPush).not.toHaveBeenCalled();
   });
 });
 
@@ -149,6 +213,10 @@ describe("FilePathCode — desktop folder click", () => {
 describe("FilePathCode — fetch failure fallback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseChatFileOpenSetting.mockReturnValue({
+      fileOpenMode: "sidebar",
+      isLoading: false,
+    });
     mockUseIsMobile.mockReturnValue(false);
   });
 

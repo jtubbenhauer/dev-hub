@@ -14,6 +14,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLeaderAction } from "@/hooks/use-leader-action";
+import { downloadTextFile } from "@/lib/download-file";
 
 import { useFileTabsSetting } from "@/hooks/use-settings";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import {
   GitCompare,
   CircleX,
   TriangleAlert,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -578,20 +580,34 @@ function FilesContent() {
             )}
 
             {activeFile && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 px-1.5 text-xs"
-                onClick={() => void handleSave()}
-                disabled={isSaving || !activeFile.isDirty}
-              >
-                {isSaving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Save className="h-3.5 w-3.5" />
-                )}
-                <span className="hidden md:inline">Save</span>
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-1.5 text-xs"
+                  onClick={() => void handleSave()}
+                  disabled={isSaving || !activeFile.isDirty}
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
+                  <span className="hidden md:inline">Save</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() =>
+                    downloadTextFile(activeFile.name, activeFile.content)
+                  }
+                  aria-label="Download file"
+                  title="Download file"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+              </>
             )}
           </div>
 

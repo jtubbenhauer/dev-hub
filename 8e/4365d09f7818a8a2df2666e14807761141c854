@@ -1,0 +1,19 @@
+components/chat/model-selector.tsx
+  s_e5cca23c90bad1::t_805e4d5f89121b 3,87-89,99-102,122,128,154-167,176-192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "8e4365d09f7818a8a2df2666e14807761141c854",
+  "prompts": {},
+  "sessions": {
+    "s_e5cca23c90bad1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0592767afffeUERLYv4fzWKH92",
+        "model": "gemini-3.1-pro-preview"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

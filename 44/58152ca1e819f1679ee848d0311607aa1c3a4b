@@ -1,0 +1,21 @@
+components/settings/general-settings.tsx
+  s_8e72c84ce53000::t_e593dace746c4c 38,47,64,152-153,163-164,239-254,460-484
+hooks/use-settings.ts
+  s_8e72c84ce53000::t_1db700aec15b68 59,68-75,603-615
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "4458152ca1e819f1679ee848d0311607aa1c3a4b",
+  "prompts": {},
+  "sessions": {
+    "s_8e72c84ce53000": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05d70a8f8ffeRAJBrU9mNR4CZf",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

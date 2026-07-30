@@ -1531,10 +1531,16 @@ export const useChatStore = create<ChatState>()(
               messages: MessageWithParts[];
               hasMore: boolean;
               total: number;
+              source: "cache" | "remote" | "stale-cache";
+              cachedAt?: number;
             };
+            const isStaleCache = data.source === "stale-cache";
 
             set((state) => {
               const wsUpdate = updateWorkspace(state, workspaceId, (ws) => {
+                if (isStaleCache && (ws.messages[sessionId]?.length ?? 0) > 0) {
+                  return {};
+                }
                 const merged = mergeTailWindow(
                   ws.messages[sessionId] ?? [],
                   data.messages,
@@ -1587,6 +1593,14 @@ export const useChatStore = create<ChatState>()(
               );
               const { [key]: _clearedError, ...remainingErrors } =
                 state.messageLoadErrorBySession;
+              const messageLoadErrorBySession = isStaleCache
+                ? {
+                    ...state.messageLoadErrorBySession,
+                    [key]: data.cachedAt
+                      ? `Showing cached messages from ${new Date(data.cachedAt).toLocaleString()} because live refresh failed`
+                      : "Showing cached messages because live refresh failed",
+                  }
+                : remainingErrors;
               return {
                 ...wsUpdate,
                 ...lruUpdate,
@@ -1594,7 +1608,7 @@ export const useChatStore = create<ChatState>()(
                   ...state.hasMoreBeforeBySession,
                   [key]: data.hasMore,
                 },
-                messageLoadErrorBySession: remainingErrors,
+                messageLoadErrorBySession,
               };
             });
           } catch (error) {

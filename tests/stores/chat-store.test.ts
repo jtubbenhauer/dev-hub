@@ -3411,6 +3411,37 @@ describe("fetchMessages — windowed loading", () => {
     expect(url).toContain("fresh=1");
   });
 
+  it("preserves newer live text and exposes degradation when fresh refresh falls back to stale cache", async () => {
+    const liveMessage = {
+      info: makeAssistantMessage("m-1", "sess-a"),
+      parts: [{ ...makePart("p-1", "sess-a", "m-1"), text: "hello world" }],
+    };
+    const staleMessage = {
+      info: makeAssistantMessage("m-1", "sess-a"),
+      parts: [makePart("p-1", "sess-a", "m-1")],
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        messages: [staleMessage],
+        hasMore: false,
+        total: 1,
+        source: "stale-cache",
+        cachedAt: 1_000,
+      }),
+    });
+    seedSession({ "sess-a": [liveMessage] });
+
+    await useChatStore
+      .getState()
+      .fetchMessages("sess-a", "ws-a", { force: true });
+
+    const state = useChatStore.getState();
+    const part = state.workspaceStates["ws-a"].messages["sess-a"][0].parts[0];
+    expect(part).toMatchObject({ type: "text", text: "hello world" });
+    expect(state.messageLoadErrorBySession["ws-a:sess-a"]).toContain("cached");
+  });
+
   it("loadOlderMessages prepends an older page and tracks hasMoreBefore", async () => {
     const existing = [
       { info: makeUserMessage("c", "sess-a"), parts: [] },

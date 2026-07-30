@@ -1,0 +1,19 @@
+tests/lib/download-file.test.ts
+  s_5003a32e135760::t_ae06dec15eb105 1-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "f98e1b1552ea7d69e64f108397104f2f6b806c5e",
+  "prompts": {},
+  "sessions": {
+    "s_5003a32e135760": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05d12b67fffe6oK4qVrD0mdZ45",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -4,15 +4,15 @@ import { db } from "@/lib/db";
 import { workspaces } from "@/drizzle/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend";
+import { superviseSseTarget } from "@/lib/opencode/sse-supervisor";
 
 export const maxDuration = 300;
 
 const KEEPALIVE_INTERVAL_MS = 30_000;
-const MAX_BUFFER_SIZE = 1024 * 1024; // 1 MB
 
 interface UpstreamTarget {
   workspaceId: string;
-  url: string;
+  connect: (signal: AbortSignal) => Promise<Response>;
 }
 
 async function resolveTargets(
@@ -28,9 +28,9 @@ async function resolveTargets(
       and(inArray(workspaces.id, workspaceIds), eq(workspaces.userId, userId)),
     );
 
-  const targets: UpstreamTarget[] = [];
-  for (const row of rows) {
-    try {
+  return rows.map((row) => ({
+    workspaceId: row.id,
+    connect: async (signal: AbortSignal) => {
       const workspace = toWorkspace(row);
       const backend = getBackend(workspace);
       const serverUrl = await backend.getOpenCodeUrl();
@@ -38,12 +38,12 @@ async function resolveTargets(
       if (workspace.backend !== "remote") {
         eventUrl.searchParams.set("directory", workspace.path);
       }
-      targets.push({ workspaceId: row.id, url: eventUrl.toString() });
-    } catch {
-      continue;
-    }
-  }
-  return targets;
+      return fetch(eventUrl, {
+        headers: { accept: "text/event-stream" },
+        signal,
+      });
+    },
+  }));
 }
 
 function safeEnqueue(
@@ -59,81 +59,28 @@ function safeEnqueue(
   }
 }
 
-async function readUpstream(
+function enqueueEvent(
   target: UpstreamTarget,
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
-  signal: AbortSignal,
   cancelled: { current: boolean },
-): Promise<void> {
+  event: unknown,
+): void {
+  const wrapped = JSON.stringify({ workspaceId: target.workspaceId, event });
+  safeEnqueue(controller, encoder.encode(`data: ${wrapped}\n\n`), cancelled);
+}
+
+function enqueueUpstreamData(
+  target: UpstreamTarget,
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  encoder: TextEncoder,
+  cancelled: { current: boolean },
+  data: string,
+): void {
   try {
-    const response = await fetch(target.url, {
-      headers: { accept: "text/event-stream" },
-      signal,
-    });
-    if (!response.body) return;
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (!signal.aborted && !cancelled.current) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      if (buffer.length > MAX_BUFFER_SIZE) {
-        // Buffer exceeded safety cap with no event boundary in sight.
-        // Preserve the trailing window so a future "\n\n" can still close
-        // a normal-sized event instead of nuking everything.
-        const lastBoundary = buffer.lastIndexOf("\n\n");
-        if (lastBoundary !== -1) {
-          buffer = buffer.slice(lastBoundary + 2);
-        } else {
-          buffer = buffer.slice(-MAX_BUFFER_SIZE / 2);
-        }
-        console.warn(
-          `[sse-mux] Upstream buffer for workspace ${target.workspaceId} exceeded ${MAX_BUFFER_SIZE} bytes — truncated to ${buffer.length}`,
-        );
-      }
-
-      for (
-        let idx = buffer.indexOf("\n\n");
-        idx !== -1;
-        idx = buffer.indexOf("\n\n")
-      ) {
-        const block = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 2);
-
-        for (const line of block.split("\n")) {
-          if (line.startsWith("data:")) {
-            const data = line.slice(5).trimStart();
-            try {
-              const event = JSON.parse(data);
-              const wrapped = JSON.stringify({
-                workspaceId: target.workspaceId,
-                event,
-              });
-              safeEnqueue(
-                controller,
-                encoder.encode(`data: ${wrapped}\n\n`),
-                cancelled,
-              );
-            } catch {
-              continue;
-            }
-          }
-        }
-      }
-    }
-  } catch (err) {
-    if (!signal.aborted) {
-      console.error(
-        `[sse-mux] Upstream disconnected for workspace ${target.workspaceId}:`,
-        err instanceof Error ? err.message : err,
-      );
-    }
+    enqueueEvent(target, controller, encoder, cancelled, JSON.parse(data));
+  } catch {
+    return;
   }
 }
 
@@ -158,27 +105,33 @@ export async function GET(request: NextRequest) {
   const abortController = new AbortController();
   const encoder = new TextEncoder();
   const cancelled = { current: false };
+  let keepalive: ReturnType<typeof setInterval> | null = null;
+  const abortFromRequest = () => abortController.abort();
+  request.signal.addEventListener("abort", abortFromRequest, { once: true });
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      // Keepalive to prevent proxy/tunnel timeouts
-      const keepalive = setInterval(() => {
+      keepalive = setInterval(() => {
         safeEnqueue(controller, encoder.encode(`: keepalive\n\n`), cancelled);
       }, KEEPALIVE_INTERVAL_MS);
 
       const upstreamPromises = targets.map((target) =>
-        readUpstream(
-          target,
-          controller,
-          encoder,
-          abortController.signal,
-          cancelled,
-        ),
+        superviseSseTarget({
+          signal: abortController.signal,
+          connect: target.connect,
+          onData: (data) =>
+            enqueueUpstreamData(target, controller, encoder, cancelled, data),
+          onState: (state) =>
+            enqueueEvent(target, controller, encoder, cancelled, {
+              type: "workspace.connection",
+              properties: state,
+            }),
+        }),
       );
 
-      // Close the stream once all upstreams finish
       Promise.allSettled(upstreamPromises).then(() => {
-        clearInterval(keepalive);
+        if (keepalive !== null) clearInterval(keepalive);
+        request.signal.removeEventListener("abort", abortFromRequest);
         if (!cancelled.current) {
           try {
             controller.close();
@@ -190,6 +143,8 @@ export async function GET(request: NextRequest) {
     },
     cancel() {
       cancelled.current = true;
+      if (keepalive !== null) clearInterval(keepalive);
+      request.signal.removeEventListener("abort", abortFromRequest);
       abortController.abort();
     },
   });

@@ -1,0 +1,33 @@
+lib/chat/descendant-activity.ts
+  s_1373064a00e778::t_9eeac4adf7c236 1-85
+stores/chat-store.ts
+  s_326b18de7881fc::t_bc584111261cc2 36,3070-3085
+tests/lib/chat/descendant-activity.test.ts
+  s_1373064a00e778::t_a9405d43dba2ef 1-118
+tests/stores/chat-store.test.ts
+  s_1373064a00e778::t_ce8668d3c78f83 538-571
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "48b461acbb724318ccc3de9802bdb8cf8985db48",
+  "prompts": {},
+  "sessions": {
+    "s_1373064a00e778": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0554168b1ffeKdA3qNMvioE1bd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_326b18de7881fc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_071c5a514ffeeXHBajNEHLCiOt",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

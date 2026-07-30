@@ -3485,7 +3485,12 @@ export const useChatStore = create<ChatState>()(
           }
           set((state) => {
             const ws = state.workspaceStates[workspaceId];
-            if (ws && Object.keys(ws.sessions).length > 0) return state;
+            if (ws && Object.keys(ws.sessions).length > 0) {
+              if (ws.sessionsLoaded) return state;
+              return updateWorkspace(state, workspaceId, () => ({
+                sessionsLoaded: true,
+              }));
+            }
             return updateWorkspace(state, workspaceId, () => ({
               sessions: sessionsMap,
               sessionsLoaded: true,

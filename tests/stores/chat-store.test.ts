@@ -4486,6 +4486,41 @@ describe("fetchCachedSessions empty-cache promotion", () => {
     };
   }
 
+  it("marks pre-populated sessions as loaded without overwriting them", async () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-remote": {
+          sessions: {
+            "live-session": makeSession("live-session", { updated: 3000 }),
+          },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: false,
+        },
+      },
+    });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [makeSession("cached-session", { updated: 1000 })],
+    });
+
+    await useChatStore.getState().fetchCachedSessions("ws-remote");
+
+    const workspace = useChatStore.getState().workspaceStates["ws-remote"];
+    expect(workspace.sessionsLoaded).toBe(true);
+    expect(Object.keys(workspace.sessions)).toEqual(["live-session"]);
+  });
+
   it("promotes to a live fetch when cache is empty for a local workspace", async () => {
     const { useWorkspaceStore } = await import("@/stores/workspace-store");
     useWorkspaceStore.setState({

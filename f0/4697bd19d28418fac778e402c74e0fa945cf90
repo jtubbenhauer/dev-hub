@@ -1,0 +1,31 @@
+app/chat/page.tsx
+  s_8e72c84ce53000::t_009dcfeac3fca1 5,13
+stores/chat-file-dialog-store.ts
+  s_d493d536a2362c::t_f4ce42459904a4 1-92
+tests/stores/chat-file-dialog-store.test.ts
+  s_d493d536a2362c::t_7fc2787453a626 1-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "f04697bd19d28418fac778e402c74e0fa945cf90",
+  "prompts": {},
+  "sessions": {
+    "s_8e72c84ce53000": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05d70a8f8ffeRAJBrU9mNR4CZf",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_d493d536a2362c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_071a30c80ffewunEZdpO0gDhf0",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

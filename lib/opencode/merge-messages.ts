@@ -106,3 +106,53 @@ export function mergeFullMessage(
   });
   return found ? next : existing;
 }
+
+// Drop optimistic-prefixed user messages from `messages` whose text already
+// appears as a real user message in `authoritative` (a fresh server window).
+// Guards against the "message shown twice" bug when the SSE `message.updated`
+// filter can't fire — either the SSE event was dropped, or a prior refresh
+// cleared the tracking mapping before the SSE arrived, leaving the optimistic
+// stranded in the array (typically at the very end, via mergeTailWindow's
+// suffix). Returns removed IDs so callers can clear the tracking mapping.
+export function dropSupersededOptimistic(
+  messages: MessageWithParts[],
+  authoritative: MessageWithParts[],
+): { messages: MessageWithParts[]; removedIds: Set<string> } {
+  const realUserTexts = new Set<string>();
+  for (const m of authoritative) {
+    if (m.info.role !== "user") continue;
+    if (m.info.id.startsWith("optimistic-")) continue;
+    const text = extractTextContent(m);
+    if (text) realUserTexts.add(text);
+  }
+  if (realUserTexts.size === 0) {
+    return { messages, removedIds: new Set() };
+  }
+
+  const removedIds = new Set<string>();
+  const next = messages.filter((m) => {
+    if (!m.info.id.startsWith("optimistic-")) return true;
+    if (m.info.role !== "user") return true;
+    const text = extractTextContent(m);
+    if (text && realUserTexts.has(text)) {
+      removedIds.add(m.info.id);
+      return false;
+    }
+    return true;
+  });
+
+  if (removedIds.size === 0) {
+    return { messages, removedIds };
+  }
+  return { messages: next, removedIds };
+}
+
+function extractTextContent(message: MessageWithParts): string {
+  let out = "";
+  for (const part of message.parts) {
+    if (part.type !== "text") continue;
+    if ("ignored" in part && part.ignored) continue;
+    out += part.text;
+  }
+  return out;
+}

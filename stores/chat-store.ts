@@ -22,6 +22,7 @@ import {
   mergeTailWindow,
   mergePrependWindow,
   mergeFullMessage,
+  dropSupersededOptimistic,
 } from "@/lib/opencode/merge-messages";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -1538,8 +1539,21 @@ export const useChatStore = create<ChatState>()(
                   ws.messages[sessionId] ?? [],
                   data.messages,
                 );
-                const { [sessionId]: _optimistic, ...remainingOptimistic } =
-                  ws.optimisticMessageIds;
+                const { messages: cleaned } = dropSupersededOptimistic(
+                  merged,
+                  data.messages,
+                );
+                const trackedOptimisticId = ws.optimisticMessageIds[sessionId];
+                const trackedOptimisticStillPresent =
+                  trackedOptimisticId !== undefined &&
+                  cleaned.some((m) => m.info.id === trackedOptimisticId);
+                const optimisticMessageIds = trackedOptimisticStillPresent
+                  ? ws.optimisticMessageIds
+                  : (() => {
+                      const { [sessionId]: _dropped, ...rest } =
+                        ws.optimisticMessageIds;
+                      return rest;
+                    })();
                 const seededAgent = ws.sessionAgents[sessionId]
                   ? {}
                   : (() => {
@@ -1560,8 +1574,8 @@ export const useChatStore = create<ChatState>()(
                         : {};
                     })();
                 return {
-                  optimisticMessageIds: remainingOptimistic,
-                  messages: { ...ws.messages, [sessionId]: merged },
+                  optimisticMessageIds,
+                  messages: { ...ws.messages, [sessionId]: cleaned },
                   ...seededAgent,
                 };
               });

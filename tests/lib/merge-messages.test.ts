@@ -3,6 +3,7 @@ import {
   mergeTailWindow,
   mergePrependWindow,
   mergeFullMessage,
+  dropSupersededOptimistic,
 } from "@/lib/opencode/merge-messages";
 import { TRUNCATION_MARKER_KEY } from "@/lib/opencode/truncate-messages";
 import type { Message, MessageWithParts, Part } from "@/lib/opencode/types";
@@ -146,5 +147,132 @@ describe("mergeFullMessage", () => {
     const existing = [msg("m1")];
     const result = mergeFullMessage(existing, msg("zzz"));
     expect(result).toBe(existing);
+  });
+});
+
+function userMsg(id: string, text: string): MessageWithParts {
+  return {
+    info: {
+      id,
+      sessionID: "ses-1",
+      role: "user",
+      time: { created: 1 },
+    } as unknown as Message,
+    parts: [
+      {
+        id: `${id}-part`,
+        sessionID: "ses-1",
+        messageID: id,
+        type: "text",
+        text,
+      } as Part,
+    ],
+  };
+}
+
+describe("dropSupersededOptimistic", () => {
+  it("drops an optimistic user message whose text matches a real user message", () => {
+    const messages = [
+      userMsg("msg_real_prev", "earlier prompt"),
+      msg("msg_assistant_prev"),
+      userMsg("msg_real_new", "hello world"),
+      msg("msg_assistant_new"),
+      userMsg("optimistic-1700000000000", "hello world"),
+    ];
+    const authoritative = [
+      userMsg("msg_real_prev", "earlier prompt"),
+      msg("msg_assistant_prev"),
+      userMsg("msg_real_new", "hello world"),
+      msg("msg_assistant_new"),
+    ];
+
+    const { messages: cleaned, removedIds } = dropSupersededOptimistic(
+      messages,
+      authoritative,
+    );
+
+    expect(cleaned.map((m) => m.info.id)).toEqual([
+      "msg_real_prev",
+      "msg_assistant_prev",
+      "msg_real_new",
+      "msg_assistant_new",
+    ]);
+    expect(Array.from(removedIds)).toEqual(["optimistic-1700000000000"]);
+  });
+
+  it("keeps the optimistic when its text has no match in authoritative window", () => {
+    const messages = [
+      userMsg("msg_real", "old prompt"),
+      msg("msg_assistant"),
+      userMsg("optimistic-1", "not yet on server"),
+    ];
+    const authoritative = [
+      userMsg("msg_real", "old prompt"),
+      msg("msg_assistant"),
+    ];
+
+    const { messages: cleaned, removedIds } = dropSupersededOptimistic(
+      messages,
+      authoritative,
+    );
+
+    expect(cleaned).toBe(messages);
+    expect(removedIds.size).toBe(0);
+  });
+
+  it("returns the input untouched when authoritative has no real user messages", () => {
+    const messages = [userMsg("optimistic-1", "hi"), msg("msg_assistant")];
+    const authoritative = [msg("msg_assistant")];
+
+    const { messages: cleaned, removedIds } = dropSupersededOptimistic(
+      messages,
+      authoritative,
+    );
+
+    expect(cleaned).toBe(messages);
+    expect(removedIds.size).toBe(0);
+  });
+
+  it("does not treat authoritative optimistic entries as real matches", () => {
+    const messages = [userMsg("optimistic-1", "hello")];
+    const authoritative = [userMsg("optimistic-2", "hello")];
+
+    const { messages: cleaned, removedIds } = dropSupersededOptimistic(
+      messages,
+      authoritative,
+    );
+
+    expect(cleaned).toBe(messages);
+    expect(removedIds.size).toBe(0);
+  });
+
+  it("does not touch optimistic-prefixed messages with a non-user role", () => {
+    const optimisticAssistant: MessageWithParts = {
+      info: {
+        id: "optimistic-asst-1",
+        sessionID: "ses-1",
+        role: "assistant",
+        time: { created: 1 },
+      } as unknown as Message,
+      parts: [
+        {
+          id: "optimistic-asst-1-part",
+          sessionID: "ses-1",
+          messageID: "optimistic-asst-1",
+          type: "text",
+          text: "hello",
+        } as Part,
+      ],
+    };
+    const messages = [optimisticAssistant];
+    const authoritative = [userMsg("msg_real", "hello")];
+
+    const { messages: cleaned, removedIds } = dropSupersededOptimistic(
+      messages,
+      authoritative,
+    );
+
+    expect(cleaned).toBe(messages);
+    expect(removedIds.size).toBe(0);
   });
 });

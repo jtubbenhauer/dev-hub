@@ -3247,6 +3247,125 @@ describe("fetchMessages — windowed loading", () => {
     ]);
   });
 
+  it("drops a stuck optimistic user message when the server window already contains the real message", async () => {
+    const optimisticId = "optimistic-1700000000000";
+    const optimisticMsg = {
+      info: makeUserMessage(optimisticId, "sess-a"),
+      parts: [
+        {
+          id: `${optimisticId}-part`,
+          sessionID: "sess-a",
+          messageID: optimisticId,
+          type: "text" as const,
+          text: "hello world",
+        },
+      ],
+    };
+    const realUserMsg = {
+      info: makeUserMessage("msg_real_new", "sess-a"),
+      parts: [
+        {
+          id: "prt_real_new",
+          sessionID: "sess-a",
+          messageID: "msg_real_new",
+          type: "text" as const,
+          text: "hello world",
+        },
+      ],
+    };
+    const existing = [
+      { info: makeUserMessage("msg_prev_user", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("msg_prev_asst", "sess-a"), parts: [] },
+      optimisticMsg,
+    ];
+    const windowResp = [
+      { info: makeUserMessage("msg_prev_user", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("msg_prev_asst", "sess-a"), parts: [] },
+      realUserMsg,
+      { info: makeAssistantMessage("msg_real_asst", "sess-a"), parts: [] },
+    ];
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ messages: windowResp, hasMore: false, total: 4 }),
+    });
+    seedSession({ "sess-a": existing });
+    useChatStore.setState((state) => ({
+      workspaceStates: {
+        ...state.workspaceStates,
+        "ws-a": {
+          ...state.workspaceStates["ws-a"],
+          optimisticMessageIds: { "sess-a": optimisticId },
+        },
+      },
+    }));
+
+    await useChatStore
+      .getState()
+      .fetchMessages("sess-a", "ws-a", { force: true });
+    await flushMicrotasks();
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"];
+    expect(ws.messages["sess-a"].map((m) => m.info.id)).toEqual([
+      "msg_prev_user",
+      "msg_prev_asst",
+      "msg_real_new",
+      "msg_real_asst",
+    ]);
+    expect(ws.optimisticMessageIds["sess-a"]).toBeUndefined();
+  });
+
+  it("keeps a still-in-flight optimistic when server window has not caught up", async () => {
+    const optimisticId = "optimistic-1700000000001";
+    const optimisticMsg = {
+      info: makeUserMessage(optimisticId, "sess-a"),
+      parts: [
+        {
+          id: `${optimisticId}-part`,
+          sessionID: "sess-a",
+          messageID: optimisticId,
+          type: "text" as const,
+          text: "just sent this",
+        },
+      ],
+    };
+    const existing = [
+      { info: makeUserMessage("msg_prev_user", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("msg_prev_asst", "sess-a"), parts: [] },
+      optimisticMsg,
+    ];
+    const windowResp = [
+      { info: makeUserMessage("msg_prev_user", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("msg_prev_asst", "sess-a"), parts: [] },
+    ];
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ messages: windowResp, hasMore: false, total: 2 }),
+    });
+    seedSession({ "sess-a": existing });
+    useChatStore.setState((state) => ({
+      workspaceStates: {
+        ...state.workspaceStates,
+        "ws-a": {
+          ...state.workspaceStates["ws-a"],
+          optimisticMessageIds: { "sess-a": optimisticId },
+        },
+      },
+    }));
+
+    await useChatStore
+      .getState()
+      .fetchMessages("sess-a", "ws-a", { force: true });
+    await flushMicrotasks();
+
+    const ws = useChatStore.getState().workspaceStates["ws-a"];
+    expect(ws.messages["sess-a"].map((m) => m.info.id)).toEqual([
+      "msg_prev_user",
+      "msg_prev_asst",
+      optimisticId,
+    ]);
+    expect(ws.optimisticMessageIds["sess-a"]).toBe(optimisticId);
+  });
+
   it("surfaces an error instead of blanking when the window request fails", async () => {
     const existing = [
       { info: makeAssistantMessage("keep-1", "sess-a"), parts: [] },

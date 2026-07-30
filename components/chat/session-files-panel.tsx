@@ -17,6 +17,8 @@ import type { MessageWithParts } from "@/lib/opencode/types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
+import { useChatFileOpenSetting } from "@/hooks/use-settings";
+import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 
 function stripWorkspacePrefix(filePath: string, workspacePath: string): string {
   if (!workspacePath) return filePath;
@@ -30,24 +32,43 @@ function stripWorkspacePrefix(filePath: string, workspacePath: string): string {
 const FileRow = memo(function FileRow({
   file,
   workspacePath,
+  onFileOpen,
 }: {
   file: SessionFile;
   workspacePath: string;
+  onFileOpen?: () => void;
 }) {
   const router = useRouter();
   const isMobile = useIsMobile();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { fileOpenMode } = useChatFileOpenSetting();
   const relativePath = stripWorkspacePrefix(file.path, workspacePath);
 
   const handleClick = useCallback(async () => {
-    if (isMobile) {
+    if (isMobile && fileOpenMode === "sidebar") {
       router.push(`/files?open=${encodeURIComponent(relativePath)}`);
+      return;
+    }
+    if (fileOpenMode === "dialog") {
+      onFileOpen?.();
+      await useChatFileDialogStore
+        .getState()
+        .openFile(activeWorkspaceId ?? "", relativePath, () =>
+          router.push(`/files?open=${encodeURIComponent(relativePath)}`),
+        );
       return;
     }
     await openFileInSidePanel(activeWorkspaceId ?? "", relativePath, () =>
       router.push(`/files?open=${encodeURIComponent(relativePath)}`),
     );
-  }, [router, relativePath, isMobile, activeWorkspaceId]);
+  }, [
+    router,
+    relativePath,
+    isMobile,
+    fileOpenMode,
+    activeWorkspaceId,
+    onFileOpen,
+  ]);
 
   const handleOpenGitDiff = useCallback(
     (e: React.MouseEvent) => {
@@ -117,9 +138,11 @@ function resolveWorkspacePath(
 export const SessionFilesPanel = memo(function SessionFilesPanel({
   messages,
   workspacePath,
+  onFileOpen,
 }: {
   messages: MessageWithParts[];
   workspacePath: string;
+  onFileOpen?: () => void;
 }) {
   const files = useMemo(() => extractSessionFiles(messages), [messages]);
   const resolvedPath = useMemo(
@@ -145,7 +168,12 @@ export const SessionFilesPanel = memo(function SessionFilesPanel({
       {modifiedFiles.length > 0 && (
         <div className="space-y-0.5">
           {modifiedFiles.map((file) => (
-            <FileRow key={file.path} file={file} workspacePath={resolvedPath} />
+            <FileRow
+              key={file.path}
+              file={file}
+              workspacePath={resolvedPath}
+              onFileOpen={onFileOpen}
+            />
           ))}
         </div>
       )}
@@ -170,6 +198,7 @@ export const SessionFilesPanel = memo(function SessionFilesPanel({
                   key={file.path}
                   file={file}
                   workspacePath={resolvedPath}
+                  onFileOpen={onFileOpen}
                 />
               ))}
             </div>

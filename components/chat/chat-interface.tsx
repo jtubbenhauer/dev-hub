@@ -1091,6 +1091,7 @@ export function ChatInterface() {
               <SessionFilesPanel
                 messages={activeMessagesRaw}
                 workspacePath={activeWorkspacePath}
+                onFileOpen={() => setIsMobileRightPanelOpen(false)}
               />
             </div>
           </div>

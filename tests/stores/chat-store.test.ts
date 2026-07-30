@@ -1427,6 +1427,172 @@ describe("message routing", () => {
     expect(messages[0].parts[0].id).toBe("part-1");
   });
 
+  it("message.part.delta appends streamed text to a loaded part", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {
+            "sess-a": [
+              {
+                info: makeAssistantMessage("msg-1", "sess-a"),
+                parts: [makePart("part-1", "sess-a", "msg-1")],
+              },
+            ],
+          },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.part.delta",
+        properties: {
+          sessionID: "sess-a",
+          messageID: "msg-1",
+          partID: "part-1",
+          field: "text",
+          delta: " world",
+        },
+      },
+      "ws-a",
+    );
+
+    const part =
+      useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"][0]
+        .parts[0];
+    expect(part).toMatchObject({ type: "text", text: "hello world" });
+  });
+
+  it("replays a delta that arrives before its full part snapshot", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {
+            "sess-a": [
+              { info: makeAssistantMessage("msg-1", "sess-a"), parts: [] },
+            ],
+          },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.part.delta",
+        properties: {
+          sessionID: "sess-a",
+          messageID: "msg-1",
+          partID: "part-1",
+          field: "text",
+          delta: "world",
+        },
+      },
+      "ws-a",
+    );
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.part.updated",
+        properties: {
+          part: { ...makePart("part-1", "sess-a", "msg-1"), text: "hello " },
+        },
+      },
+      "ws-a",
+    );
+
+    const part =
+      useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"][0]
+        .parts[0];
+    expect(part).toMatchObject({ type: "text", text: "hello world" });
+  });
+
+  it("does not let a stale full snapshot roll back streamed text", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {
+            "sess-a": [
+              {
+                info: makeAssistantMessage("msg-1", "sess-a"),
+                parts: [makePart("part-1", "sess-a", "msg-1")],
+              },
+            ],
+          },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.part.delta",
+        properties: {
+          sessionID: "sess-a",
+          messageID: "msg-1",
+          partID: "part-1",
+          field: "text",
+          delta: " world",
+        },
+      },
+      "ws-a",
+    );
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.part.updated",
+        properties: { part: makePart("part-1", "sess-a", "msg-1") },
+      },
+      "ws-a",
+    );
+
+    const part =
+      useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"][0]
+        .parts[0];
+    expect(part).toMatchObject({ type: "text", text: "hello world" });
+  });
+
   it("message.part.removed removes the correct part", () => {
     useChatStore.setState({
       workspaceStates: {

@@ -26,6 +26,12 @@ import {
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { createAttachmentPromptPart } from "@/lib/attachment-utils";
+import {
+  applyMessagePartDelta,
+  parseMessagePartDelta,
+  PartDeltaBuffer,
+  reconcilePartSnapshot,
+} from "@/lib/opencode/part-delta";
 
 export type StreamingStatus =
   | "idle"
@@ -161,6 +167,7 @@ const reconcileBackoff = new Map<string, ReconcileBackoffState>();
 // RAF-batched buffer for message.part.updated events.
 // Keyed: sessionId → messageId → partId → Part
 const pendingPartUpdates = new Map<string, Map<string, Map<string, Part>>>();
+const pendingPartDeltas = new PartDeltaBuffer();
 let partFlushScheduled = false;
 let partFlushHandle: number | null = null;
 
@@ -218,6 +225,7 @@ export function _resetModuleCaches() {
   _fetchSessionsInFlight.clear();
   _refreshMessagesInFlight.clear();
   pendingPartUpdates.clear();
+  pendingPartDeltas.clear();
   pendingMessageUpdates.clear();
   sessionSourceWorkspace.clear();
 }
@@ -470,6 +478,50 @@ function schedulePendingPartFlush(
       flushPendingPartUpdates(set);
     }) as unknown as number;
   }
+}
+
+interface PartIdentity {
+  readonly sessionID: string;
+  readonly messageID: string;
+  readonly partID: string;
+}
+
+function findPendingOrLoadedPart(
+  state: ChatState,
+  identity: PartIdentity,
+): Part | undefined {
+  const pending = pendingPartUpdates
+    .get(identity.sessionID)
+    ?.get(identity.messageID)
+    ?.get(identity.partID);
+  if (pending) return pending;
+
+  for (const workspace of Object.values(state.workspaceStates)) {
+    const message = workspace.messages[identity.sessionID]?.find(
+      (item) => item.info.id === identity.messageID,
+    );
+    const part = message?.parts.find((item) => item.id === identity.partID);
+    if (part) return part;
+  }
+  return undefined;
+}
+
+function queuePendingPartUpdate(
+  part: Part,
+  set: (fn: (state: ChatState) => Partial<ChatState>) => void,
+): void {
+  let byMessage = pendingPartUpdates.get(part.sessionID);
+  if (!byMessage) {
+    byMessage = new Map();
+    pendingPartUpdates.set(part.sessionID, byMessage);
+  }
+  let byPart = byMessage.get(part.messageID);
+  if (!byPart) {
+    byPart = new Map();
+    byMessage.set(part.messageID, byPart);
+  }
+  byPart.set(part.id, part);
+  schedulePendingPartFlush(set);
 }
 
 function flushPendingMessageUpdates(
@@ -2372,6 +2424,7 @@ export const useChatStore = create<ChatState>()(
           sseOnopenAbortController.abort();
           sseOnopenAbortController = null;
         }
+        pendingPartDeltas.clear();
         set({
           globalEventSource: null,
           sseWorkspaceIds: [],
@@ -2542,6 +2595,7 @@ export const useChatStore = create<ChatState>()(
           case "message.removed": {
             const sessionID = properties.sessionID as string;
             const messageID = properties.messageID as string;
+            pendingPartDeltas.clearMessage(sessionID, messageID);
             const wsId =
               findWorkspaceForSession(get().workspaceStates, sessionID) ??
               sourceWorkspaceId;
@@ -2563,20 +2617,34 @@ export const useChatStore = create<ChatState>()(
             const part = properties.part as Part;
             if (!part) return;
             sessionSourceWorkspace.set(part.sessionID, sourceWorkspaceId);
+            const existing = findPendingOrLoadedPart(get(), {
+              sessionID: part.sessionID,
+              messageID: part.messageID,
+              partID: part.id,
+            });
+            const bufferedText = pendingPartDeltas.take(
+              part.sessionID,
+              part.messageID,
+              part.id,
+            );
+            queuePendingPartUpdate(
+              reconcilePartSnapshot(existing, part, bufferedText),
+              set,
+            );
+            break;
+          }
 
-            let byMessage = pendingPartUpdates.get(part.sessionID);
-            if (!byMessage) {
-              byMessage = new Map();
-              pendingPartUpdates.set(part.sessionID, byMessage);
+          case "message.part.delta": {
+            const delta = parseMessagePartDelta(properties);
+            if (!delta) return;
+            sessionSourceWorkspace.set(delta.sessionID, sourceWorkspaceId);
+            const existing = findPendingOrLoadedPart(get(), delta);
+            if (!existing) {
+              pendingPartDeltas.add(delta);
+              break;
             }
-            let byPart = byMessage.get(part.messageID);
-            if (!byPart) {
-              byPart = new Map();
-              byMessage.set(part.messageID, byPart);
-            }
-            byPart.set(part.id, part);
-
-            schedulePendingPartFlush(set);
+            const updated = applyMessagePartDelta(existing, delta);
+            if (updated) queuePendingPartUpdate(updated, set);
             break;
           }
 
@@ -2584,6 +2652,7 @@ export const useChatStore = create<ChatState>()(
             const sessionID = properties.sessionID as string;
             const messageID = properties.messageID as string;
             const partID = properties.partID as string;
+            pendingPartDeltas.remove(sessionID, messageID, partID);
             const wsId =
               findWorkspaceForSession(get().workspaceStates, sessionID) ??
               sourceWorkspaceId;
@@ -2624,6 +2693,7 @@ export const useChatStore = create<ChatState>()(
             const info = properties.info as Session;
             if (!info) return;
             sessionSourceWorkspace.delete(info.id);
+            pendingPartDeltas.clearSession(info.id);
             set((state) => {
               const ws =
                 state.workspaceStates[sourceWorkspaceId] ??

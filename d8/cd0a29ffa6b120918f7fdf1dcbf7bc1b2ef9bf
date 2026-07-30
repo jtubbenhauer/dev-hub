@@ -1,0 +1,23 @@
+components/chat/file-path-code.tsx
+  s_8e72c84ce53000::t_287cd10d2004ed 10-11,162,173,177-184,189-197
+tests/components/file-click-handlers.test.tsx
+  s_8e72c84ce53000::t_b7854997ba487b 5-18,37,53-58,76-79,121-140,146-149,174-188,216-219
+tests/components/markdown-nested-anchor.test.tsx
+  s_8e72c84ce53000::t_a30062156bf4cf 9-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d8cd0a29ffa6b120918f7fdf1dcbf7bc1b2ef9bf",
+  "prompts": {},
+  "sessions": {
+    "s_8e72c84ce53000": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05d70a8f8ffeRAJBrU9mNR4CZf",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

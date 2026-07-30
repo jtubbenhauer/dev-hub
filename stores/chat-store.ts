@@ -2338,16 +2338,12 @@ export const useChatStore = create<ChatState>()(
           if (safetyTimeout) clearTimeout(safetyTimeout);
 
           const attempts = get().sseReconnectAttempts;
-          const MAX_RECONNECT_ATTEMPTS = 20;
           const backoffMs = Math.min(1000 * 2 ** Math.min(attempts, 5), 30000);
 
-          if (attempts >= MAX_RECONNECT_ATTEMPTS) {
-            console.warn("[chat] Global SSE reconnect limit reached");
-            set({ globalEventSource: null });
-            return;
-          }
-
-          set({ sseReconnectAttempts: attempts + 1, globalEventSource: null });
+          set({
+            sseReconnectAttempts: Math.min(attempts + 1, 32),
+            globalEventSource: null,
+          });
 
           const timer = setTimeout(() => {
             set({ sseReconnectTimer: null });
@@ -2469,7 +2465,10 @@ export const useChatStore = create<ChatState>()(
         }
 
         const es = get().globalEventSource;
-        if (es && es.readyState === EventSource.CLOSED) {
+        if (!es && get().sseWorkspaceIds.length > 0) {
+          set({ sseReconnectAttempts: 0 });
+          get().connectGlobalSSE(get().sseWorkspaceIds);
+        } else if (es && es.readyState === EventSource.CLOSED) {
           get().connectGlobalSSE(get().sseWorkspaceIds);
         } else if (es && es.readyState === EventSource.OPEN) {
           // SSE stayed open while backgrounded — reconcile questions/permissions
@@ -2495,6 +2494,35 @@ export const useChatStore = create<ChatState>()(
         if (!properties) return;
 
         switch (eventType) {
+          case "workspace.connection": {
+            const { activeWorkspaceId, activeSessionId } = get();
+            if (
+              properties.state !== "connected" ||
+              properties.attempt === 0 ||
+              sourceWorkspaceId !== activeWorkspaceId ||
+              !activeSessionId
+            ) {
+              break;
+            }
+            void get().fetchMessages(activeSessionId, sourceWorkspaceId, {
+              force: true,
+            });
+            void get().refreshActiveSessionStatus(sourceWorkspaceId);
+            void reconcileWorkspacePrompts(
+              sourceWorkspaceId,
+              "permission",
+              undefined,
+              set,
+            );
+            void reconcileWorkspacePrompts(
+              sourceWorkspaceId,
+              "question",
+              undefined,
+              set,
+            );
+            break;
+          }
+
           case "message.updated": {
             const info = properties.info as Message;
             if (!info) return;

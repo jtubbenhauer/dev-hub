@@ -2371,6 +2371,49 @@ describe("handleVisibilityRestored", () => {
     expect(connectGlobalSSESpy).toHaveBeenCalledWith(["ws-a"]);
   });
 
+  it("reconnects a missing globalEventSource when visibility is restored", () => {
+    useChatStore.setState({
+      globalEventSource: null,
+      sseWorkspaceIds: ["ws-a"],
+      sseReconnectAttempts: 20,
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+    const connectGlobalSSESpy = vi.spyOn(
+      useChatStore.getState(),
+      "connectGlobalSSE",
+    );
+
+    useChatStore.getState().handleVisibilityRestored();
+
+    expect(connectGlobalSSESpy).toHaveBeenCalledWith(["ws-a"]);
+  });
+
+  it("force-refreshes the active session when its workspace reconnects", () => {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+    const fetchMessagesSpy = vi
+      .spyOn(useChatStore.getState(), "fetchMessages")
+      .mockResolvedValue();
+    try {
+      useChatStore.getState().handleEvent(
+        {
+          type: "workspace.connection",
+          properties: { state: "connected", attempt: 1 },
+        },
+        "ws-a",
+      );
+
+      expect(fetchMessagesSpy).toHaveBeenCalledWith("sess-a", "ws-a", {
+        force: true,
+      });
+    } finally {
+      fetchMessagesSpy.mockRestore();
+    }
+  });
+
   it("does not reconnect when globalEventSource is already open", () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

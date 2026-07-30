@@ -2947,6 +2947,94 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
       .getRecentSessionsAcrossWorkspaces(10);
     expect(first).toBe(second); // reference equality — memoisation working
   });
+
+  it("keeps a pinned session that sorts past the limit", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: {
+            "sess-1": makeSession("sess-1", { updated: 3000 }),
+            "sess-2": makeSession("sess-2", { updated: 2000 }),
+            "sess-old": makeSession("sess-old", { updated: 100 }),
+          },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(["sess-old"]),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+    });
+
+    const sessions = useChatStore
+      .getState()
+      .getRecentSessionsAcrossWorkspaces(2);
+    expect(sessions.map((s) => s.id)).toEqual(["sess-1", "sess-2", "sess-old"]);
+  });
+
+  it("re-includes a newly pinned out-of-window session once the memo cache is invalidated", () => {
+    vi.useFakeTimers();
+    try {
+      useChatStore.setState({
+        workspaceStates: {
+          "ws-a": {
+            sessions: {
+              "sess-1": makeSession("sess-1", { updated: 3000 }),
+              "sess-2": makeSession("sess-2", { updated: 2000 }),
+              "sess-old": makeSession("sess-old", { updated: 100 }),
+            },
+            messages: {},
+            optimisticMessageIds: {},
+            sessionStatuses: {},
+            permissions: [],
+            questions: [],
+            todos: {},
+            sessionAgents: {},
+            sessionModels: {},
+            lastViewedAt: {},
+            pinnedSessionIds: new Set(),
+            sessionVariants: {},
+            sessionNotes: {},
+            sessionsLoaded: true,
+          },
+        },
+      });
+
+      const before = useChatStore
+        .getState()
+        .getRecentSessionsAcrossWorkspaces(2);
+      expect(before.map((s) => s.id)).toEqual(["sess-1", "sess-2"]);
+
+      // Advance past the store's 500ms SSE-burst stale-cache window so the next
+      // call recomputes instead of returning the throttled cache.
+      vi.advanceTimersByTime(600);
+
+      useChatStore.setState((state) => ({
+        workspaceStates: {
+          ...state.workspaceStates,
+          "ws-a": {
+            ...state.workspaceStates["ws-a"],
+            pinnedSessionIds: new Set(["sess-old"]),
+          },
+        },
+      }));
+
+      const after = useChatStore
+        .getState()
+        .getRecentSessionsAcrossWorkspaces(2);
+      expect(after.map((s) => s.id)).toEqual(["sess-1", "sess-2", "sess-old"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

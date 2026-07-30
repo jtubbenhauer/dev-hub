@@ -128,6 +128,7 @@ const EMPTY_SESSION_NOTES: Record<string, string> = {};
 // We compare each workspace's `sessions` record by reference to detect changes.
 let _unifiedSessionsCache: SessionWithWorkspace[] = EMPTY_UNIFIED_SESSIONS;
 let _unifiedSessionsCacheRefs = new Map<string, Record<string, Session>>();
+let _unifiedSessionsCachePinnedRefs = new Map<string, Set<string>>();
 let _unifiedSessionsCacheLimit = 0;
 let _unifiedSessionsCacheTime = 0;
 
@@ -203,6 +204,7 @@ const sessionSourceWorkspace = new Map<string, string>();
 export function _resetModuleCaches() {
   _unifiedSessionsCache = EMPTY_UNIFIED_SESSIONS;
   _unifiedSessionsCacheRefs = new Map();
+  _unifiedSessionsCachePinnedRefs = new Map();
   _unifiedSessionsCacheLimit = 0;
   _unifiedSessionsCacheTime = 0;
 
@@ -3173,7 +3175,9 @@ export const useChatStore = create<ChatState>()(
           limit === _unifiedSessionsCacheLimit &&
           entries.length === _unifiedSessionsCacheRefs.size &&
           entries.every(
-            ([id, ws]) => _unifiedSessionsCacheRefs.get(id) === ws.sessions,
+            ([id, ws]) =>
+              _unifiedSessionsCacheRefs.get(id) === ws.sessions &&
+              _unifiedSessionsCachePinnedRefs.get(id) === ws.pinnedSessionIds,
           );
 
         // Exact cache hit — refs unchanged
@@ -3192,8 +3196,10 @@ export const useChatStore = create<ChatState>()(
 
         const result: SessionWithWorkspace[] = [];
         const newRefs = new Map<string, Record<string, Session>>();
+        const newPinnedRefs = new Map<string, Set<string>>();
         for (const [workspaceId, ws] of entries) {
           newRefs.set(workspaceId, ws.sessions);
+          newPinnedRefs.set(workspaceId, ws.pinnedSessionIds);
           for (const session of Object.values(ws.sessions)) {
             if (!session.parentID) {
               result.push({ ...session, workspaceId });
@@ -3201,10 +3207,27 @@ export const useChatStore = create<ChatState>()(
           }
         }
 
-        _unifiedSessionsCache = result
-          .sort((a, b) => b.time.updated - a.time.updated)
-          .slice(0, limit);
+        result.sort((a, b) => b.time.updated - a.time.updated);
+        const top = result.slice(0, limit);
+        // Pinned sessions must survive the top-N slice, else age-filtered
+        // unified views drop pinned-but-old sessions that sorted past `limit`.
+        if (top.length < result.length) {
+          const includedIds = new Set(top.map((session) => session.id));
+          for (const session of result) {
+            if (includedIds.has(session.id)) continue;
+            if (
+              workspaceStates[session.workspaceId]?.pinnedSessionIds.has(
+                session.id,
+              )
+            ) {
+              top.push(session);
+            }
+          }
+        }
+
+        _unifiedSessionsCache = top;
         _unifiedSessionsCacheRefs = newRefs;
+        _unifiedSessionsCachePinnedRefs = newPinnedRefs;
         _unifiedSessionsCacheLimit = limit;
         _unifiedSessionsCacheTime = now;
         return _unifiedSessionsCache;

@@ -388,12 +388,15 @@ export function useSessionManagement({
         }
         fetchSessionNotes(ws.id);
       } else {
-        // Non-active workspaces: always use cache to avoid proxy storm.
-        // Live data will load when the user switches to that workspace.
+        // Non-active workspaces use cached sessions to avoid a proxy storm.
+        // Pins and notes are still fetched: both are local dev-hub DB reads
+        // (no remote proxy), so age-filtered unified views don't drop pinned
+        // sessions until the workspace is opened. Live sessions load on switch.
         const delay = ++delayIndex * 150;
         const timer = setTimeout(() => {
           if (cancelled) return;
           fetchCachedSessions(ws.id);
+          fetchPinnedSessions(ws.id);
           fetchSessionNotes(ws.id);
         }, delay);
         timeouts.push(timer);

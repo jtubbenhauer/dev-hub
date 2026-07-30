@@ -35,6 +35,7 @@ import {
   useSettingsMutation,
   useSoundSettings,
   useFileTabsSetting,
+  useChatFileOpenSetting,
   useNotificationSettings,
   SETTINGS_KEYS,
   FONT_SIZE_OPTIONS,
@@ -43,6 +44,7 @@ import {
   EDITOR_TYPE_OPTIONS,
   TERMINAL_SCROLLBACK_OPTIONS,
   TERMINAL_FONT_OPTIONS,
+  CHAT_FILE_OPEN_MODES,
   DEFAULT_FONT_SIZE,
   DEFAULT_MOBILE_FONT_SIZE,
   DEFAULT_TAB_SIZE,
@@ -59,6 +61,7 @@ import type {
   EditorType,
   AppTheme,
   TerminalFont,
+  ChatFileOpenMode,
 } from "@/hooks/use-settings";
 import { useTheme } from "@/components/providers/theme-provider";
 import { SOUND_OPTIONS, soundSrc, playSound } from "@/lib/sounds";
@@ -146,6 +149,8 @@ function EditorSettingsCard() {
   const { nvimAppName, isLoading: isLoadingNvim } = useNvimAppNameSetting();
   const { isFileTabsDisabled, isLoading: isLoadingFileTabs } =
     useFileTabsSetting();
+  const { fileOpenMode, isLoading: isLoadingChatFileOpenMode } =
+    useChatFileOpenSetting();
   const mutation = useSettingsMutation();
   const [customNvimAppName, setCustomNvimAppName] = useState("");
 
@@ -155,7 +160,8 @@ function EditorSettingsCard() {
     isLoadingTab ||
     isLoadingEditorType ||
     isLoadingNvim ||
-    isLoadingFileTabs;
+    isLoadingFileTabs ||
+    isLoadingChatFileOpenMode;
 
   // Sync custom nvim app name from server (during render)
   const [prevNvimAppName, setPrevNvimAppName] = useState(nvimAppName);
@@ -226,6 +232,22 @@ function EditorSettingsCard() {
       {
         onSuccess: () =>
           toast.success(checked ? "File tabs disabled" : "File tabs enabled"),
+      },
+    );
+  };
+
+  const handleChatFileOpenModeChange = (value: string) => {
+    const nextMode: ChatFileOpenMode =
+      value === "dialog" ? "dialog" : "sidebar";
+    mutation.mutate(
+      { key: SETTINGS_KEYS.CHAT_FILE_OPEN_MODE, value: nextMode },
+      {
+        onSuccess: () =>
+          toast.success(
+            nextMode === "dialog"
+              ? "Chat files will open in a dialog"
+              : "Chat files will open in the sidebar",
+          ),
       },
     );
   };
@@ -434,6 +456,31 @@ function EditorSettingsCard() {
             onCheckedChange={handleFileTabsToggle}
             disabled={mutation.isPending}
           />
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="chat-file-open-mode">Open chat files in</Label>
+            <p className="text-muted-foreground text-xs">
+              Choose where file paths opened from a chat session appear
+            </p>
+          </div>
+          <Select
+            value={fileOpenMode}
+            onValueChange={handleChatFileOpenModeChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="chat-file-open-mode" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CHAT_FILE_OPEN_MODES.map((mode) => (
+                <SelectItem key={mode} value={mode}>
+                  {mode === "sidebar" ? "Sidebar (default)" : "Dialog"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </CardContent>
     </Card>

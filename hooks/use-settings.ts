@@ -56,6 +56,7 @@ export const SETTINGS_KEYS = {
   TERMINAL_SCROLLBACK: "terminal-scrollback",
   TERMINAL_FONT: "terminal-font",
   DISABLE_FILE_TABS: "disable-file-tabs",
+  CHAT_FILE_OPEN_MODE: "chat-file-open-mode",
   NOTIFICATIONS_SOUND_ENABLED: "notifications-sound-enabled",
   NOTIFICATIONS_PUSH_ENABLED: "notifications-push-enabled",
 } as const;
@@ -63,6 +64,14 @@ export const SETTINGS_KEYS = {
 export type EditorType = "monaco" | "neovim";
 export const EDITOR_TYPE_OPTIONS: EditorType[] = ["monaco", "neovim"];
 export const DEFAULT_EDITOR_TYPE: EditorType = "monaco";
+
+export const CHAT_FILE_OPEN_MODES = ["sidebar", "dialog"] as const;
+export type ChatFileOpenMode = (typeof CHAT_FILE_OPEN_MODES)[number];
+export const DEFAULT_CHAT_FILE_OPEN_MODE: ChatFileOpenMode = "sidebar";
+
+export function resolveChatFileOpenMode(value: unknown): ChatFileOpenMode {
+  return value === "dialog" ? "dialog" : DEFAULT_CHAT_FILE_OPEN_MODE;
+}
 
 export type NvimAppName = "devhub" | "personal" | string;
 export const DEFAULT_NVIM_APPNAME: NvimAppName = "devhub";
@@ -589,6 +598,19 @@ export function useFileTabsSetting(): {
   const { data, isLoading } = useSettings();
   const raw = data?.[SETTINGS_KEYS.DISABLE_FILE_TABS];
   return { isFileTabsDisabled: raw === true, isLoading };
+}
+
+export function useChatFileOpenSetting(): {
+  fileOpenMode: ChatFileOpenMode;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  return {
+    fileOpenMode: resolveChatFileOpenMode(
+      data?.[SETTINGS_KEYS.CHAT_FILE_OPEN_MODE],
+    ),
+    isLoading,
+  };
 }
 
 export function useNotificationSettings(): {

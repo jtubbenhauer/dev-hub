@@ -29,7 +29,8 @@ export function useSessionNavigation({
   activeWorkspaceId,
   setSelectedModel,
 }: UseSessionNavigationArgs): UseSessionNavigationResult {
-  const { setSessionAgent, setSessionModel } = useChatStore.getState();
+  const { clearSessionModel, setSessionAgent, setSessionModel } =
+    useChatStore.getState();
 
   const primaryAgentsRef = useRef(orderedAgents);
   const selectedAgentRef = useRef(selectedAgent);
@@ -94,12 +95,13 @@ export function useSessionNavigation({
       const workspaceId = activeWorkspaceIdRef.current;
       if (sessionId && workspaceId) {
         setSessionAgentRef.current(sessionId, workspaceId, nextAgent);
+        clearSessionModel(sessionId, workspaceId);
       }
     };
 
     window.addEventListener("keydown", handleTabCycle);
     return () => window.removeEventListener("keydown", handleTabCycle);
-  }, []);
+  }, [clearSessionModel]);
 
   return { handleModelChange };
 }

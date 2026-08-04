@@ -10,6 +10,11 @@ interface SelectedModel {
   modelID: string;
 }
 
+interface AvailableVariants {
+  model: SelectedModel | null;
+  values: string[];
+}
+
 interface UseAgentModelSyncArgs {
   activeWorkspaceId: string | null;
   activeSessionId: string | null;
@@ -18,7 +23,7 @@ interface UseAgentModelSyncArgs {
   selectedModel: SelectedModel | null;
   setSelectedModel: Dispatch<SetStateAction<SelectedModel | null>>;
   selectedVariant: string | null;
-  availableVariants: string[];
+  availableVariants: AvailableVariants;
   setSelectedVariant: Dispatch<SetStateAction<string | null>>;
 }
 
@@ -48,16 +53,18 @@ export function useAgentModelSync({
   }, [primaryAgents]);
 
   const { bindings: agentModelBindings } = useModelAgentBindings();
+  const { model: availableVariantsModel, values: availableVariantValues } =
+    availableVariants;
 
   // Track the previous agent so we only force-set the model when the agent
   // actually changes — not when other deps (primaryAgents, bindings) re-render.
   // This lets the user manually override the model within a session.
   const prevAgentRef = useRef<string | null>(null);
 
-  // After a session restore, availableVariants still holds the previous
-  // model's list for one commit — skip one validation pass so the freshly
-  // restored variant isn't cleared as "invalid" during that window.
-  const skipVariantValidationRef = useRef(false);
+  const isVariantListCurrent =
+    selectedModel !== null &&
+    availableVariantsModel?.providerID === selectedModel.providerID &&
+    availableVariantsModel.modelID === selectedModel.modelID;
 
   useEffect(() => {
     if (!selectedAgent || primaryAgents.length === 0) return;
@@ -93,8 +100,8 @@ export function useAgentModelSync({
       } = useChatStore.getState();
       if (
         agentVariant &&
-        availableVariants.length > 0 &&
-        !availableVariants.includes(agentVariant)
+        isVariantListCurrent &&
+        !availableVariantValues.includes(agentVariant)
       ) {
         setSelectedVariant(null);
         if (sid && wsId) clearSessionVariant(sid, wsId);
@@ -111,25 +118,35 @@ export function useAgentModelSync({
     selectedAgent,
     primaryAgents,
     agentModelBindings,
-    availableVariants,
+    availableVariantValues,
+    isVariantListCurrent,
     selectedModel,
     setSelectedModel,
     setSelectedVariant,
   ]);
 
   useEffect(() => {
-    if (skipVariantValidationRef.current) {
-      skipVariantValidationRef.current = false;
-      return;
-    }
     if (
       selectedVariant &&
-      availableVariants.length > 0 &&
-      !availableVariants.includes(selectedVariant)
+      isVariantListCurrent &&
+      !availableVariantValues.includes(selectedVariant)
     ) {
       setSelectedVariant(null);
+      const {
+        activeSessionId: sessionId,
+        activeWorkspaceId: workspaceId,
+        clearSessionVariant,
+      } = useChatStore.getState();
+      if (sessionId && workspaceId) {
+        clearSessionVariant(sessionId, workspaceId);
+      }
     }
-  }, [availableVariants, selectedVariant, setSelectedVariant]);
+  }, [
+    availableVariantValues,
+    isVariantListCurrent,
+    selectedVariant,
+    setSelectedVariant,
+  ]);
 
   const { getSessionAgent, getSessionModel, getSessionVariant } =
     useChatStore.getState();
@@ -140,31 +157,42 @@ export function useAgentModelSync({
     const storedAgent = activeSessionId
       ? getSessionAgent(activeSessionId)
       : null;
-    if (storedAgent) {
-      // Mark the agent as restored so the agent-change effect above does not
-      // treat this as a user change and overwrite the session's variant.
-      prevAgentRef.current = storedAgent;
-      setSelectedAgent(storedAgent);
-    } else {
-      const defaultAgent =
-        primaryAgents.find((a) => a.name === "code") ?? primaryAgents[0];
-      setSelectedAgent(defaultAgent.name);
-    }
+    const defaultAgent =
+      primaryAgents.find((agent) => agent.name === "code") ?? primaryAgents[0];
+    const restoredAgentName = storedAgent ?? defaultAgent.name;
+    const restoredAgent = primaryAgents.find(
+      (agent) => agent.name === restoredAgentName,
+    );
+    // Mark the agent as restored so the agent-change effect above does not
+    // treat this as a user change and overwrite session-specific choices.
+    prevAgentRef.current = restoredAgentName;
+    setSelectedAgent(restoredAgentName);
 
     const storedModel = activeSessionId
       ? getSessionModel(activeSessionId)
       : null;
-    if (storedModel) {
-      setSelectedModel(storedModel);
-    }
+    setSelectedModel(
+      storedModel ??
+        restoredAgent?.model ??
+        agentModelBindings[restoredAgentName] ??
+        null,
+    );
 
     const storedVariant = activeSessionId
       ? getSessionVariant(activeSessionId)
       : null;
-    skipVariantValidationRef.current = true;
-    setSelectedVariant(storedVariant);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId, primaryAgents]);
+    setSelectedVariant(storedVariant ?? restoredAgent?.variant ?? null);
+  }, [
+    activeSessionId,
+    agentModelBindings,
+    getSessionAgent,
+    getSessionModel,
+    getSessionVariant,
+    primaryAgents,
+    setSelectedAgent,
+    setSelectedModel,
+    setSelectedVariant,
+  ]);
 
   return { orderedAgents, primaryAgents, agentModelBindings };
 }

@@ -146,7 +146,7 @@ interface PromptInputProps {
 
   selectedModel: SelectedModel | null;
   onModelChange: (model: SelectedModel) => void;
-  onVariantsChange?: (variants: string[]) => void;
+  onVariantsChange?: (model: SelectedModel | null, variants: string[]) => void;
   isModelSelectorOpen?: boolean;
   onModelSelectorOpenChange?: (open: boolean) => void;
 

@@ -33,15 +33,20 @@ const primaryAgents = vi.hoisted((): Agent[] => {
   return [makeAgent("code"), makeAgent("build")];
 });
 
+const modelBindingState = vi.hoisted(() => ({ bindings: {} }));
+
 vi.mock("@/components/chat/agent-selector", () => ({
   useAgents: () => ({ primaryAgents }),
 }));
 
 vi.mock("@/hooks/use-settings", () => ({
-  useModelAgentBindings: () => ({ bindings: {} }),
+  useModelAgentBindings: () => modelBindingState,
 }));
 
 const initialStoreState = useChatStore.getState();
+const noVariants: string[] = [];
+const testModel = { providerID: "provider-a", modelID: "model-a" };
+const otherModel = { providerID: "provider-b", modelID: "model-b" };
 
 interface SelectedModel {
   providerID: string;
@@ -50,17 +55,26 @@ interface SelectedModel {
 
 interface HarnessProps {
   activeSessionId: string;
-  variants?: string[];
+  initialModel?: SelectedModel | null;
+  variants: string[];
+  variantsModel?: SelectedModel | null;
 }
 
-function useHarness({ activeSessionId, variants = [] }: HarnessProps) {
+function useHarness({
+  activeSessionId,
+  initialModel = null,
+  variants = [],
+  variantsModel = null,
+}: HarnessProps) {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
-    null,
+    initialModel,
   );
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
-  const [availableVariants, setAvailableVariants] =
-    useState<string[]>(variants);
+  const [availableVariants, setAvailableVariants] = useState({
+    model: variantsModel,
+    values: variants,
+  });
 
   useAgentModelSync({
     activeWorkspaceId: "ws-a",
@@ -76,14 +90,18 @@ function useHarness({ activeSessionId, variants = [] }: HarnessProps) {
 
   return {
     selectedAgent,
+    selectedModel,
     selectedVariant,
     setSelectedAgent,
-    setAvailableVariants,
+    setAvailableVariants: (values: string[]) => {
+      setAvailableVariants({ model: selectedModel, values });
+    },
   };
 }
 
 function seedWorkspace(input: {
   sessionAgents?: Record<string, string>;
+  sessionModels?: Record<string, SelectedModel>;
   sessionVariants?: Record<string, string>;
   activeSessionId?: string;
 }) {
@@ -101,7 +119,7 @@ function seedWorkspace(input: {
         questions: [],
         todos: {},
         sessionAgents: input.sessionAgents ?? {},
-        sessionModels: {},
+        sessionModels: input.sessionModels ?? {},
         sessionVariants: input.sessionVariants ?? {},
         lastViewedAt: {},
         pinnedSessionIds: new Set(),
@@ -111,19 +129,10 @@ function seedWorkspace(input: {
   });
 }
 
-function switchToSession(
-  rerender: (props: HarnessProps) => void,
-  sessionId: string,
-) {
-  act(() => {
-    useChatStore.setState({ activeSessionId: sessionId });
-  });
-  rerender({ activeSessionId: sessionId });
-}
-
 describe("useAgentModelSync", () => {
   beforeEach(() => {
     useChatStore.setState(initialStoreState, true);
+    modelBindingState.bindings = {};
   });
 
   it("preserves a stored variant when switching to a session with a different agent", () => {
@@ -132,13 +141,18 @@ describe("useAgentModelSync", () => {
       sessionVariants: { "sess-b": "max" },
     });
 
-    const { result, rerender } = renderHook(
-      (props: HarnessProps) => useHarness(props),
-      { initialProps: { activeSessionId: "sess-a" } },
-    );
+    const { result, rerender } = renderHook<
+      ReturnType<typeof useHarness>,
+      HarnessProps
+    >((props: HarnessProps) => useHarness(props), {
+      initialProps: { activeSessionId: "sess-a", variants: noVariants },
+    });
     expect(result.current.selectedAgent).toBe("code");
 
-    switchToSession(rerender, "sess-b");
+    act(() => {
+      useChatStore.setState({ activeSessionId: "sess-b" });
+    });
+    rerender({ activeSessionId: "sess-b", variants: noVariants });
 
     expect(result.current.selectedAgent).toBe("build");
     expect(result.current.selectedVariant).toBe("max");
@@ -148,15 +162,31 @@ describe("useAgentModelSync", () => {
   it("does not clear a freshly restored variant while the previous model's variant list is still showing", () => {
     seedWorkspace({
       sessionAgents: { "sess-a": "code", "sess-b": "code" },
+      sessionModels: { "sess-a": testModel, "sess-b": otherModel },
       sessionVariants: { "sess-b": "max" },
     });
 
-    const { result, rerender } = renderHook(
-      (props: HarnessProps) => useHarness(props),
-      { initialProps: { activeSessionId: "sess-a", variants: ["high"] } },
-    );
+    const { result, rerender } = renderHook<
+      ReturnType<typeof useHarness>,
+      HarnessProps
+    >((props: HarnessProps) => useHarness(props), {
+      initialProps: {
+        activeSessionId: "sess-a",
+        initialModel: testModel,
+        variants: ["high"],
+        variantsModel: testModel,
+      },
+    });
 
-    switchToSession(rerender, "sess-b");
+    act(() => {
+      useChatStore.setState({ activeSessionId: "sess-b" });
+    });
+    rerender({
+      activeSessionId: "sess-b",
+      initialModel: testModel,
+      variants: ["high"],
+      variantsModel: testModel,
+    });
 
     expect(result.current.selectedVariant).toBe("max");
 
@@ -169,15 +199,31 @@ describe("useAgentModelSync", () => {
   it("clears the restored variant once the new model's variant list arrives without it", () => {
     seedWorkspace({
       sessionAgents: { "sess-a": "code", "sess-b": "code" },
+      sessionModels: { "sess-a": testModel, "sess-b": otherModel },
       sessionVariants: { "sess-b": "max" },
     });
 
     const { result, rerender } = renderHook(
       (props: HarnessProps) => useHarness(props),
-      { initialProps: { activeSessionId: "sess-a", variants: ["high"] } },
+      {
+        initialProps: {
+          activeSessionId: "sess-a",
+          initialModel: testModel,
+          variants: ["high"],
+          variantsModel: testModel,
+        },
+      },
     );
 
-    switchToSession(rerender, "sess-b");
+    act(() => {
+      useChatStore.setState({ activeSessionId: "sess-b" });
+    });
+    rerender({
+      activeSessionId: "sess-b",
+      initialModel: testModel,
+      variants: ["high"],
+      variantsModel: testModel,
+    });
     expect(result.current.selectedVariant).toBe("max");
 
     act(() => {
@@ -193,12 +239,55 @@ describe("useAgentModelSync", () => {
     });
 
     const { result } = renderHook((props: HarnessProps) => useHarness(props), {
-      initialProps: { activeSessionId: "sess-a" },
+      initialProps: { activeSessionId: "sess-a", variants: noVariants },
     });
     expect(result.current.selectedVariant).toBe("max");
 
     act(() => {
       result.current.setSelectedAgent("build");
+    });
+
+    expect(result.current.selectedVariant).toBeNull();
+    expect(useChatStore.getState().getSessionVariant("sess-a")).toBeNull();
+  });
+
+  it("restores the agent model binding when the session has no override", () => {
+    modelBindingState.bindings = {
+      build: { providerID: "anthropic", modelID: "claude-opus" },
+    };
+    seedWorkspace({
+      sessionAgents: { "sess-a": "build" },
+    });
+
+    const { result } = renderHook((props: HarnessProps) => useHarness(props), {
+      initialProps: {
+        activeSessionId: "sess-a",
+        initialModel: { providerID: "openrouter", modelID: "kimi-k3" },
+        variants: noVariants,
+      },
+    });
+
+    expect(result.current.selectedAgent).toBe("build");
+    expect(result.current.selectedModel).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus",
+    });
+  });
+
+  it("clears an invalid restored variant from local and persisted state", () => {
+    seedWorkspace({
+      sessionAgents: { "sess-a": "code" },
+      sessionModels: { "sess-a": testModel },
+      sessionVariants: { "sess-a": "max" },
+    });
+
+    const { result } = renderHook((props: HarnessProps) => useHarness(props), {
+      initialProps: {
+        activeSessionId: "sess-a",
+        initialModel: testModel,
+        variants: ["low"],
+        variantsModel: testModel,
+      },
     });
 
     expect(result.current.selectedVariant).toBeNull();

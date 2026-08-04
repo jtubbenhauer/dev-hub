@@ -93,6 +93,11 @@ interface SelectedModel {
   modelID: string;
 }
 
+interface AvailableVariants {
+  model: SelectedModel | null;
+  values: string[];
+}
+
 const EMPTY_LAST_VIEWED: Record<string, number> = {};
 
 export function ChatInterface() {
@@ -101,7 +106,15 @@ export function ChatInterface() {
   );
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
-  const [availableVariants, setAvailableVariants] = useState<string[]>([]);
+  const [availableVariants, setAvailableVariants] = useState<AvailableVariants>(
+    { model: null, values: [] },
+  );
+  const handleVariantsChange = useCallback(
+    (model: SelectedModel | null, values: string[]) => {
+      setAvailableVariants({ model, values });
+    },
+    [],
+  );
   const [isSessionListOpen, setIsSessionListOpen] = useState(true);
   const [questionViewMode, setQuestionViewMode] = useState<"list" | "tabs">(
     () => {
@@ -1594,10 +1607,10 @@ export function ChatInterface() {
             onAgentSelectorOpenChange={setIsAgentSelectorOpen}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
-            onVariantsChange={setAvailableVariants}
+            onVariantsChange={handleVariantsChange}
             isModelSelectorOpen={isModelSelectorOpen}
             onModelSelectorOpenChange={setIsModelSelectorOpen}
-            availableVariants={availableVariants}
+            availableVariants={availableVariants.values}
             selectedVariant={selectedVariant}
             onVariantChange={(variant) => {
               setSelectedVariant(variant);

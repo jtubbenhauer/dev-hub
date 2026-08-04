@@ -33,7 +33,7 @@ interface ModelSelectorProps {
   workspaceId: string | null;
   selectedModel: SelectedModel | null;
   onModelChange: (model: SelectedModel) => void;
-  onVariantsChange?: (variants: string[]) => void;
+  onVariantsChange?: (model: SelectedModel | null, variants: string[]) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
@@ -178,8 +178,16 @@ export function ModelSelector({
   }, [selectedModel, providers]);
 
   useEffect(() => {
-    onVariantsChange?.(variantsForSelectedModel);
-  }, [variantsForSelectedModel, onVariantsChange]);
+    onVariantsChange?.(
+      isProviderStateCurrent ? selectedModel : null,
+      variantsForSelectedModel,
+    );
+  }, [
+    isProviderStateCurrent,
+    onVariantsChange,
+    selectedModel,
+    variantsForSelectedModel,
+  ]);
 
   const modelOptions = useMemo(
     () =>

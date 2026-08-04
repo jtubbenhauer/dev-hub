@@ -1,0 +1,36 @@
+tests/components/chat/model-selector.test.tsx
+  s_f1426aaf2ef4b2::t_40b85c8711e4d4 1,10-11,13,16-44,47-50,116-146,148-155,157-163,199
+  s_f1426aaf2ef4b2::t_182af3e83d72ab 164-198
+  s_45bed5b85e292b::t_a8a4b8838b90cf 147,156
+components/chat/model-selector.tsx
+  s_f1426aaf2ef4b2::t_444dff835a9ded 142-146,148-150
+  s_f1426aaf2ef4b2::t_6b5e99473d7121 51-55,109-110,112-113
+  s_f1426aaf2ef4b2::t_3548710aaf1749 3,122-141,147,151-155,157-161
+  s_f1426aaf2ef4b2::t_6cf8bf4d9dff63 24-25,106-108,111
+  s_f1426aaf2ef4b2::t_d02c7b54b68856 222-227
+  s_f1426aaf2ef4b2::t_c49cc1a2665890 56,94-95,114,120,162,207-208,228-230,234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "e16673e9217bffe565ab0e539ff19c1c464925f9",
+  "prompts": {},
+  "sessions": {
+    "s_45bed5b85e292b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_033c955f1ffeG3l7gMG3Zm9ESl",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_f1426aaf2ef4b2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_033c955f1ffeG3l7gMG3Zm9ESl",
+        "model": "moonshotai/kimi-k3"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

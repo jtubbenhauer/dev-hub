@@ -54,6 +54,11 @@ export function useAgentModelSync({
   // This lets the user manually override the model within a session.
   const prevAgentRef = useRef<string | null>(null);
 
+  // After a session restore, availableVariants still holds the previous
+  // model's list for one commit — skip one validation pass so the freshly
+  // restored variant isn't cleared as "invalid" during that window.
+  const skipVariantValidationRef = useRef(false);
+
   useEffect(() => {
     if (!selectedAgent || primaryAgents.length === 0) return;
 
@@ -113,6 +118,10 @@ export function useAgentModelSync({
   ]);
 
   useEffect(() => {
+    if (skipVariantValidationRef.current) {
+      skipVariantValidationRef.current = false;
+      return;
+    }
     if (
       selectedVariant &&
       availableVariants.length > 0 &&
@@ -132,6 +141,9 @@ export function useAgentModelSync({
       ? getSessionAgent(activeSessionId)
       : null;
     if (storedAgent) {
+      // Mark the agent as restored so the agent-change effect above does not
+      // treat this as a user change and overwrite the session's variant.
+      prevAgentRef.current = storedAgent;
       setSelectedAgent(storedAgent);
     } else {
       const defaultAgent =
@@ -149,9 +161,8 @@ export function useAgentModelSync({
     const storedVariant = activeSessionId
       ? getSessionVariant(activeSessionId)
       : null;
-    if (storedVariant) {
-      setSelectedVariant(storedVariant);
-    }
+    skipVariantValidationRef.current = true;
+    setSelectedVariant(storedVariant);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, primaryAgents]);
 

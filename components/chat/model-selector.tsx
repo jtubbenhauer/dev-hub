@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ChevronsUpDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,8 @@ import { useModelAllowlist } from "@/hooks/use-settings";
 import type { Provider, Model } from "@/lib/opencode/types";
 
 const STORAGE_KEY = "dev-hub:selected-model";
+const EMPTY_PROVIDERS: ProviderWithModels[] = [];
+const EMPTY_DEFAULT_MODELS: Record<string, string> = {};
 
 interface SelectedModel {
   providerID: string;
@@ -44,6 +46,12 @@ interface ConfigProvidersResponse {
 interface ProviderWithModels {
   provider: Provider;
   models: Model[];
+}
+
+interface ProviderState {
+  workspaceId: string;
+  providers: ProviderWithModels[];
+  defaultModels: Record<string, string>;
 }
 
 export function loadPersistedModel(): SelectedModel | null {
@@ -83,9 +91,8 @@ export function ModelSelector({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: ModelSelectorProps) {
-  const [providers, setProviders] = useState<ProviderWithModels[]>([]);
-  const [defaultModels, setDefaultModels] = useState<Record<string, string>>(
-    {},
+  const [providerState, setProviderState] = useState<ProviderState | null>(
+    null,
   );
   const [isLoading, setIsLoading] = useState(false);
   const [internalOpen, setInternalOpen] = useState(false);
@@ -96,40 +103,63 @@ export function ModelSelector({
       ? controlledOnOpenChange
       : setInternalOpen;
   const { allowlist } = useModelAllowlist();
+  const isProviderStateCurrent = providerState?.workspaceId === workspaceId;
+  const providers = isProviderStateCurrent
+    ? providerState.providers
+    : EMPTY_PROVIDERS;
+  const defaultModels = isProviderStateCurrent
+    ? providerState.defaultModels
+    : EMPTY_DEFAULT_MODELS;
+  const isCurrentWorkspaceLoading =
+    isLoading || (workspaceId !== null && !isProviderStateCurrent);
   const allowlistSet = useMemo(
     () => (allowlist.length > 0 ? new Set(allowlist) : null),
     [allowlist],
   );
 
-  const fetchProviders = useCallback(async () => {
-    if (!workspaceId) return;
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams({ workspaceId });
-      const response = await fetch(
-        `/api/opencode/config/providers?${params.toString()}`,
-      );
-      if (!response.ok) return;
-
-      const data: ConfigProvidersResponse = await response.json();
-      const providerList: ProviderWithModels[] = data.providers.map(
-        (provider) => ({
-          provider,
-          models: Object.values(provider.models),
-        }),
-      );
-      setProviders(providerList);
-      setDefaultModels(data.default ?? {});
-    } catch {
-      // Silently fail
-    } finally {
-      setIsLoading(false);
-    }
-  }, [workspaceId]);
-
   useEffect(() => {
-    fetchProviders();
-  }, [fetchProviders]);
+    if (!workspaceId) return;
+    let isCurrentWorkspace = true;
+    const controller = new AbortController();
+
+    const fetchProviders = async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams({ workspaceId });
+        const response = await fetch(
+          `/api/opencode/config/providers?${params.toString()}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok || !isCurrentWorkspace) return;
+
+        const data: ConfigProvidersResponse = await response.json();
+        if (!isCurrentWorkspace) return;
+        const providerList: ProviderWithModels[] = data.providers.map(
+          (provider) => ({
+            provider,
+            models: Object.values(provider.models),
+          }),
+        );
+        setProviderState({
+          workspaceId,
+          providers: providerList,
+          defaultModels: data.default ?? {},
+        });
+      } catch {
+        if (isCurrentWorkspace) {
+          setProviderState({ workspaceId, providers: [], defaultModels: {} });
+        }
+      } finally {
+        if (isCurrentWorkspace) setIsLoading(false);
+      }
+    };
+
+    void fetchProviders();
+    return () => {
+      isCurrentWorkspace = false;
+      controller.abort();
+    };
+  }, [workspaceId]);
 
   // Emit available variants for the currently selected model
   const variantsForSelectedModel = useMemo(() => {
@@ -174,7 +204,8 @@ export function ModelSelector({
   const currentOption = modelOptions.find((o) => o.value === currentValue);
 
   useEffect(() => {
-    if (isLoading || modelOptions.length === 0 || currentOption) return;
+    if (isCurrentWorkspaceLoading || modelOptions.length === 0 || currentOption)
+      return;
 
     const defaultOption = modelOptions.find(
       (option) =>
@@ -188,13 +219,19 @@ export function ModelSelector({
     };
     onModelChange(fallback);
     persistModel(fallback);
-  }, [currentOption, defaultModels, isLoading, modelOptions, onModelChange]);
+  }, [
+    currentOption,
+    defaultModels,
+    isCurrentWorkspaceLoading,
+    modelOptions,
+    onModelChange,
+  ]);
 
-  if (isLoading || modelOptions.length === 0) {
+  if (isCurrentWorkspaceLoading || modelOptions.length === 0) {
     return (
       <Button variant="outline" size="sm" disabled className="gap-1.5 text-xs">
         <ChevronsUpDown className="size-3" />
-        {isLoading ? "Loading models..." : "No models"}
+        {isCurrentWorkspaceLoading ? "Loading models..." : "No models"}
       </Button>
     );
   }

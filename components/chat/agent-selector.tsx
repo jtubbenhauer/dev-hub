@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ChevronsUpDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,36 +18,59 @@ import {
 import { cn } from "@/lib/utils";
 import type { Agent } from "@/lib/opencode/types";
 
+const EMPTY_AGENTS: Agent[] = [];
+
 interface UseAgentsResult {
   agents: Agent[];
   primaryAgents: Agent[];
   isLoading: boolean;
 }
 
+interface AgentState {
+  workspaceId: string;
+  agents: Agent[];
+}
+
 export function useAgents(workspaceId: string | null): UseAgentsResult {
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetchAgents = useCallback(async () => {
-    if (!workspaceId) return;
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams({ workspaceId });
-      const response = await fetch(`/api/opencode/agent?${params.toString()}`);
-      if (!response.ok) return;
-
-      const data: Record<string, Agent> = await response.json();
-      setAgents(Object.values(data));
-    } catch {
-      // Silently fail
-    } finally {
-      setIsLoading(false);
-    }
-  }, [workspaceId]);
+  const [agentState, setAgentState] = useState<AgentState | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const isAgentStateCurrent = agentState?.workspaceId === workspaceId;
+  const agents = isAgentStateCurrent ? agentState.agents : EMPTY_AGENTS;
+  const isLoading =
+    isFetching || (workspaceId !== null && !isAgentStateCurrent);
 
   useEffect(() => {
-    fetchAgents();
-  }, [fetchAgents]);
+    if (!workspaceId) return;
+    let isCurrentWorkspace = true;
+    const controller = new AbortController();
+
+    const fetchAgents = async () => {
+      setIsFetching(true);
+      try {
+        const params = new URLSearchParams({ workspaceId });
+        const response = await fetch(
+          `/api/opencode/agent?${params.toString()}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok || !isCurrentWorkspace) return;
+
+        const data: Record<string, Agent> = await response.json();
+        if (isCurrentWorkspace) {
+          setAgentState({ workspaceId, agents: Object.values(data) });
+        }
+      } catch {
+        if (isCurrentWorkspace) setAgentState({ workspaceId, agents: [] });
+      } finally {
+        if (isCurrentWorkspace) setIsFetching(false);
+      }
+    };
+
+    void fetchAgents();
+    return () => {
+      isCurrentWorkspace = false;
+      controller.abort();
+    };
+  }, [workspaceId]);
 
   const primaryAgents = useMemo(
     () => agents.filter((a) => a.mode === "primary" || a.mode === "all"),

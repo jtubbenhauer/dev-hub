@@ -1,0 +1,24 @@
+tests/components/chat/use-agent-model-sync.test.tsx
+  s_45bed5b85e292b::t_2c3f163770723f 1-207
+components/chat/use-agent-model-sync.ts
+  s_45bed5b85e292b::t_e414191deff9d8 60-61
+  s_45bed5b85e292b::t_6697e25cfa2863 57-59
+  s_45bed5b85e292b::t_4d9e75666391be 121-124
+  s_45bed5b85e292b::t_0d4267d0d5760d 144-146,164-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "600feeaf6a6c7e021da834865b5a9a6541fec838",
+  "prompts": {},
+  "sessions": {
+    "s_45bed5b85e292b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_033c955f1ffeG3l7gMG3Zm9ESl",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

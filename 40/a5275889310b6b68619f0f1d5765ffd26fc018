@@ -1,0 +1,23 @@
+tests/stores/chat-store-session-config-persistence.test.ts
+  s_f1426aaf2ef4b2::t_182af3e83d72ab 55-57,61,78-116,118-121,123-124,126-129
+  s_f1426aaf2ef4b2::t_40b85c8711e4d4 1-54,58-60,62-77,117,130-131
+  s_f1426aaf2ef4b2::t_c65b317a3fe771 122,125
+stores/chat-store.ts
+  s_f1426aaf2ef4b2::t_cac10ef1ffb843 1170,1173,1189-1196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "40a5275889310b6b68619f0f1d5765ffd26fc018",
+  "prompts": {},
+  "sessions": {
+    "s_f1426aaf2ef4b2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_033c955f1ffeG3l7gMG3Zm9ESl",
+        "model": "moonshotai/kimi-k3"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

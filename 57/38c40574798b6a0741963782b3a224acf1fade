@@ -1,0 +1,33 @@
+tests/components/chat/agent-selector.test.tsx
+  s_f1426aaf2ef4b2::t_182af3e83d72ab 78-108
+  s_45bed5b85e292b::t_a8a4b8838b90cf 53-55
+  s_f1426aaf2ef4b2::t_474c720dbd31b0 1-52,56-77,109
+components/chat/agent-selector.tsx
+  s_f1426aaf2ef4b2::t_6cf8bf4d9dff63 21-22,38
+  s_f1426aaf2ef4b2::t_426cd4a02787da 29-33,35-37,39-40,48,58-60,62,64
+  s_f1426aaf2ef4b2::t_cf124863a1ce02 3,42,44-45,47,49-57,61,63,65-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "5738c40574798b6a0741963782b3a224acf1fade",
+  "prompts": {},
+  "sessions": {
+    "s_45bed5b85e292b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_033c955f1ffeG3l7gMG3Zm9ESl",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_f1426aaf2ef4b2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_033c955f1ffeG3l7gMG3Zm9ESl",
+        "model": "moonshotai/kimi-k3"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

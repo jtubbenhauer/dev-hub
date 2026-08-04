@@ -1,0 +1,38 @@
+components/chat/use-agent-model-sync.ts
+  s_f1426aaf2ef4b2::t_c3a39f99e5ec77 57,66-67,104,121,132,145
+  s_f1426aaf2ef4b2::t_29ae32e9cf59be 160-169,174-179,184-195
+  s_f1426aaf2ef4b2::t_73f32b5e311ecc 13-17,26,64-65,103,122,131,135-142,144,146-149
+  s_f1426aaf2ef4b2::t_b532ae31104f1a 56
+components/chat/chat-interface.tsx
+  s_f1426aaf2ef4b2::t_73f32b5e311ecc 96-100,109-117,1610,1613
+tests/components/chat/use-agent-model-sync.test.tsx
+  s_f1426aaf2ef4b2::t_4f155639908665 152-155,181-189,218-226
+  s_f1426aaf2ef4b2::t_474c720dbd31b0 36-37,43,58,63-66,68,71,93,135,253-265,267-274
+  s_f1426aaf2ef4b2::t_45117cfbe8db49 49,60,67,74-77,96-98,165,173-178,202,208-215,289
+  s_f1426aaf2ef4b2::t_21976729c9db09 59
+  s_f1426aaf2ef4b2::t_10ab21bf326d7e 144-147,169-172
+  s_f1426aaf2ef4b2::t_5ce2590b95cbae 47,148,242,266
+  s_f1426aaf2ef4b2::t_182af3e83d72ab 48,104,122,149,179,275-288,290-291,295
+  s_f1426aaf2ef4b2::t_576a3c16d372ce 292-294
+components/chat/model-selector.tsx
+  s_f1426aaf2ef4b2::t_d02c7b54b68856 181-190
+  s_f1426aaf2ef4b2::t_1686d9155bcae8 36
+components/chat/prompt-input.tsx
+  s_f1426aaf2ef4b2::t_a38d65bb313eef 149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "9fc5ad92d4b23741c70dd8441c3445fa28dde567",
+  "prompts": {},
+  "sessions": {
+    "s_f1426aaf2ef4b2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_033c955f1ffeG3l7gMG3Zm9ESl",
+        "model": "moonshotai/kimi-k3"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

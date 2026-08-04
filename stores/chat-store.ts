@@ -1167,9 +1167,10 @@ export const useChatStore = create<ChatState>()(
               sessions: sessionsMap,
               sessionsLoaded: true,
             }));
-            // Prune orphaned sub-records for sessions that no longer exist
+            // A full capped response cannot prove omitted sessions were deleted.
             const ws = wsUpdate.workspaceStates?.[workspaceId];
             if (!ws) return wsUpdate;
+            const isCompleteResponse = data.length < SESSION_FETCH_LIMIT;
             const validIds = new Set(Object.keys(sessionsMap));
             const prune = <T>(record: Record<string, T>): Record<string, T> => {
               const pruned: Record<string, T> = {};
@@ -1185,10 +1186,14 @@ export const useChatStore = create<ChatState>()(
                   ...ws,
                   sessionStatuses: prune(ws.sessionStatuses),
                   todos: prune(ws.todos),
-                  sessionAgents: prune(ws.sessionAgents),
-                  sessionModels: prune(ws.sessionModels),
-                  sessionVariants: prune(ws.sessionVariants),
-                  lastViewedAt: prune(ws.lastViewedAt),
+                  ...(isCompleteResponse
+                    ? {
+                        sessionAgents: prune(ws.sessionAgents),
+                        sessionModels: prune(ws.sessionModels),
+                        sessionVariants: prune(ws.sessionVariants),
+                        lastViewedAt: prune(ws.lastViewedAt),
+                      }
+                    : {}),
                 },
               },
             };

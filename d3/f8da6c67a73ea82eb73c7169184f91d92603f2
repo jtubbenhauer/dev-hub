@@ -1,0 +1,32 @@
+components/chat/task-progress.tsx
+  s_9cbea9dda90702::t_2e9a670064f6b8 10,34,62-65
+components/chat/sub-agent-dialog.tsx
+  s_9cbea9dda90702::t_2e9a670064f6b8 177-180
+tests/components/chat/sub-agent-dialog-controls.test.tsx
+  s_9cbea9dda90702::t_446d524a067a8d 37-46,114-131
+  s_d4a741388f8855::t_91de0c132296e8 132-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d3f8da6c67a73ea82eb73c7169184f91d92603f2",
+  "prompts": {},
+  "sessions": {
+    "s_9cbea9dda90702": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_026ea6104ffecb4Tt3MdPaeRIy",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_d4a741388f8855": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_026dc29d7ffeX8aO6v5QbELVmS",
+        "model": "claude-haiku-4-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

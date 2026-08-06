@@ -34,7 +34,16 @@ function setChildSessionStatus(
         sessionStatuses: { child: status },
         permissions: [],
         questions: [],
-        todos: {},
+        todos: {
+          child: [
+            {
+              id: "todo-1",
+              content: "child task",
+              status: "in_progress",
+              priority: "high",
+            },
+          ],
+        },
         sessionAgents: {},
         sessionModels: {},
         sessionVariants: {},
@@ -100,6 +109,26 @@ describe("SubAgentDialog controls", () => {
       "Retrying, attempt 3. Provider is overloaded",
     );
     expect(screen.getByRole("status")).not.toHaveTextContent("5s");
+  });
+
+  it("bounds the task list and gives it vertical scroll ownership", () => {
+    render(
+      <SubAgentDialog
+        childSessionId="child"
+        workspaceId="ws-a"
+        description="Child"
+        isActive={false}
+        open
+        onOpenChange={() => {}}
+      />,
+    );
+
+    const taskList = document.querySelector('[data-slot="task-progress-list"]');
+    expect(taskList).toHaveClass(
+      "max-h-[min(40dvh,24rem)]",
+      "overflow-y-auto",
+      "overscroll-contain",
+    );
   });
 
   it("sends continue to the child session when Nudge is pressed", async () => {

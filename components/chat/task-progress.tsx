@@ -7,6 +7,7 @@ import type { Todo } from "@/lib/opencode/types";
 
 interface TaskProgressPanelProps {
   todos: Todo[];
+  listClassName?: string;
 }
 
 const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -30,6 +31,7 @@ function sortTodos(todos: Todo[]): Todo[] {
 
 export const TaskProgressPanel = memo(function TaskProgressPanel({
   todos,
+  listClassName,
 }: TaskProgressPanelProps) {
   const completed = todos.filter((t) => t.status === "completed").length;
   const inProgress = todos.filter((t) => t.status === "in_progress").length;
@@ -57,7 +59,10 @@ export const TaskProgressPanel = memo(function TaskProgressPanel({
         </div>
       </div>
 
-      <div className="space-y-0.5">
+      <div
+        data-slot="task-progress-list"
+        className={cn("space-y-0.5", listClassName)}
+      >
         {sortedTodos.map((todo) => (
           <TodoItem key={`${todo.status}-${todo.content}`} todo={todo} />
         ))}

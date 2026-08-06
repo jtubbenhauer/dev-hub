@@ -174,7 +174,10 @@ export function SubAgentDialog({
           <div className="flex min-h-0 flex-1 flex-col">
             {todos.length > 0 && (
               <div className="shrink-0 border-b px-6 py-3">
-                <TaskProgressPanel todos={todos} />
+                <TaskProgressPanel
+                  todos={todos}
+                  listClassName="max-h-[min(40dvh,24rem)] overflow-y-auto overscroll-contain pr-2"
+                />
               </div>
             )}
 

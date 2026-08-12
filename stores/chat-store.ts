@@ -18,6 +18,7 @@ import { playSoundForEvent } from "@/lib/sounds";
 import { sendBrowserNotification } from "@/lib/notifications";
 import { toast } from "sonner";
 import { extractFilePathFromToolPart } from "@/lib/chat/extract-tool-file-path";
+import { getTodoUpdatedAt } from "@/lib/chat/todo-updated-at";
 import {
   mergeTailWindow,
   mergePrependWindow,
@@ -84,6 +85,7 @@ export interface WorkspaceState {
   permissions: PermissionRequest[];
   questions: QuestionRequest[];
   todos: Record<string, Todo[]>;
+  todoUpdatedAt?: Record<string, number>;
   sessionAgents: Record<string, string>;
   sessionModels: Record<string, { providerID: string; modelID: string }>;
   sessionVariants: Record<string, string>;
@@ -102,6 +104,7 @@ function emptyWorkspaceState(): WorkspaceState {
     permissions: [],
     questions: [],
     todos: {},
+    todoUpdatedAt: {},
     sessionAgents: {},
     sessionModels: {},
     sessionVariants: {},
@@ -712,6 +715,7 @@ interface ChatState {
     workspaceId: string,
     options?: { force?: boolean },
   ) => Promise<void>;
+  fetchSessionTodos: (sessionId: string, workspaceId: string) => Promise<void>;
   _refreshMessagesFromRemote: (
     sessionId: string,
     workspaceId: string,
@@ -938,6 +942,8 @@ interface PersistedChatState {
       sessionModels: Record<string, { providerID: string; modelID: string }>;
       sessionVariants: Record<string, string>;
       lastViewedAt: Record<string, number>;
+      todos: Record<string, Todo[]>;
+      todoUpdatedAt?: Record<string, number>;
     }
   >;
   // Serialized queuedMessages Map + queuedWorkspaceIds Set. These survive
@@ -1505,6 +1511,47 @@ export const useChatStore = create<ChatState>()(
         });
       },
 
+      fetchSessionTodos: async (sessionId, workspaceId) => {
+        const todosBeforeRequest =
+          get().workspaceStates[workspaceId]?.todos[sessionId];
+        try {
+          const response = await fetch(
+            buildProxyUrl(`session/${sessionId}/todo`, workspaceId),
+          );
+          if (!response.ok) return;
+          const todos = (await response.json()) as Todo[];
+          if (
+            get().workspaceStates[workspaceId]?.todos[sessionId] !==
+            todosBeforeRequest
+          ) {
+            return;
+          }
+          set((state) =>
+            updateWorkspace(state, workspaceId, (workspace) => {
+              const updatedAt =
+                workspace.todoUpdatedAt?.[sessionId] ??
+                getTodoUpdatedAt(
+                  workspace.messages[sessionId] ?? [],
+                  workspace.sessions[sessionId],
+                );
+              return {
+                todos: { ...workspace.todos, [sessionId]: todos },
+                ...(updatedAt === undefined
+                  ? {}
+                  : {
+                      todoUpdatedAt: {
+                        ...workspace.todoUpdatedAt,
+                        [sessionId]: updatedAt,
+                      },
+                    }),
+              };
+            }),
+          );
+        } catch {
+          return;
+        }
+      },
+
       _refreshMessagesFromRemote: (sessionId, workspaceId, options) => {
         const key = sessionKey(workspaceId, sessionId);
         const existing = _refreshMessagesInFlight.get(key);
@@ -1557,6 +1604,12 @@ export const useChatStore = create<ChatState>()(
                   merged,
                   data.messages,
                 );
+                const fallbackUpdatedAt = ws.sessions[sessionId]?.time.updated;
+                const currentTodoUpdatedAt = ws.todoUpdatedAt?.[sessionId];
+                const backfilledTodoUpdatedAt = getTodoUpdatedAt(
+                  cleaned,
+                  ws.sessions[sessionId],
+                );
                 const trackedOptimisticId = ws.optimisticMessageIds[sessionId];
                 const trackedOptimisticStillPresent =
                   trackedOptimisticId !== undefined &&
@@ -1590,6 +1643,16 @@ export const useChatStore = create<ChatState>()(
                 return {
                   optimisticMessageIds,
                   messages: { ...ws.messages, [sessionId]: cleaned },
+                  ...(backfilledTodoUpdatedAt !== undefined &&
+                  (currentTodoUpdatedAt === undefined ||
+                    currentTodoUpdatedAt === fallbackUpdatedAt)
+                    ? {
+                        todoUpdatedAt: {
+                          ...ws.todoUpdatedAt,
+                          [sessionId]: backfilledTodoUpdatedAt,
+                        },
+                      }
+                    : {}),
                   ...seededAgent,
                 };
               });
@@ -2993,6 +3056,10 @@ export const useChatStore = create<ChatState>()(
             set((state) =>
               updateWorkspace(state, wsId, (ws) => ({
                 todos: { ...ws.todos, [sessionID]: todos },
+                todoUpdatedAt: {
+                  ...ws.todoUpdatedAt,
+                  [sessionID]: Date.now(),
+                },
               })),
             );
             break;
@@ -3704,6 +3771,8 @@ export const useChatStore = create<ChatState>()(
             sessionModels: ws.sessionModels,
             sessionVariants: ws.sessionVariants,
             lastViewedAt: ws.lastViewedAt,
+            todos: ws.todos,
+            todoUpdatedAt: ws.todoUpdatedAt,
           };
         }
         return {
@@ -3739,6 +3808,11 @@ export const useChatStore = create<ChatState>()(
                 ...pws.sessionVariants,
               },
               lastViewedAt: { ...existing.lastViewedAt, ...pws.lastViewedAt },
+              todos: { ...existing.todos, ...pws.todos },
+              todoUpdatedAt: {
+                ...existing.todoUpdatedAt,
+                ...pws.todoUpdatedAt,
+              },
             };
           }
           merged.workspaceStates = nextWs;

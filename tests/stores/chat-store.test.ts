@@ -4445,6 +4445,185 @@ describe("fetchSessions fallback to cache", () => {
   });
 });
 
+describe("session todo hydration", () => {
+  beforeEach(resetStore);
+
+  it("hydrates an existing task list from OpenCode after refresh", async () => {
+    const todos = [
+      {
+        id: "todo-1",
+        content: "Done",
+        status: "completed",
+        priority: "high",
+      },
+      {
+        id: "todo-2",
+        content: "Next",
+        status: "pending",
+        priority: "medium",
+      },
+    ];
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => todos,
+    });
+
+    await useChatStore.getState().fetchSessionTodos("sess-1", "ws-1");
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-1"].todos["sess-1"],
+    ).toEqual(todos);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/opencode/session/sess-1/todo?workspaceId=ws-1",
+    );
+  });
+
+  it("keeps a newer live task update when hydration finishes later", async () => {
+    let resolveHydration:
+      | ((value: { ok: boolean; json: () => Promise<unknown> }) => void)
+      | null = null;
+    global.fetch = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveHydration = resolve;
+        }),
+    );
+
+    const hydration = useChatStore
+      .getState()
+      .fetchSessionTodos("sess-1", "ws-1");
+    await vi.waitFor(() => expect(resolveHydration).not.toBeNull());
+
+    const liveTodos = [
+      {
+        id: "todo-live",
+        content: "Live",
+        status: "in_progress",
+        priority: "high",
+      },
+    ];
+    useChatStore.getState().handleEvent(
+      {
+        type: "todo.updated",
+        properties: { sessionID: "sess-1", todos: liveTodos },
+      },
+      "ws-1",
+    );
+    resolveHydration!({
+      ok: true,
+      json: async () => [
+        {
+          id: "todo-stale",
+          content: "Stale",
+          status: "pending",
+          priority: "low",
+        },
+      ],
+    });
+    await hydration;
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-1"].todos["sess-1"],
+    ).toEqual(liveTodos);
+  });
+
+  it("backfills the task update time from the latest Todo tool completion", async () => {
+    const todoCompletedAt = Date.UTC(2026, 7, 10, 9);
+    useChatStore.setState((state) => ({
+      workspaceStates: {
+        ...state.workspaceStates,
+        "ws-1": {
+          sessionsLoaded: true,
+          sessions: {
+            "sess-1": {
+              id: "sess-1",
+              title: "Session",
+              projectID: "project-1",
+              directory: "/tmp",
+              version: "1",
+              time: { created: 1, updated: todoCompletedAt + 10_000 },
+            },
+          },
+          messages: {
+            "sess-1": [
+              {
+                info: {
+                  id: "msg-1",
+                  sessionID: "sess-1",
+                  role: "assistant",
+                  time: { created: todoCompletedAt - 1_000 },
+                  parentID: "msg-parent",
+                  modelID: "model-1",
+                  providerID: "provider-1",
+                  mode: "build",
+                  agent: "build",
+                  path: { cwd: "/tmp", root: "/tmp" },
+                  cost: 0,
+                  tokens: {
+                    input: 0,
+                    output: 0,
+                    reasoning: 0,
+                    cache: { read: 0, write: 0 },
+                  },
+                },
+                parts: [
+                  {
+                    id: "part-1",
+                    sessionID: "sess-1",
+                    messageID: "msg-1",
+                    type: "tool",
+                    callID: "call-1",
+                    tool: "todowrite",
+                    state: {
+                      status: "completed",
+                      input: {},
+                      output: "ok",
+                      title: "Todo",
+                      metadata: {},
+                      time: {
+                        start: todoCompletedAt - 100,
+                        end: todoCompletedAt,
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+        },
+      },
+    }));
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: "todo-1",
+          content: "Done",
+          status: "completed",
+          priority: "high",
+        },
+      ],
+    });
+
+    await useChatStore.getState().fetchSessionTodos("sess-1", "ws-1");
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-1"].todoUpdatedAt?.["sess-1"],
+    ).toBe(todoCompletedAt);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // fetchCachedSessions — auto-promote to live fetch when cache is empty
 // ---------------------------------------------------------------------------

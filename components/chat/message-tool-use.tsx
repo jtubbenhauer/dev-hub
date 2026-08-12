@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useMemo } from "react";
+import { memo, useEffect, useState, useMemo } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -14,11 +14,13 @@ import AnsiToHtml from "ansi-to-html";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
 import { SubAgentDialog } from "@/components/chat/sub-agent-dialog";
-import type { ToolPart } from "@/lib/opencode/types";
+import { SessionTaskProgressIndicator } from "@/components/chat/session-task-progress";
+import type { Todo, ToolPart } from "@/lib/opencode/types";
 import { getPartTruncation } from "@/lib/opencode/truncate-messages";
 
 const MAX_OUTPUT_LINES = 10;
 const AGENT_TOOL_NAMES = new Set(["agent", "task"]);
+const EMPTY_TODOS: Todo[] = [];
 function containsAnsi(text: string): boolean {
   return text.includes("\u001b[");
 }
@@ -205,6 +207,34 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
   });
 
   const resolvedSessionId = childSessionId ?? storeSessionId;
+  const todos = useChatStore((state) =>
+    activeWorkspaceId && resolvedSessionId
+      ? (state.workspaceStates[activeWorkspaceId]?.todos[resolvedSessionId] ??
+        EMPTY_TODOS)
+      : EMPTY_TODOS,
+  );
+  const todoUpdatedAt = useChatStore((state) =>
+    activeWorkspaceId && resolvedSessionId
+      ? (state.workspaceStates[activeWorkspaceId]?.todoUpdatedAt?.[
+          resolvedSessionId
+        ] ??
+        state.workspaceStates[activeWorkspaceId]?.sessions[resolvedSessionId]
+          ?.time.updated)
+      : undefined,
+  );
+  const fetchSessionTodos = useChatStore((state) => state.fetchSessionTodos);
+  useEffect(() => {
+    if (!activeWorkspaceId || !resolvedSessionId) return;
+    void fetchSessionTodos(resolvedSessionId, activeWorkspaceId);
+  }, [activeWorkspaceId, fetchSessionTodos, resolvedSessionId]);
+  const taskProgress = useMemo(() => {
+    if (todos.length === 0) return null;
+    return {
+      completed: todos.filter((todo) => todo.status === "completed").length,
+      total: todos.length,
+      updatedAt: todoUpdatedAt,
+    };
+  }, [todoUpdatedAt, todos]);
 
   const description =
     typeof state.input?.description === "string"
@@ -235,6 +265,10 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
         </span>
 
         <span className="text-muted-foreground/70 truncate">{description}</span>
+
+        {taskProgress && (
+          <SessionTaskProgressIndicator progress={taskProgress} compact />
+        )}
 
         {isActiveStatus && (
           <Loader2 className="text-muted-foreground/50 size-3 shrink-0 animate-spin" />

@@ -1,8 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
 import { MessageToolUse } from "@/components/chat/message-tool-use";
 import type { ToolPart } from "@/lib/opencode/types";
+import { useChatStore } from "@/stores/chat-store";
 
 function makeRunningBashPart(command: string): ToolPart {
   return {
@@ -20,6 +21,12 @@ function makeRunningBashPart(command: string): ToolPart {
 
 afterEach(() => {
   cleanup();
+  useChatStore.setState({
+    activeWorkspaceId: null,
+    activeSessionId: null,
+    workspaceStates: {},
+  });
+  vi.restoreAllMocks();
 });
 
 describe("MessageToolUse - expanded ToolParams", () => {
@@ -53,5 +60,68 @@ describe("MessageToolUse - expanded ToolParams", () => {
     const valueEl = screen.getByText((_, el) => el?.textContent === multiLine);
     expect(valueEl.textContent).toBe(multiLine);
     expect(valueEl.textContent).toContain("\n");
+  });
+});
+
+describe("MessageToolUse - sub-agent task progress", () => {
+  it("shows completed task progress in the sub-agent listing row", () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => [] });
+    useChatStore.setState({
+      activeWorkspaceId: "ws-1",
+      workspaceStates: {
+        "ws-1": {
+          sessions: {},
+          sessionsLoaded: true,
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {
+            "child-1": [
+              {
+                id: "todo-1",
+                content: "Done",
+                status: "completed",
+                priority: "high",
+              },
+              {
+                id: "todo-2",
+                content: "Next",
+                status: "pending",
+                priority: "medium",
+              },
+            ],
+          },
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+        },
+      },
+    });
+    const part = {
+      id: "part-agent",
+      sessionID: "parent-1",
+      messageID: "msg-1",
+      type: "tool",
+      tool: "task",
+      state: {
+        status: "running",
+        input: { description: "Review implementation" },
+        metadata: { sessionId: "child-1" },
+      },
+    } as unknown as ToolPart;
+
+    render(<MessageToolUse part={part} />);
+
+    expect(screen.getByText("1/2")).toBeInTheDocument();
+    expect(
+      screen.getByRole("progressbar", { name: "1 of 2 tasks completed" }),
+    ).toBeInTheDocument();
   });
 });

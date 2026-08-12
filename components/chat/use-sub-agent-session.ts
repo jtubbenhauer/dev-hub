@@ -48,18 +48,27 @@ export function useSubAgentSession({
       : null,
   );
   const fetchMessages = useChatStore((state) => state.fetchMessages);
+  const fetchSessionTodos = useChatStore((state) => state.fetchSessionTodos);
 
   useEffect(() => {
     if (!isOpen || !childSessionId || !workspaceId) return;
 
     void fetchMessages(childSessionId, workspaceId, { force: true });
+    void fetchSessionTodos(childSessionId, workspaceId);
     if (!isActive) return;
 
     const interval = setInterval(() => {
       void fetchMessages(childSessionId, workspaceId, { force: true });
     }, ACTIVE_REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [childSessionId, fetchMessages, isActive, isOpen, workspaceId]);
+  }, [
+    childSessionId,
+    fetchMessages,
+    fetchSessionTodos,
+    isActive,
+    isOpen,
+    workspaceId,
+  ]);
 
   return { messages, todos, sessionStatus };
 }

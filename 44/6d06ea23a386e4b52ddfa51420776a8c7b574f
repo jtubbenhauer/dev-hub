@@ -1,0 +1,27 @@
+tests/components/chat/session-task-progress.test.tsx
+  s_30bef43d4a076c::t_67999ceac8d651 2
+  s_30bef43d4a076c::t_18ebeebaa8f11e 1,3-33,39,41-42
+  s_30bef43d4a076c::t_a39a328809ade1 34-38,40
+components/chat/session-task-progress.tsx
+  s_30bef43d4a076c::t_debfc931c33ad0 1-3,5,11-13,15-18,21-24,27,38,51-53,59,63-66,73-78
+  s_30bef43d4a076c::t_a0878c47e3aab3 6-8,10,14,20,39-40,42,44-47,54-55,57-58,60-62,68-72
+  s_30bef43d4a076c::t_348c429bd5db90 19,25
+  s_30bef43d4a076c::t_fd811c4efda9aa 4,9,26,28-37,41,43
+  s_30bef43d4a076c::t_a39a328809ade1 48-50,56,67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "446d06ea23a386e4b52ddfa51420776a8c7b574f",
+  "prompts": {},
+  "sessions": {
+    "s_30bef43d4a076c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a1772c6ffe65ZyBFNJcSz5j3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

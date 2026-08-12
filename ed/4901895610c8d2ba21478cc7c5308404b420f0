@@ -1,0 +1,36 @@
+components/chat/chat-interface.tsx
+  s_30bef43d4a076c::t_797c7508993c31 471-475
+  s_30bef43d4a076c::t_6b30a1a59010d3 476-477,482-494,498-503,1033,1061
+  s_30bef43d4a076c::t_043fa5b92d1e6f 426
+  s_30bef43d4a076c::t_3eefb8cf0b13e3 478-481,495-497
+components/chat/session-list.tsx
+  s_30bef43d4a076c::t_debfc931c33ad0 39-42,56,551,758,862
+  s_30bef43d4a076c::t_6b30a1a59010d3 113,414,481,578,702,776,861,863
+tests/components/session-list.test.tsx
+  s_b3f91d0a56d5bf::t_fc6c54028f9715 287-289
+  s_30bef43d4a076c::t_d43a8e7a67ef49 255-286,290-292
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "ed4901895610c8d2ba21478cc7c5308404b420f0",
+  "prompts": {},
+  "sessions": {
+    "s_30bef43d4a076c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a1772c6ffe65ZyBFNJcSz5j3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_b3f91d0a56d5bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_00a1772c6ffe65ZyBFNJcSz5j3",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -252,4 +252,42 @@ describe("SessionList — unified mode workspace picker", () => {
     // Branch name is shown when workspaceBranches provides it; falls back to workspace name
     expect(screen.getByText("main")).toBeInTheDocument();
   });
+
+  it("shows task progress only for sessions with tasks", () => {
+    const sessions = {
+      "sess-1": makeUnifiedSession("sess-1", "ws-1", {
+        title: "Session with tasks",
+      }),
+      "sess-2": makeUnifiedSession("sess-2", "ws-1", {
+        title: "Session without tasks",
+      }),
+    };
+
+    const { container } = render(
+      <SessionList
+        {...baseProps}
+        mode="workspace"
+        sessions={sessions}
+        taskProgressBySessionId={{
+          "sess-1": { completed: 2, total: 3 },
+        }}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    const sessionWithTasks = container.querySelector(
+      "[data-session-id='sess-1']",
+    );
+    const sessionWithoutTasks = container.querySelector(
+      "[data-session-id='sess-2']",
+    );
+
+    expect(sessionWithTasks).toHaveTextContent("2/3");
+    expect(
+      sessionWithTasks?.querySelector(
+        "progress[aria-label='2 of 3 tasks completed']",
+      ),
+    ).toHaveAttribute("value", "2");
+    expect(sessionWithoutTasks?.querySelector("progress")).toBeNull();
+  });
 });

@@ -423,7 +423,7 @@ export function ChatInterface() {
   const activeSessionTitle = activeSessionId
     ? (sessions[activeSessionId]?.title ?? "")
     : "";
-  const { data: gitStatus } = useGitStatus(activeWorkspaceId);
+  useGitStatus(activeWorkspaceId);
   const [unifiedLimit, setUnifiedLimit] = useState(20);
   // In grouped mode, we still cap per-workspace to avoid sorting thousands of sessions.
   // WorkspaceGroup already collapses to ~3 visible per group, so 50 per workspace is generous.
@@ -468,6 +468,39 @@ export function ChatInterface() {
     : activeWsSessionStatuses;
   const lastViewedAt = isUnifiedMode ? unifiedLastViewed : activeWsLastViewedAt;
   const activeTodos = useChatStore(getActiveTodos);
+  const fetchSessionTodos = useChatStore((state) => state.fetchSessionTodos);
+  useEffect(() => {
+    if (!activeSessionId || !activeWorkspaceId) return;
+    void fetchSessionTodos(activeSessionId, activeWorkspaceId);
+  }, [activeSessionId, activeWorkspaceId, fetchSessionTodos]);
+  const workspaceStates = useChatStore((state) => state.workspaceStates);
+  const taskProgressBySessionId = useMemo(() => {
+    const progress: Record<
+      string,
+      { completed: number; total: number; updatedAt?: number }
+    > = {};
+    const workspacesToSummarize = isUnifiedMode
+      ? Object.values(workspaceStates)
+      : activeWorkspaceId
+        ? [workspaceStates[activeWorkspaceId]]
+        : [];
+
+    for (const workspaceState of workspacesToSummarize) {
+      if (!workspaceState) continue;
+      for (const [sessionId, todos] of Object.entries(workspaceState.todos)) {
+        if (todos.length === 0) continue;
+        progress[sessionId] = {
+          completed: todos.filter((todo) => todo.status === "completed").length,
+          total: todos.length,
+          updatedAt:
+            workspaceState.todoUpdatedAt?.[sessionId] ??
+            workspaceState.sessions[sessionId]?.time.updated,
+        };
+      }
+    }
+
+    return progress;
+  }, [activeWorkspaceId, isUnifiedMode, workspaceStates]);
   const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
   const activePinnedIds = useChatStore(getActivePinnedSessionIds);
   const pinnedSessionIds = isUnifiedMode ? unifiedPinnedIds : activePinnedIds;
@@ -997,6 +1030,7 @@ export function ChatInterface() {
     lastViewedAt,
     isLoading: isSessionsLoading,
     pinnedSessionIds,
+    taskProgressBySessionId,
     sessionNotes,
     onDeleteSession: handleDeleteSession,
     onPinSession: handlePinSession,
@@ -1024,6 +1058,7 @@ export function ChatInterface() {
     questionSessionIds,
     lastViewedAt,
     pinnedSessionIds,
+    taskProgressBySessionId,
     sessionNotes,
     isLoading: isSessionsLoading,
     onDeleteSession: handleDeleteSession,

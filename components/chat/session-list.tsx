@@ -36,6 +36,10 @@ import { cn } from "@/lib/utils";
 import type { Session, SessionStatus } from "@/lib/opencode/types";
 import type { SessionWithWorkspace } from "@/stores/chat-store";
 import type { SessionAgeFilter } from "@/lib/session-filters";
+import {
+  SessionTaskProgressIndicator,
+  type SessionTaskProgress,
+} from "@/components/chat/session-task-progress";
 
 const AGE_FILTER_LABEL: Record<SessionAgeFilter, string> = {
   "1d": "1d",
@@ -49,6 +53,7 @@ interface BaseSessionListProps {
   questionSessionIds?: Set<string>;
   lastViewedAt: Record<string, number>;
   pinnedSessionIds?: Set<string>;
+  taskProgressBySessionId?: Readonly<Record<string, SessionTaskProgress>>;
   isLoading?: boolean;
   onCreateSession: () => void;
   onDeleteSession: (sessionId: string, workspaceId?: string) => void;
@@ -105,12 +110,12 @@ export function SessionList(props: SessionListProps) {
     questionSessionIds,
     lastViewedAt,
     pinnedSessionIds,
+    taskProgressBySessionId,
     onCreateSession,
     onDeleteSession,
     onPinSession,
     onUnpinSession,
     sessionNotes,
-    onSetSessionNote,
     onClearSessionNote,
   } = props;
 
@@ -406,6 +411,7 @@ export function SessionList(props: SessionListProps) {
                         : undefined
                     }
                     pinnedSessionIds={pinnedSessionIds}
+                    taskProgressBySessionId={taskProgressBySessionId}
                     sessionNotes={sessionNotes}
                     onClearSessionNote={onClearSessionNote}
                     onSelectSession={(
@@ -472,6 +478,7 @@ export function SessionList(props: SessionListProps) {
                           : undefined
                     }
                     note={sessionNotes?.[session.id]}
+                    taskProgress={taskProgressBySessionId?.[session.id]}
                     onSelect={() => handleSelect(session)}
                     onDelete={() =>
                       onDeleteSession(
@@ -541,6 +548,7 @@ interface WorkspaceGroupProps {
   questionSessionIds?: Set<string>;
   lastViewedAt: Record<string, number>;
   pinnedSessionIds?: Set<string>;
+  taskProgressBySessionId?: Readonly<Record<string, SessionTaskProgress>>;
   isExpanded: boolean;
   onToggleExpanded?: () => void;
   onSelectSession: (session: SessionWithWorkspace) => void;
@@ -567,6 +575,7 @@ function WorkspaceGroup({
   questionSessionIds,
   lastViewedAt,
   pinnedSessionIds,
+  taskProgressBySessionId,
   isExpanded,
   onToggleExpanded,
   onSelectSession,
@@ -690,6 +699,7 @@ function WorkspaceGroup({
             }
             workspaceColor={workspaceColor}
             note={sessionNotes?.[session.id]}
+            taskProgress={taskProgressBySessionId?.[session.id]}
             onSelect={() => onSelectSession(session)}
             onDelete={() => onDeleteSession(session.id, workspaceId)}
             onTogglePin={
@@ -745,6 +755,7 @@ interface SessionItemProps {
   workspaceBranch?: string;
   workspaceColor?: string;
   note?: string;
+  taskProgress?: SessionTaskProgress;
   onSelect: () => void;
   onDelete: () => void;
   onTogglePin?: () => void;
@@ -762,6 +773,7 @@ function SessionItem({
   workspaceBranch,
   workspaceColor,
   note,
+  taskProgress,
   onSelect,
   onDelete,
   onTogglePin,
@@ -846,6 +858,9 @@ function SessionItem({
         </p>
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="text-muted-foreground text-xs">{formattedTime}</p>
+          {taskProgress && taskProgress.total > 0 && (
+            <SessionTaskProgressIndicator progress={taskProgress} />
+          )}
           {workspaceBranch && (
             <Badge
               variant="outline"

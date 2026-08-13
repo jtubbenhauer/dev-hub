@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-const STALE_AFTER_MS = 86_400_000;
+const STALE_AFTER_MS = 3_600_000;
 const PAGE_LOADED_AT = Date.now();
 
 export interface SessionTaskProgress {
@@ -18,12 +18,14 @@ interface SessionTaskProgressIndicatorProps {
   readonly progress: SessionTaskProgress;
   readonly compact?: boolean;
   readonly currentTime?: number;
+  readonly isSessionActive?: boolean;
 }
 
 export function SessionTaskProgressIndicator({
   progress,
   compact = false,
   currentTime,
+  isSessionActive = false,
 }: SessionTaskProgressIndicatorProps) {
   const [clockTime, setClockTime] = useState(PAGE_LOADED_AT);
   useEffect(() => {
@@ -37,13 +39,15 @@ export function SessionTaskProgressIndicator({
   const effectiveTime = currentTime ?? clockTime;
   const accessibleLabel = `${progress.completed} of ${progress.total} tasks completed`;
   const isStale =
+    !isSessionActive &&
     progress.updatedAt !== undefined &&
     effectiveTime - progress.updatedAt > STALE_AFTER_MS;
-  const daysSinceUpdate = progress.updatedAt
+  if (isStale && progress.completed === progress.total) return null;
+  const hoursSinceUpdate = progress.updatedAt
     ? Math.floor((effectiveTime - progress.updatedAt) / STALE_AFTER_MS)
     : 0;
   const title = isStale
-    ? `Task status last updated ${daysSinceUpdate} ${daysSinceUpdate === 1 ? "day" : "days"} ago`
+    ? `Task status last updated ${hoursSinceUpdate} ${hoursSinceUpdate === 1 ? "hour" : "hours"} ago`
     : accessibleLabel;
   const progressLabel = isStale
     ? `${accessibleLabel}. ${title}`

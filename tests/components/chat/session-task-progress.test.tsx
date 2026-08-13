@@ -6,10 +6,10 @@ import { SessionTaskProgressIndicator } from "@/components/chat/session-task-pro
 const NOW = Date.UTC(2026, 7, 12, 12);
 
 describe("SessionTaskProgressIndicator", () => {
-  it("keeps progress colored at exactly 24 hours old", () => {
+  it("keeps progress colored at exactly one hour old", () => {
     render(
       <SessionTaskProgressIndicator
-        progress={{ completed: 2, total: 3, updatedAt: NOW - 86_400_000 }}
+        progress={{ completed: 2, total: 3, updatedAt: NOW - 3_600_000 }}
         currentTime={NOW}
       />,
     );
@@ -18,13 +18,13 @@ describe("SessionTaskProgressIndicator", () => {
     expect(screen.getByTitle("2 of 3 tasks completed")).toBeInTheDocument();
   });
 
-  it("mutes progress older than 24 hours and shows its age", () => {
+  it("mutes progress older than one hour and shows its age", () => {
     render(
       <SessionTaskProgressIndicator
         progress={{
           completed: 2,
           total: 3,
-          updatedAt: NOW - 2 * 86_400_000,
+          updatedAt: NOW - 2 * 3_600_000,
         }}
         currentTime={NOW}
       />,
@@ -32,11 +32,47 @@ describe("SessionTaskProgressIndicator", () => {
 
     expect(
       screen.getByRole("progressbar", {
-        name: "2 of 3 tasks completed. Task status last updated 2 days ago",
+        name: "2 of 3 tasks completed. Task status last updated 2 hours ago",
       }),
     ).toHaveClass("accent-gray-400");
     expect(
-      screen.getByTitle("Task status last updated 2 days ago"),
+      screen.getByTitle("Task status last updated 2 hours ago"),
     ).not.toHaveClass("opacity-70");
+  });
+
+  it("keeps old progress colored while the session is active", () => {
+    render(
+      <SessionTaskProgressIndicator
+        progress={{ completed: 2, total: 3, updatedAt: NOW - 2 * 3_600_000 }}
+        currentTime={NOW}
+        isSessionActive
+      />,
+    );
+
+    expect(screen.getByRole("progressbar")).toHaveClass("accent-sky-500");
+    expect(screen.getByTitle("2 of 3 tasks completed")).toBeInTheDocument();
+  });
+
+  it("hides inactive completed progress older than one hour", () => {
+    const { container } = render(
+      <SessionTaskProgressIndicator
+        progress={{ completed: 3, total: 3, updatedAt: NOW - 2 * 3_600_000 }}
+        currentTime={NOW}
+      />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("keeps active completed progress visible after one hour", () => {
+    render(
+      <SessionTaskProgressIndicator
+        progress={{ completed: 3, total: 3, updatedAt: NOW - 2 * 3_600_000 }}
+        currentTime={NOW}
+        isSessionActive
+      />,
+    );
+
+    expect(screen.getByRole("progressbar")).toHaveClass("accent-sky-500");
   });
 });

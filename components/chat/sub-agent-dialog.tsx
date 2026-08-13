@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Loader2, Send } from "lucide-react";
+import { Bot, Loader2, Send, Square } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +45,20 @@ export function SubAgentDialog({
   const isAtBottomRef = useRef(true);
   const [now, setNow] = useState(Date.now);
   const [isNudging, setIsNudging] = useState(false);
+  const [isAborting, setIsAborting] = useState(false);
+  const [abortError, setAbortError] = useState<string | null>(null);
+  const [hasAborted, setHasAborted] = useState(false);
+
+  useEffect(() => {
+    setHasAborted(false);
+    setAbortError(null);
+  }, [childSessionId]);
+
+  useEffect(() => {
+    if (sessionStatus?.type === "busy" || sessionStatus?.type === "retry") {
+      setHasAborted(false);
+    }
+  }, [sessionStatus]);
 
   const isRetrying = sessionStatus?.type === "retry";
   useEffect(() => {
@@ -57,20 +71,22 @@ export function SubAgentDialog({
     if (sessionStatus?.type === "retry") {
       return formatRetryLabel(sessionStatus, now);
     }
-    if (sessionStatus?.type === "busy" || isActive) return "Working...";
+    if (!hasAborted && (sessionStatus?.type === "busy" || isActive)) {
+      return "Working...";
+    }
     return "Idle";
-  }, [isActive, now, sessionStatus]);
+  }, [hasAborted, isActive, now, sessionStatus]);
 
   const statusAnnouncement = useMemo(() => {
     if (sessionStatus?.type === "retry") {
       const reason = sessionStatus.message.trim();
       return `Retrying, attempt ${sessionStatus.attempt}.${reason ? ` ${reason}` : ""}`;
     }
-    if (sessionStatus?.type === "busy" || isActive) {
+    if (!hasAborted && (sessionStatus?.type === "busy" || isActive)) {
       return "Sub-agent is working.";
     }
     return "Sub-agent is idle.";
-  }, [isActive, sessionStatus]);
+  }, [hasAborted, isActive, sessionStatus]);
 
   const handleNudge = useCallback(async () => {
     if (!childSessionId || isNudging) return;
@@ -83,6 +99,21 @@ export function SubAgentDialog({
       setIsNudging(false);
     }
   }, [childSessionId, isNudging, workspaceId]);
+
+  const handleAbort = useCallback(async () => {
+    if (!childSessionId || isAborting) return;
+    setIsAborting(true);
+    setAbortError(null);
+    const didAbort = await useChatStore
+      .getState()
+      .abortSession(childSessionId, workspaceId);
+    if (!didAbort) {
+      setAbortError("Could not abort this sub-agent. Try again.");
+    } else {
+      setHasAborted(true);
+    }
+    setIsAborting(false);
+  }, [childSessionId, isAborting, workspaceId]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -161,7 +192,7 @@ export function SubAgentDialog({
                 {model.modelID}
               </span>
             )}
-            {isActive && (
+            {isActive && !hasAborted && (
               <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />
             )}
           </DialogTitle>
@@ -236,18 +267,44 @@ export function SubAgentDialog({
               <span className="sr-only" role="status" aria-live="polite">
                 {statusAnnouncement}
               </span>
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                onClick={() => void handleNudge()}
-                disabled={!childSessionId || isNudging}
-                title='Send "continue" to this sub-agent'
-                className="self-end sm:self-auto"
-              >
-                {isNudging ? <Loader2 className="animate-spin" /> : <Send />}
-                Nudge
-              </Button>
+              <div className="flex items-center justify-end gap-2">
+                {abortError && (
+                  <span className="text-destructive text-xs" role="alert">
+                    {abortError}
+                  </span>
+                )}
+                {!hasAborted &&
+                  (sessionStatus?.type === "busy" ||
+                    isRetrying ||
+                    isActive) && (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="destructive"
+                      onClick={() => void handleAbort()}
+                      disabled={!childSessionId || isAborting}
+                      title="Abort this sub-agent"
+                    >
+                      {isAborting ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <Square />
+                      )}
+                      {isAborting ? "Aborting" : "Abort"}
+                    </Button>
+                  )}
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => void handleNudge()}
+                  disabled={!childSessionId || isNudging}
+                  title='Send "continue" to this sub-agent'
+                >
+                  {isNudging ? <Loader2 className="animate-spin" /> : <Send />}
+                  Nudge
+                </Button>
+              </div>
             </div>
           </div>
         </ChatDisplayContext>

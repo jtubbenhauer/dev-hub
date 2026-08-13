@@ -1,6 +1,6 @@
 import { SubAgentDialog } from "@/components/chat/sub-agent-dialog";
 import { useChatStore } from "@/stores/chat-store";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +15,7 @@ vi.mock("@/hooks/use-git", () => ({
 function setChildSessionStatus(
   status:
     | { type: "idle" }
+    | { type: "busy" }
     | {
         type: "retry";
         attempt: number;
@@ -153,5 +154,143 @@ describe("SubAgentDialog controls", () => {
         body: JSON.stringify({ parts: [{ type: "text", text: "continue" }] }),
       }),
     );
+  });
+
+  it("aborts only the active child session", async () => {
+    setChildSessionStatus({ type: "busy" });
+    const user = userEvent.setup();
+    render(
+      <SubAgentDialog
+        childSessionId="child"
+        workspaceId="ws-a"
+        description="Child"
+        isActive
+        open
+        onOpenChange={() => {}}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Abort" }));
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/opencode/session/child/abort?workspaceId=ws-a",
+      { method: "POST" },
+    );
+    expect(screen.getByText("Idle")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Abort" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("disables Abort while the child cancellation is pending", async () => {
+    setChildSessionStatus({ type: "busy" });
+    let resolveAbort: (response: Response) => void = () => {};
+    vi.mocked(fetch).mockImplementation((input) => {
+      if (String(input).includes("/abort")) {
+        return new Promise<Response>((resolve) => {
+          resolveAbort = resolve;
+        });
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ messages: [], hasMore: false, total: 0 }),
+          { status: 200 },
+        ),
+      );
+    });
+    const user = userEvent.setup();
+    render(
+      <SubAgentDialog
+        childSessionId="child"
+        workspaceId="ws-a"
+        description="Child"
+        isActive
+        open
+        onOpenChange={() => {}}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Abort" }));
+    expect(screen.getByRole("button", { name: "Aborting" })).toBeDisabled();
+
+    await act(async () => {
+      resolveAbort(new Response(null, { status: 204 }));
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Aborting" }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("shows a retryable error when abort fails", async () => {
+    setChildSessionStatus({ type: "busy" });
+    vi.mocked(fetch).mockImplementation((input) =>
+      Promise.resolve(
+        String(input).includes("/abort")
+          ? new Response(null, { status: 500 })
+          : new Response(
+              JSON.stringify({ messages: [], hasMore: false, total: 0 }),
+              { status: 200 },
+            ),
+      ),
+    );
+    const user = userEvent.setup();
+    render(
+      <SubAgentDialog
+        childSessionId="child"
+        workspaceId="ws-a"
+        description="Child"
+        isActive
+        open
+        onOpenChange={() => {}}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Abort" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not abort this sub-agent. Try again.",
+    );
+    expect(screen.getByRole("button", { name: "Abort" })).toBeEnabled();
+  });
+
+  it("hides Abort for an idle child", () => {
+    render(
+      <SubAgentDialog
+        childSessionId="child"
+        workspaceId="ws-a"
+        description="Child"
+        isActive={false}
+        open
+        onOpenChange={() => {}}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Abort" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("restores Abort when an aborted child starts working again", async () => {
+    setChildSessionStatus({ type: "busy" });
+    const user = userEvent.setup();
+    render(
+      <SubAgentDialog
+        childSessionId="child"
+        workspaceId="ws-a"
+        description="Child"
+        isActive
+        open
+        onOpenChange={() => {}}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Abort" }));
+    await user.click(screen.getByRole("button", { name: "Nudge" }));
+    act(() => setChildSessionStatus({ type: "busy" }));
+
+    expect(await screen.findByText("Working...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abort" })).toBeEnabled();
   });
 });

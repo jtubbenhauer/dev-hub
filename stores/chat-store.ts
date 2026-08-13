@@ -760,7 +760,7 @@ interface ChatState {
     agent?: string,
     variant?: string,
   ) => Promise<void>;
-  abortSession: (sessionId: string, workspaceId: string) => Promise<void>;
+  abortSession: (sessionId: string, workspaceId: string) => Promise<boolean>;
   respondToPermission: (
     sessionId: string,
     permissionId: string,
@@ -2289,17 +2289,28 @@ export const useChatStore = create<ChatState>()(
 
       abortSession: async (sessionId, workspaceId) => {
         try {
-          await fetch(
+          const response = await fetch(
             buildProxyUrl(`session/${sessionId}/abort`, workspaceId),
             {
               method: "POST",
             },
           );
-          // session.idle SSE will update sessionStatuses; optimistic clear is safe here
-          set({ optimisticStreamingSessionId: null });
-          get().clearStreamingPoll();
+          if (!response.ok) return false;
+          set((state) => ({
+            ...(state.activeSessionId === sessionId
+              ? { optimisticStreamingSessionId: null }
+              : {}),
+            ...updateWorkspace(state, workspaceId, (workspace) => ({
+              sessionStatuses: {
+                ...workspace.sessionStatuses,
+                [sessionId]: { type: "idle" },
+              },
+            })),
+          }));
+          if (get().activeSessionId === sessionId) get().clearStreamingPoll();
+          return true;
         } catch {
-          // Best effort
+          return false;
         }
       },
 

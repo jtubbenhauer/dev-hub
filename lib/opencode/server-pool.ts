@@ -120,42 +120,62 @@ function waitForServerUrl(
   timeoutMs: number,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(
-        new Error(`OpenCode server startup timed out after ${timeoutMs}ms`),
-      );
-    }, timeoutMs);
-
     let output = "";
+    let isSettled = false;
 
-    proc.stdout?.on("data", (chunk: Buffer) => {
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      proc.stdout?.removeListener("data", handleStdout);
+      proc.stderr?.removeListener("data", handleStderr);
+      proc.removeListener("exit", handleExit);
+      proc.removeListener("error", handleError);
+      proc.stdout?.resume();
+      proc.stderr?.resume();
+    };
+    const settleWithError = (error: Error) => {
+      if (isSettled) return;
+      isSettled = true;
+      cleanup();
+      reject(error);
+    };
+    const settleWithUrl = (url: string) => {
+      if (isSettled) return;
+      isSettled = true;
+      cleanup();
+      resolve(url);
+    };
+    const handleStdout = (chunk: Buffer) => {
       output += chunk.toString();
       const lines = output.split("\n");
       for (const line of lines) {
         if (line.startsWith("opencode server listening")) {
           const match = line.match(/on\s+(https?:\/\/[^\s]+)/);
           if (match) {
-            clearTimeout(timeoutId);
-            resolve(match[1]);
+            settleWithUrl(match[1]);
             return;
           }
         }
       }
-    });
-
-    proc.stderr?.on("data", (chunk: Buffer) => {
+    };
+    const handleStderr = (chunk: Buffer) => {
       output += chunk.toString();
-    });
+    };
+    const handleExit = (code: number | null) => {
+      settleWithError(new Error(`Server exited with code ${code}\n${output}`));
+    };
+    const handleError = (error: Error) => settleWithError(error);
+    const timeoutId = setTimeout(
+      () =>
+        settleWithError(
+          new Error(`OpenCode server startup timed out after ${timeoutMs}ms`),
+        ),
+      timeoutMs,
+    );
 
-    proc.on("exit", (code) => {
-      clearTimeout(timeoutId);
-      reject(new Error(`Server exited with code ${code}\n${output}`));
-    });
-
-    proc.on("error", (error) => {
-      clearTimeout(timeoutId);
-      reject(error);
-    });
+    proc.stdout?.on("data", handleStdout);
+    proc.stderr?.on("data", handleStderr);
+    proc.on("exit", handleExit);
+    proc.on("error", handleError);
   });
 }
 

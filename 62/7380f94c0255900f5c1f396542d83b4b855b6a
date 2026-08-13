@@ -1,0 +1,30 @@
+tests/hooks/use-settings.test.ts
+  s_30bef43d4a076c::t_f95fb901e52f25 1-4,8-9,12-16,22-28,42-83
+  s_b3f91d0a56d5bf::t_a6189278b33b10 17-21
+hooks/use-settings.ts
+  s_b3f91d0a56d5bf::t_8d1e87132cc8f2 167-168,191-192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "627380f94c0255900f5c1f396542d83b4b855b6a",
+  "prompts": {},
+  "sessions": {
+    "s_30bef43d4a076c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a1772c6ffe65ZyBFNJcSz5j3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_b3f91d0a56d5bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_00a1772c6ffe65ZyBFNJcSz5j3",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

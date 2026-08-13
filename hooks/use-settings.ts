@@ -164,8 +164,8 @@ async function fetchSettings(): Promise<SettingsMap> {
     try {
       const err = await res.json();
       if (err.error) message = err.error;
-    } catch {
-      // Response body is not JSON (e.g. HTML error page or redirect)
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
     }
     throw new Error(message);
   }
@@ -188,8 +188,8 @@ async function putSetting(key: string, value: unknown): Promise<void> {
     try {
       const err = await res.json();
       if (err.error) message = err.error;
-    } catch {
-      // Response body is not JSON (e.g. HTML error page or server crash)
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
     }
     throw new Error(message);
   }

@@ -51,6 +51,7 @@ interface BaseSessionListProps {
   activeSessionId: string | null;
   sessionStatuses: Record<string, SessionStatus>;
   questionSessionIds?: Set<string>;
+  taskActiveSessionIds?: ReadonlySet<string>;
   lastViewedAt: Record<string, number>;
   pinnedSessionIds?: Set<string>;
   taskProgressBySessionId?: Readonly<Record<string, SessionTaskProgress>>;
@@ -108,6 +109,7 @@ export function SessionList(props: SessionListProps) {
     activeSessionId,
     sessionStatuses,
     questionSessionIds,
+    taskActiveSessionIds,
     lastViewedAt,
     pinnedSessionIds,
     taskProgressBySessionId,
@@ -399,6 +401,7 @@ export function SessionList(props: SessionListProps) {
                     activeSessionId={activeSessionId}
                     sessionStatuses={sessionStatuses}
                     questionSessionIds={questionSessionIds}
+                    taskActiveSessionIds={taskActiveSessionIds}
                     lastViewedAt={lastViewedAt}
                     isExpanded={
                       props.mode === "unified"
@@ -450,6 +453,9 @@ export function SessionList(props: SessionListProps) {
                     isActive={session.id === activeSessionId}
                     isPinned={pinnedSessionIds?.has(session.id) ?? false}
                     hasQuestion={questionSessionIds?.has(session.id) ?? false}
+                    isTaskActive={
+                      taskActiveSessionIds?.has(session.id) ?? false
+                    }
                     status={sessionStatuses[session.id] ?? null}
                     isUnread={
                       !!(
@@ -546,6 +552,7 @@ interface WorkspaceGroupProps {
   activeSessionId: string | null;
   sessionStatuses: Record<string, SessionStatus>;
   questionSessionIds?: Set<string>;
+  taskActiveSessionIds?: ReadonlySet<string>;
   lastViewedAt: Record<string, number>;
   pinnedSessionIds?: Set<string>;
   taskProgressBySessionId?: Readonly<Record<string, SessionTaskProgress>>;
@@ -573,6 +580,7 @@ function WorkspaceGroup({
   activeSessionId,
   sessionStatuses,
   questionSessionIds,
+  taskActiveSessionIds,
   lastViewedAt,
   pinnedSessionIds,
   taskProgressBySessionId,
@@ -689,6 +697,7 @@ function WorkspaceGroup({
             isActive={session.id === activeSessionId}
             isPinned={pinnedSessionIds?.has(session.id) ?? false}
             hasQuestion={questionSessionIds?.has(session.id) ?? false}
+            isTaskActive={taskActiveSessionIds?.has(session.id) ?? false}
             status={sessionStatuses[session.id] ?? null}
             isUnread={
               !!(
@@ -750,6 +759,7 @@ interface SessionItemProps {
   isActive: boolean;
   isPinned: boolean;
   hasQuestion: boolean;
+  isTaskActive: boolean;
   status: SessionStatus | null;
   isUnread: boolean;
   workspaceBranch?: string;
@@ -768,6 +778,7 @@ function SessionItem({
   isActive,
   isPinned,
   hasQuestion,
+  isTaskActive,
   status,
   isUnread,
   workspaceBranch,
@@ -783,7 +794,8 @@ function SessionItem({
     return formatRelativeTime(session.time.updated);
   }, [session.time.updated]);
 
-  const isBusy = status !== null && status.type === "busy";
+  const isWorking =
+    status !== null && (status.type === "busy" || status.type === "retry");
   const isCached =
     "fromCache" in session &&
     (session as Record<string, unknown>).fromCache === true;
@@ -822,7 +834,7 @@ function SessionItem({
                 : { color: "var(--color-indigo-500)" }
             }
           />
-        ) : isBusy ? (
+        ) : isWorking ? (
           <Brain
             className="size-3.5 animate-pulse"
             style={
@@ -859,7 +871,10 @@ function SessionItem({
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="text-muted-foreground text-xs">{formattedTime}</p>
           {taskProgress && taskProgress.total > 0 && (
-            <SessionTaskProgressIndicator progress={taskProgress} />
+            <SessionTaskProgressIndicator
+              progress={taskProgress}
+              isSessionActive={isTaskActive || isWorking || hasQuestion}
+            />
           )}
           {workspaceBranch && (
             <Badge

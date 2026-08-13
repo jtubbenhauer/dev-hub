@@ -290,4 +290,65 @@ describe("SessionList — unified mode workspace picker", () => {
     ).toHaveAttribute("value", "2");
     expect(sessionWithoutTasks?.querySelector("progress")).toBeNull();
   });
+
+  it.each([
+    ["busy", false, false],
+    ["retry", false, false],
+    ["idle", true, false],
+    ["idle", false, true],
+  ] as const)(
+    "keeps old task progress colored for %s status with question=%s and active descendant=%s",
+    (status, hasQuestion, hasActiveDescendant) => {
+      const updatedAt = Date.now() - 2 * 3_600_000;
+      const { container } = render(
+        <SessionList
+          {...baseProps}
+          mode="workspace"
+          sessions={{
+            "sess-1": makeUnifiedSession("sess-1", "ws-1", {
+              updated: updatedAt,
+            }),
+          }}
+          sessionStatuses={{ "sess-1": { type: status } as never }}
+          questionSessionIds={hasQuestion ? new Set(["sess-1"]) : undefined}
+          taskActiveSessionIds={
+            hasActiveDescendant ? new Set(["sess-1"]) : undefined
+          }
+          taskProgressBySessionId={{
+            "sess-1": { completed: 1, total: 4, updatedAt },
+          }}
+          onSelectSession={vi.fn()}
+        />,
+      );
+
+      expect(
+        container.querySelector("[data-session-id='sess-1'] progress"),
+      ).toHaveClass("accent-sky-500");
+    },
+  );
+
+  it("keeps old task progress colored in grouped workspace mode", () => {
+    const updatedAt = Date.now() - 2 * 3_600_000;
+    const { container } = render(
+      <SessionList
+        {...baseProps}
+        mode="unified"
+        sessions={[
+          makeUnifiedSession("sess-1", "ws-1", { updated: updatedAt }),
+        ]}
+        workspaceNames={{ "ws-1": "Workspace" }}
+        workspaceBranches={{}}
+        groupByWorkspace
+        taskActiveSessionIds={new Set(["sess-1"])}
+        taskProgressBySessionId={{
+          "sess-1": { completed: 1, total: 4, updatedAt },
+        }}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    expect(
+      container.querySelector("[data-session-id='sess-1'] progress"),
+    ).toHaveClass("accent-sky-500");
+  });
 });

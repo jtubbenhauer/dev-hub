@@ -1,0 +1,37 @@
+tests/components/chat/sub-agent-dialog-controls.test.tsx
+  s_30bef43d4a076c::t_6048caf59a943c 179-182
+  s_30bef43d4a076c::t_94bb3107aaa93e 274-294
+  s_30bef43d4a076c::t_a2097ab5d1c4d1 18,158-178,183-215,224-273,295
+  s_30bef43d4a076c::t_9f8b9f783a5b1c 3,216-223
+stores/chat-store.ts
+  s_30bef43d4a076c::t_9f8b9f783a5b1c 763,2292,2298-2311,2313
+components/chat/sub-agent-dialog.tsx
+  s_30bef43d4a076c::t_94bb3107aaa93e 57-61
+  s_30bef43d4a076c::t_6048caf59a943c 50-56,74-76,78,85,89,112-113,195,276-279,295
+  s_30bef43d4a076c::t_9f8b9f783a5b1c 4,48-49,103-111,114-117,270-275,296-307
+  s_b3f91d0a56d5bf::t_03de308542cf62 280-294
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "206e395f04b492d49a4ad96ecc6eedd7955b4b88",
+  "prompts": {},
+  "sessions": {
+    "s_30bef43d4a076c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a1772c6ffe65ZyBFNJcSz5j3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_b3f91d0a56d5bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_00a1772c6ffe65ZyBFNJcSz5j3",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

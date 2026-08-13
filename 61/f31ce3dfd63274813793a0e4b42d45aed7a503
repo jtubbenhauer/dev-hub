@@ -1,0 +1,25 @@
+tests/components/session-list.test.tsx
+  s_30bef43d4a076c::t_70b747639be54c 329-353
+  s_30bef43d4a076c::t_045aedd3bcc491 295-298,300-301,314-316
+  s_30bef43d4a076c::t_3bf842a76ad278 293-294,299,302-313,317-328
+components/chat/session-list.tsx
+  s_30bef43d4a076c::t_6974c30e068643 797-798,837,874-875,877
+  s_30bef43d4a076c::t_045aedd3bcc491 54,112,456-458,555,583,700,762,781,876
+  s_30bef43d4a076c::t_70b747639be54c 404
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "61f31ce3dfd63274813793a0e4b42d45aed7a503",
+  "prompts": {},
+  "sessions": {
+    "s_30bef43d4a076c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a1772c6ffe65ZyBFNJcSz5j3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

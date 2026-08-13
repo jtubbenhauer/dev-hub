@@ -27,6 +27,7 @@ import { useSessionNavigation } from "@/components/chat/use-session-navigation";
 import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
+import { RunningSubAgentsBanner } from "@/components/chat/running-sub-agents-banner";
 import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
 import { SidePanel } from "@/components/chat/side-panel";
 import { useSidePanelStore } from "@/stores/side-panel-store";
@@ -51,6 +52,7 @@ import {
   computePrevUserMessageIndex,
 } from "@/lib/chat-navigation";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
+import { getDescendantActivity } from "@/lib/chat/descendant-activity";
 import {
   filterSessionsByAge,
   parseSessionAgeFilter,
@@ -500,6 +502,46 @@ export function ChatInterface() {
     }
 
     return progress;
+  }, [activeWorkspaceId, isUnifiedMode, workspaceStates]);
+  const taskActiveSessionIds = useMemo(() => {
+    const activeIds = new Set<string>();
+    const workspacesToCheck = isUnifiedMode
+      ? Object.values(workspaceStates)
+      : activeWorkspaceId
+        ? [workspaceStates[activeWorkspaceId]]
+        : [];
+
+    for (const workspaceState of workspacesToCheck) {
+      if (!workspaceState) continue;
+      for (const session of Object.values(workspaceState.sessions)) {
+        if (session.parentID) continue;
+        const status = workspaceState.sessionStatuses[session.id];
+        const hasDirectActivity =
+          status?.type === "busy" ||
+          status?.type === "retry" ||
+          workspaceState.questions.some(
+            (question) => question.sessionID === session.id,
+          );
+        const descendantActivity = getDescendantActivity({
+          parentSessionId: session.id,
+          sessions: workspaceState.sessions,
+          statuses: workspaceState.sessionStatuses,
+          permissions: workspaceState.permissions,
+          questions: workspaceState.questions,
+          now: Date.now(),
+          recentWindowMs: 0,
+        });
+        if (
+          hasDirectActivity ||
+          descendantActivity.activeCount > 0 ||
+          descendantActivity.waitingCount > 0
+        ) {
+          activeIds.add(session.id);
+        }
+      }
+    }
+
+    return activeIds;
   }, [activeWorkspaceId, isUnifiedMode, workspaceStates]);
   const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
   const activePinnedIds = useChatStore(getActivePinnedSessionIds);
@@ -1031,6 +1073,7 @@ export function ChatInterface() {
     isLoading: isSessionsLoading,
     pinnedSessionIds,
     taskProgressBySessionId,
+    taskActiveSessionIds,
     sessionNotes,
     onDeleteSession: handleDeleteSession,
     onPinSession: handlePinSession,
@@ -1059,6 +1102,7 @@ export function ChatInterface() {
     lastViewedAt,
     pinnedSessionIds,
     taskProgressBySessionId,
+    taskActiveSessionIds,
     sessionNotes,
     isLoading: isSessionsLoading,
     onDeleteSession: handleDeleteSession,
@@ -1375,6 +1419,14 @@ export function ChatInterface() {
                 </>
               )}
             </div>
+          )}
+
+          {activeSessionId && activeWorkspaceId && (
+            <RunningSubAgentsBanner
+              key={`${activeWorkspaceId}:${activeSessionId}`}
+              parentSessionId={activeSessionId}
+              workspaceId={activeWorkspaceId}
+            />
           )}
 
           {/* Messages area or plan panel — mutually exclusive */}

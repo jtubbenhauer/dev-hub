@@ -17,8 +17,14 @@ export async function superviseSseTarget(
 ): Promise<void> {
   let attempt = 0;
   while (!options.signal.aborted) {
+    const attemptAbortController = new AbortController();
+    const abortAttempt = () => attemptAbortController.abort();
+    options.signal.addEventListener("abort", abortAttempt, { once: true });
+    if (options.signal.aborted) abortAttempt();
+    let retryInMs: number | null = null;
+
     try {
-      const response = await options.connect(options.signal);
+      const response = await options.connect(attemptAbortController.signal);
       if (!response.ok || !response.body) {
         throw new Error(`SSE upstream unavailable (${response.status})`);
       }
@@ -29,14 +35,26 @@ export async function superviseSseTarget(
         state: "connected",
         attempt: recoveredAfterAttempts,
       });
-      await readSseData(response.body, options.signal, options.onData);
+      await readSseData(
+        response.body,
+        attemptAbortController.signal,
+        options.onData,
+      );
       if (options.signal.aborted) return;
       throw new Error("SSE upstream closed");
     } catch {
       if (options.signal.aborted) return;
       attempt += 1;
-      const retryInMs = Math.min(1000 * 2 ** Math.min(attempt - 1, 5), 30000);
+      retryInMs = Math.min(1000 * 2 ** Math.min(attempt - 1, 5), 30000);
       options.onState({ state: "retrying", attempt, retryInMs });
+    } finally {
+      options.signal.removeEventListener("abort", abortAttempt);
+      if (!attemptAbortController.signal.aborted) {
+        attemptAbortController.abort();
+      }
+    }
+
+    if (retryInMs !== null) {
       await (options.wait ?? waitForRetry)(retryInMs, options.signal);
     }
   }
@@ -48,7 +66,12 @@ async function readSseData(
   onData: (data: string) => void,
 ): Promise<void> {
   const reader = body.getReader();
-  const cancelReader = () => void reader.cancel();
+  const cancelReader = () => {
+    void reader.cancel().catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.warn("[opencode-sse] Failed to cancel upstream reader", error);
+    });
+  };
   signal.addEventListener("abort", cancelReader, { once: true });
   const decoder = new TextDecoder();
   let buffer = "";

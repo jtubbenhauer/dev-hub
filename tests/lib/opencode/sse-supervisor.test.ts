@@ -1,3 +1,6 @@
+// @vitest-environment node
+
+import { getEventListeners, setMaxListeners } from "node:events";
 import {
   superviseSseTarget,
   type SseSupervisorState,
@@ -35,6 +38,10 @@ function openStream(data: string): {
     response,
     close: () => streamController?.close(),
   };
+}
+
+class StopRetryingError extends Error {
+  readonly name = "StopRetryingError";
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {
@@ -106,5 +113,65 @@ describe("superviseSseTarget", () => {
 
     expect(connect).toHaveBeenCalledTimes(1);
     expect(wait).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles a rejected upstream cancellation when the downstream aborts", async () => {
+    const abortController = new AbortController();
+    const cancellationError = new DOMException(
+      "This operation was aborted",
+      "AbortError",
+    );
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        cancel: () => Promise.reject(cancellationError),
+      }),
+    );
+    const unhandledRejections: unknown[] = [];
+    const handleUnhandledRejection = (error: unknown) => {
+      unhandledRejections.push(error);
+    };
+    process.on("unhandledRejection", handleUnhandledRejection);
+
+    try {
+      const supervision = superviseSseTarget({
+        signal: abortController.signal,
+        connect: async () => response,
+        onData: () => {},
+        onState: () => setImmediate(() => abortController.abort()),
+      });
+
+      await supervision;
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.removeListener("unhandledRejection", handleUnhandledRejection);
+    }
+  });
+
+  it("does not retain fetch-owned abort listeners across reconnect attempts", async () => {
+    const requestAbortController = new AbortController();
+    setMaxListeners(0, requestAbortController.signal);
+    const stopRetryingError = new StopRetryingError();
+    let connectionAttempts = 0;
+
+    const supervision = superviseSseTarget({
+      signal: requestAbortController.signal,
+      connect: async (signal) => {
+        signal.addEventListener("abort", () => {}, { once: true });
+        connectionAttempts += 1;
+        return finiteStream("event");
+      },
+      onData: () => {},
+      onState: () => {},
+      wait: async () => {
+        if (connectionAttempts >= 100) throw stopRetryingError;
+      },
+    });
+
+    await expect(supervision).rejects.toBe(stopRetryingError);
+    expect(getEventListeners(requestAbortController.signal, "abort")).toEqual(
+      [],
+    );
   });
 });

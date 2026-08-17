@@ -1,0 +1,23 @@
+tests/lib/pr-mention.test.ts
+  s_b0393b474824a3::t_e5c656bf285179 10,16,22,39,44,48-51,55,57,65,69-72,76-77,80-81,84-85,88-89,101,108-109,113,118-122,124
+  s_b0393b474824a3::t_d18157cf4eafa9 38,100
+  s_b0393b474824a3::t_53d969d13f6492 123
+lib/pr-mention.ts
+  s_b0393b474824a3::t_cd103b60193b92 21,50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "cbf56294fe9a0b7ce155c9ee2a7454ce6ff52b73",
+  "prompts": {},
+  "sessions": {
+    "s_b0393b474824a3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ff0a6bd78ffeHFv3exJeTqrO3Z",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -630,7 +630,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       async (prNumber: number) => {
         const cursor = textareaRef.current?.selectionStart ?? value.length;
         const textUpToCursor = value.slice(0, cursor);
-        const hashIndex = textUpToCursor.search(/(^|\s)#\d*$/);
+        const hashIndex = textUpToCursor.search(/(^|\s)##\d*$/);
         const before =
           hashIndex !== -1
             ? value.slice(
@@ -1014,7 +1014,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
             onKeyDown={handleKeyDown}
             onFocus={handleFocus}
             onPaste={handlePaste}
-            placeholder="Send a message... (@ for files, # for PRs)"
+            placeholder="Send a message... (@ for files, ## for PRs)"
             disabled={disabled}
             rows={1}
             className="placeholder:text-muted-foreground max-h-[200px] w-full resize-none bg-transparent px-3 py-2 text-base focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"

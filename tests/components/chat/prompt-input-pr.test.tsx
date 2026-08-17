@@ -129,34 +129,34 @@ afterEach(() => {
 });
 
 describe("PromptInput — PR mention trigger", () => {
-  describe("# trigger detection", () => {
-    it("shows PrPicker when # is typed at start of input", async () => {
+  describe("## trigger detection", () => {
+    it("shows PrPicker when ## is typed at start of input", async () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
 
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
     });
 
-    it("shows PrPicker when # is typed after whitespace", async () => {
+    it("shows PrPicker when ## is typed after whitespace", async () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "check #");
+      await user.type(screen.getByRole("textbox"), "check ##");
 
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
     });
 
-    it("passes digits after # as query to PrPicker", async () => {
+    it("passes digits after ## as query to PrPicker", async () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "#12");
+      await user.type(screen.getByRole("textbox"), "##12");
 
       await waitFor(() => {
         const picker = screen.getByTestId("pr-picker");
@@ -169,7 +169,7 @@ describe("PromptInput — PR mention trigger", () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
 
       expect(screen.queryByTestId("pr-picker")).not.toBeInTheDocument();
     });
@@ -182,6 +182,15 @@ describe("PromptInput — PR mention trigger", () => {
 
       expect(screen.queryByTestId("pr-picker")).not.toBeInTheDocument();
     });
+
+    it("does not show PrPicker for a single-hash task reference", async () => {
+      const user = userEvent.setup();
+      render(<PromptInput {...baseProps} />);
+
+      await user.type(screen.getByRole("textbox"), "#123");
+
+      expect(screen.queryByTestId("pr-picker")).not.toBeInTheDocument();
+    });
   });
 
   describe("picker dismiss", () => {
@@ -189,7 +198,7 @@ describe("PromptInput — PR mention trigger", () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
@@ -203,7 +212,7 @@ describe("PromptInput — PR mention trigger", () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
@@ -219,7 +228,7 @@ describe("PromptInput — PR mention trigger", () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
@@ -235,7 +244,7 @@ describe("PromptInput — PR mention trigger", () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
@@ -251,7 +260,7 @@ describe("PromptInput — PR mention trigger", () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
@@ -272,7 +281,7 @@ describe("PromptInput — PR mention trigger", () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} onSubmit={onSubmit} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
@@ -302,7 +311,7 @@ describe("PromptInput — PR mention trigger", () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} onSubmit={onSubmit} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
@@ -328,7 +337,7 @@ describe("PromptInput — PR mention trigger", () => {
       const user = userEvent.setup();
       render(<PromptInput {...baseProps} />);
 
-      await user.type(screen.getByRole("textbox"), "#");
+      await user.type(screen.getByRole("textbox"), "##");
       await waitFor(() => {
         expect(screen.getByTestId("pr-picker")).toBeInTheDocument();
       });
@@ -344,13 +353,13 @@ describe("PromptInput — PR mention trigger", () => {
   });
 
   describe("placeholder text", () => {
-    it("mentions # for PRs in placeholder", () => {
+    it("mentions ## for PRs in placeholder", () => {
       render(<PromptInput {...baseProps} />);
 
       const textarea = screen.getByRole("textbox");
       expect(textarea).toHaveAttribute(
         "placeholder",
-        "Send a message... (@ for files, # for PRs)",
+        "Send a message... (@ for files, ## for PRs)",
       );
     });
   });

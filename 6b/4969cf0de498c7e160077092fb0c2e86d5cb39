@@ -1,0 +1,19 @@
+tests/components/markdown-pr-badge.test.tsx
+  s_b0393b474824a3::t_2f744799c42d13 43-45,49-51,55-57,62,66,77,92,102,133,147,150,156,185-197,208,211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "6b4969cf0de498c7e160077092fb0c2e86d5cb39",
+  "prompts": {},
+  "sessions": {
+    "s_b0393b474824a3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ff0a6bd78ffeHFv3exJeTqrO3Z",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

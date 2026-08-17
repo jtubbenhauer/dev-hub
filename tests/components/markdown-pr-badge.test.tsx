@@ -40,30 +40,30 @@ beforeEach(() => {
 
 describe("MarkdownContent PR badge rendering", () => {
   describe("no-op when owner/repo missing", () => {
-    it("renders plain #NNN text when owner is not provided", () => {
-      render(<MarkdownContent content="see #42 for details" repo="myrepo" />);
-      expect(screen.getByText(/see #42 for details/)).toBeInTheDocument();
+    it("renders plain ##NNN text when owner is not provided", () => {
+      render(<MarkdownContent content="see ##42 for details" repo="myrepo" />);
+      expect(screen.getByText(/see ##42 for details/)).toBeInTheDocument();
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
     });
 
-    it("renders plain #NNN text when repo is not provided", () => {
-      render(<MarkdownContent content="see #42 for details" owner="acme" />);
-      expect(screen.getByText(/see #42 for details/)).toBeInTheDocument();
+    it("renders plain ##NNN text when repo is not provided", () => {
+      render(<MarkdownContent content="see ##42 for details" owner="acme" />);
+      expect(screen.getByText(/see ##42 for details/)).toBeInTheDocument();
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
     });
 
-    it("renders plain #NNN text when neither owner nor repo is provided", () => {
-      render(<MarkdownContent content="check #100 for context" />);
-      expect(screen.getByText(/check #100 for context/)).toBeInTheDocument();
+    it("renders plain ##NNN text when neither owner nor repo is provided", () => {
+      render(<MarkdownContent content="check ##100 for context" />);
+      expect(screen.getByText(/check ##100 for context/)).toBeInTheDocument();
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
     });
   });
 
-  describe("#NNN replaced with badge", () => {
+  describe("##NNN replaced with badge", () => {
     it("renders PrBadge when owner and repo are provided", () => {
       render(
         <MarkdownContent
-          content="see #42 for details"
+          content="see ##42 for details"
           owner="acme"
           repo="myapp"
         />,
@@ -74,7 +74,7 @@ describe("MarkdownContent PR badge rendering", () => {
     it("renders the PR badge as a link with correct href", () => {
       render(
         <MarkdownContent
-          content="see #42 for details"
+          content="see ##42 for details"
           owner="acme"
           repo="myapp"
         />,
@@ -89,7 +89,7 @@ describe("MarkdownContent PR badge rendering", () => {
     it("renders PR title inside the badge", () => {
       render(
         <MarkdownContent
-          content="see #42 for details"
+          content="see ##42 for details"
           owner="acme"
           repo="myapp"
         />,
@@ -99,7 +99,7 @@ describe("MarkdownContent PR badge rendering", () => {
   });
 
   describe("multiple PRs in one paragraph", () => {
-    it("renders multiple badges for multiple #NNN references", () => {
+    it("renders multiple badges for multiple ##NNN references", () => {
       mockUseGitHubPr
         .mockReturnValueOnce({
           data: {
@@ -130,7 +130,7 @@ describe("MarkdownContent PR badge rendering", () => {
 
       render(
         <MarkdownContent
-          content="Fixes #10 and also #20 are related"
+          content="Fixes ##10 and also ##20 are related"
           owner="acme"
           repo="myapp"
         />,
@@ -144,16 +144,16 @@ describe("MarkdownContent PR badge rendering", () => {
   });
 
   describe("no replacement inside inline code", () => {
-    it("does not render PrBadge for #NNN inside backtick inline code", () => {
+    it("does not render PrBadge for ##NNN inside backtick inline code", () => {
       render(
         <MarkdownContent
-          content="use `#42` as the reference"
+          content="use `##42` as the reference"
           owner="acme"
           repo="myapp"
         />,
       );
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
-      expect(screen.getByText("#42")).toBeInTheDocument();
+      expect(screen.getByText("##42")).toBeInTheDocument();
     });
   });
 
@@ -182,6 +182,19 @@ describe("MarkdownContent PR badge rendering", () => {
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
     });
 
+    it("does not replace a single-hash task reference with a badge", () => {
+      render(
+        <MarkdownContent
+          content="task #42 stays plain"
+          owner="acme"
+          repo="myapp"
+        />,
+      );
+      expect(mockUseGitHubPr).not.toHaveBeenCalled();
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+      expect(screen.getByText(/task #42 stays plain/)).toBeInTheDocument();
+    });
+
     it("does not process markdown headings as PR badges", () => {
       render(
         <MarkdownContent content="# Heading text" owner="acme" repo="myapp" />,
@@ -192,10 +205,10 @@ describe("MarkdownContent PR badge rendering", () => {
   });
 
   describe("PR at start of text", () => {
-    it("renders a badge for #NNN at the start of a paragraph", () => {
+    it("renders a badge for ##NNN at the start of a paragraph", () => {
       render(
         <MarkdownContent
-          content="#42 is the issue"
+          content="##42 is the issue"
           owner="acme"
           repo="myapp"
         />,

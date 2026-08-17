@@ -18,7 +18,7 @@ export interface GitHubPr {
 const PR_DIFF_MAX_BYTES = 50 * 1024;
 
 export function parsePrReferences(text: string): PrReference[] {
-  const pattern = /(?:^|\s)(#(\d+))/g;
+  const pattern = /(?:^|\s)(##(\d+))/g;
   const refs: PrReference[] = [];
   let match: RegExpExecArray | null;
 
@@ -47,7 +47,7 @@ export function isPrTrigger(textBeforeCursor: string): {
 } {
   const notTriggered = { triggered: false, query: "" };
 
-  const triggerMatch = /(^|\s)(#(\d*))$/.exec(textBeforeCursor);
+  const triggerMatch = /(^|\s)(##(\d*))$/.exec(textBeforeCursor);
   if (!triggerMatch) return notTriggered;
 
   const afterHash = triggerMatch[3];

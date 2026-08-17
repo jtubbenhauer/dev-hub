@@ -7,19 +7,19 @@ import {
 
 describe("parsePrReferences", () => {
   it("matches a PR reference at start of string", () => {
-    const refs = parsePrReferences("#123");
+    const refs = parsePrReferences("##123");
     expect(refs).toHaveLength(1);
     expect(refs[0].number).toBe(123);
   });
 
   it("matches a PR reference preceded by space", () => {
-    const refs = parsePrReferences("check #456 please");
+    const refs = parsePrReferences("check ##456 please");
     expect(refs).toHaveLength(1);
     expect(refs[0].number).toBe(456);
   });
 
   it("matches multiple PR references", () => {
-    const refs = parsePrReferences("see #1 and #2");
+    const refs = parsePrReferences("see ##1 and ##2");
     expect(refs).toHaveLength(2);
     expect(refs[0].number).toBe(1);
     expect(refs[1].number).toBe(2);
@@ -35,26 +35,26 @@ describe("parsePrReferences", () => {
     expect(refs).toHaveLength(0);
   });
 
-  it("does NOT match non-numeric reference (#notanumber)", () => {
-    const refs = parsePrReferences("#notanumber");
+  it("does NOT match non-numeric reference (##notanumber)", () => {
+    const refs = parsePrReferences("##notanumber");
     expect(refs).toHaveLength(0);
   });
 
   it("does NOT match when hash has no preceding whitespace (foo#bar)", () => {
-    const refs = parsePrReferences("foo#123");
+    const refs = parsePrReferences("foo##123");
     expect(refs).toHaveLength(0);
   });
 
-  it("returns correct startIndex and endIndex for the #123 part", () => {
-    const refs = parsePrReferences("check #456 please");
-    expect(refs[0].startIndex).toBe(6); // index of '#' in "check #456 please"
-    expect(refs[0].endIndex).toBe(10); // index after '6'
+  it("returns correct startIndex and endIndex for the ##123 part", () => {
+    const refs = parsePrReferences("check ##456 please");
+    expect(refs[0].startIndex).toBe(6);
+    expect(refs[0].endIndex).toBe(11);
   });
 
   it("returns correct startIndex for reference at start of string", () => {
-    const refs = parsePrReferences("#99");
+    const refs = parsePrReferences("##99");
     expect(refs[0].startIndex).toBe(0);
-    expect(refs[0].endIndex).toBe(3);
+    expect(refs[0].endIndex).toBe(4);
   });
 
   it("returns empty array for empty string", () => {
@@ -62,27 +62,31 @@ describe("parsePrReferences", () => {
   });
 
   it("matches PR reference with large number", () => {
-    const refs = parsePrReferences("fixes #10042");
+    const refs = parsePrReferences("fixes ##10042");
     expect(refs).toHaveLength(1);
     expect(refs[0].number).toBe(10042);
+  });
+
+  it("does NOT match a single-hash task reference", () => {
+    expect(parsePrReferences("task #123")).toHaveLength(0);
   });
 });
 
 describe("isPrTrigger", () => {
-  it("returns triggered=true for text ending with # after space", () => {
-    expect(isPrTrigger("hello #")).toEqual({ triggered: true, query: "" });
+  it("returns triggered=true for text ending with ## after space", () => {
+    expect(isPrTrigger("hello ##")).toEqual({ triggered: true, query: "" });
   });
 
-  it("returns triggered=true for text ending with #digits after space", () => {
-    expect(isPrTrigger("hello #12")).toEqual({ triggered: true, query: "12" });
+  it("returns triggered=true for text ending with ##digits after space", () => {
+    expect(isPrTrigger("hello ##12")).toEqual({ triggered: true, query: "12" });
   });
 
-  it("returns triggered=true for # at start of text", () => {
-    expect(isPrTrigger("#")).toEqual({ triggered: true, query: "" });
+  it("returns triggered=true for ## at start of text", () => {
+    expect(isPrTrigger("##")).toEqual({ triggered: true, query: "" });
   });
 
-  it("returns triggered=true for #digits at start of text", () => {
-    expect(isPrTrigger("#5")).toEqual({ triggered: true, query: "5" });
+  it("returns triggered=true for ##digits at start of text", () => {
+    expect(isPrTrigger("##5")).toEqual({ triggered: true, query: "5" });
   });
 
   it("returns triggered=false for # heading (space after hash)", () => {
@@ -93,22 +97,29 @@ describe("isPrTrigger", () => {
     expect(isPrTrigger("hello")).toEqual({ triggered: false, query: "" });
   });
 
-  it("returns triggered=false for non-numeric after # (#abc)", () => {
-    expect(isPrTrigger("hello #abc")).toEqual({ triggered: false, query: "" });
+  it("returns triggered=false for non-numeric after ## (##abc)", () => {
+    expect(isPrTrigger("hello ##abc")).toEqual({ triggered: false, query: "" });
   });
 
   it("returns triggered=false for ## heading", () => {
     expect(isPrTrigger("## heading")).toEqual({ triggered: false, query: "" });
   });
 
-  it("returns triggered=false when # is not preceded by whitespace or start", () => {
-    expect(isPrTrigger("foo#")).toEqual({ triggered: false, query: "" });
+  it("returns triggered=false when ## is not preceded by whitespace or start", () => {
+    expect(isPrTrigger("foo##")).toEqual({ triggered: false, query: "" });
   });
 
   it("returns triggered=true with multi-digit query", () => {
-    expect(isPrTrigger("fix #1234")).toEqual({
+    expect(isPrTrigger("fix ##1234")).toEqual({
       triggered: true,
       query: "1234",
+    });
+  });
+
+  it("returns triggered=false for a single-hash task reference", () => {
+    expect(isPrTrigger("task #1234")).toEqual({
+      triggered: false,
+      query: "",
     });
   });
 });

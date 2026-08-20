@@ -1,0 +1,21 @@
+lib/opencode/server-runtime.ts
+  s_c9e43e2796b80b::t_a706d52e169624 1-14,20-26,38-43,45,47-48,50-54,61-77
+  s_c9e43e2796b80b::t_413ee23b0fe704 15-19,27-37,44,46,49,55-60
+  s_c9e43e2796b80b::t_33ab0d496d12a8 78-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "43e03c5f689f516f5e238067bb6ced93cadaf059",
+  "prompts": {},
+  "sessions": {
+    "s_c9e43e2796b80b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_fe30663dcffeO0WoWWBZ4Oood3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

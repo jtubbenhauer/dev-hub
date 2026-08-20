@@ -16,9 +16,11 @@ import {
 const DEFAULT_PORT = 4096;
 const STARTUP_TIMEOUT_MS = 10000;
 const HEALTH_CHECK_INTERVAL_MS = 30000;
+const HEALTH_CHECK_FAILURE_THRESHOLD = 3;
 
 let serverState: ServerState | null = null;
 let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
+let consecutiveHealthCheckFailures = 0;
 
 async function tryAdoptExistingServer(
   port: number,
@@ -100,8 +102,12 @@ async function startServer(
     state.status = "ready";
     state.lastActivity = Date.now();
 
-    proc.on("exit", (code) => {
-      console.error(`[opencode] Server exited with code ${code}`);
+    proc.on("exit", (code, signal) => {
+      console.error("[opencode] Server exited", {
+        code,
+        signal,
+        pid: state.pid,
+      });
       state.status = "stopped";
       clearSharedServerState(state);
       if (serverState === state) {
@@ -151,18 +157,30 @@ function startHealthChecks() {
     }
 
     try {
-      const response = await fetch(`${checkedState.url}/session`, {
+      const response = await fetch(`${checkedState.url}/global/health`, {
         signal: AbortSignal.timeout(5000),
       });
       if (serverState !== checkedState) return;
       if (!response.ok) {
-        console.warn(`[opencode] Health check returned ${response.status}`);
+        throw new Error(`Health check returned ${response.status}`);
       }
+      consecutiveHealthCheckFailures = 0;
       checkedState.lastActivity = Date.now();
     } catch (error) {
       if (serverState !== checkedState) return;
+      consecutiveHealthCheckFailures += 1;
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[opencode] Health check failed: ${message}`);
+      console.warn("[opencode] Health check failed", {
+        message,
+        consecutiveFailures: consecutiveHealthCheckFailures,
+      });
+      if (consecutiveHealthCheckFailures < HEALTH_CHECK_FAILURE_THRESHOLD) {
+        return;
+      }
+      console.error("[opencode] Health check failure threshold reached", {
+        consecutiveFailures: consecutiveHealthCheckFailures,
+        pid: checkedState.pid,
+      });
       if (checkedState.process) {
         checkedState.abortController.abort();
         checkedState.process.kill();
@@ -180,6 +198,7 @@ function stopHealthChecks() {
     clearInterval(healthCheckTimer);
     healthCheckTimer = null;
   }
+  consecutiveHealthCheckFailures = 0;
 }
 
 export async function getOrStartServer(): Promise<{

@@ -236,4 +236,38 @@ describe("OpenCode server pool", () => {
     expect(replacementProcess.kill).not.toHaveBeenCalled();
     expect(replacementModule.getServerStatus()?.status).toBe("ready");
   });
+
+  it("requires repeated control-plane failures before stopping the server", async () => {
+    vi.useFakeTimers();
+    mockSpawn.mockReset();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValueOnce(new Error("not running"))
+        .mockRejectedValue(new Error("health unavailable")),
+    );
+    const process = new FakeOpenCodeProcess();
+    mockSpawn.mockReturnValue(process);
+
+    const { getOrStartServer } = await import("@/lib/opencode/server-pool");
+    const serverPromise = getOrStartServer();
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalledOnce());
+    process.stdout.write(
+      "opencode server listening on http://127.0.0.1:4096\n",
+    );
+    await serverPromise;
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(fetch).toHaveBeenLastCalledWith(
+      "http://127.0.0.1:4096/global/health",
+      expect.any(Object),
+    );
+    expect(process.kill).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(process.kill).toHaveBeenCalledOnce();
+  });
 });

@@ -1,31 +1,28 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { OpenCodeInstance } from "./types";
+import {
+  clearSharedServer,
+  clearSharedServerState,
+  createSharedServer,
+  findOpenCodeBinary,
+  getSharedServer,
+  isPortAvailable,
+  markSharedServerReady,
+  setSharedServer,
+  type ServerState,
+  waitForServerUrl,
+} from "./server-runtime";
 
 const DEFAULT_PORT = 4096;
 const STARTUP_TIMEOUT_MS = 10000;
 const HEALTH_CHECK_INTERVAL_MS = 30000;
 
-interface ServerState {
-  process: ChildProcess;
-  url: string;
-  port: number;
-  pid: number | null;
-  status: "starting" | "ready" | "error" | "stopped";
-  abortController: AbortController;
-  lastActivity: number;
-  errorMessage?: string;
-}
-
 let serverState: ServerState | null = null;
 let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
 
-function findOpenCodeBinary(): string {
-  const homeDir = process.env.HOME || process.env.USERPROFILE || "";
-  return process.env.OPENCODE_BIN || `${homeDir}/.opencode/bin/opencode`;
-}
-
 async function tryAdoptExistingServer(
   port: number,
+  abortController: AbortController,
 ): Promise<ServerState | null> {
   const url = `http://127.0.0.1:${port}`;
   try {
@@ -35,8 +32,7 @@ async function tryAdoptExistingServer(
     if (!response.ok) return null;
 
     console.log(`[opencode] Adopted existing server at ${url}`);
-    const abortController = new AbortController();
-    const state: ServerState = {
+    return {
       process: null as unknown as ChildProcess,
       url,
       port,
@@ -45,15 +41,16 @@ async function tryAdoptExistingServer(
       abortController,
       lastActivity: Date.now(),
     };
-    serverState = state;
-    startHealthChecks();
-    return state;
   } catch {
     return null;
   }
 }
 
-async function startServer(port = DEFAULT_PORT): Promise<ServerState> {
+async function startServer(
+  abortController: AbortController,
+  port = DEFAULT_PORT,
+): Promise<ServerState> {
+  abortController.signal.throwIfAborted();
   if (serverState?.status === "ready") {
     return serverState;
   }
@@ -63,13 +60,20 @@ async function startServer(port = DEFAULT_PORT): Promise<ServerState> {
   }
 
   // Check if a server is already running on the port (survives HMR / state loss)
-  const adopted = await tryAdoptExistingServer(port);
-  if (adopted) return adopted;
+  const adopted = await tryAdoptExistingServer(port, abortController);
+  abortController.signal.throwIfAborted();
+  if (adopted) {
+    serverState = adopted;
+    startHealthChecks();
+    return adopted;
+  }
 
-  const abortController = new AbortController();
+  const spawnPort = (await isPortAvailable(port)) ? port : 0;
+  abortController.signal.throwIfAborted();
+
   const binary = findOpenCodeBinary();
 
-  const args = ["serve", `--hostname=127.0.0.1`, `--port=${port}`];
+  const args = ["serve", `--hostname=127.0.0.1`, `--port=${spawnPort}`];
 
   const proc = spawn(binary, args, {
     signal: abortController.signal,
@@ -80,7 +84,7 @@ async function startServer(port = DEFAULT_PORT): Promise<ServerState> {
   const state: ServerState = {
     process: proc,
     url: "",
-    port,
+    port: spawnPort,
     pid: proc.pid ?? null,
     status: "starting",
     abortController,
@@ -92,12 +96,14 @@ async function startServer(port = DEFAULT_PORT): Promise<ServerState> {
   try {
     const url = await waitForServerUrl(proc, STARTUP_TIMEOUT_MS);
     state.url = url;
+    state.port = Number(new URL(url).port);
     state.status = "ready";
     state.lastActivity = Date.now();
 
     proc.on("exit", (code) => {
       console.error(`[opencode] Server exited with code ${code}`);
       state.status = "stopped";
+      clearSharedServerState(state);
       if (serverState === state) {
         serverState = null;
       }
@@ -113,70 +119,6 @@ async function startServer(port = DEFAULT_PORT): Promise<ServerState> {
     serverState = null;
     throw error;
   }
-}
-
-function waitForServerUrl(
-  proc: ChildProcess,
-  timeoutMs: number,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let output = "";
-    let isSettled = false;
-
-    const cleanup = () => {
-      clearTimeout(timeoutId);
-      proc.stdout?.removeListener("data", handleStdout);
-      proc.stderr?.removeListener("data", handleStderr);
-      proc.removeListener("exit", handleExit);
-      proc.removeListener("error", handleError);
-      proc.stdout?.resume();
-      proc.stderr?.resume();
-    };
-    const settleWithError = (error: Error) => {
-      if (isSettled) return;
-      isSettled = true;
-      cleanup();
-      reject(error);
-    };
-    const settleWithUrl = (url: string) => {
-      if (isSettled) return;
-      isSettled = true;
-      cleanup();
-      resolve(url);
-    };
-    const handleStdout = (chunk: Buffer) => {
-      output += chunk.toString();
-      const lines = output.split("\n");
-      for (const line of lines) {
-        if (line.startsWith("opencode server listening")) {
-          const match = line.match(/on\s+(https?:\/\/[^\s]+)/);
-          if (match) {
-            settleWithUrl(match[1]);
-            return;
-          }
-        }
-      }
-    };
-    const handleStderr = (chunk: Buffer) => {
-      output += chunk.toString();
-    };
-    const handleExit = (code: number | null) => {
-      settleWithError(new Error(`Server exited with code ${code}\n${output}`));
-    };
-    const handleError = (error: Error) => settleWithError(error);
-    const timeoutId = setTimeout(
-      () =>
-        settleWithError(
-          new Error(`OpenCode server startup timed out after ${timeoutMs}ms`),
-        ),
-      timeoutMs,
-    );
-
-    proc.stdout?.on("data", handleStdout);
-    proc.stderr?.on("data", handleStderr);
-    proc.on("exit", handleExit);
-    proc.on("error", handleError);
-  });
 }
 
 async function waitForReady(state: ServerState): Promise<ServerState> {
@@ -202,27 +144,31 @@ function startHealthChecks() {
   if (healthCheckTimer) return;
 
   healthCheckTimer = setInterval(async () => {
-    if (!serverState || serverState.status !== "ready") {
+    const checkedState = serverState;
+    if (!checkedState || checkedState.status !== "ready") {
       stopHealthChecks();
       return;
     }
 
     try {
-      const response = await fetch(`${serverState.url}/session`, {
+      const response = await fetch(`${checkedState.url}/session`, {
         signal: AbortSignal.timeout(5000),
       });
+      if (serverState !== checkedState) return;
       if (!response.ok) {
         console.warn(`[opencode] Health check returned ${response.status}`);
       }
-      serverState.lastActivity = Date.now();
+      checkedState.lastActivity = Date.now();
     } catch (error) {
+      if (serverState !== checkedState) return;
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[opencode] Health check failed: ${message}`);
-      if (serverState.process) {
-        serverState.abortController.abort();
-        serverState.process.kill();
+      if (checkedState.process) {
+        checkedState.abortController.abort();
+        checkedState.process.kill();
       }
-      serverState.status = "stopped";
+      clearSharedServerState(checkedState);
+      checkedState.status = "stopped";
       serverState = null;
       stopHealthChecks();
     }
@@ -240,20 +186,45 @@ export async function getOrStartServer(): Promise<{
   url: string;
   port: number;
 }> {
-  const state = await startServer();
+  const sharedServer = getSharedServer();
+  if (sharedServer) {
+    const state = await sharedServer.startPromise;
+    serverState = state;
+    state.lastActivity = Date.now();
+    return { url: state.url, port: state.port };
+  }
+
+  const serverLifecycle = createSharedServer((abortController) =>
+    startServer(abortController),
+  );
+  setSharedServer(serverLifecycle);
+  let state: ServerState;
+  try {
+    state = await serverLifecycle.startPromise;
+  } catch (error) {
+    clearSharedServer(serverLifecycle);
+    throw error;
+  }
+  markSharedServerReady(serverLifecycle, state);
   state.lastActivity = Date.now();
   return { url: state.url, port: state.port };
 }
 
 export function stopServer() {
   stopHealthChecks();
-  if (serverState) {
-    if (serverState.process) {
-      serverState.abortController.abort();
-      serverState.process.kill();
+  const sharedServer = getSharedServer();
+  sharedServer?.abortController.abort();
+  clearSharedServer(sharedServer);
+  const state = sharedServer?.state ?? serverState;
+  if (state) {
+    if (state.process) {
+      state.abortController.abort();
+      state.process.kill();
     }
-    serverState.status = "stopped";
-    serverState = null;
+    state.status = "stopped";
+    if (serverState === state) {
+      serverState = null;
+    }
   }
 }
 

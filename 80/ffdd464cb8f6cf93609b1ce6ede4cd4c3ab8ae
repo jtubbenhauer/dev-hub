@@ -1,0 +1,23 @@
+tests/components/chat-message-user-bubble-width.test.tsx
+  s_42fb42e4debe3d::t_fe22c28be9c19e 1-72,74-78,80-84,87-91,94,96-97
+  s_42fb42e4debe3d::t_23143ea3de5c54 73,79,85-86,92-93,95
+components/chat/message.tsx
+  s_42fb42e4debe3d::t_e64e5485cde760 364
+  s_42fb42e4debe3d::t_31c57c89809f3e 172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "80ffdd464cb8f6cf93609b1ce6ede4cd4c3ab8ae",
+  "prompts": {},
+  "sessions": {
+    "s_42fb42e4debe3d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_fd4281dd8ffeLd5SNQPscV67zI",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

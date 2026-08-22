@@ -169,7 +169,7 @@ function UserMessageBubble({
           })}
         </div>
       )}
-      <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-2.5">
+      <div className="bg-primary text-primary-foreground max-w-full rounded-2xl rounded-br-md px-4 py-2.5">
         <div className="user-bubble-prose prose prose-sm prose-p:my-1 prose-pre:my-1 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-1.5 max-w-full overflow-hidden break-words">
           <MarkdownContent
             content={cleanedText || textContent}
@@ -361,7 +361,7 @@ export const ChatMessage = memo(
         >
           {isUser ? (
             <>
-              <div className="flex items-end gap-1">
+              <div className="flex max-w-full items-end gap-1">
                 {onRevert && (
                   <button
                     type="button"

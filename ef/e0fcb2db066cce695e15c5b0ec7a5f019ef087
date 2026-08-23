@@ -1,0 +1,66 @@
+tests/components/chat/session-sub-agent-count.test.tsx
+  s_2cb950165fba4c::t_07e793faa7fb97 1-35,76
+  s_2cb950165fba4c::t_167c409f65be24 36-75
+lib/chat/descendant-activity.ts
+  s_2cb950165fba4c::t_8a2c3bf45edb49 8,14-15
+  s_2cb950165fba4c::t_3f89e3aa918e5f 45
+  s_2cb950165fba4c::t_6f288d93e968af 58,64
+  s_2cb950165fba4c::t_6b8060e5166522 76,80
+  s_2cb950165fba4c::t_cc370156701289 16-17
+components/chat/session-list.tsx
+  s_2cb950165fba4c::t_4ccfa7ee83b5e9 121
+  s_2cb950165fba4c::t_17bd93d84e874c 424
+  s_2cb950165fba4c::t_dd05f69b2394b7 495
+  s_2cb950165fba4c::t_e30a41bfbcbad9 596
+  s_2cb950165fba4c::t_eafd022b22f41c 800
+  s_2cb950165fba4c::t_49de6200156474 892-894
+  s_2cb950165fba4c::t_c3fe874c29ab91 43-46
+  s_2cb950165fba4c::t_feed4a2272d54e 62
+  s_2cb950165fba4c::t_0c8e82b3bc0d61 780
+  s_2cb950165fba4c::t_1a9ccc5f07834b 722
+  s_2cb950165fba4c::t_7fc4d4034c5465 567
+tests/components/session-list.test.tsx
+  s_2cb950165fba4c::t_47ee0d538bd188 330-348,354-366,368-369,375-400
+  s_2cb950165fba4c::t_d931cdf08c5ea7 349-353
+  s_2cb950165fba4c::t_8c3ab2b7f36dac 367,370-374
+components/chat/session-sub-agent-count.tsx
+  s_2cb950165fba4c::t_f5c10a3c698f59 8-11
+  s_2cb950165fba4c::t_84de6c3f27f43f 25-34,44-51
+  s_2cb950165fba4c::t_3ebae0edacc32f 1-7,12-24,35-37,39-43,52-54
+  s_2cb950165fba4c::t_8ab6d4f9a2f765 38
+tests/lib/chat/descendant-activity.test.ts
+  s_2cb950165fba4c::t_44857c5c68108e 96
+  s_2cb950165fba4c::t_c428637f0e5a4a 53
+  s_2cb950165fba4c::t_209b95d2b3f35c 74
+components/chat/chat-interface.tsx
+  s_2cb950165fba4c::t_80f16f7113f501 508-517
+  s_2cb950165fba4c::t_8a08779fc8ac6a 555
+  s_2cb950165fba4c::t_fb54cb5b4ebd71 506,545-547,564-566,568-569,580-582,584
+  s_2cb950165fba4c::t_df2a1f08b17209 548-554,556-563,567
+  s_2cb950165fba4c::t_4a645fcffe2cd7 591-592
+  s_2cb950165fba4c::t_8ab6d4f9a2f765 586-590
+  s_2cb950165fba4c::t_b82491888c5f1c 583,594-595,599-601
+  s_2cb950165fba4c::t_a1fb5f5c15261d 593,596-598
+  s_2cb950165fba4c::t_5f183834948a46 519,521,524
+  s_2cb950165fba4c::t_05de4d4d1204ec 544
+components/chat/streaming-indicator.tsx
+  s_2cb950165fba4c::t_cac06169188ecc 7
+  s_2cb950165fba4c::t_6933dad99d9df7 124
+  s_2cb950165fba4c::t_e92d1e6a58f8db 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "efe0fcb2db066cce695e15c5b0ec7a5f019ef087",
+  "prompts": {},
+  "sessions": {
+    "s_2cb950165fba4c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_fd410703cffeQd4F1M2CuOO72p",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

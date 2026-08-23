@@ -5,10 +5,14 @@ import type {
   SessionStatus,
 } from "@/lib/opencode/types";
 
-export interface DescendantActivity {
+export interface DescendantActivityCounts {
   readonly activeCount: number;
   readonly waitingCount: number;
   readonly recentCount: number;
+}
+
+export interface DescendantActivity extends DescendantActivityCounts {
+  readonly activeSessionIds: readonly string[];
 }
 
 interface DescendantActivityOptions {
@@ -38,6 +42,7 @@ export function getDescendantActivity(
   ]);
   const visited = new Set([options.parentSessionId]);
   const pending = [...(childrenByParent.get(options.parentSessionId) ?? [])];
+  const activeSessionIds: string[] = [];
   let activeCount = 0;
   let waitingCount = 0;
   let recentCount = 0;
@@ -50,11 +55,13 @@ export function getDescendantActivity(
 
     if (waitingSessionIds.has(sessionId)) {
       waitingCount += 1;
+      activeSessionIds.push(sessionId);
       continue;
     }
     const status = options.statuses[sessionId];
     if (status && status.type !== "idle") {
       activeCount += 1;
+      activeSessionIds.push(sessionId);
       continue;
     }
     const session = options.sessions[sessionId];
@@ -66,11 +73,11 @@ export function getDescendantActivity(
     }
   }
 
-  return { activeCount, waitingCount, recentCount };
+  return { activeCount, waitingCount, recentCount, activeSessionIds };
 }
 
 export function formatDescendantActivity(
-  activity: DescendantActivity,
+  activity: DescendantActivityCounts,
 ): string | null {
   if (activity.waitingCount > 0) {
     return `${activity.waitingCount} ${activity.waitingCount === 1 ? "subagent" : "subagents"} waiting for input`;

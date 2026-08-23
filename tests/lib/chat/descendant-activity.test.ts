@@ -50,6 +50,7 @@ describe("getDescendantActivity", () => {
       activeCount: 2,
       waitingCount: 0,
       recentCount: 0,
+      activeSessionIds: ["child", "grandchild"],
     });
   });
 
@@ -70,6 +71,7 @@ describe("getDescendantActivity", () => {
       activeCount: 0,
       waitingCount: 1,
       recentCount: 0,
+      activeSessionIds: ["child"],
     });
   });
 
@@ -91,6 +93,7 @@ describe("getDescendantActivity", () => {
       activeCount: 0,
       waitingCount: 0,
       recentCount: 1,
+      activeSessionIds: [],
     });
   });
 });

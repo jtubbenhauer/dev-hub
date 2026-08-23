@@ -4,7 +4,7 @@ import { formatRetryLabel } from "@/lib/chat/streaming-label";
 import {
   formatDescendantActivity,
   getDescendantActivity,
-  type DescendantActivity,
+  type DescendantActivityCounts,
 } from "@/lib/chat/descendant-activity";
 import type { MessageWithParts, SessionStatus } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
@@ -17,7 +17,7 @@ export const StreamingIndicator = memo(function StreamingIndicator({
 }: {
   messages: MessageWithParts[];
   sessionStatus: SessionStatus | null;
-  descendantActivity?: DescendantActivity;
+  descendantActivity?: DescendantActivityCounts;
 }) {
   const [now, setNow] = useState(Date.now);
   const isRetrying = sessionStatus?.type === "retry";
@@ -121,4 +121,4 @@ const EMPTY_DESCENDANT_ACTIVITY = {
   activeCount: 0,
   waitingCount: 0,
   recentCount: 0,
-} as const satisfies DescendantActivity;
+} as const satisfies DescendantActivityCounts;

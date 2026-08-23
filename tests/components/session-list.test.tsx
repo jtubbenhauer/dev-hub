@@ -327,6 +327,77 @@ describe("SessionList — unified mode workspace picker", () => {
     },
   );
 
+  it("shows the sub-agent counter only for sessions running sub-agents", () => {
+    const sessions = {
+      "sess-1": makeUnifiedSession("sess-1", "ws-1", {
+        title: "Session with sub-agents",
+      }),
+      "sess-2": makeUnifiedSession("sess-2", "ws-1", {
+        title: "Session without sub-agents",
+      }),
+    };
+
+    const { container } = render(
+      <SessionList
+        {...baseProps}
+        mode="workspace"
+        sessions={sessions}
+        taskProgressBySessionId={{
+          "sess-1": { completed: 2, total: 3 },
+        }}
+        subAgentCountBySessionId={{
+          "sess-1": {
+            active: 2,
+            waiting: 1,
+            progress: { completed: 4, total: 10 },
+          },
+        }}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    const withSubAgents = container.querySelector("[data-session-id='sess-1']");
+    const withoutSubAgents = container.querySelector(
+      "[data-session-id='sess-2']",
+    );
+
+    expect(withSubAgents).toHaveTextContent("2/3");
+    expect(
+      withSubAgents?.querySelector(
+        "[aria-label='3 sub-agents working (1 waiting for input) — 4 of 10 sub-agent tasks completed']",
+      ),
+    ).toHaveTextContent("3");
+    expect(
+      withSubAgents?.querySelector(
+        "progress[aria-label='4 of 10 sub-agent tasks completed']",
+      ),
+    ).toHaveAttribute("value", "4");
+    expect(
+      withoutSubAgents?.querySelector("[aria-label*='sub-agent']"),
+    ).toBeNull();
+  });
+
+  it("shows the sub-agent counter in grouped workspace mode", () => {
+    const { container } = render(
+      <SessionList
+        {...baseProps}
+        mode="unified"
+        sessions={[makeUnifiedSession("sess-1", "ws-1")]}
+        workspaceNames={{ "ws-1": "Workspace" }}
+        workspaceBranches={{}}
+        groupByWorkspace
+        subAgentCountBySessionId={{ "sess-1": { active: 4, waiting: 0 } }}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    expect(
+      container.querySelector(
+        "[data-session-id='sess-1'] [aria-label='4 sub-agents working']",
+      ),
+    ).toHaveTextContent("4");
+  });
+
   it("keeps old task progress colored in grouped workspace mode", () => {
     const updatedAt = Date.now() - 2 * 3_600_000;
     const { container } = render(

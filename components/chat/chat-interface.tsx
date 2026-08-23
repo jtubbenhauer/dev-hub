@@ -503,15 +503,25 @@ export function ChatInterface() {
 
     return progress;
   }, [activeWorkspaceId, isUnifiedMode, workspaceStates]);
-  const taskActiveSessionIds = useMemo(() => {
+  const sessionActivity = useMemo(() => {
     const activeIds = new Set<string>();
+    const subAgentCounts: Record<
+      string,
+      {
+        active: number;
+        waiting: number;
+        progress?: { completed: number; total: number };
+      }
+    > = {};
+    const subAgentTodoHydration: { sessionId: string; workspaceId: string }[] =
+      [];
     const workspacesToCheck = isUnifiedMode
-      ? Object.values(workspaceStates)
+      ? Object.entries(workspaceStates)
       : activeWorkspaceId
-        ? [workspaceStates[activeWorkspaceId]]
+        ? ([[activeWorkspaceId, workspaceStates[activeWorkspaceId]]] as const)
         : [];
 
-    for (const workspaceState of workspacesToCheck) {
+    for (const [workspaceId, workspaceState] of workspacesToCheck) {
       if (!workspaceState) continue;
       for (const session of Object.values(workspaceState.sessions)) {
         if (session.parentID) continue;
@@ -532,6 +542,32 @@ export function ChatInterface() {
           recentWindowMs: 0,
         });
         if (
+          descendantActivity.activeCount > 0 ||
+          descendantActivity.waitingCount > 0
+        ) {
+          let completed = 0;
+          let total = 0;
+          for (const descendantId of descendantActivity.activeSessionIds) {
+            const descendantTodos = workspaceState.todos[descendantId];
+            if (!descendantTodos) {
+              subAgentTodoHydration.push({
+                sessionId: descendantId,
+                workspaceId,
+              });
+              continue;
+            }
+            total += descendantTodos.length;
+            completed += descendantTodos.filter(
+              (todo) => todo.status === "completed",
+            ).length;
+          }
+          subAgentCounts[session.id] = {
+            active: descendantActivity.activeCount,
+            waiting: descendantActivity.waitingCount,
+            ...(total > 0 ? { progress: { completed, total } } : {}),
+          };
+        }
+        if (
           hasDirectActivity ||
           descendantActivity.activeCount > 0 ||
           descendantActivity.waitingCount > 0
@@ -541,8 +577,28 @@ export function ChatInterface() {
       }
     }
 
-    return activeIds;
+    return {
+      taskActiveSessionIds: activeIds,
+      subAgentCountBySessionId: subAgentCounts,
+      subAgentTodoHydration,
+    };
   }, [activeWorkspaceId, isUnifiedMode, workspaceStates]);
+  const {
+    taskActiveSessionIds,
+    subAgentCountBySessionId,
+    subAgentTodoHydration,
+  } = sessionActivity;
+  // Hydrate once per session: a todo fetch that keeps failing would otherwise
+  // be retried on every store change.
+  const hydratedSubAgentTodosRef = useRef(new Set<string>());
+  useEffect(() => {
+    for (const { sessionId, workspaceId } of subAgentTodoHydration) {
+      const key = `${workspaceId}:${sessionId}`;
+      if (hydratedSubAgentTodosRef.current.has(key)) continue;
+      hydratedSubAgentTodosRef.current.add(key);
+      void fetchSessionTodos(sessionId, workspaceId);
+    }
+  }, [fetchSessionTodos, subAgentTodoHydration]);
   const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
   const activePinnedIds = useChatStore(getActivePinnedSessionIds);
   const pinnedSessionIds = isUnifiedMode ? unifiedPinnedIds : activePinnedIds;
@@ -1074,6 +1130,7 @@ export function ChatInterface() {
     pinnedSessionIds,
     taskProgressBySessionId,
     taskActiveSessionIds,
+    subAgentCountBySessionId,
     sessionNotes,
     onDeleteSession: handleDeleteSession,
     onPinSession: handlePinSession,
@@ -1103,6 +1160,7 @@ export function ChatInterface() {
     pinnedSessionIds,
     taskProgressBySessionId,
     taskActiveSessionIds,
+    subAgentCountBySessionId,
     sessionNotes,
     isLoading: isSessionsLoading,
     onDeleteSession: handleDeleteSession,

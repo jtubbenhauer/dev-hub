@@ -40,6 +40,10 @@ import {
   SessionTaskProgressIndicator,
   type SessionTaskProgress,
 } from "@/components/chat/session-task-progress";
+import {
+  SessionSubAgentCountIndicator,
+  type SessionSubAgentCount,
+} from "@/components/chat/session-sub-agent-count";
 
 const AGE_FILTER_LABEL: Record<SessionAgeFilter, string> = {
   "1d": "1d",
@@ -55,6 +59,7 @@ interface BaseSessionListProps {
   lastViewedAt: Record<string, number>;
   pinnedSessionIds?: Set<string>;
   taskProgressBySessionId?: Readonly<Record<string, SessionTaskProgress>>;
+  subAgentCountBySessionId?: Readonly<Record<string, SessionSubAgentCount>>;
   isLoading?: boolean;
   onCreateSession: () => void;
   onDeleteSession: (sessionId: string, workspaceId?: string) => void;
@@ -113,6 +118,7 @@ export function SessionList(props: SessionListProps) {
     lastViewedAt,
     pinnedSessionIds,
     taskProgressBySessionId,
+    subAgentCountBySessionId,
     onCreateSession,
     onDeleteSession,
     onPinSession,
@@ -415,6 +421,7 @@ export function SessionList(props: SessionListProps) {
                     }
                     pinnedSessionIds={pinnedSessionIds}
                     taskProgressBySessionId={taskProgressBySessionId}
+                    subAgentCountBySessionId={subAgentCountBySessionId}
                     sessionNotes={sessionNotes}
                     onClearSessionNote={onClearSessionNote}
                     onSelectSession={(
@@ -485,6 +492,7 @@ export function SessionList(props: SessionListProps) {
                     }
                     note={sessionNotes?.[session.id]}
                     taskProgress={taskProgressBySessionId?.[session.id]}
+                    subAgentCount={subAgentCountBySessionId?.[session.id]}
                     onSelect={() => handleSelect(session)}
                     onDelete={() =>
                       onDeleteSession(
@@ -556,6 +564,7 @@ interface WorkspaceGroupProps {
   lastViewedAt: Record<string, number>;
   pinnedSessionIds?: Set<string>;
   taskProgressBySessionId?: Readonly<Record<string, SessionTaskProgress>>;
+  subAgentCountBySessionId?: Readonly<Record<string, SessionSubAgentCount>>;
   isExpanded: boolean;
   onToggleExpanded?: () => void;
   onSelectSession: (session: SessionWithWorkspace) => void;
@@ -584,6 +593,7 @@ function WorkspaceGroup({
   lastViewedAt,
   pinnedSessionIds,
   taskProgressBySessionId,
+  subAgentCountBySessionId,
   isExpanded,
   onToggleExpanded,
   onSelectSession,
@@ -709,6 +719,7 @@ function WorkspaceGroup({
             workspaceColor={workspaceColor}
             note={sessionNotes?.[session.id]}
             taskProgress={taskProgressBySessionId?.[session.id]}
+            subAgentCount={subAgentCountBySessionId?.[session.id]}
             onSelect={() => onSelectSession(session)}
             onDelete={() => onDeleteSession(session.id, workspaceId)}
             onTogglePin={
@@ -766,6 +777,7 @@ interface SessionItemProps {
   workspaceColor?: string;
   note?: string;
   taskProgress?: SessionTaskProgress;
+  subAgentCount?: SessionSubAgentCount;
   onSelect: () => void;
   onDelete: () => void;
   onTogglePin?: () => void;
@@ -785,6 +797,7 @@ function SessionItem({
   workspaceColor,
   note,
   taskProgress,
+  subAgentCount,
   onSelect,
   onDelete,
   onTogglePin,
@@ -875,6 +888,9 @@ function SessionItem({
               progress={taskProgress}
               isSessionActive={isTaskActive || isWorking || hasQuestion}
             />
+          )}
+          {subAgentCount && (
+            <SessionSubAgentCountIndicator count={subAgentCount} />
           )}
           {workspaceBranch && (
             <Badge

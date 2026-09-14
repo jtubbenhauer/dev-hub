@@ -550,7 +550,10 @@ export function useTerminalScrollbackSetting(): {
   return { scrollback: isValid ? raw : DEFAULT_TERMINAL_SCROLLBACK, isLoading };
 }
 
-export type TerminalFont = "geist-mono" | "ibm-plex-mono-nerd";
+export type TerminalFont =
+  | "geist-mono"
+  | "ibm-plex-mono-nerd"
+  | "jetbrains-mono-nerd";
 export const TERMINAL_FONT_OPTIONS: Array<{
   value: TerminalFont;
   label: string;
@@ -565,6 +568,11 @@ export const TERMINAL_FONT_OPTIONS: Array<{
     value: "ibm-plex-mono-nerd",
     label: "IBM Plex Mono Nerd Font",
     fontFamily: "BlexMonoNerdFontMono, monospace",
+  },
+  {
+    value: "jetbrains-mono-nerd",
+    label: "JetBrains Mono Nerd Font",
+    fontFamily: "JetBrainsMonoNerdFontMono, monospace",
   },
 ];
 export const DEFAULT_TERMINAL_FONT: TerminalFont = "geist-mono";

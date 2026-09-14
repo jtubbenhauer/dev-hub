@@ -115,6 +115,9 @@ interface ReviewEditorProps {
   onMarkAndNext?: (file: ReviewFile) => void;
   onOpenFileList?: () => void;
   onOpenInEditor?: () => void;
+  showToolbar?: boolean;
+  forceSideBySide?: boolean;
+  readOnly?: boolean;
 }
 
 export const MonacoReviewEditor = forwardRef<
@@ -132,6 +135,9 @@ export const MonacoReviewEditor = forwardRef<
     onMarkAndNext,
     onOpenFileList,
     onOpenInEditor,
+    showToolbar = true,
+    forceSideBySide = false,
+    readOnly = false,
   },
   ref,
 ) {
@@ -290,10 +296,12 @@ export const MonacoReviewEditor = forwardRef<
 
       const modifiedEditor = diffEditor.getModifiedEditor();
 
-      modifiedEditor.addCommand(
-        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
-        () => handleSaveRef.current?.(),
-      );
+      if (!readOnly) {
+        modifiedEditor.addCommand(
+          monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
+          () => handleSaveRef.current?.(),
+        );
+      }
 
       decorationsRef.current = modifiedEditor.createDecorationsCollection([]);
 
@@ -353,7 +361,7 @@ export const MonacoReviewEditor = forwardRef<
 
       setIsEditorReady(true);
     },
-    [],
+    [readOnly],
   );
 
   useEffect(() => {
@@ -548,105 +556,107 @@ export const MonacoReviewEditor = forwardRef<
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
-      <div className="bg-muted/30 flex shrink-0 items-center gap-1.5 overflow-hidden border-b px-2 py-1.5 md:gap-2 md:px-3">
-        {onOpenFileList && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 md:hidden"
-            onClick={onOpenFileList}
-          >
-            <PanelLeft className="h-3.5 w-3.5" />
-          </Button>
-        )}
-
-        <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
-          {fileName}
-        </span>
-
-        {(additions != null || deletions != null) &&
-          ((additions ?? 0) > 0 || (deletions ?? 0) > 0) && (
-            <span className="flex shrink-0 items-center gap-1 font-mono text-[10px]">
-              {(additions ?? 0) > 0 && (
-                <span className="text-green-500">+{additions}</span>
-              )}
-              {(deletions ?? 0) > 0 && (
-                <span className="text-red-500">-{deletions}</span>
-              )}
-            </span>
+      {showToolbar !== false && (
+        <div className="bg-muted/30 flex shrink-0 items-center gap-1.5 overflow-hidden border-b px-2 py-1.5 md:gap-2 md:px-3">
+          {onOpenFileList && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 md:hidden"
+              onClick={onOpenFileList}
+            >
+              <PanelLeft className="h-3.5 w-3.5" />
+            </Button>
           )}
 
-        {onOpenInEditor && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            title="Open file in editor"
-            onClick={onOpenInEditor}
-          >
-            <FileCode2 className="h-3.5 w-3.5" />
-          </Button>
-        )}
+          <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
+            {fileName}
+          </span>
 
-        <DiffViewToggle />
+          {(additions != null || deletions != null) &&
+            ((additions ?? 0) > 0 || (deletions ?? 0) > 0) && (
+              <span className="flex shrink-0 items-center gap-1 font-mono text-[10px]">
+                {(additions ?? 0) > 0 && (
+                  <span className="text-green-500">+{additions}</span>
+                )}
+                {(deletions ?? 0) > 0 && (
+                  <span className="text-red-500">-{deletions}</span>
+                )}
+              </span>
+            )}
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
-          onClick={() => void handleSave()}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Save className="h-3.5 w-3.5" />
+          {onOpenInEditor && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              title="Open file in editor"
+              onClick={onOpenInEditor}
+            >
+              <FileCode2 className="h-3.5 w-3.5" />
+            </Button>
           )}
-          <span className="hidden md:inline">Save</span>
-        </Button>
 
-        {file && onToggleReviewed && (
-          <Button
-            variant={file.reviewed ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
-            onClick={() => onToggleReviewed(file)}
-          >
-            <Check className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">
-              {file.reviewed ? "Reviewed" : "Mark reviewed"}
-            </span>
-          </Button>
-        )}
+          <DiffViewToggle />
 
-        {file && onMarkAndNext && (
           <Button
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
-            onClick={() => onMarkAndNext(file)}
+            onClick={() => void handleSave()}
+            disabled={isSaving}
           >
-            <ChevronRight className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">Next</span>
+            {isSaving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden md:inline">Save</span>
           </Button>
-        )}
 
-        {fileCommentsData && fileCommentsData.length > 0 && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
-            onClick={() => setIsSidebarOpen((open) => !open)}
-            aria-label="Toggle comments"
-          >
-            <MessageCircle className="h-3.5 w-3.5" />
-            <span className="bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-[10px] leading-none">
-              {commentCount}
-            </span>
-          </Button>
-        )}
-      </div>
+          {file && onToggleReviewed && (
+            <Button
+              variant={file.reviewed ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
+              onClick={() => onToggleReviewed(file)}
+            >
+              <Check className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">
+                {file.reviewed ? "Reviewed" : "Mark reviewed"}
+              </span>
+            </Button>
+          )}
+
+          {file && onMarkAndNext && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
+              onClick={() => onMarkAndNext(file)}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Next</span>
+            </Button>
+          )}
+
+          {fileCommentsData && fileCommentsData.length > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-1.5 text-xs md:px-2"
+              onClick={() => setIsSidebarOpen((open) => !open)}
+              aria-label="Toggle comments"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span className="bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-[10px] leading-none">
+                {commentCount}
+              </span>
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <div className="min-w-0 flex-1 overflow-hidden">
@@ -663,12 +673,13 @@ export const MonacoReviewEditor = forwardRef<
               fontFamily: MONACO_FONT_FAMILY,
               fontLigatures: false,
               ...WRAPPED_DIFF_EDITOR_OPTIONS,
-              renderSideBySide: diffViewMode === "side-by-side",
+              renderSideBySide:
+                forceSideBySide || diffViewMode === "side-by-side",
               hideUnchangedRegions: { enabled: true },
               renderIndicators: true,
               renderMarginRevertIcon: true,
               originalEditable: false,
-              readOnly: false,
+              readOnly,
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
               lineNumbers: "on",

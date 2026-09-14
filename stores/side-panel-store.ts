@@ -3,6 +3,16 @@ import { persist } from "zustand/middleware";
 
 import type { OpenFile } from "@/types";
 
+const VALID_PANEL_TABS = ["status", "files", "git"] as const;
+
+type ActivePanelTab = (typeof VALID_PANEL_TABS)[number];
+
+function sanitizeActivePanelTab(value: unknown): ActivePanelTab {
+  return VALID_PANEL_TABS.includes(value as ActivePanelTab)
+    ? (value as ActivePanelTab)
+    : "status";
+}
+
 export interface PersistedFile {
   path: string;
   name: string;
@@ -24,7 +34,7 @@ function getWsFiles(
 interface SidePanelState {
   isOpen: boolean;
   activeTab: "files";
-  activePanelTab: "status" | "files";
+  activePanelTab: ActivePanelTab;
   openFiles: OpenFile[];
   activeFilePath: string | null;
   isFilePickerOpen: boolean;
@@ -32,12 +42,22 @@ interface SidePanelState {
   error: string | null;
   expandedPaths: string[];
   workspaceFileStates: Record<string, WorkspaceFilesState>;
+  fileViewModes: Record<string, "editor" | "diff">;
+  gitTabSelection: {
+    workspaceId: string;
+    path: string;
+    staged: boolean;
+  } | null;
 
   openFileInTab: (path: string, content: string, language: string) => void;
   openFile: (path: string, content: string, language: string) => void;
   closeTab: (path: string) => void;
   setActiveTab: (path: string) => void;
-  setActivePanelTab: (tab: "status" | "files") => void;
+  setActivePanelTab: (tab: ActivePanelTab) => void;
+  setFileViewMode: (path: string, mode: "editor" | "diff") => void;
+  setGitTabSelection: (
+    sel: { workspaceId: string; path: string; staged: boolean } | null,
+  ) => void;
   updateFileContent: (path: string, content: string) => void;
   markFileSaved: (path: string) => void;
   closePanel: () => void;
@@ -72,6 +92,8 @@ export const useSidePanelStore = create<SidePanelState>()(
       error: null,
       expandedPaths: [],
       workspaceFileStates: {},
+      fileViewModes: {},
+      gitTabSelection: null,
 
       openFileInTab: (path, content, language) => {
         const { openFiles } = get();
@@ -121,12 +143,27 @@ export const useSidePanelStore = create<SidePanelState>()(
             nextActive = nextFiles[index].path;
           }
         }
-        set({ openFiles: nextFiles, activeFilePath: nextActive });
+        set((state) => {
+          const nextViewModes = { ...state.fileViewModes };
+          delete nextViewModes[path];
+          return {
+            openFiles: nextFiles,
+            activeFilePath: nextActive,
+            fileViewModes: nextViewModes,
+          };
+        });
       },
 
       setActiveTab: (path) => set({ activeFilePath: path }),
 
       setActivePanelTab: (tab) => set({ activePanelTab: tab }),
+
+      setFileViewMode: (path, mode) =>
+        set((state) => ({
+          fileViewModes: { ...state.fileViewModes, [path]: mode },
+        })),
+
+      setGitTabSelection: (sel) => set({ gitTabSelection: sel }),
 
       updateFileContent: (path, content) =>
         set((state) => ({
@@ -169,6 +206,7 @@ export const useSidePanelStore = create<SidePanelState>()(
           openFiles: [],
           activeFilePath: null,
           error: null,
+          fileViewModes: {},
         }),
 
       setError: (msg) => set({ error: msg, isLoading: false }),
@@ -257,6 +295,21 @@ export const useSidePanelStore = create<SidePanelState>()(
     }),
     {
       name: "dev-hub:side-panel",
+      version: 1,
+      migrate: (persisted) => persisted as SidePanelState,
+      merge: (persisted, current) => {
+        const persistedObject =
+          persisted && typeof persisted === "object"
+            ? (persisted as Partial<SidePanelState>)
+            : {};
+        return {
+          ...current,
+          ...persistedObject,
+          activePanelTab: sanitizeActivePanelTab(
+            persistedObject.activePanelTab,
+          ),
+        };
+      },
       partialize: (state) => ({
         isOpen: state.isOpen,
         isFilePickerOpen: state.isFilePickerOpen,

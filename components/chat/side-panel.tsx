@@ -1,14 +1,18 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { GripVertical, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useSidePanelStore } from "@/stores/side-panel-store";
+import { useGitStatus } from "@/hooks/use-git";
 
 import type { Workspace } from "@/types";
 import type { Todo, MessageWithParts } from "@/lib/opencode/types";
 
 import { McpStatusPanel } from "./mcp-status";
+import { GitTabPanel } from "@/components/chat/git-tab-panel";
 import { SessionFilesPanel } from "./session-files-panel";
 import { SplitPanelFiles } from "./split-panel-files";
 import { TaskProgressPanel } from "./task-progress";
@@ -38,6 +42,17 @@ export function SidePanel({
   const activePanelTab = useSidePanelStore((s) => s.activePanelTab);
   const setActivePanelTab = useSidePanelStore((s) => s.setActivePanelTab);
   const closePanel = useSidePanelStore((s) => s.closePanel);
+
+  const { data: gitStatus } = useGitStatus(workspaceId);
+  const dirtyCount = useMemo(() => {
+    if (!gitStatus || !gitStatus.isRepo) return 0;
+    const paths = new Set<string>();
+    for (const f of gitStatus.staged) paths.add(f.path);
+    for (const f of gitStatus.unstaged) paths.add(f.path);
+    for (const p of gitStatus.untracked) paths.add(p);
+    for (const p of gitStatus.conflicted) paths.add(p);
+    return paths.size;
+  }, [gitStatus]);
 
   return (
     <>
@@ -70,6 +85,17 @@ export function SidePanel({
             >
               Files
             </button>
+            <button
+              className={`flex items-center gap-1 border-b-2 px-1 pb-1.5 text-xs transition-colors ${activePanelTab === "git" ? "text-foreground border-primary font-medium" : "text-muted-foreground hover:text-foreground/70 border-transparent"}`}
+              onClick={() => setActivePanelTab("git")}
+            >
+              Git
+              {dirtyCount > 0 && (
+                <span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[10px] tabular-nums">
+                  {dirtyCount}
+                </span>
+              )}
+            </button>
           </div>
           <Button
             size="icon-xs"
@@ -81,7 +107,7 @@ export function SidePanel({
           </Button>
         </div>
 
-        {activePanelTab === "status" ? (
+        {activePanelTab === "status" && (
           <>
             {workspaceId && workspace && (
               <WorkspaceContextPanel
@@ -121,9 +147,11 @@ export function SidePanel({
               />
             </div>
           </>
-        ) : (
+        )}
+        {activePanelTab === "files" && (
           <SplitPanelFiles workspaceId={workspaceId} />
         )}
+        {activePanelTab === "git" && <GitTabPanel workspaceId={workspaceId} />}
       </div>
     </>
   );

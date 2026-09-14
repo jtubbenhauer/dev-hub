@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { extractSessionFiles } from "@/lib/chat/extract-session-files";
+import {
+  extractSessionFiles,
+  extractSessionFilesMulti,
+} from "@/lib/chat/extract-session-files";
 import type { MessageWithParts } from "@/lib/opencode/types";
 
 function makeToolPart(
@@ -218,5 +221,107 @@ describe("extractSessionFiles", () => {
     const result = extractSessionFiles(messages);
     expect(result).toHaveLength(1);
     expect(result[0].action).toBe("created");
+  });
+
+  it("classifies apply_patch (edit set) with filePath as modified", () => {
+    const messages = [
+      makeMessage([makeToolPart("apply_patch", { filePath: "src/ap.ts" })]),
+    ];
+    const result = extractSessionFiles(messages);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ path: "src/ap.ts", action: "modified" });
+  });
+
+  it("heuristic: unknown mcp_edit_file with path classifies as modified", () => {
+    const messages = [
+      makeMessage([makeToolPart("mcp_edit_file", { path: "src/mcp.ts" })]),
+    ];
+    const result = extractSessionFiles(messages);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ path: "src/mcp.ts", action: "modified" });
+  });
+
+  it("heuristic: unknown my_write_tool on first touch classifies as created", () => {
+    const messages = [
+      makeMessage([makeToolPart("my_write_tool", { filePath: "src/mw.ts" })]),
+    ];
+    const result = extractSessionFiles(messages);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ path: "src/mw.ts", action: "created" });
+  });
+
+  it("heuristic decoy: mcp_read_file with path is not present", () => {
+    const messages = [
+      makeMessage([makeToolPart("mcp_read_file", { path: "src/decoy1.ts" })]),
+    ];
+    expect(extractSessionFiles(messages)).toHaveLength(0);
+  });
+
+  it("heuristic decoy: get_file_contents is not present", () => {
+    const messages = [
+      makeMessage([
+        makeToolPart("get_file_contents", { path: "src/decoy2.ts" }),
+      ]),
+    ];
+    expect(extractSessionFiles(messages)).toHaveLength(0);
+  });
+
+  it("heuristic decoy: credit_file (token boundary) is not present", () => {
+    const messages = [
+      makeMessage([makeToolPart("credit_file", { path: "src/decoy3.ts" })]),
+    ];
+    expect(extractSessionFiles(messages)).toHaveLength(0);
+  });
+
+  it("heuristic decoy: reapply_metadata (token boundary) is not present", () => {
+    const messages = [
+      makeMessage([
+        makeToolPart("reapply_metadata", { path: "src/decoy4.ts" }),
+      ]),
+    ];
+    expect(extractSessionFiles(messages)).toHaveLength(0);
+  });
+});
+
+describe("extractSessionFilesMulti", () => {
+  it("merges parent read + child edit of same file into one modified entry, count 2", () => {
+    const parent = [makeMessage([makeToolPart("read", { filePath: "A.ts" })])];
+    const child = [makeMessage([makeToolPart("edit", { filePath: "A.ts" })])];
+    const result = extractSessionFilesMulti([parent, child]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      path: "A.ts",
+      action: "modified",
+      count: 2,
+    });
+  });
+
+  it("includes child-only files in output", () => {
+    const parent = [makeMessage([makeToolPart("read", { filePath: "A.ts" })])];
+    const child = [makeMessage([makeToolPart("write", { filePath: "B.ts" })])];
+    const result = extractSessionFilesMulti([parent, child]);
+    expect(result.map((f) => f.path).sort()).toEqual(["A.ts", "B.ts"]);
+    expect(result.find((f) => f.path === "B.ts")?.action).toBe("created");
+  });
+
+  it("single source equals extractSessionFiles for a fixture with all action types", () => {
+    const fixture = [
+      makeMessage([
+        makeToolPart("read", { filePath: "r.ts" }),
+        makeToolPart("write", { filePath: "w.ts" }),
+        makeToolPart("edit", { filePath: "e.ts" }),
+        makeToolPart("read", { filePath: "w.ts" }),
+      ]),
+    ];
+    expect(extractSessionFilesMulti([fixture])).toEqual(
+      extractSessionFiles(fixture),
+    );
+  });
+
+  it("tolerates empty child arrays", () => {
+    const parent = [makeMessage([makeToolPart("write", { filePath: "A.ts" })])];
+    const result = extractSessionFilesMulti([parent, [], []]);
+    expect(result).toHaveLength(1);
+    expect(result[0].path).toBe("A.ts");
   });
 });

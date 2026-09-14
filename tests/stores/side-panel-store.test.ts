@@ -25,6 +25,12 @@ const initialState = {
       activeFilePath: string | null;
     }
   >,
+  fileViewModes: {} as Record<string, "editor" | "diff">,
+  gitTabSelection: null as {
+    workspaceId: string;
+    path: string;
+    staged: boolean;
+  } | null,
 };
 
 function resetStore() {
@@ -564,5 +570,124 @@ describe("saveWorkspaceFiles / getPersistedFiles", () => {
     expect(state.workspaceFileStates).toBeDefined();
     expect(state.workspaceFileStates["ws-1"]).toBeDefined();
     expect(state.workspaceFileStates["ws-1"].files[0].path).toBe("src/a.ts");
+  });
+});
+
+describe("activePanelTab git tab", () => {
+  beforeEach(resetStore);
+
+  it("accepts 'git' as a valid tab", () => {
+    useSidePanelStore.getState().setActivePanelTab("git");
+    expect(useSidePanelStore.getState().activePanelTab).toBe("git");
+  });
+});
+
+describe("merge sanitization", () => {
+  beforeEach(resetStore);
+
+  it("coerces an out-of-union activePanelTab to status on rehydrate", () => {
+    const merge = useSidePanelStore.persist.getOptions().merge!;
+    const current = useSidePanelStore.getState();
+    const merged = merge(
+      { activePanelTab: "bogus", isOpen: true },
+      current,
+    ) as typeof current;
+    expect(merged.activePanelTab).toBe("status");
+    expect(merged.isOpen).toBe(true);
+  });
+
+  it("preserves a valid persisted activePanelTab", () => {
+    const merge = useSidePanelStore.persist.getOptions().merge!;
+    const current = useSidePanelStore.getState();
+    const merged = merge({ activePanelTab: "git" }, current) as typeof current;
+    expect(merged.activePanelTab).toBe("git");
+  });
+
+  it("returns a valid default when persisted state is undefined", () => {
+    const merge = useSidePanelStore.persist.getOptions().merge!;
+    const current = useSidePanelStore.getState();
+    const merged = merge(undefined, current) as typeof current;
+    expect(merged.activePanelTab).toBe("status");
+    expect(typeof merged.setActivePanelTab).toBe("function");
+  });
+
+  it("returns a valid default when persisted state is garbage", () => {
+    const merge = useSidePanelStore.persist.getOptions().merge!;
+    const current = useSidePanelStore.getState();
+    expect(() => merge("not-an-object", current)).not.toThrow();
+    const merged = merge("not-an-object", current) as typeof current;
+    expect(merged.activePanelTab).toBe("status");
+    expect(typeof merged.setActivePanelTab).toBe("function");
+  });
+});
+
+describe("partialize excludes non-persisted state", () => {
+  beforeEach(resetStore);
+
+  it("does not persist fileViewModes or gitTabSelection", () => {
+    useSidePanelStore.getState().setFileViewMode("src/a.ts", "diff");
+    useSidePanelStore.getState().setGitTabSelection({
+      workspaceId: "ws-1",
+      path: "src/a.ts",
+      staged: true,
+    });
+
+    const partialize = useSidePanelStore.persist.getOptions().partialize!;
+    const persisted = partialize(useSidePanelStore.getState());
+
+    expect(persisted).not.toHaveProperty("fileViewModes");
+    expect(persisted).not.toHaveProperty("gitTabSelection");
+  });
+});
+
+describe("fileViewModes", () => {
+  beforeEach(resetStore);
+
+  it("setFileViewMode stores the mode for a path", () => {
+    useSidePanelStore.getState().setFileViewMode("src/a.ts", "diff");
+    expect(useSidePanelStore.getState().fileViewModes["src/a.ts"]).toBe("diff");
+  });
+
+  it("closeTab removes the fileViewModes entry for the path", () => {
+    useSidePanelStore.getState().openFileInTab("src/a.ts", "aaa", "typescript");
+    useSidePanelStore.getState().setFileViewMode("src/a.ts", "diff");
+    expect(useSidePanelStore.getState().fileViewModes["src/a.ts"]).toBe("diff");
+
+    useSidePanelStore.getState().closeTab("src/a.ts");
+    expect(useSidePanelStore.getState().fileViewModes).not.toHaveProperty(
+      "src/a.ts",
+    );
+  });
+
+  it("clearFile resets all fileViewModes", () => {
+    useSidePanelStore.getState().setFileViewMode("src/a.ts", "diff");
+    useSidePanelStore.getState().setFileViewMode("src/b.ts", "editor");
+    useSidePanelStore.getState().clearFile();
+    expect(useSidePanelStore.getState().fileViewModes).toEqual({});
+  });
+});
+
+describe("gitTabSelection", () => {
+  beforeEach(resetStore);
+
+  it("setGitTabSelection stores the workspaceId, path, and staged flag", () => {
+    useSidePanelStore.getState().setGitTabSelection({
+      workspaceId: "ws-42",
+      path: "src/x.ts",
+      staged: true,
+    });
+
+    const sel = useSidePanelStore.getState().gitTabSelection;
+    expect(sel?.workspaceId).toBe("ws-42");
+    expect(sel?.path).toBe("src/x.ts");
+    expect(sel?.staged).toBe(true);
+  });
+
+  it("setGitTabSelection accepts null to clear", () => {
+    useSidePanelStore
+      .getState()
+      .setGitTabSelection({ workspaceId: "ws-1", path: "a", staged: false });
+    useSidePanelStore.getState().setGitTabSelection(null);
+    expect(useSidePanelStore.getState().gitTabSelection).toBeNull();
   });
 });

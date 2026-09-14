@@ -9,25 +9,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  extractSessionFiles,
-  type SessionFile,
-} from "@/lib/chat/extract-session-files";
+import { type SessionFile } from "@/lib/chat/extract-session-files";
+import { useSessionFiles } from "@/components/chat/use-session-files";
 import type { MessageWithParts } from "@/lib/opencode/types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import { useChatFileOpenSetting } from "@/hooks/use-settings";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
-
-function stripWorkspacePrefix(filePath: string, workspacePath: string): string {
-  if (!workspacePath) return filePath;
-  const prefix = workspacePath.endsWith("/")
-    ? workspacePath
-    : workspacePath + "/";
-  if (filePath.startsWith(prefix)) return filePath.slice(prefix.length);
-  return filePath;
-}
+import { toRepoRelative } from "@/lib/workspace-paths";
 
 const FileRow = memo(function FileRow({
   file,
@@ -42,7 +32,7 @@ const FileRow = memo(function FileRow({
   const isMobile = useIsMobile();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { fileOpenMode } = useChatFileOpenSetting();
-  const relativePath = stripWorkspacePrefix(file.path, workspacePath);
+  const relativePath = toRepoRelative(file.path, workspacePath);
 
   const handleClick = useCallback(async () => {
     if (isMobile && fileOpenMode === "sidebar") {
@@ -144,7 +134,7 @@ export const SessionFilesPanel = memo(function SessionFilesPanel({
   workspacePath: string;
   onFileOpen?: () => void;
 }) {
-  const files = useMemo(() => extractSessionFiles(messages), [messages]);
+  const { files, hasUnloadedHistory } = useSessionFiles(messages);
   const resolvedPath = useMemo(
     () => resolveWorkspacePath(messages, workspacePath),
     [messages, workspacePath],
@@ -161,7 +151,7 @@ export const SessionFilesPanel = memo(function SessionFilesPanel({
     [files],
   );
 
-  if (files.length === 0) return null;
+  if (files.length === 0 && !hasUnloadedHistory) return null;
 
   return (
     <div className="space-y-2">
@@ -203,6 +193,15 @@ export const SessionFilesPanel = memo(function SessionFilesPanel({
               ))}
             </div>
           )}
+        </div>
+      )}
+      {hasUnloadedHistory && (
+        <div
+          data-testid="session-files-unloaded-hint"
+          className="text-muted-foreground px-1.5 py-1 text-[11px] italic"
+        >
+          Some sub-agent history isn&apos;t loaded yet — file list may be
+          incomplete.
         </div>
       )}
     </div>

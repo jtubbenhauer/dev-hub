@@ -42,6 +42,10 @@ vi.mock("@/components/chat/split-panel-files", () => ({
   ),
 }));
 
+vi.mock("@/hooks/use-git", () => ({
+  useGitStatus: vi.fn(() => ({ data: undefined })),
+}));
+
 const mockSetActivePanelTab = vi.fn();
 const mockClosePanel = vi.fn();
 

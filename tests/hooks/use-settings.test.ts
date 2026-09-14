@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_CHAT_FILE_OPEN_MODE,
   resolveChatFileOpenMode,
+  TERMINAL_FONT_OPTIONS,
+  terminalFontFamily,
   useSettings,
   useSettingsMutation,
 } from "@/hooks/use-settings";
@@ -78,6 +80,34 @@ describe("settings response errors", () => {
       await expect(
         result.current.mutateAsync({ key: "theme", value: "dark" }),
       ).rejects.toBe(bodyReadError);
+    });
+  });
+});
+
+describe("terminalFontFamily", () => {
+  it("resolves the JetBrains Mono Nerd Font option", () => {
+    expect(terminalFontFamily("jetbrains-mono-nerd")).toBe(
+      "JetBrainsMonoNerdFontMono, monospace",
+    );
+  });
+
+  it("resolves the existing font options", () => {
+    expect(terminalFontFamily("geist-mono")).toBe(
+      "var(--font-geist-mono), monospace",
+    );
+    expect(terminalFontFamily("ibm-plex-mono-nerd")).toBe(
+      "BlexMonoNerdFontMono, monospace",
+    );
+  });
+
+  it("exposes the JetBrains Mono option in TERMINAL_FONT_OPTIONS", () => {
+    const option = TERMINAL_FONT_OPTIONS.find(
+      (o) => o.value === "jetbrains-mono-nerd",
+    );
+    expect(option).toEqual({
+      value: "jetbrains-mono-nerd",
+      label: "JetBrains Mono Nerd Font",
+      fontFamily: "JetBrainsMonoNerdFontMono, monospace",
     });
   });
 });

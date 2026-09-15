@@ -91,7 +91,7 @@ const DEFAULT_PANEL_WIDTH = 280;
 type PrTab = "for-review" | "my-prs";
 
 interface PrPanelProps {
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 function formatRelativeDate(dateString: string): string {
@@ -585,9 +585,16 @@ export function PrPanel({ onClose }: PrPanelProps) {
         >
           <ExternalLink className="size-3.5" />
         </a>
-        <Button variant="ghost" size="icon-xs" onClick={onClose}>
-          <X className="size-3.5" />
-        </Button>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={onClose}
+            aria-label="Close PR review"
+          >
+            <X className="size-3.5" />
+          </Button>
+        )}
       </div>
 
       {/* PR description + review status collapsible */}
@@ -818,7 +825,7 @@ interface PrListViewProps {
   isReviewLoading: boolean;
   isMyPrsLoading: boolean;
   onSelect: (pr: GitHubPullRequest) => void;
-  onClose: () => void;
+  onClose?: () => void;
   currentUser: GitHubUser | null;
 }
 
@@ -840,9 +847,16 @@ function PrListView({
           <GitPullRequest className="size-4" />
           Pull Requests
         </div>
-        <Button variant="ghost" size="icon-xs" onClick={onClose}>
-          <X className="size-3.5" />
-        </Button>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={onClose}
+            aria-label="Close PR review"
+          >
+            <X className="size-3.5" />
+          </Button>
+        )}
       </div>
       <Tabs
         value={activeTab}

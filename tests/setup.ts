@@ -54,3 +54,18 @@ globalThis.cancelAnimationFrame = () => {};
 if (typeof Element !== "undefined") {
   Element.prototype.scrollIntoView = function scrollIntoView() {};
 }
+
+// ResizeObserver is not available in jsdom — Radix ScrollArea constructs one in
+// a layout effect. Provide a no-op stub so components that render inside a
+// ScrollArea can mount in tests.
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  value: MockResizeObserver,
+  writable: true,
+  configurable: true,
+});

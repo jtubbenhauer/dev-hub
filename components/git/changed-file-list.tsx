@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import type React from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { FileIcon, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,6 +10,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FolderTree } from "@/components/git/folder-tree";
+import { buildFileTree, flattenVisibleItems } from "@/lib/git-file-tree";
+import type { SortMode } from "@/lib/git-panel-logic";
 import { cn, isEditorElement } from "@/lib/utils";
 import type { ReviewChangedFile, ReviewFileStatus } from "@/types";
 
@@ -38,6 +42,10 @@ interface ChangedFileListProps {
   isLoading: boolean;
   reviewedFiles: Set<string>;
   emptyMessage?: string;
+  sortMode: SortMode;
+  isGroupedByFolder: boolean;
+  collapsedFolders: Set<string>;
+  onToggleFolder: (folderPath: string) => void;
   onSelectFile: (file: string) => void;
   onToggleReviewed: (path: string) => void;
 }
@@ -48,10 +56,29 @@ export function ChangedFileList({
   isLoading,
   reviewedFiles,
   emptyMessage = "No changed files",
+  sortMode,
+  isGroupedByFolder,
+  collapsedFolders,
+  onToggleFolder,
   onSelectFile,
   onToggleReviewed,
 }: ChangedFileListProps) {
-  const selectedIndex = files.findIndex((f) => f.path === selectedFile);
+  const tree = useMemo(
+    () => buildFileTree(files, sortMode === "name-desc" ? "desc" : "asc"),
+    [files, sortMode],
+  );
+
+  // j/k navigates whatever is visible: the flattened tree when grouped
+  // (skipping files hidden inside collapsed folders), the flat list otherwise.
+  const navigableFiles = useMemo(
+    () =>
+      isGroupedByFolder ? flattenVisibleItems(tree, collapsedFolders) : files,
+    [isGroupedByFolder, tree, collapsedFolders, files],
+  );
+
+  const selectedIndex = navigableFiles.findIndex(
+    (f) => f.path === selectedFile,
+  );
 
   const handleKeyboard = useCallback(
     (e: KeyboardEvent) => {
@@ -66,25 +93,104 @@ export function ChangedFileList({
       switch (e.key) {
         case "j": {
           e.preventDefault();
-          const next = files[Math.min(selectedIndex + 1, files.length - 1)];
+          const next =
+            navigableFiles[
+              Math.min(selectedIndex + 1, navigableFiles.length - 1)
+            ];
           if (next) onSelectFile(next.path);
           break;
         }
         case "k": {
           e.preventDefault();
-          const prev = files[Math.max(selectedIndex - 1, 0)];
+          const prev = navigableFiles[Math.max(selectedIndex - 1, 0)];
           if (prev) onSelectFile(prev.path);
           break;
         }
       }
     },
-    [selectedIndex, files, onSelectFile],
+    [selectedIndex, navigableFiles, onSelectFile],
   );
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyboard);
     return () => window.removeEventListener("keydown", handleKeyboard);
   }, [handleKeyboard]);
+
+  const renderFileRow = (
+    file: ReviewChangedFile,
+    showDirPath: boolean,
+  ): React.ReactNode => {
+    const statusChar = STATUS_CHAR[file.status] ?? file.status[0].toUpperCase();
+    const statusColor = STATUS_COLOR[file.status] ?? "text-muted-foreground";
+    const fileName = file.path.split("/").pop() ?? file.path;
+    const dirPath = file.path.includes("/")
+      ? file.path.slice(0, file.path.lastIndexOf("/"))
+      : "";
+    const isReviewed = reviewedFiles.has(file.path);
+
+    return (
+      <div
+        key={file.path}
+        className={cn(
+          "group hover:bg-accent/50 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-xs",
+          selectedFile === file.path && "bg-accent",
+          isReviewed && "opacity-60",
+        )}
+        onClick={() => onSelectFile(file.path)}
+      >
+        <span
+          className={cn(
+            "w-4 shrink-0 text-center font-mono font-bold",
+            statusColor,
+          )}
+        >
+          {statusChar}
+        </span>
+        <FileIcon className="text-muted-foreground size-3.5 shrink-0" />
+        <span className="flex-1 truncate">
+          {fileName}
+          {showDirPath && dirPath && (
+            <span className="text-muted-foreground/60 ml-1">{dirPath}</span>
+          )}
+        </span>
+        <div className="flex shrink-0 items-center gap-1">
+          {(file.additions != null || file.deletions != null) &&
+            ((file.additions ?? 0) > 0 || (file.deletions ?? 0) > 0) && (
+              <span className="text-muted-foreground/60 flex items-center gap-1 font-mono text-[10px]">
+                {(file.additions ?? 0) > 0 && (
+                  <span className="text-green-500">+{file.additions}</span>
+                )}
+                {(file.deletions ?? 0) > 0 && (
+                  <span className="text-red-500">-{file.deletions}</span>
+                )}
+              </span>
+            )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className={cn(
+                  isReviewed
+                    ? "text-green-500 hover:text-green-400"
+                    : "text-muted-foreground/40 hover:text-muted-foreground",
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleReviewed(file.path);
+                }}
+              >
+                <Check className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isReviewed ? "Unmark reviewed" : "Mark as reviewed"}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -105,84 +211,16 @@ export function ChangedFileList({
   return (
     <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
       <div className="space-y-px p-2">
-        {files.map((file) => {
-          const statusChar =
-            STATUS_CHAR[file.status] ?? file.status[0].toUpperCase();
-          const statusColor =
-            STATUS_COLOR[file.status] ?? "text-muted-foreground";
-          const fileName = file.path.split("/").pop() ?? file.path;
-          const dirPath = file.path.includes("/")
-            ? file.path.slice(0, file.path.lastIndexOf("/"))
-            : "";
-          const isReviewed = reviewedFiles.has(file.path);
-
-          return (
-            <div
-              key={file.path}
-              className={cn(
-                "group hover:bg-accent/50 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-xs",
-                selectedFile === file.path && "bg-accent",
-                isReviewed && "opacity-60",
-              )}
-              onClick={() => onSelectFile(file.path)}
-            >
-              <span
-                className={cn(
-                  "w-4 shrink-0 text-center font-mono font-bold",
-                  statusColor,
-                )}
-              >
-                {statusChar}
-              </span>
-              <FileIcon className="text-muted-foreground size-3.5 shrink-0" />
-              <span className="flex-1 truncate">
-                {fileName}
-                {dirPath && (
-                  <span className="text-muted-foreground/60 ml-1">
-                    {dirPath}
-                  </span>
-                )}
-              </span>
-              <div className="flex shrink-0 items-center gap-1">
-                {(file.additions != null || file.deletions != null) &&
-                  ((file.additions ?? 0) > 0 || (file.deletions ?? 0) > 0) && (
-                    <span className="text-muted-foreground/60 flex items-center gap-1 font-mono text-[10px]">
-                      {(file.additions ?? 0) > 0 && (
-                        <span className="text-green-500">
-                          +{file.additions}
-                        </span>
-                      )}
-                      {(file.deletions ?? 0) > 0 && (
-                        <span className="text-red-500">-{file.deletions}</span>
-                      )}
-                    </span>
-                  )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className={cn(
-                        isReviewed
-                          ? "text-green-500 hover:text-green-400"
-                          : "text-muted-foreground/40 hover:text-muted-foreground",
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleReviewed(file.path);
-                      }}
-                    >
-                      <Check className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {isReviewed ? "Unmark reviewed" : "Mark as reviewed"}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-          );
-        })}
+        {isGroupedByFolder ? (
+          <FolderTree
+            root={tree}
+            collapsedFolders={collapsedFolders}
+            onToggleFolder={onToggleFolder}
+            renderFile={(file) => renderFileRow(file, false)}
+          />
+        ) : (
+          files.map((file) => renderFileRow(file, true))
+        )}
       </div>
     </ScrollArea>
   );

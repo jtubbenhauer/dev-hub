@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useCallback, useEffect, useMemo } from "react";
 import {
   Plus,
@@ -18,6 +19,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FolderTree } from "@/components/git/folder-tree";
+import { buildFileTree, flattenVisibleItems } from "@/lib/git-file-tree";
 import { cn, isEditorElement } from "@/lib/utils";
 import type { GitFileStatus } from "@/types";
 
@@ -61,6 +64,13 @@ interface DiffStat {
   deletions: number;
 }
 
+// Section-local wrapper for the combined Changes tree. The kind discriminator
+// routes each file to its per-kind renderer (unstaged keeps Discard+Stage,
+// untracked keeps Stage) while buildFileTree only needs `path`.
+type ChangesItem =
+  | { path: string; kind: "unstaged"; original: GitFileStatus }
+  | { path: string; kind: "untracked"; original: string };
+
 interface FileStatusListProps {
   staged: GitFileStatus[];
   unstaged: GitFileStatus[];
@@ -71,6 +81,9 @@ interface FileStatusListProps {
   reviewedFiles: Set<string>;
   sortMode?: SortMode;
   diffStats?: Map<string, DiffStat>;
+  isGroupedByFolder: boolean;
+  collapsedFolders: Set<string>;
+  onToggleFolder: (folderPath: string) => void;
   onSelectFile: (file: string, staged: boolean) => void;
   onStageFiles: (files: string[]) => void;
   onUnstageFiles: (files: string[]) => void;
@@ -90,6 +103,9 @@ export function FileStatusList({
   reviewedFiles,
   sortMode = "path",
   diffStats,
+  isGroupedByFolder,
+  collapsedFolders,
+  onToggleFolder,
   onSelectFile,
   onStageFiles,
   onUnstageFiles,
@@ -127,16 +143,82 @@ export function FileStatusList({
     [conflicted, sortMode],
   );
 
-  // Flat ordered list for keyboard navigation — matches display order
-  const flatFiles = useMemo(
+  // Folder ordering mirrors todo 4: descending only when name-desc is active.
+  const folderOrder = sortMode === "name-desc" ? "desc" : "asc";
+
+  const stagedTree = useMemo(
+    () => buildFileTree(sortedStaged, folderOrder),
+    [sortedStaged, folderOrder],
+  );
+
+  // Changes = unstaged then untracked in ONE tree. Stable insertion order keeps
+  // unstaged rows before untracked rows within any shared folder.
+  const changesItems = useMemo<ChangesItem[]>(
     () => [
+      ...sortedUnstaged.map(
+        (file): ChangesItem => ({
+          path: file.path,
+          kind: "unstaged",
+          original: file,
+        }),
+      ),
+      ...sortedUntracked.map(
+        (path): ChangesItem => ({ path, kind: "untracked", original: path }),
+      ),
+    ],
+    [sortedUnstaged, sortedUntracked],
+  );
+  const changesTree = useMemo(
+    () => buildFileTree(changesItems, folderOrder),
+    [changesItems, folderOrder],
+  );
+
+  const conflictItems = useMemo(
+    () => sortedConflicted.map((path) => ({ path })),
+    [sortedConflicted],
+  );
+  const conflictsTree = useMemo(
+    () => buildFileTree(conflictItems, folderOrder),
+    [conflictItems, folderOrder],
+  );
+
+  // Flat ordered list for keyboard navigation — matches display order. When
+  // grouped, concatenate each section's visible files (staged → changes →
+  // conflicts) so j/k/s skip files hidden inside collapsed folders.
+  const flatFiles = useMemo(() => {
+    if (isGroupedByFolder) {
+      return [
+        ...flattenVisibleItems(stagedTree, collapsedFolders).map((f) => ({
+          path: f.path,
+          isStaged: true,
+        })),
+        ...flattenVisibleItems(changesTree, collapsedFolders).map((f) => ({
+          path: f.path,
+          isStaged: false,
+        })),
+        ...flattenVisibleItems(conflictsTree, collapsedFolders).map((f) => ({
+          path: f.path,
+          isStaged: false,
+        })),
+      ];
+    }
+    return [
       ...sortedStaged.map((f) => ({ path: f.path, isStaged: true })),
       ...sortedUnstaged.map((f) => ({ path: f.path, isStaged: false })),
       ...sortedUntracked.map((path) => ({ path, isStaged: false })),
       ...sortedConflicted.map((path) => ({ path, isStaged: false })),
-    ],
-    [sortedStaged, sortedUnstaged, sortedUntracked, sortedConflicted],
-  );
+    ];
+  }, [
+    isGroupedByFolder,
+    stagedTree,
+    changesTree,
+    conflictsTree,
+    collapsedFolders,
+    sortedStaged,
+    sortedUnstaged,
+    sortedUntracked,
+    sortedConflicted,
+  ]);
 
   const selectedIndex = flatFiles.findIndex(
     (f) => f.path === selectedFile && f.isStaged === selectedStaged,
@@ -196,6 +278,152 @@ export function FileStatusList({
     return () => window.removeEventListener("keydown", handleKeyboard);
   }, [handleKeyboard]);
 
+  const renderStagedRow = (
+    file: GitFileStatus,
+    showDirPath: boolean,
+  ): React.ReactNode => (
+    <FileRow
+      key={`staged-${file.path}`}
+      path={file.path}
+      statusChar={file.index}
+      statusColor="text-green-500"
+      showDirPath={showDirPath}
+      isSelected={selectedFile === file.path && selectedStaged}
+      isReviewed={reviewedFiles.has(file.path)}
+      diffStat={diffStats?.get(`staged:${file.path}`)}
+      onClick={() => onSelectFile(file.path, true)}
+      onToggleReviewed={() => onToggleReviewed(file.path)}
+      actions={
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={(event) => {
+                event.stopPropagation();
+                onUnstageFiles([file.path]);
+              }}
+            >
+              <CircleMinus className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Unstage</TooltipContent>
+        </Tooltip>
+      }
+    />
+  );
+
+  const renderUnstagedRow = (
+    file: GitFileStatus,
+    showDirPath: boolean,
+  ): React.ReactNode => (
+    <FileRow
+      key={`unstaged-${file.path}`}
+      path={file.path}
+      statusChar={file.workingDir}
+      statusColor="text-yellow-500"
+      showDirPath={showDirPath}
+      isSelected={selectedFile === file.path && !selectedStaged}
+      isReviewed={reviewedFiles.has(file.path)}
+      diffStat={diffStats?.get(`unstaged:${file.path}`)}
+      onClick={() => onSelectFile(file.path, false)}
+      onToggleReviewed={() => onToggleReviewed(file.path)}
+      actions={
+        <div className="flex gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDiscardFiles([file.path]);
+                }}
+              >
+                <Undo2 className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Discard</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onStageFiles([file.path]);
+                }}
+              >
+                <CirclePlus className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Stage</TooltipContent>
+          </Tooltip>
+        </div>
+      }
+    />
+  );
+
+  const renderUntrackedRow = (
+    path: string,
+    showDirPath: boolean,
+  ): React.ReactNode => (
+    <FileRow
+      key={`untracked-${path}`}
+      path={path}
+      statusChar="?"
+      statusColor="text-muted-foreground"
+      showDirPath={showDirPath}
+      isSelected={selectedFile === path && !selectedStaged}
+      isReviewed={reviewedFiles.has(path)}
+      onClick={() => onSelectFile(path, false)}
+      onToggleReviewed={() => onToggleReviewed(path)}
+      actions={
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={(event) => {
+                event.stopPropagation();
+                onStageFiles([path]);
+              }}
+            >
+              <CirclePlus className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stage</TooltipContent>
+        </Tooltip>
+      }
+    />
+  );
+
+  const renderConflictedRow = (
+    path: string,
+    showDirPath: boolean,
+  ): React.ReactNode => (
+    <FileRow
+      key={`conflicted-${path}`}
+      path={path}
+      statusChar="!"
+      statusColor="text-red-500"
+      showDirPath={showDirPath}
+      isSelected={selectedFile === path}
+      isReviewed={reviewedFiles.has(path)}
+      onClick={() => onSelectFile(path, false)}
+      onToggleReviewed={() => onToggleReviewed(path)}
+    />
+  );
+
+  const renderChangesRow = (
+    item: ChangesItem,
+    showDirPath: boolean,
+  ): React.ReactNode =>
+    item.kind === "unstaged"
+      ? renderUnstagedRow(item.original, showDirPath)
+      : renderUntrackedRow(item.original, showDirPath);
+
   return (
     <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
       <div className="space-y-1 p-2">
@@ -216,39 +444,19 @@ export function FileStatusList({
             ) : null
           }
         >
-          {sortedStaged.map((file) => (
-            <FileRow
-              key={`staged-${file.path}`}
-              path={file.path}
-              statusChar={file.index}
-              statusColor="text-green-500"
-              isSelected={selectedFile === file.path && selectedStaged}
-              isReviewed={reviewedFiles.has(file.path)}
-              diffStat={diffStats?.get(`staged:${file.path}`)}
-              onClick={() => onSelectFile(file.path, true)}
-              onToggleReviewed={() => onToggleReviewed(file.path)}
-              actions={
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onUnstageFiles([file.path]);
-                      }}
-                    >
-                      <CircleMinus className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Unstage</TooltipContent>
-                </Tooltip>
-              }
+          {isGroupedByFolder ? (
+            <FolderTree
+              root={stagedTree}
+              collapsedFolders={collapsedFolders}
+              onToggleFolder={onToggleFolder}
+              renderFile={(file) => renderStagedRow(file, false)}
             />
-          ))}
+          ) : (
+            sortedStaged.map((file) => renderStagedRow(file, true))
+          )}
         </FileSection>
 
-        {/* Unstaged (modified) files */}
+        {/* Unstaged (modified) + untracked files */}
         <FileSection
           title="Changes"
           count={unstaged.length + untracked.length}
@@ -267,99 +475,34 @@ export function FileStatusList({
             ) : null
           }
         >
-          {sortedUnstaged.map((file) => (
-            <FileRow
-              key={`unstaged-${file.path}`}
-              path={file.path}
-              statusChar={file.workingDir}
-              statusColor="text-yellow-500"
-              isSelected={selectedFile === file.path && !selectedStaged}
-              isReviewed={reviewedFiles.has(file.path)}
-              diffStat={diffStats?.get(`unstaged:${file.path}`)}
-              onClick={() => onSelectFile(file.path, false)}
-              onToggleReviewed={() => onToggleReviewed(file.path)}
-              actions={
-                <div className="flex gap-0.5">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onDiscardFiles([file.path]);
-                        }}
-                      >
-                        <Undo2 className="size-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Discard</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onStageFiles([file.path]);
-                        }}
-                      >
-                        <CirclePlus className="size-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Stage</TooltipContent>
-                  </Tooltip>
-                </div>
-              }
+          {isGroupedByFolder ? (
+            <FolderTree
+              root={changesTree}
+              collapsedFolders={collapsedFolders}
+              onToggleFolder={onToggleFolder}
+              renderFile={(item) => renderChangesRow(item, false)}
             />
-          ))}
-          {sortedUntracked.map((path) => (
-            <FileRow
-              key={`untracked-${path}`}
-              path={path}
-              statusChar="?"
-              statusColor="text-muted-foreground"
-              isSelected={selectedFile === path && !selectedStaged}
-              isReviewed={reviewedFiles.has(path)}
-              onClick={() => onSelectFile(path, false)}
-              onToggleReviewed={() => onToggleReviewed(path)}
-              actions={
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onStageFiles([path]);
-                      }}
-                    >
-                      <CirclePlus className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Stage</TooltipContent>
-                </Tooltip>
-              }
-            />
-          ))}
+          ) : (
+            <>
+              {sortedUnstaged.map((file) => renderUnstagedRow(file, true))}
+              {sortedUntracked.map((path) => renderUntrackedRow(path, true))}
+            </>
+          )}
         </FileSection>
 
         {/* Conflicted files */}
         {conflicted.length > 0 && (
           <FileSection title="Conflicts" count={conflicted.length}>
-            {sortedConflicted.map((path) => (
-              <FileRow
-                key={`conflicted-${path}`}
-                path={path}
-                statusChar="!"
-                statusColor="text-red-500"
-                isSelected={selectedFile === path}
-                isReviewed={reviewedFiles.has(path)}
-                onClick={() => onSelectFile(path, false)}
-                onToggleReviewed={() => onToggleReviewed(path)}
+            {isGroupedByFolder ? (
+              <FolderTree
+                root={conflictsTree}
+                collapsedFolders={collapsedFolders}
+                onToggleFolder={onToggleFolder}
+                renderFile={(item) => renderConflictedRow(item.path, false)}
               />
-            ))}
+            ) : (
+              sortedConflicted.map((path) => renderConflictedRow(path, true))
+            )}
           </FileSection>
         )}
       </div>
@@ -402,6 +545,7 @@ function FileRow({
   isSelected,
   isReviewed,
   diffStat,
+  showDirPath = true,
   onClick,
   onToggleReviewed,
   actions,
@@ -412,6 +556,7 @@ function FileRow({
   isSelected: boolean;
   isReviewed: boolean;
   diffStat?: DiffStat;
+  showDirPath?: boolean;
   onClick: () => void;
   onToggleReviewed: () => void;
   actions?: React.ReactNode;
@@ -441,7 +586,7 @@ function FileRow({
       <FileIcon className="text-muted-foreground size-3.5 shrink-0" />
       <span className="flex-1 truncate">
         {fileName}
-        {dirPath && (
+        {showDirPath && dirPath && (
           <span className="text-muted-foreground/60 ml-1">{dirPath}</span>
         )}
       </span>

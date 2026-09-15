@@ -1,5 +1,21 @@
-import { describe, it, expect } from "vitest";
-import { sortFiles, buildFlatFiles } from "@/lib/git-panel-logic";
+import { describe, it, expect, vi } from "vitest";
+import {
+  sortFiles,
+  buildFlatFiles,
+  buildVisibleFlatFiles,
+  buildVisibleChangedFiles,
+  resolveLeaderFileAction,
+  applyLeaderFileResolution,
+  parseStoredViewMode,
+  isValidViewMode,
+} from "@/lib/git-panel-logic";
+import type {
+  SortMode,
+  LeaderFileAction,
+  LeaderFileActionInput,
+  LeaderFileEffects,
+} from "@/lib/git-panel-logic";
+import { buildFileTree, flattenVisibleItems } from "@/lib/git-file-tree";
 import type { ReviewChangedFile, GitStatusResult } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -650,5 +666,642 @@ describe("stage-toggle logic", () => {
     const current = flatFiles[selectedIndex];
     expect(current).toBeUndefined();
     // Handler would return early (if (!current) return)
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 13. buildVisibleFlatFiles / buildVisibleChangedFiles — collapse-aware order
+// ---------------------------------------------------------------------------
+
+const ALL_SORT_MODES: SortMode[] = ["name-asc", "name-desc", "status", "path"];
+
+function nestedStatus(): GitStatusResult {
+  return makeStatus({
+    staged: [
+      { path: "src/components/Button.tsx", index: "M", workingDir: " " },
+      { path: "src/index.ts", index: "A", workingDir: " " },
+      { path: "README.md", index: "M", workingDir: " " },
+    ],
+    unstaged: [
+      { path: "src/utils/helpers.ts", index: " ", workingDir: "M" },
+      { path: "lib/db.ts", index: " ", workingDir: "M" },
+    ],
+    untracked: ["src/new.ts", "docs/guide.md"],
+    conflicted: ["config/settings.json"],
+  });
+}
+
+// Independent re-derivation of file-status.tsx's grouped flat order — the
+// canonical display pipeline the leader keys must mirror.
+function expectedWorkingVisible(
+  status: GitStatusResult,
+  sortMode: SortMode,
+  collapsed: ReadonlySet<string>,
+): { path: string; isStaged: boolean }[] {
+  const folderOrder = sortMode === "name-desc" ? "desc" : "asc";
+  const sortSec = <T extends { path: string }>(
+    items: T[],
+    key?: keyof T,
+  ): T[] => {
+    const s = [...items];
+    switch (sortMode) {
+      case "name-asc":
+        return s.sort((a, b) => {
+          const an = a.path.split("/").pop() ?? a.path;
+          const bn = b.path.split("/").pop() ?? b.path;
+          return an.localeCompare(bn);
+        });
+      case "name-desc":
+        return s.sort((a, b) => {
+          const an = a.path.split("/").pop() ?? a.path;
+          const bn = b.path.split("/").pop() ?? b.path;
+          return bn.localeCompare(an);
+        });
+      case "status":
+        return key
+          ? s.sort((a, b) => String(a[key]).localeCompare(String(b[key])))
+          : s;
+      case "path":
+        return s.sort((a, b) => a.path.localeCompare(b.path));
+      default:
+        return s;
+    }
+  };
+  const staged = sortSec(status.staged, "index");
+  const unstaged = sortSec(status.unstaged, "workingDir");
+  const untracked = sortSec(status.untracked.map((p) => ({ path: p })));
+  const conflicted = sortSec(status.conflicted.map((p) => ({ path: p })));
+  const stagedTree = buildFileTree(staged, folderOrder);
+  const changesTree = buildFileTree(
+    [
+      ...unstaged.map((f) => ({ path: f.path })),
+      ...untracked.map((f) => ({ path: f.path })),
+    ],
+    folderOrder,
+  );
+  const conflictsTree = buildFileTree(conflicted, folderOrder);
+  return [
+    ...flattenVisibleItems(stagedTree, collapsed).map((f) => ({
+      path: f.path,
+      isStaged: true,
+    })),
+    ...flattenVisibleItems(changesTree, collapsed).map((f) => ({
+      path: f.path,
+      isStaged: false,
+    })),
+    ...flattenVisibleItems(conflictsTree, collapsed).map((f) => ({
+      path: f.path,
+      isStaged: false,
+    })),
+  ];
+}
+
+describe("buildVisibleFlatFiles — explicit nested order (name-asc, grouped)", () => {
+  it("orders subfolders' files before root files, staged → changes → conflicts", () => {
+    const status = makeStatus({
+      staged: [
+        { path: "src/z.ts", index: "M", workingDir: " " },
+        { path: "src/a.ts", index: "A", workingDir: " " },
+        { path: "root.ts", index: "M", workingDir: " " },
+      ],
+    });
+    const result = buildVisibleFlatFiles(
+      status,
+      "name-asc",
+      true,
+      new Set<string>(),
+    );
+    expect(result).toEqual([
+      { path: "src/a.ts", isStaged: true },
+      { path: "src/z.ts", isStaged: true },
+      { path: "root.ts", isStaged: true },
+    ]);
+  });
+});
+
+describe.each(ALL_SORT_MODES)(
+  "buildVisibleFlatFiles — grouped matches display pipeline (%s)",
+  (mode) => {
+    it("matches the display order for a nested fixture", () => {
+      const status = nestedStatus();
+      const collapsed = new Set<string>();
+      expect(buildVisibleFlatFiles(status, mode, true, collapsed)).toEqual(
+        expectedWorkingVisible(status, mode, collapsed),
+      );
+    });
+
+    it("excludes files inside a collapsed folder", () => {
+      const status = nestedStatus();
+      const collapsed = new Set<string>(["src"]);
+      const result = buildVisibleFlatFiles(status, mode, true, collapsed);
+      expect(result.some((f) => f.path.startsWith("src/"))).toBe(false);
+      expect(result).toEqual(expectedWorkingVisible(status, mode, collapsed));
+    });
+
+    it("ungrouped delegates to buildFlatFiles output exactly", () => {
+      const status = nestedStatus();
+      expect(
+        buildVisibleFlatFiles(status, mode, false, new Set<string>()),
+      ).toEqual(buildFlatFiles(status, mode));
+    });
+  },
+);
+
+describe("buildVisibleFlatFiles — null status", () => {
+  it("returns [] for null/undefined status regardless of grouping", () => {
+    expect(buildVisibleFlatFiles(null, "path", true, new Set())).toEqual([]);
+    expect(buildVisibleFlatFiles(undefined, "path", false, new Set())).toEqual(
+      [],
+    );
+  });
+});
+
+function expectedChangedVisible(
+  files: ReviewChangedFile[],
+  sortMode: SortMode,
+  collapsed: ReadonlySet<string>,
+): { path: string; isStaged: boolean }[] {
+  const folderOrder = sortMode === "name-desc" ? "desc" : "asc";
+  const tree = buildFileTree(files, folderOrder);
+  return flattenVisibleItems(tree, collapsed).map((f) => ({
+    path: f.path,
+    isStaged: false,
+  }));
+}
+
+describe("buildVisibleChangedFiles — collapse + folderOrder", () => {
+  const changed = [
+    makeReviewFile("src/a/one.ts"),
+    makeReviewFile("src/b/two.ts"),
+    makeReviewFile("root.ts"),
+  ];
+
+  it("ungrouped returns every file as isStaged: false in input order", () => {
+    expect(
+      buildVisibleChangedFiles(changed, "path", false, new Set<string>()),
+    ).toEqual([
+      { path: "src/a/one.ts", isStaged: false },
+      { path: "src/b/two.ts", isStaged: false },
+      { path: "root.ts", isStaged: false },
+    ]);
+  });
+
+  it.each(ALL_SORT_MODES)(
+    "grouped matches the display pipeline (%s)",
+    (mode) => {
+      const collapsed = new Set<string>();
+      expect(buildVisibleChangedFiles(changed, mode, true, collapsed)).toEqual(
+        expectedChangedVisible(changed, mode, collapsed),
+      );
+    },
+  );
+
+  it("excludes files inside a collapsed folder", () => {
+    const collapsed = new Set<string>(["src/a"]);
+    const result = buildVisibleChangedFiles(changed, "path", true, collapsed);
+    expect(result.some((f) => f.path.startsWith("src/a/"))).toBe(false);
+    expect(result).toEqual(expectedChangedVisible(changed, "path", collapsed));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14. resolveLeaderFileAction
+// ---------------------------------------------------------------------------
+
+const NAV_ACTIONS: LeaderFileAction[] = [
+  "next-file",
+  "prev-file",
+  "next-unreviewed",
+  "prev-unreviewed",
+];
+const ALL_ACTIONS: LeaderFileAction[] = [
+  ...NAV_ACTIONS,
+  "reviewed-next",
+  "stage-toggle",
+];
+
+const workingStatus = makeStatus({
+  staged: [
+    { path: "a.ts", index: "M", workingDir: " " },
+    { path: "b.ts", index: "M", workingDir: " " },
+    { path: "c.ts", index: "M", workingDir: " " },
+  ],
+});
+
+const changedFixture: ReviewChangedFile[] = [
+  makeReviewFile("x.ts"),
+  makeReviewFile("y.ts"),
+  makeReviewFile("z.ts"),
+];
+
+function baseInput(
+  overrides: Partial<LeaderFileActionInput> = {},
+): LeaderFileActionInput {
+  return {
+    action: "next-file",
+    viewMode: "working",
+    status: workingStatus,
+    changedFiles: [],
+    sortMode: "path",
+    isGroupedByFolder: false,
+    collapsedFolders: new Set<string>(),
+    selectedFile: null,
+    selectedStaged: false,
+    reviewedFiles: new Set<string>(),
+    ...overrides,
+  };
+}
+
+describe("resolveLeaderFileAction — null selection", () => {
+  it.each(NAV_ACTIONS)(
+    "%s resolves to the first visible candidate",
+    (action) => {
+      const res = resolveLeaderFileAction(baseInput({ action }));
+      expect(res).toEqual({ kind: "select", path: "a.ts", staged: true });
+    },
+  );
+
+  it("reviewed-next resolves to noop", () => {
+    expect(
+      resolveLeaderFileAction(baseInput({ action: "reviewed-next" })),
+    ).toEqual({ kind: "noop" });
+  });
+
+  it("stage-toggle resolves to noop", () => {
+    expect(
+      resolveLeaderFileAction(baseInput({ action: "stage-toggle" })),
+    ).toEqual({ kind: "noop" });
+  });
+
+  it("next-unreviewed skips reviewed files when landing on first candidate", () => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "next-unreviewed",
+        reviewedFiles: new Set(["a.ts"]),
+      }),
+    );
+    expect(res).toEqual({ kind: "select", path: "b.ts", staged: true });
+  });
+});
+
+describe("resolveLeaderFileAction — hidden selection", () => {
+  const nested = makeStatus({
+    staged: [
+      { path: "src/hidden.ts", index: "M", workingDir: " " },
+      { path: "top.ts", index: "M", workingDir: " " },
+    ],
+  });
+
+  it.each(ALL_ACTIONS)(
+    "%s resolves to noop when the selection is inside a collapsed folder",
+    (action) => {
+      const res = resolveLeaderFileAction(
+        baseInput({
+          action,
+          status: nested,
+          sortMode: "name-asc",
+          isGroupedByFolder: true,
+          collapsedFolders: new Set(["src"]),
+          selectedFile: "src/hidden.ts",
+          selectedStaged: true,
+        }),
+      );
+      expect(res).toEqual({ kind: "noop" });
+    },
+  );
+});
+
+describe("resolveLeaderFileAction — pr and non-file view modes", () => {
+  it.each(ALL_ACTIONS)("%s resolves to noop in pr view mode", (action) => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action,
+        viewMode: "pr",
+        selectedFile: "a.ts",
+        selectedStaged: true,
+      }),
+    );
+    expect(res).toEqual({ kind: "noop" });
+  });
+});
+
+describe("resolveLeaderFileAction — stage-toggle scope", () => {
+  it.each(["branch", "last-commit", "pr"])(
+    "resolves to noop outside working mode (%s)",
+    (viewMode) => {
+      const res = resolveLeaderFileAction(
+        baseInput({
+          action: "stage-toggle",
+          viewMode,
+          changedFiles: changedFixture,
+          selectedFile: "x.ts",
+          selectedStaged: false,
+        }),
+      );
+      expect(res).toEqual({ kind: "noop" });
+    },
+  );
+
+  it("stages an unstaged selected file in working mode", () => {
+    const status = makeStatus({
+      unstaged: [{ path: "u.ts", index: " ", workingDir: "M" }],
+    });
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "stage-toggle",
+        status,
+        selectedFile: "u.ts",
+        selectedStaged: false,
+      }),
+    );
+    expect(res).toEqual({ kind: "stage", path: "u.ts" });
+  });
+
+  it("unstages a staged selected file in working mode", () => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "stage-toggle",
+        selectedFile: "a.ts",
+        selectedStaged: true,
+      }),
+    );
+    expect(res).toEqual({ kind: "unstage", path: "a.ts" });
+  });
+});
+
+describe("resolveLeaderFileAction — navigation from a selection", () => {
+  it("next-file advances to the following visible file", () => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "next-file",
+        selectedFile: "a.ts",
+        selectedStaged: true,
+      }),
+    );
+    expect(res).toEqual({ kind: "select", path: "b.ts", staged: true });
+  });
+
+  it("prev-file steps back to the previous visible file", () => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "prev-file",
+        selectedFile: "b.ts",
+        selectedStaged: true,
+      }),
+    );
+    expect(res).toEqual({ kind: "select", path: "a.ts", staged: true });
+  });
+
+  it("next-file clamps at the end (re-selects the last file)", () => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "next-file",
+        selectedFile: "c.ts",
+        selectedStaged: true,
+      }),
+    );
+    expect(res).toEqual({ kind: "select", path: "c.ts", staged: true });
+  });
+
+  it("navigates the branch changed-file list (isStaged false)", () => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "next-file",
+        viewMode: "branch",
+        changedFiles: changedFixture,
+        selectedFile: "x.ts",
+        selectedStaged: false,
+      }),
+    );
+    expect(res).toEqual({ kind: "select", path: "y.ts", staged: false });
+  });
+});
+
+describe("resolveLeaderFileAction — reviewed-next uses the visible list", () => {
+  const nested = makeStatus({
+    staged: [
+      { path: "aaa/1.ts", index: "M", workingDir: " " },
+      { path: "aaa/2.ts", index: "M", workingDir: " " },
+      { path: "bbb/3.ts", index: "M", workingDir: " " },
+    ],
+  });
+
+  it("toggles the current file and selects the next visible file", () => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "reviewed-next",
+        status: nested,
+        sortMode: "name-asc",
+        isGroupedByFolder: true,
+        collapsedFolders: new Set<string>(),
+        selectedFile: "aaa/2.ts",
+        selectedStaged: true,
+      }),
+    );
+    expect(res).toEqual({
+      kind: "toggle-reviewed-then-select",
+      togglePath: "aaa/2.ts",
+      next: { path: "bbb/3.ts", staged: true },
+    });
+  });
+
+  it("toggles with next: null when the next file is hidden in a collapsed folder", () => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "reviewed-next",
+        status: nested,
+        sortMode: "name-asc",
+        isGroupedByFolder: true,
+        collapsedFolders: new Set(["bbb"]),
+        selectedFile: "aaa/2.ts",
+        selectedStaged: true,
+      }),
+    );
+    expect(res).toEqual({
+      kind: "toggle-reviewed-then-select",
+      togglePath: "aaa/2.ts",
+      next: null,
+    });
+  });
+
+  it("toggles with next: null at the end of the list", () => {
+    const res = resolveLeaderFileAction(
+      baseInput({
+        action: "reviewed-next",
+        selectedFile: "c.ts",
+        selectedStaged: true,
+      }),
+    );
+    expect(res).toEqual({
+      kind: "toggle-reviewed-then-select",
+      togglePath: "c.ts",
+      next: null,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. applyLeaderFileResolution
+// ---------------------------------------------------------------------------
+
+describe("applyLeaderFileResolution", () => {
+  function makeEffects(wasEditorFocused: boolean): LeaderFileEffects {
+    return {
+      select: vi.fn(),
+      toggleReviewed: vi.fn(),
+      stage: vi.fn(),
+      unstage: vi.fn(),
+      wasEditorFocused,
+      refocusEditor: vi.fn(),
+    };
+  }
+
+  beforeEachRafStub();
+
+  it("toggle-reviewed-then-select refocuses AFTER select when editor was focused", () => {
+    const effects = makeEffects(true);
+    applyLeaderFileResolution(
+      {
+        kind: "toggle-reviewed-then-select",
+        togglePath: "a.ts",
+        next: { path: "b.ts", staged: true },
+      },
+      effects,
+    );
+    expect(effects.toggleReviewed).toHaveBeenCalledWith("a.ts");
+    expect(effects.select).toHaveBeenCalledWith("b.ts", true);
+    expect(effects.refocusEditor).toHaveBeenCalledTimes(1);
+    const selectOrder = (effects.select as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[0];
+    const refocusOrder = (effects.refocusEditor as ReturnType<typeof vi.fn>)
+      .mock.invocationCallOrder[0];
+    expect(selectOrder).toBeLessThan(refocusOrder);
+  });
+
+  it("toggle-reviewed-then-select never refocuses when editor was not focused", () => {
+    const effects = makeEffects(false);
+    applyLeaderFileResolution(
+      {
+        kind: "toggle-reviewed-then-select",
+        togglePath: "a.ts",
+        next: { path: "b.ts", staged: true },
+      },
+      effects,
+    );
+    expect(effects.select).toHaveBeenCalledWith("b.ts", true);
+    expect(effects.refocusEditor).not.toHaveBeenCalled();
+  });
+
+  it("toggle-reviewed-then-select with next: null toggles but never selects/refocuses", () => {
+    const effects = makeEffects(true);
+    applyLeaderFileResolution(
+      { kind: "toggle-reviewed-then-select", togglePath: "a.ts", next: null },
+      effects,
+    );
+    expect(effects.toggleReviewed).toHaveBeenCalledWith("a.ts");
+    expect(effects.select).not.toHaveBeenCalled();
+    expect(effects.refocusEditor).not.toHaveBeenCalled();
+  });
+
+  it("select invokes only select", () => {
+    const effects = makeEffects(true);
+    applyLeaderFileResolution(
+      { kind: "select", path: "a.ts", staged: false },
+      effects,
+    );
+    expect(effects.select).toHaveBeenCalledWith("a.ts", false);
+    expect(effects.stage).not.toHaveBeenCalled();
+    expect(effects.unstage).not.toHaveBeenCalled();
+    expect(effects.toggleReviewed).not.toHaveBeenCalled();
+  });
+
+  it("stage invokes only stage", () => {
+    const effects = makeEffects(true);
+    applyLeaderFileResolution({ kind: "stage", path: "u.ts" }, effects);
+    expect(effects.stage).toHaveBeenCalledWith("u.ts");
+    expect(effects.unstage).not.toHaveBeenCalled();
+    expect(effects.select).not.toHaveBeenCalled();
+  });
+
+  it("unstage invokes only unstage", () => {
+    const effects = makeEffects(true);
+    applyLeaderFileResolution({ kind: "unstage", path: "s.ts" }, effects);
+    expect(effects.unstage).toHaveBeenCalledWith("s.ts");
+    expect(effects.stage).not.toHaveBeenCalled();
+  });
+
+  it("noop invokes no effect", () => {
+    const effects = makeEffects(true);
+    applyLeaderFileResolution({ kind: "noop" }, effects);
+    expect(effects.select).not.toHaveBeenCalled();
+    expect(effects.stage).not.toHaveBeenCalled();
+    expect(effects.unstage).not.toHaveBeenCalled();
+    expect(effects.toggleReviewed).not.toHaveBeenCalled();
+    expect(effects.refocusEditor).not.toHaveBeenCalled();
+  });
+});
+
+// requestAnimationFrame is stubbed to run synchronously so refocus ordering is
+// observable within the apply unit tests.
+function beforeEachRafStub(): void {
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    cb(0);
+    return 0;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 16. parseStoredViewMode / isValidViewMode — localStorage view-mode parsing
+// ---------------------------------------------------------------------------
+
+describe("parseStoredViewMode", () => {
+  it("maps the removed 'pr' value to 'working'", () => {
+    expect(parseStoredViewMode("pr")).toBe("working");
+  });
+
+  it("returns 'branch' for a valid 'branch' value", () => {
+    expect(parseStoredViewMode("branch")).toBe("branch");
+  });
+
+  it("returns 'last-commit' for a valid 'last-commit' value", () => {
+    expect(parseStoredViewMode("last-commit")).toBe("last-commit");
+  });
+
+  it("returns 'working' for a valid 'working' value", () => {
+    expect(parseStoredViewMode("working")).toBe("working");
+  });
+
+  it("returns 'working' for null", () => {
+    expect(parseStoredViewMode(null)).toBe("working");
+  });
+
+  it("returns 'working' for garbage input", () => {
+    expect(parseStoredViewMode("garbage")).toBe("working");
+  });
+});
+
+describe("isValidViewMode", () => {
+  it("returns false for the removed 'pr' value", () => {
+    expect(isValidViewMode("pr")).toBe(false);
+  });
+
+  it("returns true for 'branch'", () => {
+    expect(isValidViewMode("branch")).toBe(true);
+  });
+
+  it("returns true for 'working'", () => {
+    expect(isValidViewMode("working")).toBe(true);
+  });
+
+  it("returns true for 'last-commit'", () => {
+    expect(isValidViewMode("last-commit")).toBe(true);
+  });
+
+  it("returns false for null", () => {
+    expect(isValidViewMode(null)).toBe(false);
+  });
+
+  it("returns false for garbage input", () => {
+    expect(isValidViewMode("garbage")).toBe(false);
   });
 });

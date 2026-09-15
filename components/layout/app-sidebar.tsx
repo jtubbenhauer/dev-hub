@@ -9,6 +9,7 @@ import {
   GitMerge,
   GitBranch,
   GitCompare,
+  Github,
   Terminal,
   Settings,
   CheckSquare,
@@ -36,6 +37,7 @@ const navItems = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/files", label: "Files", icon: FileCode2 },
   { href: "/git", label: "Git", icon: GitMerge },
+  { href: "/prs", label: "PRs", icon: Github },
   { href: "/terminal", label: "Term", icon: Terminal },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/workspaces", label: "Repos", icon: GitBranch },
@@ -123,6 +125,10 @@ export function AppSidebar() {
       {
         action: { id: "nav:git", label: "Go to Git", page: "global" as const },
         handler: () => routerRef.current.push("/git"),
+      },
+      {
+        action: { id: "nav:prs", label: "Go to PRs", page: "global" as const },
+        handler: () => routerRef.current.push("/prs"),
       },
       {
         action: {

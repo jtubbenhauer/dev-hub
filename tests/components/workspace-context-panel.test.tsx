@@ -1,13 +1,15 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
 import { useFirebasePreview } from "@/hooks/use-firebase-preview";
 import type { Workspace } from "@/types";
 
 vi.mock("@/hooks/use-firebase-preview");
+const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -38,6 +40,11 @@ const mockWorkspace: Workspace = {
 };
 
 describe("WorkspaceContextPanel", () => {
+  beforeEach(() => {
+    pushMock.mockClear();
+    localStorage.clear();
+  });
+
   it("renders nothing when no data is available", () => {
     vi.mocked(useFirebasePreview).mockReturnValue({
       previews: [],
@@ -89,5 +96,36 @@ describe("WorkspaceContextPanel", () => {
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "https://app.clickup.com/t/DEV-123");
     expect(screen.getByText("in progress")).toBeInTheDocument();
+  });
+
+  it("routes PR deep-link to /prs and seeds selected PR without view-mode", async () => {
+    vi.mocked(useFirebasePreview).mockReturnValue({
+      previews: [],
+      pr: {
+        title: "Add feature",
+        number: 42,
+        draft: false,
+        html_url: "https://github.com/acme/repo/pull/42",
+        base: { repo: { full_name: "acme/repo" } },
+      } as unknown as ReturnType<typeof useFirebasePreview>["pr"],
+      isLoading: false,
+      owner: null,
+      repo: null,
+      branch: null,
+    });
+
+    render(
+      <WorkspaceContextPanel workspaceId="ws-1" workspace={mockWorkspace} />,
+      { wrapper: Wrapper },
+    );
+
+    const prButton = screen.getByRole("button", { name: /Add feature #42/ });
+    await userEvent.click(prButton);
+
+    expect(pushMock).toHaveBeenCalledWith("/prs");
+    expect(localStorage.getItem("dev-hub:git-selected-pr")).toBe(
+      "acme/repo/42",
+    );
+    expect(localStorage.getItem("dev-hub:git-view-mode")).toBeNull();
   });
 });

@@ -139,13 +139,12 @@ export const WorkspaceContextPanel = memo(function WorkspaceContextPanel({
   const handleOpenPrReview = useCallback(() => {
     if (!pr) return;
     try {
-      localStorage.setItem("dev-hub:git-view-mode", "pr");
       localStorage.setItem(
         "dev-hub:git-selected-pr",
         `${pr.base.repo.full_name}/${pr.number}`,
       );
     } catch {}
-    router.push("/git");
+    router.push("/prs");
   }, [pr, router]);
 
   const linkedTaskMeta = workspace.linkedTaskMeta as LinkedTaskMeta | null;

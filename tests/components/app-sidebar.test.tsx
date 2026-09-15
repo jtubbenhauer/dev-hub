@@ -4,8 +4,9 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
 const mockPathname = vi.fn(() => "/");
+const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
   usePathname: () => mockPathname(),
 }));
 
@@ -83,9 +84,10 @@ describe("AppSidebar", () => {
     mockPathname.mockReturnValue("/");
     mockUseCommand.mockClear();
     mockUseLeaderAction.mockClear();
+    pushMock.mockClear();
   });
 
-  it("renders all 8 navigation items with correct labels", () => {
+  it("renders all 9 navigation items with correct labels", () => {
     renderSidebar();
 
     const labels = [
@@ -97,10 +99,38 @@ describe("AppSidebar", () => {
       "Tasks",
       "Repos",
       "Settings",
+      "PRs",
+      "Tasks",
+      "Repos",
+      "Settings",
     ];
     for (const label of labels) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+  });
+
+  it("renders a link to /prs with label PRs", () => {
+    renderSidebar();
+
+    const prsLink = screen
+      .getAllByRole("link")
+      .find((el) => el.getAttribute("href") === "/prs");
+    expect(prsLink).toBeTruthy();
+    expect(prsLink).toHaveTextContent("PRs");
+  });
+
+  it("registers a nav:prs leader action that routes to /prs", () => {
+    renderSidebar();
+
+    const registrations = mockUseLeaderAction.mock.calls[0][0] as {
+      action: { id: string };
+      handler: () => void;
+    }[];
+    const prsAction = registrations.find((r) => r.action.id === "nav:prs");
+    expect(prsAction).toBeTruthy();
+
+    prsAction?.handler();
+    expect(pushMock).toHaveBeenCalledWith("/prs");
   });
 
   it("renders Sidebar with collapsible='offcanvas' (data-collapsible attribute)", () => {
@@ -118,7 +148,7 @@ describe("AppSidebar", () => {
     renderSidebar();
 
     const labels = screen.getAllByText(
-      /^(Dash|Chat|Files|Git|Term|Tasks|Repos|Settings)$/,
+      /^(Dash|Chat|Files|Git|PRs|Term|Tasks|Repos|Settings)$/,
     );
     for (const label of labels) {
       expect(label).toHaveClass("text-[10px]");

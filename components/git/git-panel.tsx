@@ -38,7 +38,7 @@ import {
   ArrowUpDown,
   GripVertical,
   PanelLeft,
-  Github,
+  FolderTree,
 } from "lucide-react";
 import { FileStatusList } from "@/components/git/file-status";
 import { ChangedFileList } from "@/components/git/changed-file-list";
@@ -47,14 +47,23 @@ import type { ReviewEditorHandle } from "@/components/review/review-editor";
 import { CommitPanel } from "@/components/git/commit-panel";
 import { BranchSelector } from "@/components/git/branch-selector";
 import { CommitLog } from "@/components/git/commit-log";
-import { PrPanel } from "@/components/git/pr-panel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, isEditorElement } from "@/lib/utils";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useLeaderKey } from "@/components/providers/leader-key-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { sortFiles, buildFlatFiles } from "@/lib/git-panel-logic";
-import type { SortMode } from "@/lib/git-panel-logic";
+import {
+  sortFiles,
+  resolveLeaderFileAction,
+  applyLeaderFileResolution,
+  parseStoredViewMode,
+  isValidViewMode,
+} from "@/lib/git-panel-logic";
+import type {
+  SortMode,
+  LeaderFileAction,
+  GitViewMode,
+} from "@/lib/git-panel-logic";
 import {
   useGitStatus,
   useGitLog,
@@ -78,10 +87,9 @@ import {
   useGitStashDrop,
   useGitFileDiffs,
 } from "@/hooks/use-git";
+import { useGitFolderGrouping } from "@/hooks/use-git-folder-grouping";
 import type { Workspace } from "@/types";
 
-type ViewMode = "working" | "branch" | "last-commit" | "pr";
-const VALID_VIEW_MODES: ViewMode[] = ["working", "branch", "last-commit", "pr"];
 type BottomPanel = "branches" | "log" | "stashes" | null;
 
 const SORT_LABELS: Record<SortMode, string> = {
@@ -130,12 +138,10 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
     return null;
   });
   const [selectedStaged, setSelectedStaged] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+  const [viewMode, setViewMode] = useState<GitViewMode>(() => {
     try {
-      const raw = localStorage.getItem("dev-hub:git-view-mode");
-      return raw && VALID_VIEW_MODES.includes(raw as ViewMode)
-        ? (raw as ViewMode)
-        : "working";
+      const stored = localStorage.getItem("dev-hub:git-view-mode");
+      return parseStoredViewMode(stored);
     } catch {
       return "working";
     }
@@ -161,6 +167,13 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   });
   const [isMobileFileListOpen, setIsMobileFileListOpen] = useState(false);
   const isMobile = useIsMobile();
+
+  const {
+    isGroupedByFolder,
+    toggleGroupedByFolder,
+    collapsedFolders,
+    toggleFolder,
+  } = useGitFolderGrouping(workspace.id);
 
   const gitReviewStore = useGitReviewStore();
   const reviewKey = `${workspace.id}:${viewMode}:${compareBaseRef ?? ""}`;
@@ -267,8 +280,8 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
       // Sync view mode if the picker changed it
       try {
         const raw = localStorage.getItem("dev-hub:git-view-mode");
-        if (raw && VALID_VIEW_MODES.includes(raw as ViewMode)) {
-          setViewMode(raw as ViewMode);
+        if (isValidViewMode(raw)) {
+          setViewMode(raw);
         }
       } catch {}
     };
@@ -294,7 +307,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   );
 
   const handleViewModeChange = useCallback(
-    (mode: ViewMode) => {
+    (mode: GitViewMode) => {
       setViewMode(mode);
       setSelectedFile(null);
       setSelectedStaged(false);
@@ -310,11 +323,9 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
       try {
         localStorage.setItem("dev-hub:git-view-mode", mode);
       } catch {}
-      if (mode !== "pr") {
-        try {
-          localStorage.removeItem("dev-hub:git-selected-pr");
-        } catch {}
-      }
+      try {
+        localStorage.removeItem("dev-hub:git-selected-pr");
+      } catch {}
     },
     [comparableBranches],
   );
@@ -518,10 +529,46 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
   useEffect(() => {
     handlePushRef.current = handlePush;
   }, [handlePush]);
+  const isGroupedByFolderRef = useRef(isGroupedByFolder);
+  const collapsedFoldersRef = useRef(collapsedFolders);
+  useEffect(() => {
+    isGroupedByFolderRef.current = isGroupedByFolder;
+    collapsedFoldersRef.current = collapsedFolders;
+  });
+  const viewModeRef = useRef(viewMode);
+  const sortedChangedFilesRef = useRef(sortedChangedFiles);
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+    sortedChangedFilesRef.current = sortedChangedFiles;
+  });
 
   const { registerAction, deregisterAction } = useLeaderKey();
 
   useEffect(() => {
+    const runLeaderFileAction = (action: LeaderFileAction) => {
+      const wasEditorFocused = isEditorElement(document.activeElement);
+      const resolution = resolveLeaderFileAction({
+        action,
+        viewMode: viewModeRef.current,
+        status: statusRef.current,
+        changedFiles: sortedChangedFilesRef.current,
+        sortMode: sortModeRef.current,
+        isGroupedByFolder: isGroupedByFolderRef.current,
+        collapsedFolders: collapsedFoldersRef.current,
+        selectedFile: selectedFileRef.current,
+        selectedStaged: selectedStagedRef.current,
+        reviewedFiles: reviewedFilesRef.current,
+      });
+      applyLeaderFileResolution(resolution, {
+        select: (path, staged) => handleSelectFileRef.current(path, staged),
+        toggleReviewed: (path) => handleToggleReviewedRef.current(path),
+        stage: (path) => handleStageFilesRef.current([path]),
+        unstage: (path) => handleUnstageFilesRef.current([path]),
+        wasEditorFocused,
+        refocusEditor: () =>
+          requestAnimationFrame(() => editorHandleRef.current?.focus()),
+      });
+    };
     const actions = [
       {
         action: {
@@ -540,28 +587,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           label: "Mark reviewed & next file",
           page: "git" as const,
         },
-        handler: () => {
-          const file = selectedFileRef.current;
-          if (!file) return;
-          const editorWasFocused = isEditorElement(document.activeElement);
-          handleToggleReviewedRef.current(file);
-          const flatFiles = buildFlatFiles(
-            statusRef.current,
-            sortModeRef.current,
-          );
-          const selectedIndex = flatFiles.findIndex(
-            (f) =>
-              f.path === selectedFileRef.current &&
-              f.isStaged === selectedStagedRef.current,
-          );
-          const next = flatFiles[selectedIndex + 1];
-          if (next) {
-            handleSelectFileRef.current(next.path, next.isStaged);
-            if (editorWasFocused) {
-              requestAnimationFrame(() => editorHandleRef.current?.focus());
-            }
-          }
-        },
+        handler: () => runLeaderFileAction("reviewed-next"),
       },
       {
         action: {
@@ -569,24 +595,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           label: "Stage/unstage current file",
           page: "git" as const,
         },
-        handler: () => {
-          const flatFiles = buildFlatFiles(
-            statusRef.current,
-            sortModeRef.current,
-          );
-          const selectedIndex = flatFiles.findIndex(
-            (f) =>
-              f.path === selectedFileRef.current &&
-              f.isStaged === selectedStagedRef.current,
-          );
-          const current = flatFiles[selectedIndex];
-          if (!current) return;
-          if (current.isStaged) {
-            handleUnstageFilesRef.current([current.path]);
-          } else {
-            handleStageFilesRef.current([current.path]);
-          }
-        },
+        handler: () => runLeaderFileAction("stage-toggle"),
       },
       {
         action: {
@@ -652,22 +661,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           label: "Jump to next unreviewed",
           page: "git" as const,
         },
-        handler: () => {
-          const flatFiles = buildFlatFiles(
-            statusRef.current,
-            sortModeRef.current,
-          );
-          const selectedIndex = flatFiles.findIndex(
-            (f) =>
-              f.path === selectedFileRef.current &&
-              f.isStaged === selectedStagedRef.current,
-          );
-          const next = flatFiles.find(
-            (f, i) =>
-              !reviewedFilesRef.current.has(f.path) && i > selectedIndex,
-          );
-          if (next) handleSelectFileRef.current(next.path, next.isStaged);
-        },
+        handler: () => runLeaderFileAction("next-unreviewed"),
       },
       {
         action: {
@@ -675,22 +669,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           label: "Jump to prev unreviewed",
           page: "git" as const,
         },
-        handler: () => {
-          const flatFiles = buildFlatFiles(
-            statusRef.current,
-            sortModeRef.current,
-          );
-          const selectedIndex = flatFiles.findIndex(
-            (f) =>
-              f.path === selectedFileRef.current &&
-              f.isStaged === selectedStagedRef.current,
-          );
-          const prev = [...flatFiles]
-            .slice(0, selectedIndex)
-            .reverse()
-            .find((f) => !reviewedFilesRef.current.has(f.path));
-          if (prev) handleSelectFileRef.current(prev.path, prev.isStaged);
-        },
+        handler: () => runLeaderFileAction("prev-unreviewed"),
       },
       {
         action: {
@@ -698,20 +677,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           label: "Select next file",
           page: "git" as const,
         },
-        handler: () => {
-          const flatFiles = buildFlatFiles(
-            statusRef.current,
-            sortModeRef.current,
-          );
-          const selectedIndex = flatFiles.findIndex(
-            (f) =>
-              f.path === selectedFileRef.current &&
-              f.isStaged === selectedStagedRef.current,
-          );
-          const next =
-            flatFiles[Math.min(selectedIndex + 1, flatFiles.length - 1)];
-          if (next) handleSelectFileRef.current(next.path, next.isStaged);
-        },
+        handler: () => runLeaderFileAction("next-file"),
       },
       {
         action: {
@@ -719,19 +685,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           label: "Select previous file",
           page: "git" as const,
         },
-        handler: () => {
-          const flatFiles = buildFlatFiles(
-            statusRef.current,
-            sortModeRef.current,
-          );
-          const selectedIndex = flatFiles.findIndex(
-            (f) =>
-              f.path === selectedFileRef.current &&
-              f.isStaged === selectedStagedRef.current,
-          );
-          const prev = flatFiles[Math.max(selectedIndex - 1, 0)];
-          if (prev) handleSelectFileRef.current(prev.path, prev.isStaged);
-        },
+        handler: () => runLeaderFileAction("prev-file"),
       },
       {
         action: {
@@ -937,28 +891,6 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
           </TooltipContent>
         </Tooltip>
 
-        <div className="bg-border mx-1 h-4 w-px" />
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={viewMode === "pr" ? "secondary" : "ghost"}
-              size="icon-xs"
-              onClick={() => handleViewModeChange("pr")}
-            >
-              <Github className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div>
-              <p className="font-medium">PR Review</p>
-              <p className="text-muted-foreground">
-                Review teammates&apos; GitHub pull requests
-              </p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-
         {viewMode === "branch" && (
           <Select
             value={compareBaseRef ?? ""}
@@ -1019,23 +951,21 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
       </div>
 
       {/* Main area: file list + drag handle + editor */}
-      {viewMode === "pr" ? (
-        <PrPanel onClose={() => handleViewModeChange("working")} />
-      ) : (
-        <div className="flex min-h-0 flex-1">
-          {/* File list - mobile sheet */}
-          {isMobile && (
-            <Sheet
-              open={isMobileFileListOpen}
-              onOpenChange={setIsMobileFileListOpen}
+      <div className="flex min-h-0 flex-1">
+        {/* File list - mobile sheet */}
+        {isMobile && (
+          <Sheet
+            open={isMobileFileListOpen}
+            onOpenChange={setIsMobileFileListOpen}
+          >
+            <SheetContent
+              side="left"
+              className="w-[280px] p-0"
+              showCloseButton={false}
             >
-              <SheetContent
-                side="left"
-                className="w-[280px] p-0"
-                showCloseButton={false}
-              >
-                <SheetHeader className="border-b px-2 py-1">
-                  <SheetTitle className="sr-only">File list</SheetTitle>
+              <SheetHeader className="border-b px-2 py-1">
+                <SheetTitle className="sr-only">File list</SheetTitle>
+                <div className="flex items-center justify-between">
                   <button
                     className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[11px] transition-colors"
                     onClick={cycleSortMode}
@@ -1043,172 +973,216 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
                     <ArrowUpDown className="size-3.5" />
                     <span>{SORT_LABELS[sortMode]}</span>
                   </button>
-                </SheetHeader>
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                  {viewMode === "working" ? (
-                    <>
-                      <FileStatusList
-                        staged={status.staged}
-                        unstaged={status.unstaged}
-                        untracked={status.untracked}
-                        conflicted={status.conflicted}
-                        selectedFile={selectedFile}
-                        selectedStaged={selectedStaged}
-                        reviewedFiles={reviewedFiles}
-                        sortMode={sortMode}
-                        diffStats={fileDiffStats}
-                        onSelectFile={handleSelectFile}
-                        onStageFiles={handleStageFiles}
-                        onUnstageFiles={handleUnstageFiles}
-                        onStageAll={handleStageAll}
-                        onUnstageAll={handleUnstageAll}
-                        onDiscardFiles={handleDiscardFiles}
-                        onToggleReviewed={handleToggleReviewed}
-                      />
-                      <CommitPanel
-                        stagedCount={status.staged.length}
-                        onCommit={handleCommit}
-                        isCommitting={commitMutation.isPending}
-                        focusRef={commitFocusRef}
-                      />
-                    </>
-                  ) : (
-                    <ChangedFileList
-                      files={sortedChangedFiles}
-                      selectedFile={selectedFile}
-                      isLoading={isChangedFilesLoading}
-                      reviewedFiles={reviewedFiles}
-                      emptyMessage={
-                        viewMode === "branch" && !compareBaseRef
-                          ? "Select a branch to compare"
-                          : "No changed files"
-                      }
-                      onSelectFile={handleSelectChangedFile}
-                      onToggleReviewed={handleToggleReviewed}
-                    />
+                  {viewMode !== "working" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={isGroupedByFolder ? "secondary" : "ghost"}
+                          size="icon-xs"
+                          aria-label="Group by folder"
+                          onClick={toggleGroupedByFolder}
+                        >
+                          <FolderTree className="size-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Group by folder</TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
-              </SheetContent>
-            </Sheet>
-          )}
-
-          {/* File list (left) - desktop */}
-          {!isMobile && (
-            <div
-              ref={(el) => {
-                fileListFocusRef.current = el;
-              }}
-              tabIndex={-1}
-              className="relative flex min-h-0 shrink-0 flex-col border-r outline-none"
-              style={{ width: panelWidth }}
-            >
-              {/* Sort bar */}
-              <div className="flex shrink-0 items-center justify-between border-b px-2 py-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[11px] transition-colors"
-                      onClick={cycleSortMode}
-                    >
-                      <ArrowUpDown className="size-3.5" />
-                      <span>{SORT_LABELS[sortMode]}</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Cycle sort order</TooltipContent>
-                </Tooltip>
-              </div>
-
-              {viewMode === "working" ? (
-                <>
-                  <FileStatusList
-                    staged={status.staged}
-                    unstaged={status.unstaged}
-                    untracked={status.untracked}
-                    conflicted={status.conflicted}
+              </SheetHeader>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                {viewMode === "working" ? (
+                  <>
+                    <FileStatusList
+                      staged={status.staged}
+                      unstaged={status.unstaged}
+                      untracked={status.untracked}
+                      conflicted={status.conflicted}
+                      selectedFile={selectedFile}
+                      selectedStaged={selectedStaged}
+                      reviewedFiles={reviewedFiles}
+                      sortMode={sortMode}
+                      diffStats={fileDiffStats}
+                      isGroupedByFolder={isGroupedByFolder}
+                      collapsedFolders={collapsedFolders}
+                      onToggleFolder={toggleFolder}
+                      onSelectFile={handleSelectFile}
+                      onStageFiles={handleStageFiles}
+                      onUnstageFiles={handleUnstageFiles}
+                      onStageAll={handleStageAll}
+                      onUnstageAll={handleUnstageAll}
+                      onDiscardFiles={handleDiscardFiles}
+                      onToggleReviewed={handleToggleReviewed}
+                    />
+                    <CommitPanel
+                      stagedCount={status.staged.length}
+                      onCommit={handleCommit}
+                      isCommitting={commitMutation.isPending}
+                      focusRef={commitFocusRef}
+                    />
+                  </>
+                ) : (
+                  <ChangedFileList
+                    files={sortedChangedFiles}
                     selectedFile={selectedFile}
-                    selectedStaged={selectedStaged}
+                    isLoading={isChangedFilesLoading}
                     reviewedFiles={reviewedFiles}
                     sortMode={sortMode}
-                    diffStats={fileDiffStats}
-                    onSelectFile={handleSelectFile}
-                    onStageFiles={handleStageFiles}
-                    onUnstageFiles={handleUnstageFiles}
-                    onStageAll={handleStageAll}
-                    onUnstageAll={handleUnstageAll}
-                    onDiscardFiles={handleDiscardFiles}
+                    isGroupedByFolder={isGroupedByFolder}
+                    collapsedFolders={collapsedFolders}
+                    onToggleFolder={toggleFolder}
+                    emptyMessage={
+                      viewMode === "branch" && !compareBaseRef
+                        ? "Select a branch to compare"
+                        : "No changed files"
+                    }
+                    onSelectFile={handleSelectChangedFile}
                     onToggleReviewed={handleToggleReviewed}
                   />
-                  <CommitPanel
-                    stagedCount={status.staged.length}
-                    onCommit={handleCommit}
-                    isCommitting={commitMutation.isPending}
-                    focusRef={commitFocusRef}
-                  />
-                </>
-              ) : (
-                <ChangedFileList
-                  files={sortedChangedFiles}
-                  selectedFile={selectedFile}
-                  isLoading={isChangedFilesLoading}
-                  reviewedFiles={reviewedFiles}
-                  emptyMessage={
-                    viewMode === "branch" && !compareBaseRef
-                      ? "Select a branch to compare"
-                      : "No changed files"
-                  }
-                  onSelectFile={handleSelectChangedFile}
-                  onToggleReviewed={handleToggleReviewed}
-                />
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
 
-          {/* Drag handle - desktop only */}
-          {!isMobile && (
-            <div
-              className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
-              onMouseDown={handleDragStart}
-            >
-              <GripVertical className="text-muted-foreground/30 size-3.5" />
-            </div>
-          )}
-
-          {/* Editor (right) */}
+        {/* File list (left) - desktop */}
+        {!isMobile && (
           <div
             ref={(el) => {
-              editorPanelFocusRef.current = el;
+              fileListFocusRef.current = el;
             }}
             tabIndex={-1}
-            className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+            className="relative flex min-h-0 shrink-0 flex-col border-r outline-none"
+            style={{ width: panelWidth }}
           >
-            {fileContent ? (
-              <ReviewEditor
-                ref={editorHandleRef}
-                fileContent={fileContent}
-                workspaceId={workspace.id}
-                isLoading={isFileContentLoading}
-                additions={selectedFileDiffStat?.additions}
-                deletions={selectedFileDiffStat?.deletions}
-                onOpenInEditor={() => {
-                  if (selectedFile) {
-                    router.push(
-                      `/files?open=${encodeURIComponent(selectedFile)}`,
-                    );
-                  }
-                }}
-              />
+            {/* Sort bar */}
+            <div className="flex shrink-0 items-center justify-between border-b px-2 py-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[11px] transition-colors"
+                    onClick={cycleSortMode}
+                  >
+                    <ArrowUpDown className="size-3.5" />
+                    <span>{SORT_LABELS[sortMode]}</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Cycle sort order</TooltipContent>
+              </Tooltip>
+              {viewMode !== "working" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isGroupedByFolder ? "secondary" : "ghost"}
+                      size="icon-xs"
+                      aria-label="Group by folder"
+                      onClick={toggleGroupedByFolder}
+                    >
+                      <FolderTree className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Group by folder</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            {viewMode === "working" ? (
+              <>
+                <FileStatusList
+                  staged={status.staged}
+                  unstaged={status.unstaged}
+                  untracked={status.untracked}
+                  conflicted={status.conflicted}
+                  selectedFile={selectedFile}
+                  selectedStaged={selectedStaged}
+                  reviewedFiles={reviewedFiles}
+                  sortMode={sortMode}
+                  diffStats={fileDiffStats}
+                  isGroupedByFolder={isGroupedByFolder}
+                  collapsedFolders={collapsedFolders}
+                  onToggleFolder={toggleFolder}
+                  onSelectFile={handleSelectFile}
+                  onStageFiles={handleStageFiles}
+                  onUnstageFiles={handleUnstageFiles}
+                  onStageAll={handleStageAll}
+                  onUnstageAll={handleUnstageAll}
+                  onDiscardFiles={handleDiscardFiles}
+                  onToggleReviewed={handleToggleReviewed}
+                />
+                <CommitPanel
+                  stagedCount={status.staged.length}
+                  onCommit={handleCommit}
+                  isCommitting={commitMutation.isPending}
+                  focusRef={commitFocusRef}
+                />
+              </>
             ) : (
-              <div className="text-muted-foreground flex h-full items-center justify-center text-xs">
-                {selectedFile
-                  ? isFileContentLoading
-                    ? "Loading..."
-                    : "Failed to load file"
-                  : "Select a file to view diff"}
-              </div>
+              <ChangedFileList
+                files={sortedChangedFiles}
+                selectedFile={selectedFile}
+                isLoading={isChangedFilesLoading}
+                reviewedFiles={reviewedFiles}
+                sortMode={sortMode}
+                isGroupedByFolder={isGroupedByFolder}
+                collapsedFolders={collapsedFolders}
+                onToggleFolder={toggleFolder}
+                emptyMessage={
+                  viewMode === "branch" && !compareBaseRef
+                    ? "Select a branch to compare"
+                    : "No changed files"
+                }
+                onSelectFile={handleSelectChangedFile}
+                onToggleReviewed={handleToggleReviewed}
+              />
             )}
           </div>
+        )}
+
+        {/* Drag handle - desktop only */}
+        {!isMobile && (
+          <div
+            className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
+            onMouseDown={handleDragStart}
+          >
+            <GripVertical className="text-muted-foreground/30 size-3.5" />
+          </div>
+        )}
+
+        {/* Editor (right) */}
+        <div
+          ref={(el) => {
+            editorPanelFocusRef.current = el;
+          }}
+          tabIndex={-1}
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+        >
+          {fileContent ? (
+            <ReviewEditor
+              ref={editorHandleRef}
+              fileContent={fileContent}
+              workspaceId={workspace.id}
+              isLoading={isFileContentLoading}
+              additions={selectedFileDiffStat?.additions}
+              deletions={selectedFileDiffStat?.deletions}
+              onOpenInEditor={() => {
+                if (selectedFile) {
+                  router.push(
+                    `/files?open=${encodeURIComponent(selectedFile)}`,
+                  );
+                }
+              }}
+            />
+          ) : (
+            <div className="text-muted-foreground flex h-full items-center justify-center text-xs">
+              {selectedFile
+                ? isFileContentLoading
+                  ? "Loading..."
+                  : "Failed to load file"
+                : "Select a file to view diff"}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Collapsible bottom section */}
       <div className="shrink-0 border-t">

@@ -15,6 +15,11 @@ import type {
   AllBranch,
   WorktreeInfo,
 } from "@devhub/shared";
+import {
+  assertWorkspaceRelativePaths,
+  partitionDiscardFiles,
+  toLiteralPathspecs,
+} from "@devhub/shared";
 
 function createGit(workspacePath: string): SimpleGit {
   return simpleGit(workspacePath);
@@ -366,11 +371,30 @@ export function gitRoutes(workspacePath: string): Hono {
     return c.json({ ok: true });
   });
 
-  // POST /git/discard { files: string[] }
+  // POST /git/discard { files: string[], expectedUntracked?: string[] }
   app.post("/discard", async (c) => {
     const git = createGit(workspacePath);
-    const { files } = await c.req.json<{ files: string[] }>();
-    await git.checkout(["--", ...files]);
+    const { files, expectedUntracked } = await c.req.json<{
+      files: string[];
+      expectedUntracked?: string[];
+    }>();
+    assertWorkspaceRelativePaths(files);
+    const status = await git.status();
+    const { tracked, untracked } = partitionDiscardFiles(
+      {
+        unstaged: status.files.map((f) => f.path),
+        untracked: status.not_added,
+        conflicted: status.conflicted,
+      },
+      files,
+      expectedUntracked,
+    );
+    if (tracked.length > 0) {
+      await git.checkout(["--", ...toLiteralPathspecs(tracked)]);
+    }
+    if (untracked.length > 0) {
+      await git.clean("fd", ["--", ...toLiteralPathspecs(untracked)]);
+    }
     return c.json({ ok: true });
   });
 

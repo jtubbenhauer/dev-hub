@@ -367,11 +367,11 @@ export function useGitUnstage(workspaceId: string | null) {
 }
 
 export function useGitDiscard(workspaceId: string | null) {
-  return useGitMutation<{ action: string; files: string[] }>(
-    workspaceId,
-    ["git-status"],
-    "Changes discarded",
-  );
+  return useGitMutation<{
+    action: string;
+    files: string[];
+    expectedUntracked?: string[];
+  }>(workspaceId, ["git-status"], "Changes discarded");
 }
 
 export function useGitCommit(workspaceId: string | null) {

@@ -231,14 +231,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       case "discard": {
-        const { files } = body;
+        const { files, expectedUntracked } = body;
         if (!Array.isArray(files) || files.length === 0) {
           return NextResponse.json(
             { error: "files array required" },
             { status: 400 },
           );
         }
-        await backend.discardChanges(files);
+        await backend.discardChanges(files, expectedUntracked);
         return NextResponse.json({ ok: true });
       }
 

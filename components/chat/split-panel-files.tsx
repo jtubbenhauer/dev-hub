@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ChevronDown,
@@ -29,6 +29,9 @@ import {
 import { attachCommentToChat } from "@/lib/comment-chat-bridge";
 import { useLintOnSave } from "@/hooks/use-diagnostics";
 import type { FileTreeEntry, FileComment } from "@/types";
+import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
+import { FileViewToggle } from "@/components/chat/file-view-toggle";
+import { useFileViewMode } from "@/components/chat/use-file-view-mode";
 
 const MonacoEditor = dynamic(
   () => import("@/components/editor/monaco-editor").then((m) => m.MonacoEditor),
@@ -40,6 +43,7 @@ const MonacoEditor = dynamic(
 
 interface SplitPanelFilesProps {
   workspaceId: string;
+  workspacePath: string;
 }
 
 const BINARY_EXTENSIONS = [
@@ -63,7 +67,10 @@ const BINARY_EXTENSIONS = [
   ".eot",
 ];
 
-export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
+export function SplitPanelFiles({
+  workspaceId,
+  workspacePath,
+}: SplitPanelFilesProps) {
   const openFiles = useSidePanelStore((s) => s.openFiles);
   const activeFilePath = useSidePanelStore((s) => s.activeFilePath);
   const isFilePickerOpen = useSidePanelStore((s) => s.isFilePickerOpen);
@@ -95,6 +102,16 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
   const currentFileContent = activeFile?.content ?? null;
   const currentFileLanguage = activeFile?.language ?? null;
   const isDirty = activeFile?.isDirty ?? false;
+
+  const queryClient = useQueryClient();
+
+  const {
+    mode: fileViewMode,
+    canDiff,
+    repoRelativeKey,
+    setMode,
+  } = useFileViewMode(workspaceId, workspacePath, activeFile);
+  const isDiff = canDiff && fileViewMode === "diff";
 
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -336,6 +353,13 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
     onSuccess: () => {
       markSaved();
       void lintFile();
+      queryClient.invalidateQueries({
+        queryKey: ["git-file-content", workspaceId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["git-status", workspaceId] });
+      queryClient.invalidateQueries({
+        queryKey: ["git-file-diffs", workspaceId],
+      });
     },
     onError: () => toast.error("Failed to save file"),
   });
@@ -467,6 +491,12 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
           {isDirty && (
             <span className="bg-warning size-1.5 shrink-0 rounded-full" />
           )}
+          {canDiff && (
+            <FileViewToggle
+              mode={isDiff ? "diff" : "editor"}
+              onChange={setMode}
+            />
+          )}
           <Button
             size="icon-xs"
             variant="ghost"
@@ -540,7 +570,17 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
       {currentFilePath &&
         !error &&
         !isLoading &&
-        currentFileContent !== null && (
+        currentFileContent !== null &&
+        (isDiff ? (
+          <div className="flex min-h-0 flex-1" data-testid="split-panel-diff">
+            <div className="min-w-0 flex-1">
+              <SidePanelDiffView
+                workspaceId={workspaceId}
+                filePath={repoRelativeKey}
+              />
+            </div>
+          </div>
+        ) : (
           <div className="flex min-h-0 flex-1">
             <div className="min-w-0 flex-1">
               <MonacoEditor
@@ -566,7 +606,7 @@ export function SplitPanelFiles({ workspaceId }: SplitPanelFilesProps) {
               </div>
             )}
           </div>
-        )}
+        ))}
 
       {currentFilePath &&
         !error &&

@@ -149,7 +149,10 @@ export function SidePanel({
           </>
         )}
         {activePanelTab === "files" && (
-          <SplitPanelFiles workspaceId={workspaceId} />
+          <SplitPanelFiles
+            workspaceId={workspaceId}
+            workspacePath={workspacePath}
+          />
         )}
         {activePanelTab === "git" && <GitTabPanel workspaceId={workspaceId} />}
       </div>

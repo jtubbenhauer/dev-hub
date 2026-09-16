@@ -3,17 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowUpFromLine,
-  ExternalLink,
-  Loader2,
-  Minus,
-  Plus,
-  X,
-} from "lucide-react";
+import { ExternalLink, Loader2, Minus, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
+import { GitSyncControls } from "@/components/chat/git-sync-controls";
+import { GitRevertDialog } from "@/components/chat/git-revert-dialog";
+import { GitRevertAction } from "@/components/chat/git-revert-action";
+import { useGitRevert } from "@/hooks/use-git-revert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -27,7 +24,6 @@ import {
   useGitStage,
   useGitUnstage,
   useGitCommit,
-  useGitPush,
 } from "@/hooks/use-git";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import { cn } from "@/lib/utils";
@@ -119,7 +115,6 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
   const stageMutation = useGitStage(workspaceId);
   const unstageMutation = useGitUnstage(workspaceId);
   const commitMutation = useGitCommit(workspaceId);
-  const pushMutation = useGitPush(workspaceId);
 
   const [commitMessage, setCommitMessage] = useState("");
 
@@ -235,7 +230,17 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
   const stageMutate = stageMutation.mutate;
   const unstageMutate = unstageMutation.mutate;
   const commitMutate = commitMutation.mutate;
-  const pushMutate = pushMutation.mutate;
+
+  const {
+    revertTarget,
+    isDiscarding,
+    requestRevert,
+    clearRevert,
+    confirmRevert,
+  } = useGitRevert(workspaceId, invalidateFreshness);
+
+  const isMutating =
+    stageMutation.isPending || unstageMutation.isPending || isDiscarding;
 
   const handleStage = useCallback(
     (path: string) => {
@@ -314,10 +319,6 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
       },
     );
   }, [commitMessage, stageMutate, commitMutate, invalidateFreshness]);
-
-  const handlePush = useCallback(() => {
-    pushMutate({ action: "push" });
-  }, [pushMutate]);
 
   const selectRow = useCallback(
     (row: GitRow) => {
@@ -542,6 +543,19 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
                           )}
                         </span>
                       )}
+                      {(row.section === "changes" ||
+                        row.section === "untracked") && (
+                        <GitRevertAction
+                          disabled={isMutating}
+                          onActivate={() =>
+                            requestRevert({
+                              workspaceId,
+                              path: row.path,
+                              isUntracked: row.section === "untracked",
+                            })
+                          }
+                        />
+                      )}
                     </div>
                   );
                 })}
@@ -646,44 +660,21 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
           >
             Stage all &amp; commit
           </Button>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                aria-label="Push"
-                data-testid="git-push-button"
-                disabled={pushMutation.isPending}
-                onClick={handlePush}
-              >
-                {pushMutation.isPending ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <ArrowUpFromLine className="size-3" />
-                )}
-                {status.ahead > 0 && (
-                  <span
-                    className="ml-0.5 text-[10px] tabular-nums"
-                    data-testid="git-ahead-count"
-                  >
-                    {status.ahead}
-                  </span>
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Push{status.ahead > 0 ? ` (${status.ahead})` : ""}
-            </TooltipContent>
-          </Tooltip>
+          <GitSyncControls
+            workspaceId={workspaceId}
+            hasDirtyTree={dirtyCount > 0}
+            tracking={status.tracking}
+            ahead={status.ahead}
+            behind={status.behind}
+            onSuccess={invalidateFreshness}
+          />
         </div>
-        {pushMutation.isError && (
-          <p className="text-destructive text-xs" data-testid="git-push-error">
-            {pushMutation.error instanceof Error
-              ? pushMutation.error.message
-              : "Push failed"}
-          </p>
-        )}
       </div>
+      <GitRevertDialog
+        target={revertTarget}
+        onOpenChange={(open) => !open && clearRevert()}
+        onConfirm={confirmRevert}
+      />
     </div>
   );
 }

@@ -14,10 +14,19 @@ vi.mock("@/hooks/use-git", () => ({
   useGitCommit: () => ({ mutate: vi.fn(), isPending: false }),
   useGitPush: () => ({
     mutate: vi.fn(),
+    mutateAsync: vi.fn(),
     isPending: false,
     isError: false,
     error: null,
   }),
+  useGitPull: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
+  useGitDiscard: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const setGitTabSelection = vi.fn();

@@ -7,6 +7,11 @@ import type {
   GitDiffResult,
   GitFileStatus,
 } from "@/types";
+import {
+  assertWorkspaceRelativePaths,
+  partitionDiscardFiles,
+  toLiteralPathspecs,
+} from "@devhub/shared";
 
 function createGit(workspacePath: string): SimpleGit {
   return simpleGit(workspacePath);
@@ -129,9 +134,26 @@ export async function unstageAll(workspacePath: string): Promise<void> {
 export async function discardChanges(
   workspacePath: string,
   files: string[],
+  expectedUntracked?: string[],
 ): Promise<void> {
+  assertWorkspaceRelativePaths(files);
   const git = createGit(workspacePath);
-  await git.checkout(["--", ...files]);
+  const status = await git.status();
+  const { tracked, untracked } = partitionDiscardFiles(
+    {
+      unstaged: status.files.map((f) => f.path),
+      untracked: status.not_added,
+      conflicted: status.conflicted,
+    },
+    files,
+    expectedUntracked,
+  );
+  if (tracked.length > 0) {
+    await git.checkout(["--", ...toLiteralPathspecs(tracked)]);
+  }
+  if (untracked.length > 0) {
+    await git.clean("fd", ["--", ...toLiteralPathspecs(untracked)]);
+  }
 }
 
 export async function commit(

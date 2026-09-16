@@ -94,7 +94,7 @@ export interface WorkspaceBackend {
   stageAll(): Promise<void>;
   unstageFiles(files: string[]): Promise<void>;
   unstageAll(): Promise<void>;
-  discardChanges(files: string[]): Promise<void>;
+  discardChanges(files: string[], expectedUntracked?: string[]): Promise<void>;
 
   // Git commit/remote
   commit(message: string): Promise<string>;
@@ -223,8 +223,8 @@ export class LocalBackend implements WorkspaceBackend {
     return unstageAll(this.workspacePath);
   }
 
-  discardChanges(files: string[]) {
-    return discardChanges(this.workspacePath, files);
+  discardChanges(files: string[], expectedUntracked?: string[]) {
+    return discardChanges(this.workspacePath, files, expectedUntracked);
   }
 
   commit(message: string) {
@@ -486,8 +486,8 @@ export class RemoteBackend implements WorkspaceBackend {
     await this.agentPost("/git/unstage-all");
   }
 
-  async discardChanges(files: string[]) {
-    await this.agentPost("/git/discard", { files });
+  async discardChanges(files: string[], expectedUntracked?: string[]) {
+    await this.agentPost("/git/discard", { files, expectedUntracked });
   }
 
   async commit(message: string) {

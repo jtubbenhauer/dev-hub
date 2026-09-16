@@ -115,3 +115,12 @@ export interface WorktreeInfo {
   isBare: boolean;
   isDetached: boolean;
 }
+
+// Discard/revert helpers (shared by app + agent)
+
+export {
+  assertWorkspaceRelativePaths,
+  partitionDiscardFiles,
+  toLiteralPathspecs,
+} from "./git-discard";
+export type { DiscardBuckets, DiscardPartition } from "./git-discard";

@@ -9,14 +9,17 @@ import type { GitStatusResult } from "@/types";
 const stageMutate = vi.fn();
 const unstageMutate = vi.fn();
 const commitMutate = vi.fn();
-const pushMutate = vi.fn();
+const pushMutateAsync = vi.fn();
+const pullMutateAsync = vi.fn();
 
-let pushState: {
-  mutate: typeof pushMutate;
-  isPending: boolean;
-  isError: boolean;
-  error: Error | null;
-} = { mutate: pushMutate, isPending: false, isError: false, error: null };
+let pushState: { mutateAsync: typeof pushMutateAsync; isPending: boolean } = {
+  mutateAsync: pushMutateAsync,
+  isPending: false,
+};
+let pullState: { mutateAsync: typeof pullMutateAsync; isPending: boolean } = {
+  mutateAsync: pullMutateAsync,
+  isPending: false,
+};
 
 vi.mock("@/hooks/use-git", () => ({
   useGitStatus: vi.fn(),
@@ -25,6 +28,8 @@ vi.mock("@/hooks/use-git", () => ({
   useGitUnstage: () => ({ mutate: unstageMutate, isPending: false }),
   useGitCommit: () => ({ mutate: commitMutate, isPending: false }),
   useGitPush: () => pushState,
+  useGitPull: () => pullState,
+  useGitDiscard: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const setGitTabSelection = vi.fn();
@@ -87,12 +92,12 @@ function renderPanel() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  pushState = {
-    mutate: pushMutate,
-    isPending: false,
-    isError: false,
-    error: null,
-  };
+  pushMutateAsync.mockReset();
+  pullMutateAsync.mockReset();
+  pushMutateAsync.mockResolvedValue(undefined);
+  pullMutateAsync.mockResolvedValue(undefined);
+  pushState = { mutateAsync: pushMutateAsync, isPending: false };
+  pullState = { mutateAsync: pullMutateAsync, isPending: false };
   mockUseGitFileDiffs.mockReturnValue(new Map() as DiffMap);
 });
 
@@ -325,18 +330,20 @@ describe("GitTabPanel commit bar", () => {
 
     const { unmount } = renderPanel();
     await user.click(screen.getByTestId("git-push-button"));
-    expect(pushMutate).toHaveBeenCalledWith({ action: "push" });
+    expect(pushMutateAsync).toHaveBeenCalledWith({ action: "push" });
     unmount();
 
-    // Error path: hook reports isError -> error surfaced, button still usable
-    pushState = {
-      mutate: pushMutate,
-      isPending: false,
-      isError: true,
-      error: new Error("push failed"),
-    };
+    // Error path: mutateAsync rejects -> local error surfaced, button still usable
+    pushMutateAsync.mockReset();
+    pushMutateAsync.mockRejectedValue(new Error("push failed"));
+    mockUseGitStatus.mockReturnValue({
+      data: makeStatus({
+        unstaged: [{ path: "src/changed.ts", index: " ", workingDir: "M" }],
+      }),
+    });
     renderPanel();
-    expect(screen.getByTestId("git-push-error")).toHaveTextContent(
+    await user.click(screen.getByTestId("git-push-button"));
+    expect(await screen.findByTestId("git-push-error")).toHaveTextContent(
       "push failed",
     );
     expect(screen.getByTestId("git-push-button")).not.toBeDisabled();

@@ -17,7 +17,13 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import { useChatFileOpenSetting } from "@/hooks/use-settings";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
-import { toRepoRelative } from "@/lib/workspace-paths";
+import {
+  fileViewKey,
+  isOutsideRepoPath,
+  toRepoRelative,
+} from "@/lib/workspace-paths";
+import { useSidePanelStore } from "@/stores/side-panel-store";
+import { toast } from "sonner";
 
 const FileRow = memo(function FileRow({
   file,
@@ -61,18 +67,24 @@ const FileRow = memo(function FileRow({
   ]);
 
   const handleOpenGitDiff = useCallback(
-    (e: React.MouseEvent) => {
+    async (e: React.MouseEvent) => {
       e.stopPropagation();
-      localStorage.setItem("dev-hub:git-picker-selected-file", relativePath);
-      localStorage.setItem("dev-hub:git-view-mode", "working");
-      router.push("/git");
-      window.dispatchEvent(
-        new CustomEvent("devhub:git-select-file", {
-          detail: { path: relativePath, staged: false },
-        }),
-      );
+      if (isOutsideRepoPath(relativePath)) return; // unreachable but defensive
+      let failed = false;
+      await openFileInSidePanel(activeWorkspaceId ?? "", relativePath, () => {
+        failed = true;
+        toast.error("Could not open file");
+      });
+      if (!failed) {
+        useSidePanelStore
+          .getState()
+          .setFileViewMode(
+            fileViewKey(activeWorkspaceId ?? "", relativePath),
+            "diff",
+          );
+      }
     },
-    [router, relativePath],
+    [relativePath, activeWorkspaceId],
   );
 
   return (
@@ -91,13 +103,15 @@ const FileRow = memo(function FileRow({
         </TooltipTrigger>
         <TooltipContent side="left">{relativePath}</TooltipContent>
       </Tooltip>
-      <span
-        onClick={handleOpenGitDiff}
-        title="Open in git diff"
-        className="text-muted-foreground hover:text-foreground hidden shrink-0 rounded p-0.5 transition-colors group-hover:block"
-      >
-        <GitCompare className="size-3" />
-      </span>
+      {!isOutsideRepoPath(relativePath) && (
+        <span
+          onClick={handleOpenGitDiff}
+          title="Open in git diff"
+          className="text-muted-foreground hover:text-foreground hidden shrink-0 rounded p-0.5 transition-colors group-hover:block"
+        >
+          <GitCompare className="size-3" />
+        </span>
+      )}
       {file.action === "created" && (
         <span className="shrink-0 rounded bg-emerald-500/15 px-1 text-[10px] text-emerald-600 dark:text-emerald-400">
           new

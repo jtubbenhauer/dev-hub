@@ -1,14 +1,26 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { MessageWithParts } from "@/lib/opencode/types";
 
-const mockOpenFile = vi.fn().mockResolvedValue(undefined);
+const {
+  mockOpenFile,
+  mockRouterPush,
+  mockOpenFileInSidePanel,
+  mockSetFileViewMode,
+  mockToastError,
+} = vi.hoisted(() => ({
+  mockOpenFile: vi.fn().mockResolvedValue(undefined),
+  mockRouterPush: vi.fn(),
+  mockOpenFileInSidePanel: vi.fn().mockResolvedValue(undefined),
+  mockSetFileViewMode: vi.fn(),
+  mockToastError: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockRouterPush }),
 }));
 
 vi.mock("@/hooks/use-mobile", () => ({
@@ -34,11 +46,42 @@ vi.mock("@/stores/chat-file-dialog-store", () => ({
   }),
 }));
 
-vi.mock("@/lib/side-panel-open-file", () => ({
-  openFileInSidePanel: vi.fn(),
+vi.mock("@/stores/side-panel-store", () => ({
+  useSidePanelStore: Object.assign(vi.fn(), {
+    getState: () => ({ setFileViewMode: mockSetFileViewMode }),
+  }),
 }));
 
-function makeMessage(): MessageWithParts {
+vi.mock("@/lib/side-panel-open-file", () => ({
+  openFileInSidePanel: mockOpenFileInSidePanel,
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: mockToastError },
+}));
+
+function makePart(filePath: string, id: string, callID: string) {
+  return {
+    id,
+    sessionID: "session-1",
+    messageID: "message-1",
+    type: "tool" as const,
+    callID,
+    tool: "write",
+    state: {
+      status: "completed" as const,
+      input: { filePath },
+      output: "",
+      title: "",
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
+function makeMessage(
+  filePaths: string[] = ["/workspace/src/example.ts"],
+): MessageWithParts {
   return {
     info: {
       id: "message-1",
@@ -58,43 +101,83 @@ function makeMessage(): MessageWithParts {
         cache: { read: 0, write: 0 },
       },
     },
-    parts: [
-      {
-        id: "part-1",
-        sessionID: "session-1",
-        messageID: "message-1",
-        type: "tool",
-        callID: "call-1",
-        tool: "write",
-        state: {
-          status: "completed",
-          input: { filePath: "/workspace/src/example.ts" },
-          output: "",
-          title: "",
-          metadata: {},
-          time: { start: 1, end: 2 },
-        },
-      },
-    ],
+    parts: filePaths.map((fp, i) => makePart(fp, `part-${i}`, `call-${i}`)),
   };
 }
 
+function renderPanel(message: MessageWithParts, onFileOpen = vi.fn()) {
+  render(
+    <TooltipProvider>
+      <SessionFilesPanel
+        messages={[message]}
+        workspacePath="/workspace"
+        onFileOpen={onFileOpen}
+      />
+    </TooltipProvider>,
+  );
+  return { onFileOpen };
+}
+
 describe("SessionFilesPanel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOpenFileInSidePanel.mockResolvedValue(undefined);
+  });
+
   it("closes the mobile sheet before opening a file dialog", async () => {
-    const onFileOpen = vi.fn();
-    render(
-      <TooltipProvider>
-        <SessionFilesPanel
-          messages={[makeMessage()]}
-          workspacePath="/workspace"
-          onFileOpen={onFileOpen}
-        />
-      </TooltipProvider>,
-    );
+    const { onFileOpen } = renderPanel(makeMessage());
 
     fireEvent.click(screen.getByRole("button", { name: /src\/example[.]ts/ }));
 
     await waitFor(() => expect(mockOpenFile).toHaveBeenCalledOnce());
     expect(onFileOpen).toHaveBeenCalledOnce();
+  });
+
+  it("opens the file in the side panel diff mode on GitCompare click", async () => {
+    renderPanel(makeMessage());
+
+    fireEvent.click(screen.getByTitle("Open in git diff"));
+
+    await waitFor(() =>
+      expect(mockOpenFileInSidePanel).toHaveBeenCalledWith(
+        "workspace-1",
+        "src/example.ts",
+        expect.any(Function),
+      ),
+    );
+    expect(mockSetFileViewMode).toHaveBeenCalledWith(
+      "workspace-1:src/example.ts",
+      "diff",
+    );
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it("does not set diff mode when opening the file fails", async () => {
+    mockOpenFileInSidePanel.mockImplementationOnce(
+      async (_workspaceId: string, _path: string, fallback: () => void) => {
+        fallback();
+      },
+    );
+    renderPanel(makeMessage());
+
+    fireEvent.click(screen.getByTitle("Open in git diff"));
+
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledOnce());
+    expect(mockSetFileViewMode).not.toHaveBeenCalled();
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it("renders no GitCompare icon for outside-repo paths", () => {
+    renderPanel(
+      makeMessage([
+        "/abs/f.ts",
+        "C:\\outside\\f.ts",
+        "\\\\server\\share\\f.ts",
+        "../outside.ts",
+      ]),
+    );
+
+    expect(screen.getAllByRole("button")).toHaveLength(4);
+    expect(screen.queryAllByTitle("Open in git diff")).toHaveLength(0);
   });
 });

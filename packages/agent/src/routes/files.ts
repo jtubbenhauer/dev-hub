@@ -21,6 +21,7 @@ const IGNORED_NAMES = new Set([
 ]);
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_RAW_FILE_SIZE = 100 * 1024 * 1024;
 
 function validatePathWithinWorkspace(
   workspacePath: string,
@@ -238,6 +239,36 @@ export function fileRoutes(workspacePath: string): Hono {
 
     const content = fs.readFileSync(resolvedPath, "utf-8");
     return c.json({ content, size: stat.size });
+  });
+
+  // GET /files/raw?path=<relative> — unmodified bytes for binary previews
+  app.get("/raw", (c) => {
+    const filePath = c.req.query("path");
+    if (!filePath) {
+      return c.json({ error: "path query parameter required" }, 400);
+    }
+
+    let resolvedPath: string;
+    try {
+      resolvedPath = validatePathWithinWorkspace(workspacePath, filePath);
+    } catch {
+      return c.json({ error: "Path traversal denied" }, 403);
+    }
+
+    if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isFile()) {
+      return c.json({ error: "File not found" }, 404);
+    }
+
+    const stat = fs.statSync(resolvedPath);
+    if (stat.size > MAX_RAW_FILE_SIZE) {
+      return c.json({ error: "File too large" }, 413);
+    }
+
+    const bytes = fs.readFileSync(resolvedPath);
+    return c.body(new Uint8Array(bytes), 200, {
+      "Content-Type": "application/octet-stream",
+      "Content-Length": String(bytes.byteLength),
+    });
   });
 
   // POST /files/write { path, content }

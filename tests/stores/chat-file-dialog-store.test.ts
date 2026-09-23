@@ -37,6 +37,27 @@ describe("chat file dialog store", () => {
     expect(fallback).not.toHaveBeenCalled();
   });
 
+  it("opens PDFs as a preview without fetching text content", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const fallback = vi.fn();
+
+    await useChatFileDialogStore
+      .getState()
+      .openFile("workspace-1", "docs/spec.pdf", fallback);
+
+    const state = useChatFileDialogStore.getState();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(state.isOpen).toBe(true);
+    expect(state.isLoading).toBe(false);
+    expect(state.file).toEqual({
+      path: "docs/spec.pdf",
+      content: "",
+      language: "pdf",
+      workspaceId: "workspace-1",
+    });
+  });
+
   it("uses the full editor fallback when the file cannot be loaded", async () => {
     vi.stubGlobal(
       "fetch",

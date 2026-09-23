@@ -34,6 +34,8 @@ import type { FileTreeEntry, FileComment } from "@/types";
 import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
 import { FileViewToggle } from "@/components/chat/file-view-toggle";
 import { useFileViewMode } from "@/components/chat/use-file-view-mode";
+import { PdfViewer } from "@/components/editor/pdf-viewer";
+import { isPdfPath, PDF_LANGUAGE } from "@/lib/file-preview";
 
 const MonacoEditor = dynamic(
   () => import("@/components/editor/monaco-editor").then((m) => m.MonacoEditor),
@@ -56,7 +58,6 @@ const BINARY_EXTENSIONS = [
   ".svg",
   ".ico",
   ".wasm",
-  ".pdf",
   ".zip",
   ".tar",
   ".gz",
@@ -105,6 +106,7 @@ export function SplitPanelFiles({
   const currentFileContent = activeFile?.content ?? null;
   const currentFileLanguage = activeFile?.language ?? null;
   const isDirty = activeFile?.isDirty ?? false;
+  const isPdf = currentFileLanguage === PDF_LANGUAGE;
 
   const queryClient = useQueryClient();
 
@@ -210,6 +212,12 @@ export function SplitPanelFiles({
   const loadFile = useCallback(
     async (path: string) => {
       abortControllerRef.current?.abort();
+      if (isPdfPath(path)) {
+        clearError();
+        openFileInTab(path, "", PDF_LANGUAGE);
+        setIsLoading(false);
+        return;
+      }
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
@@ -259,6 +267,9 @@ export function SplitPanelFiles({
       isRestoringRef.current = true;
       const results = await Promise.all(
         files.map(async (f) => {
+          if (isPdfPath(f.path)) {
+            return { path: f.path, content: "", language: PDF_LANGUAGE };
+          }
           try {
             const res = await fetch(
               `/api/files/content?workspaceId=${wsId}&path=${encodeURIComponent(f.path)}`,
@@ -502,26 +513,28 @@ export function SplitPanelFiles({
           {isDirty && (
             <span className="bg-warning size-1.5 shrink-0 rounded-full" />
           )}
-          {canDiff && (
+          {canDiff && !isPdf && (
             <FileViewToggle
               mode={isDiff ? "diff" : "editor"}
               onChange={setMode}
             />
           )}
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            data-testid="split-panel-save"
-            disabled={!isDirty || saveFileMutation.isPending}
-            onClick={handleSave}
-            title="Save (Cmd+S)"
-          >
-            {saveFileMutation.isPending ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <Save className="size-3" />
-            )}
-          </Button>
+          {!isPdf && (
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              data-testid="split-panel-save"
+              disabled={!isDirty || saveFileMutation.isPending}
+              onClick={handleSave}
+              title="Save (Cmd+S)"
+            >
+              {saveFileMutation.isPending ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Save className="size-3" />
+              )}
+            </Button>
+          )}
           <Link
             href={`/files?open=${encodeURIComponent(currentFilePath)}`}
             className="text-muted-foreground hover:text-foreground"
@@ -582,7 +595,11 @@ export function SplitPanelFiles({
         !error &&
         !isLoading &&
         currentFileContent !== null &&
-        (isDiff ? (
+        (isPdf ? (
+          <div className="flex min-h-0 flex-1">
+            <PdfViewer workspaceId={workspaceId} filePath={currentFilePath} />
+          </div>
+        ) : isDiff ? (
           <div className="flex min-h-0 flex-1" data-testid="split-panel-diff">
             <div className="min-w-0 flex-1">
               <SidePanelDiffView

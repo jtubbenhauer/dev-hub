@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { isPdfPath, PDF_LANGUAGE } from "@/lib/file-preview";
 
 interface ChatDialogFile {
   readonly path: string;
@@ -44,6 +45,15 @@ export const useChatFileDialogStore = create<ChatFileDialogState>(
   (set, get) => ({
     ...initialState,
     openFile: async (workspaceId, path, fallback) => {
+      if (isPdfPath(path)) {
+        set({
+          isOpen: true,
+          isLoading: false,
+          file: { path, content: "", language: PDF_LANGUAGE, workspaceId },
+          originalContent: "",
+        });
+        return;
+      }
       set({ isOpen: true, isLoading: true, file: null, originalContent: "" });
       try {
         const response = await fetch(

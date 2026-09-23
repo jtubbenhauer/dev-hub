@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
+import { PdfViewer } from "@/components/editor/pdf-viewer";
+import { PDF_LANGUAGE } from "@/lib/file-preview";
 
 export function ChatFileDialog() {
   const isOpen = useChatFileDialogStore((state) => state.isOpen);
@@ -98,20 +100,22 @@ export function ChatFileDialog() {
               </Link>
             </Button>
           )}
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={!isDirty || isSaving}
-            aria-label="Save file"
-            className="px-2 sm:px-3"
-          >
-            {isSaving ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Save className="size-3.5" />
-            )}
-            <span className="hidden sm:inline">Save</span>
-          </Button>
+          {file?.language !== PDF_LANGUAGE && (
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={!isDirty || isSaving}
+              aria-label="Save file"
+              className="px-2 sm:px-3"
+            >
+              {isSaving ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Save className="size-3.5" />
+              )}
+              <span className="hidden sm:inline">Save</span>
+            </Button>
+          )}
         </DialogHeader>
 
         <div className="min-h-0 flex-1">
@@ -120,6 +124,8 @@ export function ChatFileDialog() {
               <Loader2 className="size-4 animate-spin" />
               Opening file...
             </div>
+          ) : file.language === PDF_LANGUAGE ? (
+            <PdfViewer workspaceId={file.workspaceId} filePath={file.path} />
           ) : (
             <EditorSwitcher
               content={file.content}

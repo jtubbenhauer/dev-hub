@@ -1,4 +1,5 @@
 import { useSidePanelStore } from "@/stores/side-panel-store";
+import { isPdfPath, PDF_LANGUAGE } from "@/lib/file-preview";
 
 export async function openFileInSidePanel(
   workspaceId: string,
@@ -6,6 +7,12 @@ export async function openFileInSidePanel(
   fallback: () => void,
 ): Promise<void> {
   const { setIsLoading, clearError, openFile } = useSidePanelStore.getState();
+  if (isPdfPath(path)) {
+    clearError();
+    openFile(path, "", PDF_LANGUAGE);
+    useSidePanelStore.getState().setActivePanelTab("files");
+    return;
+  }
   setIsLoading(true);
   clearError();
   try {

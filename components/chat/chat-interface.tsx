@@ -32,6 +32,7 @@ import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel
 import { SidePanel } from "@/components/chat/side-panel";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { Button } from "@/components/ui/button";
+import { VscodeIcon } from "@/components/ui/vscode-icon";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +63,9 @@ import { useAgentHealth, useGitStatus } from "@/hooks/use-git";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOpencodeRestart } from "@/hooks/use-opencode-restart";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
+import { useExternalEditorSetting } from "@/hooks/use-settings";
+import { EDITOR_FLAVOR_LABELS, resolveVscodeTarget } from "@/lib/vscode";
+import { toast } from "sonner";
 
 import type { Command } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
@@ -217,6 +221,16 @@ export function ChatInterface() {
     const ws = allWorkspaces.find((w) => w.id === activeWorkspaceId);
     return ws?.color ?? undefined;
   }, [allWorkspaces, activeWorkspaceId]);
+
+  const { externalEditor } = useExternalEditorSetting();
+  const vscodeTarget = useMemo(
+    () =>
+      activeWorkspace
+        ? resolveVscodeTarget(activeWorkspace, externalEditor)
+        : null,
+    [activeWorkspace, externalEditor],
+  );
+  const externalEditorLabel = EDITOR_FLAVOR_LABELS[externalEditor];
 
   const workspaceNames = useMemo(() => {
     const map: Record<string, string> = {};
@@ -1387,6 +1401,26 @@ export function ChatInterface() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {vscodeTarget?.kind === "unconfigured" && (
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      toast.error(`Cannot open in ${externalEditorLabel}`, {
+                        description: `${vscodeTarget.reason}. Set an SSH target in workspace settings.`,
+                      })
+                    }
+                  >
+                    <VscodeIcon className="mr-2 size-4" />
+                    Open in {externalEditorLabel}
+                  </DropdownMenuItem>
+                )}
+                {vscodeTarget && vscodeTarget.kind !== "unconfigured" && (
+                  <DropdownMenuItem asChild>
+                    <a href={vscodeTarget.uri}>
+                      <VscodeIcon className="mr-2 size-4" />
+                      Open in {externalEditorLabel}
+                    </a>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onSelect={() => restartOpencode()}
                   disabled={isRestarting}

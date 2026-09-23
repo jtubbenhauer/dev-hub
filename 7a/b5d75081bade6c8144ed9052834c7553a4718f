@@ -1,0 +1,45 @@
+components/chat/git-diff-dialog.tsx
+  s_80eaf202d6febe::t_1028afd2dbb00e 1-104
+components/chat/git-tab-panel.tsx
+  s_78fd576d73afde::t_159c33762af02b 13,121-122,328,335,682
+components/settings/general-settings.tsx
+  s_78fd576d73afde::t_a2a169d40bbd0e 40,163-164,175-176,278-293,550-577
+hooks/use-settings.ts
+  s_78fd576d73afde::t_e319e8a53968b0 66,646-658
+tests/components/chat/git-tab-panel.test.tsx
+  s_78fd576d73afde::t_2c0106057d9b05 93-108,156,254-298
+tests/components/chat/split-panel-files-open-mode.test.tsx
+  s_73a8299a783242::t_7c7656a7e3e256 1-145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7ab5d75081bade6c8144ed9052834c7553a4718f",
+  "prompts": {},
+  "sessions": {
+    "s_73a8299a783242": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3297f459ffeeDH6AZJlVTJkKt",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_78fd576d73afde": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3264a7a0ffeqkjhB3wCt3jPfD",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_80eaf202d6febe": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f328d3f69ffe3ufMZOYxzucTu2",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

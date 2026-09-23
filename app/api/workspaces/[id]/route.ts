@@ -54,6 +54,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     provider?: string | null;
     providerMeta?: Record<string, unknown> | null;
     shellCommand?: string | null;
+    sshTarget?: string | null;
+    sshPath?: string | null;
     color?: string | null;
     linkedTaskId?: string | null;
     linkedTaskMeta?: LinkedTaskMeta | null;
@@ -66,6 +68,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     provider,
     providerMeta,
     shellCommand,
+    sshTarget,
+    sshPath,
     color,
     linkedTaskId,
     linkedTaskMeta,
@@ -79,6 +83,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (provider !== undefined) updateData.provider = provider;
   if (providerMeta !== undefined) updateData.providerMeta = providerMeta;
   if (shellCommand !== undefined) updateData.shellCommand = shellCommand;
+  if (sshTarget !== undefined) {
+    updateData.sshTarget = sshTarget === "" ? null : sshTarget;
+  }
+  if (sshPath !== undefined) {
+    updateData.sshPath = sshPath === "" ? null : sshPath;
+  }
   if (color !== undefined) updateData.color = color;
   if (linkedTaskId !== undefined) {
     if (linkedTaskId === null) {

@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { WorkspaceBackendType } from "@/types";
 import { getAutoColorForNewWorkspace } from "@/lib/workspace-colors";
+import { backfillSshTargets } from "@/lib/workspaces/ssh-target";
 
 function detectPackageManager(
   dirPath: string,
@@ -75,7 +76,7 @@ export async function GET() {
     .from(workspaces)
     .where(eq(workspaces.userId, session.user.id));
 
-  return NextResponse.json(userWorkspaces);
+  return NextResponse.json(await backfillSshTargets(userWorkspaces));
 }
 
 // POST: create workspace

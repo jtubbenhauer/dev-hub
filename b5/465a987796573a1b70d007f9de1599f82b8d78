@@ -1,0 +1,16 @@
+components/chat/streaming-indicator.tsx
+  h_c7f8735263030f 9-13,76-106
+tests/components/chat/streaming-indicator.test.tsx
+  h_c7f8735263030f 7,36-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b5465a987796573a1b70d007f9de1599f82b8d78",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

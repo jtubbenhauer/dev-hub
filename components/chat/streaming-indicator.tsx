@@ -6,6 +6,11 @@ import {
   getDescendantActivity,
   type DescendantActivityCounts,
 } from "@/lib/chat/descendant-activity";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { MessageWithParts, SessionStatus } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
 import { memo, useEffect, useMemo, useState } from "react";
@@ -68,12 +73,37 @@ export const StreamingIndicator = memo(function StreamingIndicator({
         <span className="bg-muted-foreground/50 size-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
         <span className="bg-muted-foreground/50 size-1.5 animate-bounce rounded-full" />
       </div>
-      <span
-        className="text-muted-foreground min-w-0 truncate text-xs"
-        title={label}
-      >
-        {label}
-      </span>
+      {isRetrying ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="text-muted-foreground focus-visible:ring-ring/50 data-[state=open]:text-foreground min-h-6 min-w-0 cursor-pointer truncate rounded-sm py-1 text-left text-xs underline decoration-dotted underline-offset-2 focus-visible:ring-[3px] focus-visible:outline-none"
+              aria-label={label}
+            >
+              {label}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="top"
+            align="start"
+            collisionPadding={16}
+            className="max-h-[min(50dvh,20rem)] w-[min(36rem,calc(100vw-2rem))] overflow-y-auto p-3"
+          >
+            <p className="mb-2 text-xs font-medium">Retry details</p>
+            <pre className="text-muted-foreground font-mono text-xs break-words whitespace-pre-wrap">
+              {sessionStatus.message.trim()}
+            </pre>
+          </PopoverContent>
+        </Popover>
+      ) : (
+        <span
+          className="text-muted-foreground min-w-0 truncate text-xs"
+          title={label}
+        >
+          {label}
+        </span>
+      )}
     </div>
   );
 });

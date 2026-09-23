@@ -4,6 +4,7 @@ import {
 } from "@/components/chat/streaming-indicator";
 import { useChatStore } from "@/stores/chat-store";
 import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("StreamingIndicator", () => {
@@ -30,6 +31,30 @@ describe("StreamingIndicator", () => {
     expect(
       screen.getByText("Retrying... attempt 2 · 3s · Provider is overloaded"),
     ).toBeInTheDocument();
+  });
+
+  it("reveals the complete structured retry error on request", async () => {
+    const reason =
+      'Rate limited: {"type":"error","error":{"type":"rate_limit_error"},"request_id":"req_test"}';
+    const label = `Retrying... attempt 1 · ${reason}`;
+
+    render(
+      <StreamingIndicator
+        messages={[]}
+        sessionStatus={{
+          type: "retry",
+          attempt: 1,
+          message: reason,
+          next: 0,
+        }}
+      />,
+    );
+
+    const status = screen.getByRole("button", { name: label });
+    await userEvent.click(status);
+
+    expect(screen.getByText("Retry details")).toBeInTheDocument();
+    expect(screen.getByText(reason)).toBeInTheDocument();
   });
 
   it("falls back to Thinking when there is no status or message", () => {

@@ -1,0 +1,35 @@
+hooks/use-settings.ts
+  s_f45976a41bddf9::t_5247f81c6b41eb 58
+  s_f45976a41bddf9::t_13d3cb73ad7189 16-20
+  s_f45976a41bddf9::t_f0c0ec7c4867fe 521-531
+  s_f45976a41bddf9::t_0659c6037c5c7c 532-534
+components/settings/general-settings.tsx
+  s_f45976a41bddf9::t_bc68d726a40d3f 200-205,207-210
+  s_f45976a41bddf9::t_3ff123c9ae1304 69-74
+  s_f45976a41bddf9::t_c90d636f6d42bc 330-349
+  s_f45976a41bddf9::t_76fe62594bf606 31
+  s_f45976a41bddf9::t_7d778295aa74f1 206
+  s_f45976a41bddf9::t_fd53169f8205f8 156
+  s_f45976a41bddf9::t_48aa38d035c274 350-352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "968ebd8a152089897541b7b0fcf0779075d69f80",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f45976a41bddf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f379059c3ffekAKR5fZMi9Wit4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

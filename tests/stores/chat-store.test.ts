@@ -743,6 +743,7 @@ describe("SSE event handling — session lifecycle", () => {
   });
 
   it("session.deleted removes the session from the workspace", () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true });
     const store = useChatStore.getState();
     store.handleEvent(
       { type: "session.created", properties: { info: makeSession("sess-1") } },
@@ -752,9 +753,265 @@ describe("SSE event handling — session lifecycle", () => {
       { type: "session.deleted", properties: { info: makeSession("sess-1") } },
       "ws-a",
     );
+    store.handleEvent(
+      {
+        type: "session.updated",
+        properties: {
+          info: { ...makeSession("sess-1"), title: "Late update" },
+        },
+      },
+      "ws-a",
+    );
     expect(
       useChatStore.getState().workspaceStates["ws-a"].sessions["sess-1"],
     ).toBeUndefined();
+  });
+
+  it("does not repeat store and cache cleanup for a locally deleted session", async () => {
+    const cacheDeleteUrls: string[] = [];
+    global.fetch = vi
+      .fn()
+      .mockImplementation((input: RequestInfo | URL, options?: RequestInit) => {
+        if (
+          options?.method === "DELETE" &&
+          String(input).startsWith("/api/sessions/cache?")
+        ) {
+          cacheDeleteUrls.push(String(input));
+        }
+        return Promise.resolve({ ok: true });
+      });
+    const store = useChatStore.getState();
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    const snapshot = store.removeSessionLocal("sess-1", "ws-a");
+    expect(snapshot).not.toBeNull();
+    const workspaceAfterOptimisticRemoval =
+      useChatStore.getState().workspaceStates["ws-a"];
+    let repeatedWorkspaceUpdates = 0;
+    const unsubscribe = useChatStore.subscribe((state) => {
+      if (state.workspaceStates["ws-a"] !== workspaceAfterOptimisticRemoval) {
+        repeatedWorkspaceUpdates += 1;
+      }
+    });
+
+    await store.deleteSession("sess-1", "ws-a");
+    store.handleEvent(
+      { type: "session.deleted", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    await flushMicrotasks();
+    unsubscribe();
+
+    expect(repeatedWorkspaceUpdates).toBe(0);
+    expect(cacheDeleteUrls).toHaveLength(1);
+  });
+
+  it("serializes upstream deletions within a workspace", async () => {
+    const deletionStarts: string[] = [];
+    const finishDeletion: Array<() => void> = [];
+    global.fetch = vi
+      .fn()
+      .mockImplementation((input: RequestInfo | URL, options?: RequestInit) => {
+        if (
+          options?.method === "DELETE" &&
+          String(input).includes("/api/opencode/session/")
+        ) {
+          deletionStarts.push(String(input));
+          return new Promise((resolve) => {
+            finishDeletion.push(() => resolve({ ok: true }));
+          });
+        }
+        return Promise.resolve({ ok: true });
+      });
+    const store = useChatStore.getState();
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-2") } },
+      "ws-a",
+    );
+    store.removeSessionLocal("sess-1", "ws-a");
+    store.removeSessionLocal("sess-2", "ws-a");
+
+    const firstDeletion = store.deleteSession("sess-1", "ws-a");
+    const secondDeletion = store.deleteSession("sess-2", "ws-a");
+    await flushMicrotasks();
+
+    expect(deletionStarts).toHaveLength(1);
+    finishDeletion[0]?.();
+    await vi.waitFor(() => expect(deletionStarts).toHaveLength(2));
+    finishDeletion[1]?.();
+    await Promise.all([firstDeletion, secondDeletion]);
+  });
+
+  it("treats an already absent upstream session as deleted", async () => {
+    global.fetch = vi
+      .fn()
+      .mockImplementation((input: RequestInfo | URL, options?: RequestInit) => {
+        if (
+          options?.method === "DELETE" &&
+          String(input).includes("/api/opencode/session/")
+        ) {
+          return Promise.resolve({ ok: false, status: 404 });
+        }
+        return Promise.resolve({ ok: true, status: 200 });
+      });
+    const store = useChatStore.getState();
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    store.removeSessionLocal("sess-1", "ws-a");
+
+    const wasDeleted = await store.deleteSession("sess-1", "ws-a");
+
+    expect(wasDeleted).toBe(true);
+  });
+
+  it("reports a genuine upstream deletion failure", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    const store = useChatStore.getState();
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    store.removeSessionLocal("sess-1", "ws-a");
+
+    const wasDeleted = await store.deleteSession("sess-1", "ws-a");
+
+    expect(wasDeleted).toBe(false);
+  });
+
+  it("does not restore a deletion already confirmed by SSE", () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    const store = useChatStore.getState();
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    const snapshot = store.removeSessionLocal("sess-1", "ws-a");
+    expect(snapshot).not.toBeNull();
+    store.handleEvent(
+      { type: "session.deleted", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+
+    if (snapshot) store.restoreSessionLocal(snapshot);
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].sessions["sess-1"],
+    ).toBeUndefined();
+  });
+
+  it("does not hold the upstream deletion queue on cache cleanup", async () => {
+    let upstreamDeletionStarts = 0;
+    let finishFirstCacheDelete: (() => void) | undefined;
+    global.fetch = vi
+      .fn()
+      .mockImplementation((input: RequestInfo | URL, options?: RequestInit) => {
+        const url = String(input);
+        if (
+          options?.method === "DELETE" &&
+          url.includes("/api/opencode/session/")
+        ) {
+          upstreamDeletionStarts += 1;
+          return Promise.resolve({ ok: true, status: 200 });
+        }
+        if (
+          options?.method === "DELETE" &&
+          url.startsWith("/api/sessions/cache?") &&
+          !finishFirstCacheDelete
+        ) {
+          return new Promise((resolve) => {
+            finishFirstCacheDelete = () => resolve({ ok: true, status: 200 });
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200 });
+      });
+    const store = useChatStore.getState();
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-2") } },
+      "ws-a",
+    );
+    store.removeSessionLocal("sess-1", "ws-a");
+    store.removeSessionLocal("sess-2", "ws-a");
+
+    const firstDeletion = store.deleteSession("sess-1", "ws-a");
+    const secondDeletion = store.deleteSession("sess-2", "ws-a");
+
+    await vi.waitFor(() => expect(finishFirstCacheDelete).toBeDefined());
+    expect(upstreamDeletionStarts).toBe(2);
+    finishFirstCacheDelete?.();
+    await Promise.all([firstDeletion, secondDeletion]);
+  });
+
+  it("does not hydrate a deleted session from stale metadata cache", async () => {
+    const deletedSession = { ...makeSession("sess-1"), fromCache: true };
+    global.fetch = vi
+      .fn()
+      .mockImplementation((_input: RequestInfo | URL, options?: RequestInit) =>
+        Promise.resolve({
+          ok: true,
+          json: async () =>
+            options?.method === "DELETE" ? { deleted: true } : [deletedSession],
+        }),
+      );
+    const store = useChatStore.getState();
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    store.handleEvent(
+      { type: "session.deleted", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+
+    await useChatStore.getState().fetchCachedSessions("ws-a");
+
+    expect(
+      useChatStore.getState().workspaceStates["ws-a"].sessions["sess-1"],
+    ).toBeUndefined();
+  });
+
+  it("orders session cache deletion after an earlier metadata write", async () => {
+    const methods: string[] = [];
+    let finishPost: (() => void) | null = null;
+    global.fetch = vi
+      .fn()
+      .mockImplementation(
+        (_input: RequestInfo | URL, options?: RequestInit) => {
+          const method = options?.method ?? "GET";
+          methods.push(method);
+          if (method === "POST") {
+            return new Promise((resolve) => {
+              finishPost = () => resolve({ ok: true });
+            });
+          }
+          return Promise.resolve({ ok: true });
+        },
+      );
+    const store = useChatStore.getState();
+
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    store.handleEvent(
+      { type: "session.deleted", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    await vi.waitFor(() => expect(finishPost).not.toBeNull());
+    expect(methods).toEqual(["POST"]);
+    finishPost!();
+    await vi.waitFor(() => expect(methods).toEqual(["POST", "DELETE"]));
   });
 
   it("session.status (busy) transitions streaming status to streaming", () => {
@@ -1328,7 +1585,15 @@ describe("message routing", () => {
     expect(info.agent).toBe("updated-agent");
   });
 
-  it("message.removed deletes the correct message from the correct session", () => {
+  it("message.removed deletes and purges the exact message", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true });
+    let flushMessages = (): void => {};
+    const animationFrame = vi
+      .spyOn(globalThis, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => {
+        flushMessages = () => callback(0);
+        return 1;
+      });
     const store = useChatStore.getState();
 
     store.handleEvent(
@@ -1356,11 +1621,19 @@ describe("message routing", () => {
       },
       "ws-a",
     );
+    flushMessages();
+    animationFrame.mockRestore();
 
     const messages =
       useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"];
     expect(messages).toHaveLength(1);
     expect(messages[0].info.id).toBe("msg-2");
+    await vi.waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("message=msg-1"),
+        { method: "DELETE" },
+      );
+    });
   });
 
   it("optimistic user message is replaced when the real message.updated arrives", () => {
@@ -1445,7 +1718,6 @@ describe("message routing", () => {
       activeWorkspaceId: "ws-a",
       activeSessionId: "sess-a",
     });
-
     useChatStore.getState().handleEvent(
       {
         type: "message.part.updated",
@@ -1453,7 +1725,6 @@ describe("message routing", () => {
       },
       "ws-a",
     );
-
     // RAF was shimmed to flush synchronously in setup.ts
     const messages =
       useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"];
@@ -1661,6 +1932,26 @@ describe("message routing", () => {
       activeSessionId: "sess-a",
     });
 
+    let flushPendingUpdate = (): void => {};
+    const animationFrame = vi
+      .spyOn(globalThis, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => {
+        flushPendingUpdate = () => callback(0);
+        return 1;
+      });
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            ...makePart("part-1", "sess-a", "msg-1"),
+            text: "late update",
+          },
+        },
+      },
+      "ws-a",
+    );
     useChatStore.getState().handleEvent(
       {
         type: "message.part.removed",
@@ -1672,6 +1963,8 @@ describe("message routing", () => {
       },
       "ws-a",
     );
+    flushPendingUpdate();
+    animationFrame.mockRestore();
 
     const parts =
       useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"][0]
@@ -2309,7 +2602,7 @@ describe("streaming poll", () => {
     expect(useChatStore.getState().streamingPollInterval).not.toBeNull();
   });
 
-  it("refreshes active messages while polling a busy external session", async () => {
+  it("does not refresh the full history while external streaming is busy", async () => {
     const existing = [
       { info: makeUserMessage("msg-user", "sess-a"), parts: [] },
     ];
@@ -2342,6 +2635,12 @@ describe("streaming poll", () => {
       activeWorkspaceId: "ws-a",
       activeSessionId: "sess-a",
     });
+    const streamingStatus = vi
+      .spyOn(useChatStore.getState(), "getStreamingStatus")
+      .mockReturnValue("streaming");
+    const refreshMessages = vi
+      .spyOn(useChatStore.getState(), "_refreshMessagesFromRemote")
+      .mockResolvedValue(undefined);
     global.fetch = vi
       .fn()
       .mockImplementation(async (input: RequestInfo | URL) => {
@@ -2362,20 +2661,19 @@ describe("streaming poll", () => {
         }
         return {
           ok: true,
-          json: async () => ({ "sess-a": { type: "busy" } }),
+          json: async () => ({ "sess-a": { type: "idle" } }),
         };
       });
 
     useChatStore.getState().startStreamingPoll("ws-a");
     await vi.advanceTimersByTimeAsync(4000);
+    await flushMicrotasks();
+    await vi.advanceTimersByTimeAsync(4000);
+    await flushMicrotasks();
 
-    expect(
-      useChatStore
-        .getState()
-        .workspaceStates[
-          "ws-a"
-        ].messages["sess-a"].map((message) => message.info.id),
-    ).toEqual(["msg-user", "msg-assistant"]);
+    expect(refreshMessages).not.toHaveBeenCalled();
+    streamingStatus.mockRestore();
+    refreshMessages.mockRestore();
   });
 });
 
@@ -3324,7 +3622,13 @@ describe("fetchMessages — windowed loading", () => {
     ];
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ messages, hasMore: true, total: 42 }),
+      json: async () => ({
+        messages,
+        hasMore: true,
+        total: 42,
+        source: "cache",
+        recoveredMessageIds: ["m-1"],
+      }),
     });
     seedSession({});
 
@@ -3333,6 +3637,9 @@ describe("fetchMessages — windowed loading", () => {
     const state = useChatStore.getState();
     expect(state.workspaceStates["ws-a"].messages["sess-a"]).toHaveLength(2);
     expect(state.hasMoreBeforeBySession["ws-a:sess-a"]).toBe(true);
+    expect(state.recoveredMessageIdsBySession["ws-a:sess-a"]).toEqual(
+      new Set(["m-1"]),
+    );
 
     const url = (global.fetch as ReturnType<typeof vi.fn>).mock
       .calls[0][0] as string;
@@ -3356,6 +3663,11 @@ describe("fetchMessages — windowed loading", () => {
       json: async () => ({ messages: windowResp, hasMore: false, total: 4 }),
     });
     seedSession({ "sess-a": existing });
+    useChatStore.setState({
+      recoveredMessageIdsBySession: {
+        "ws-a:sess-a": new Set(["a"]),
+      },
+    });
 
     await useChatStore.getState().fetchMessages("sess-a", "ws-a");
     await flushMicrotasks();
@@ -3367,6 +3679,64 @@ describe("fetchMessages — windowed loading", () => {
       "c",
       "d",
     ]);
+    expect(
+      useChatStore.getState().recoveredMessageIdsBySession["ws-a:sess-a"],
+    ).toEqual(new Set(["a"]));
+  });
+
+  it("does not resurrect a message removed during an in-flight refresh", async () => {
+    const existing = [
+      { info: makeUserMessage("a", "sess-a"), parts: [] },
+      { info: makeAssistantMessage("b", "sess-a"), parts: [] },
+    ];
+    let resolveRefresh: ((value: ResponseLike) => void) | null = null;
+    type ResponseLike = {
+      ok: boolean;
+      json: () => Promise<unknown>;
+    };
+    global.fetch = vi
+      .fn()
+      .mockImplementation(
+        (_input: RequestInfo | URL, options?: RequestInit) => {
+          if (options?.method === "DELETE") {
+            return Promise.resolve({ ok: true });
+          }
+          return new Promise<ResponseLike>((resolve) => {
+            resolveRefresh = resolve;
+          });
+        },
+      );
+    seedSession({ "sess-a": existing });
+
+    const refresh = useChatStore
+      .getState()
+      ._refreshMessagesFromRemote("sess-a", "ws-a", { fresh: true });
+    await vi.waitFor(() => expect(resolveRefresh).not.toBeNull());
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.removed",
+        properties: { sessionID: "sess-a", messageID: "b" },
+      },
+      "ws-a",
+    );
+    resolveRefresh!({
+      ok: true,
+      json: async () => ({
+        messages: existing,
+        hasMore: false,
+        total: existing.length,
+        source: "remote",
+        recoveredMessageIds: [],
+      }),
+    });
+    await refresh;
+
+    const ids = useChatStore
+      .getState()
+      .workspaceStates[
+        "ws-a"
+      ].messages["sess-a"].map((message) => message.info.id);
+    expect(ids).toEqual(["a"]);
   });
 
   it("drops a stuck optimistic user message when the server window already contains the real message", async () => {
@@ -3564,6 +3934,69 @@ describe("fetchMessages — windowed loading", () => {
     expect(state.messageLoadErrorBySession["ws-a:sess-a"]).toContain("cached");
   });
 
+  it("replays queued text when only an older recovered prompt matches", async () => {
+    const historical = {
+      info: {
+        ...makeUserMessage("msg-historical", "sess-a"),
+        time: { created: 1_000 },
+      },
+      parts: [
+        {
+          ...makePart("part-historical", "sess-a", "msg-historical"),
+          text: "continue",
+        },
+      ],
+    };
+    const optimistic = {
+      info: {
+        ...makeUserMessage("optimistic-2000", "sess-a"),
+        time: { created: 2_000 },
+      },
+      parts: [
+        {
+          ...makePart("part-optimistic", "sess-a", "optimistic-2000"),
+          text: "continue",
+        },
+      ],
+    };
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+    seedSession({ "sess-a": [historical, optimistic] });
+    useChatStore.setState({
+      queuedMessages: new Map([
+        [
+          "ws-a",
+          [
+            {
+              sessionId: "sess-a",
+              text: "continue",
+              workspaceId: "ws-a",
+              optimisticMessageId: "optimistic-2000",
+              queuedAt: 2_000,
+            },
+          ],
+        ],
+      ]),
+      queuedWorkspaceIds: new Set(["ws-a"]),
+      recoveredMessageIdsBySession: {
+        "ws-a:sess-a": new Set(["msg-historical"]),
+      },
+      fetchMessages: vi.fn().mockResolvedValue(undefined),
+      sendMessage,
+    });
+
+    await useChatStore.getState().flushQueuedMessages("ws-a");
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      "sess-a",
+      "continue",
+      "ws-a",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
+
   it("loadOlderMessages prepends an older page and tracks hasMoreBefore", async () => {
     const existing = [
       { info: makeUserMessage("c", "sess-a"), parts: [] },
@@ -3575,7 +4008,11 @@ describe("fetchMessages — windowed loading", () => {
     ];
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ messages: older, hasMore: true }),
+      json: async () => ({
+        messages: older,
+        hasMore: true,
+        recoveredMessageIds: ["a"],
+      }),
     });
     seedSession({ "sess-a": existing });
 
@@ -3586,6 +4023,9 @@ describe("fetchMessages — windowed loading", () => {
       state.workspaceStates["ws-a"].messages["sess-a"].map((m) => m.info.id),
     ).toEqual(["a", "b", "c", "d"]);
     expect(state.hasMoreBeforeBySession["ws-a:sess-a"]).toBe(true);
+    expect(state.recoveredMessageIdsBySession["ws-a:sess-a"]).toEqual(
+      new Set(["a"]),
+    );
 
     const url = (global.fetch as ReturnType<typeof vi.fn>).mock
       .calls[0][0] as string;
@@ -4051,6 +4491,38 @@ describe("revertSession", () => {
     expect(msgs).toHaveLength(4);
   });
 
+  it("restores messages and preserves archive when upstream revert fails", async () => {
+    seedMessages();
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+
+    const result = await useChatStore
+      .getState()
+      .revertSession("sess-a", "ws-a", "msg-3");
+
+    const msgs =
+      useChatStore.getState().workspaceStates["ws-a"].messages["sess-a"];
+    expect(result).toBeNull();
+    expect(msgs).toHaveLength(4);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses to revert a display-only recovered message", async () => {
+    seedMessages();
+    useChatStore.setState({
+      recoveredMessageIdsBySession: {
+        "ws-a:sess-a": new Set(["msg-3"]),
+      },
+    });
+    global.fetch = vi.fn();
+
+    const result = await useChatStore
+      .getState()
+      .revertSession("sess-a", "ws-a", "msg-3");
+
+    expect(result).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it("returns null when message ID is not found", async () => {
     seedMessages();
     global.fetch = vi
@@ -4253,15 +4725,17 @@ describe("fetchSessions fallback to cache", () => {
       status?: number;
       json: () => Promise<unknown>;
     };
+    let liveFetchPromise: Promise<ResponseLike> | null = null;
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if ((url as string).includes("/api/sessions/cache?workspaceId=")) {
         return Promise.resolve({ ok: true, json: async () => cachedSessions });
       }
       if ((url as string).includes("/api/opencode/session")) {
-        return new Promise<ResponseLike>((resolve) => {
+        liveFetchPromise ??= new Promise<ResponseLike>((resolve) => {
           resolveLiveFetch = resolve;
         });
+        return liveFetchPromise;
       }
       if ((url as string).includes("/api/sessions/cache")) {
         return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
@@ -4288,6 +4762,7 @@ describe("fetchSessions fallback to cache", () => {
 
     ws = useChatStore.getState().workspaceStates["ws-local"];
     expect(Object.keys(ws.sessions)).toHaveLength(1);
+    expect(ws.sessions["cached-1"]).toBeUndefined();
     expect(ws.sessions["live-1"]).toBeDefined();
   });
 
@@ -4419,10 +4894,24 @@ describe("fetchSessions fallback to cache", () => {
     expect(cacheReads).toHaveLength(1);
   });
 
-  it("requests a large limit so top-level sessions aren't crowded out by subagent children", async () => {
+  it("merges complete root history with recent subagent sessions", async () => {
+    const historicalRoot = makeSession("root-historical", { updated: 1000 });
+    const recentRoot = makeSession("root-recent", { updated: 3000 });
+    const recentChild = makeSession("child-recent", {
+      parentID: recentRoot.id,
+      updated: 4000,
+    });
+
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if ((url as string).includes("/api/opencode/session")) {
-        return Promise.resolve({ ok: true, json: async () => [] });
+        const requestUrl = new URL(url, "http://localhost");
+        return Promise.resolve({
+          ok: true,
+          json: async () =>
+            requestUrl.searchParams.get("roots") === "true"
+              ? [recentRoot, historicalRoot]
+              : [recentChild, recentRoot],
+        });
       }
       if ((url as string).includes("/api/sessions/cache")) {
         return Promise.resolve({ ok: true, json: async () => [] });
@@ -4432,16 +4921,64 @@ describe("fetchSessions fallback to cache", () => {
 
     await useChatStore.getState().fetchSessions("ws-local");
 
+    const sessions =
+      useChatStore.getState().workspaceStates["ws-local"].sessions;
+    expect(Object.keys(sessions).sort()).toEqual([
+      "child-recent",
+      "root-historical",
+      "root-recent",
+    ]);
+
     const fetchCalls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-    const liveCall = fetchCalls.find(
+    const liveCalls = fetchCalls.filter(
       (args: unknown[]) =>
         typeof args[0] === "string" &&
         args[0].startsWith("/api/opencode/session"),
     );
-    expect(liveCall).toBeDefined();
-    const url = new URL(liveCall![0] as string, "http://localhost");
-    const limit = Number(url.searchParams.get("limit"));
-    expect(limit).toBeGreaterThanOrEqual(500);
+    expect(liveCalls).toHaveLength(2);
+    const requestUrls = liveCalls.map(
+      (args: unknown[]) => new URL(String(args[0]), "http://localhost"),
+    );
+    expect(
+      requestUrls.some((url) => url.searchParams.get("roots") === "true"),
+    ).toBe(true);
+    expect(
+      requestUrls.every((url) => Number(url.searchParams.get("limit")) >= 500),
+    ).toBe(true);
+  });
+
+  it("replaces a stale active session with the newest valid root in the same workspace", async () => {
+    const staleSession = {
+      ...makeSession("stale-session", { updated: 1000 }),
+      fromCache: true,
+    };
+    const olderRoot = makeSession("root-older", { updated: 2000 });
+    const newestRoot = makeSession("root-newest", { updated: 3000 });
+    useChatStore.setState({
+      activeWorkspaceId: "ws-local",
+      activeSessionId: staleSession.id,
+    });
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/sessions/cache?")) {
+        return Promise.resolve({ ok: true, json: async () => [staleSession] });
+      }
+      if (url.includes("/api/opencode/session")) {
+        const requestUrl = new URL(url, "http://localhost");
+        return Promise.resolve({
+          ok: true,
+          json: async () =>
+            requestUrl.searchParams.get("roots") === "true"
+              ? [olderRoot, newestRoot]
+              : [newestRoot],
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    await useChatStore.getState().fetchSessions("ws-local");
+
+    expect(useChatStore.getState().activeWorkspaceId).toBe("ws-local");
+    expect(useChatStore.getState().activeSessionId).toBe(newestRoot.id);
   });
 });
 

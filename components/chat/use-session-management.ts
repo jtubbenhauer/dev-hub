@@ -27,6 +27,7 @@ export function useSessionManagement({
   const {
     setActiveSession,
     setActiveWorkspaceId,
+    setActiveWorkspaceSession,
     fetchSessions,
     createSession,
     deleteSession,
@@ -166,41 +167,38 @@ export function useSessionManagement({
     new Map(),
   );
 
-  useEffect(() => {
-    const ref = pendingDeletions.current;
-    return () => {
-      for (const timer of ref.values()) clearTimeout(timer);
-      ref.clear();
-    };
-  }, []);
-
   const handleDeleteSession = useCallback(
     (sessionId: string, sessionWorkspaceId?: string) => {
       const workspaceId = sessionWorkspaceId ?? activeWorkspaceId;
       if (!workspaceId) return;
+      const deletionKey = `${workspaceId}:${sessionId}`;
 
-      const existing = pendingDeletions.current.get(sessionId);
+      const existing = pendingDeletions.current.get(deletionKey);
       if (existing) clearTimeout(existing);
 
       const snapshot = removeSessionLocal(sessionId, workspaceId);
       if (!snapshot) return;
 
-      const timer = setTimeout(() => {
-        pendingDeletions.current.delete(sessionId);
-        deleteSession(sessionId, workspaceId);
+      const timer = setTimeout(async () => {
+        pendingDeletions.current.delete(deletionKey);
+        const wasDeleted = await deleteSession(sessionId, workspaceId);
+        if (!wasDeleted) {
+          restoreSessionLocal(snapshot);
+          toast.error("Failed to delete chat");
+        }
       }, 5000);
 
-      pendingDeletions.current.set(sessionId, timer);
+      pendingDeletions.current.set(deletionKey, timer);
 
       toast.success("Chat deleted", {
         duration: 5000,
         action: {
           label: "Undo",
           onClick: () => {
-            const pending = pendingDeletions.current.get(sessionId);
+            const pending = pendingDeletions.current.get(deletionKey);
             if (pending) {
               clearTimeout(pending);
-              pendingDeletions.current.delete(sessionId);
+              pendingDeletions.current.delete(deletionKey);
             }
             restoreSessionLocal(snapshot);
           },
@@ -243,8 +241,7 @@ export function useSessionManagement({
       const isSleeping = ws && !shouldSSEConnect(ws, activeWorkspaceId);
 
       useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
-      setActiveWorkspaceId(workspaceId);
-      setActiveSession(sessionId);
+      setActiveWorkspaceSession(workspaceId, sessionId);
       setIsMobileSessionsOpen(false);
       if (!shouldSuppressAutoFocus) {
         requestAnimationFrame(() => promptInputRef.current?.focus());
@@ -260,8 +257,7 @@ export function useSessionManagement({
     [
       allWorkspaces,
       activeWorkspaceId,
-      setActiveWorkspaceId,
-      setActiveSession,
+      setActiveWorkspaceSession,
       fetchSessions,
       promptInputRef,
       shouldSuppressAutoFocus,

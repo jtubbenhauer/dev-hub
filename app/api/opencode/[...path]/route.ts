@@ -5,6 +5,7 @@ import { settings } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import {
   resolveOpenCodeTarget,
+  authorizeOpenCodeSession,
   OpenCodeTargetError,
 } from "@/lib/opencode/proxy-target";
 import { fetchWithHeaderTimeout } from "@/lib/opencode/fetch-timeout";
@@ -28,6 +29,13 @@ async function proxyToOpenCode(
 
   const url = new URL(request.url);
   const workspaceId = url.searchParams.get("workspaceId");
+  const requestedSessionId = pathSegments.path[1];
+  if (!workspaceId) {
+    return NextResponse.json(
+      { error: "workspaceId is required" },
+      { status: 400 },
+    );
+  }
 
   let serverUrl: string;
   let directory: string | undefined;
@@ -37,6 +45,10 @@ async function proxyToOpenCode(
     serverUrl = target.serverUrl;
     directory = target.directory;
     workspace = target.workspace;
+    const sessionId = requestedSessionId;
+    if (pathSegments.path[0] === "session" && sessionId?.startsWith("ses_")) {
+      await authorizeOpenCodeSession(target, sessionId);
+    }
   } catch (error) {
     if (error instanceof OpenCodeTargetError) {
       return NextResponse.json(

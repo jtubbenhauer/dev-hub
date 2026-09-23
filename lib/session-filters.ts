@@ -1,5 +1,14 @@
 export type SessionAgeFilter = "1d" | "1w" | "all";
 
+interface SessionLoadState {
+  readonly sessionsLoaded: boolean;
+}
+
+interface UnifiedFallbackCandidate {
+  readonly id: string;
+  readonly workspaceId: string;
+}
+
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const ONE_WEEK_MS = 7 * ONE_DAY_MS;
 
@@ -34,4 +43,21 @@ export function filterSessionsByAge<T extends SessionAgeFilterable>(
     if (pinnedSessionIds?.has(session.id)) return true;
     return session.time.updated >= cutoff;
   });
+}
+
+export function isSessionListLoading(
+  workspaceStates: Readonly<Record<string, SessionLoadState | undefined>>,
+  activeWorkspaceId: string | null,
+): boolean {
+  if (!activeWorkspaceId) return false;
+  return !workspaceStates[activeWorkspaceId]?.sessionsLoaded;
+}
+
+export function getUnifiedFallbackSession<T extends UnifiedFallbackCandidate>(
+  isUnifiedMode: boolean,
+  activeSessionId: string | null,
+  sessions: readonly T[],
+): T | null {
+  if (!isUnifiedMode || activeSessionId || sessions.length === 0) return null;
+  return sessions[0];
 }

@@ -270,4 +270,51 @@ describe("OpenCode proxy route retry", () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(await response.text()).toBe("chunk");
   });
+
+  it("rejects a session whose directory belongs to another workspace", async () => {
+    const localWorkspace = {
+      ...makeRemoteWorkspace(),
+      backend: "local" as const,
+      provider: "local" as const,
+      opencodeUrl: null,
+      agentUrl: null,
+    };
+    mockWhere.mockResolvedValueOnce([makeRemoteWorkspaceRow()]);
+    mockToWorkspace.mockReturnValue(localWorkspace);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ directory: "/another-workspace" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    const response = await GET(
+      new NextRequest(
+        "http://localhost:3000/api/opencode/session/ses_other/message?workspaceId=ws-1",
+      ),
+      {
+        params: Promise.resolve({
+          path: ["session", "ses_other", "message"],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(404);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires a workspace for every session-specific request", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+
+    const response = await GET(
+      new NextRequest("http://localhost:3000/api/opencode/session/ses_other"),
+      { params: Promise.resolve({ path: ["session", "ses_other"] }) },
+    );
+
+    expect(response.status).toBe(400);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
 });

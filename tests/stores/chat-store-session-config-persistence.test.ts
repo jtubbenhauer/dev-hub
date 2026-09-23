@@ -57,14 +57,24 @@ describe("chat session configuration persistence", () => {
     );
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(cappedSessions), {
-          status: 200,
-        }),
+      vi.fn().mockImplementation(
+        async () =>
+          new Response(JSON.stringify(cappedSessions), {
+            status: 200,
+          }),
       ),
     );
 
     await useChatStore.getState().fetchSessions("workspace-a");
+
+    const sessionRequestUrls = vi
+      .mocked(global.fetch)
+      .mock.calls.map(([input]) => String(input));
+    expect(
+      sessionRequestUrls.some(
+        (url) => url.includes("roots=true") && url.includes("limit=5000"),
+      ),
+    ).toBe(true);
 
     expect(useChatStore.getState().getSessionAgent("session-active")).toBe(
       "build",
@@ -76,9 +86,14 @@ describe("chat session configuration persistence", () => {
     expect(useChatStore.getState().getSessionVariant("session-active")).toBe(
       "high",
     );
+    expect(
+      useChatStore.getState().workspaceStates["workspace-a"].sessions[
+        "session-active"
+      ],
+    ).toBeDefined();
   });
 
-  it("prunes deleted session configuration after a complete refresh", async () => {
+  it("preserves archived session configuration after a complete refresh", async () => {
     useChatStore.setState({
       activeWorkspaceId: "workspace-a",
       activeSessionId: null,
@@ -109,23 +124,25 @@ describe("chat session configuration persistence", () => {
     });
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify([makeSession("session-current")]), {
-          status: 200,
-        }),
+      vi.fn().mockImplementation(
+        async () =>
+          new Response(JSON.stringify([makeSession("session-current")]), {
+            status: 200,
+          }),
       ),
     );
 
     await useChatStore.getState().fetchSessions("workspace-a");
 
-    expect(
-      useChatStore.getState().getSessionAgent("session-deleted"),
-    ).toBeNull();
-    expect(
-      useChatStore.getState().getSessionModel("session-deleted"),
-    ).toBeNull();
-    expect(
-      useChatStore.getState().getSessionVariant("session-deleted"),
-    ).toBeNull();
+    expect(useChatStore.getState().getSessionAgent("session-deleted")).toBe(
+      "build",
+    );
+    expect(useChatStore.getState().getSessionModel("session-deleted")).toEqual({
+      providerID: "provider-a",
+      modelID: "model-a",
+    });
+    expect(useChatStore.getState().getSessionVariant("session-deleted")).toBe(
+      "high",
+    );
   });
 });

@@ -57,6 +57,8 @@ import { getDescendantActivity } from "@/lib/chat/descendant-activity";
 import { getQueuedUserMessageIds } from "@/lib/chat/queued-messages";
 import {
   filterSessionsByAge,
+  getUnifiedFallbackSession,
+  isSessionListLoading,
   parseSessionAgeFilter,
   type SessionAgeFilter,
 } from "@/lib/session-filters";
@@ -623,6 +625,18 @@ export function ChatInterface() {
       filterSessionsByAge(unifiedSessions, sessionAgeFilter, unifiedPinnedIds),
     [unifiedSessions, sessionAgeFilter, unifiedPinnedIds],
   );
+  const unifiedFallbackSession = getUnifiedFallbackSession(
+    isUnifiedMode,
+    activeSessionId,
+    filteredUnifiedSessions,
+  );
+  useEffect(() => {
+    if (!unifiedFallbackSession) return;
+    pushChatState({
+      sessionId: unifiedFallbackSession.id,
+      workspaceId: unifiedFallbackSession.workspaceId,
+    });
+  }, [pushChatState, unifiedFallbackSession]);
   const unifiedSessionNotes = useChatStore(getUnifiedSessionNotes);
   const activeSessionNotes = useChatStore(getActiveSessionNotes);
   const sessionNotes = isUnifiedMode ? unifiedSessionNotes : activeSessionNotes;
@@ -636,14 +650,7 @@ export function ChatInterface() {
     : activeQuestionSessionIds;
 
   const isSessionsLoading = useChatStore((s) => {
-    if (isUnifiedMode) {
-      return allWorkspaces.some(
-        (ws) => !s.workspaceStates[ws.id]?.sessionsLoaded,
-      );
-    }
-    const wsId = s.activeWorkspaceId;
-    if (!wsId) return false;
-    return !s.workspaceStates[wsId]?.sessionsLoaded;
+    return isSessionListLoading(s.workspaceStates, s.activeWorkspaceId);
   });
 
   const childSessionIds = useMemo(() => {
@@ -707,6 +714,14 @@ export function ChatInterface() {
         : EMPTY_ID_SET,
     [activeMessagesRaw, streamingStatus],
   );
+  const recoveredMessageIds = useChatStore((state) => {
+    if (!activeWorkspaceId || !activeSessionId) return EMPTY_ID_SET;
+    return (
+      state.recoveredMessageIdsBySession[
+        `${activeWorkspaceId}:${activeSessionId}`
+      ] ?? EMPTY_ID_SET
+    );
+  });
   const isMessagesLoaded = useChatStore((state) => {
     const {
       activeSessionId: sid,
@@ -909,7 +924,11 @@ export function ChatInterface() {
           case "undo": {
             const lastAssistant = [...activeMessages]
               .reverse()
-              .find((m) => m.info.role === "assistant");
+              .find(
+                (m) =>
+                  m.info.role === "assistant" &&
+                  !recoveredMessageIds.has(m.info.id),
+              );
             if (lastAssistant) {
               revertSession(
                 sessionId,
@@ -936,6 +955,7 @@ export function ChatInterface() {
       activeWorkspaceId,
       activeSessionId,
       activeMessages,
+      recoveredMessageIds,
       primaryAgents,
       createSession,
       summarizeSession,

@@ -3,6 +3,7 @@ import { workspaces } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend";
 import type { Workspace } from "@/types";
+import { fetchWithHeaderTimeout } from "@/lib/opencode/fetch-timeout";
 
 // Thrown when a workspace can't be resolved or its OpenCode server can't be
 // reached. Carries the HTTP status the caller should surface.
@@ -78,5 +79,43 @@ export async function resolveOpenCodeTarget(
         ? error.message
         : "Failed to start OpenCode server",
     );
+  }
+}
+
+export async function authorizeOpenCodeSession(
+  target: OpenCodeTarget,
+  sessionId: string,
+): Promise<void> {
+  if (!target.directory) return;
+
+  const sessionUrl = new URL(`/session/${sessionId}`, target.serverUrl);
+  sessionUrl.searchParams.set("directory", target.directory);
+  let response: Response;
+  try {
+    response = await fetchWithHeaderTimeout(
+      sessionUrl.toString(),
+      { headers: { accept: "application/json" } },
+      10_000,
+    );
+  } catch (error) {
+    throw new OpenCodeTargetError(
+      503,
+      "OpenCode server unavailable",
+      error instanceof Error ? error.message : "Session lookup failed",
+    );
+  }
+  if (!response.ok) {
+    throw new OpenCodeTargetError(404, "Session not found");
+  }
+
+  const session: unknown = await response.json();
+  if (
+    typeof session !== "object" ||
+    session === null ||
+    !("directory" in session) ||
+    typeof session.directory !== "string" ||
+    session.directory !== target.directory
+  ) {
+    throw new OpenCodeTargetError(404, "Session not found");
   }
 }

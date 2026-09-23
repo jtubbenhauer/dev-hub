@@ -83,6 +83,7 @@ describe("useSessionManagement", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     localStorage.clear();
   });
@@ -178,5 +179,89 @@ describe("useSessionManagement", () => {
 
     expect(storeMocks.fetchCachedSessions).toHaveBeenCalledWith("ws-remote");
     expect(storeMocks.fetchPinnedSessions).toHaveBeenCalledWith("ws-remote");
+  });
+
+  it("commits a pending deletion after the hook unmounts", async () => {
+    vi.useFakeTimers();
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
+    storeMocks.removeSessionLocal.mockReturnValue({ sessionId: "session-1" });
+    const promptInputRef = {
+      current: null,
+    } as RefObject<PromptInputHandle | null>;
+    const { result, unmount } = renderHook(() =>
+      useSessionManagement({
+        activeWorkspaceId: "ws-1",
+        allWorkspaces: [],
+        healthStatus: "healthy",
+        promptInputRef,
+      }),
+    );
+
+    result.current.handleDeleteSession("session-1");
+    unmount();
+    await vi.runAllTimersAsync();
+
+    expect(storeMocks.deleteSession).toHaveBeenCalledWith("session-1", "ws-1");
+  });
+
+  it("restores an optimistic deletion when the upstream delete fails", async () => {
+    vi.useFakeTimers();
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
+    const snapshot = { sessionId: "session-1" };
+    storeMocks.removeSessionLocal.mockReturnValue(snapshot);
+    storeMocks.deleteSession.mockResolvedValue(false);
+    const promptInputRef = {
+      current: null,
+    } as RefObject<PromptInputHandle | null>;
+    const { result } = renderHook(() =>
+      useSessionManagement({
+        activeWorkspaceId: "ws-1",
+        allWorkspaces: [],
+        healthStatus: "healthy",
+        promptInputRef,
+      }),
+    );
+
+    result.current.handleDeleteSession("session-1");
+    await vi.runAllTimersAsync();
+
+    expect(storeMocks.restoreSessionLocal).toHaveBeenCalledWith(snapshot);
+  });
+
+  it("keeps same-id deletions independent across workspaces", async () => {
+    vi.useFakeTimers();
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
+    storeMocks.removeSessionLocal.mockImplementation(
+      (sessionId: string, workspaceId: string) => ({ sessionId, workspaceId }),
+    );
+    storeMocks.deleteSession.mockResolvedValue(true);
+    const promptInputRef = {
+      current: null,
+    } as RefObject<PromptInputHandle | null>;
+    const { result } = renderHook(() =>
+      useSessionManagement({
+        activeWorkspaceId: "ws-1",
+        allWorkspaces: [],
+        healthStatus: "healthy",
+        promptInputRef,
+      }),
+    );
+
+    result.current.handleDeleteSession("shared-session", "ws-1");
+    result.current.handleDeleteSession("shared-session", "ws-2");
+    await vi.runAllTimersAsync();
+
+    expect(storeMocks.deleteSession).toHaveBeenCalledTimes(2);
+    expect(storeMocks.deleteSession).toHaveBeenCalledWith(
+      "shared-session",
+      "ws-1",
+    );
+    expect(storeMocks.deleteSession).toHaveBeenCalledWith(
+      "shared-session",
+      "ws-2",
+    );
   });
 });

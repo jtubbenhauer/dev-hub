@@ -3,6 +3,7 @@ import {
   mergeTailWindow,
   mergePrependWindow,
   mergeFullMessage,
+  mergeRecoveredMessages,
   dropSupersededOptimistic,
 } from "@/lib/opencode/merge-messages";
 import { TRUNCATION_MARKER_KEY } from "@/lib/opencode/truncate-messages";
@@ -30,17 +31,72 @@ function toolPart(id: string, output: string, truncated = false): Part {
   } as Part;
 }
 
-function msg(id: string, parts: Part[] = []): MessageWithParts {
+function msg(id: string, parts: Part[] = [], created = 1): MessageWithParts {
   return {
     info: {
       id,
       sessionID: "ses-1",
       role: "assistant",
-      time: { created: 1 },
+      time: { created },
     } as unknown as Message,
     parts,
   };
 }
+
+describe("mergeRecoveredMessages", () => {
+  it("inserts recovered messages chronologically without replacing authoritative duplicates", () => {
+    const authoritativeDuplicate = msg("c", [], 30);
+    const authoritative = [msg("a", [], 10), authoritativeDuplicate];
+    const recovered = [
+      { sequence: 2, message: msg("c", [toolPart("recovered", "old")], 30) },
+      { sequence: 1, message: msg("b", [], 20) },
+    ];
+
+    const result = mergeRecoveredMessages(authoritative, recovered);
+
+    expect(result.map((message) => message.info.id)).toEqual(["a", "b", "c"]);
+    expect(result[2]).toBe(authoritativeDuplicate);
+  });
+
+  it("keeps richer archived parts when the authoritative duplicate is truncated", () => {
+    const authoritative = [msg("a", [toolPart("p1", "trunc", true)], 10)];
+    const recovered = [
+      { sequence: 1, message: msg("a", [toolPart("p1", "FULL_OUTPUT")], 10) },
+    ];
+
+    const [merged] = mergeRecoveredMessages(authoritative, recovered);
+
+    const part = merged.parts[0];
+    if (part.type !== "tool" || part.state.status !== "completed") {
+      throw new Error("expected completed tool part");
+    }
+    expect(part.state.output).toBe("FULL_OUTPUT");
+  });
+
+  it("keeps reconciled suffixes after recovered-only entries are exhausted", () => {
+    const authoritative = [
+      msg("a", [], 10),
+      msg("b", [toolPart("p1", "trunc", true)], 20),
+    ];
+    const recovered = [
+      { sequence: 1, message: msg("recovered", [], 5) },
+      { sequence: 2, message: msg("b", [toolPart("p1", "FULL")], 20) },
+    ];
+
+    const result = mergeRecoveredMessages(authoritative, recovered);
+    const part = result[2].parts[0];
+
+    expect(result.map((message) => message.info.id)).toEqual([
+      "recovered",
+      "a",
+      "b",
+    ]);
+    if (part.type !== "tool" || part.state.status !== "completed") {
+      throw new Error("expected completed tool part");
+    }
+    expect(part.state.output).toBe("FULL");
+  });
+});
 
 describe("mergeTailWindow", () => {
   it("returns the incoming window when nothing is loaded yet", () => {
@@ -62,6 +118,22 @@ describe("mergeTailWindow", () => {
 
     const result = mergeTailWindow(existing, incoming).map((m) => m.info.id);
     expect(result).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("preserves cached messages removed between remote overlap anchors", () => {
+    const existing = [msg("a"), msg("b"), msg("x"), msg("c"), msg("d")];
+    const incoming = [msg("b"), msg("c")];
+
+    const result = mergeTailWindow(existing, incoming).map((m) => m.info.id);
+    expect(result).toEqual(["a", "b", "x", "c", "d"]);
+  });
+
+  it("emits every id once when the incoming window contradicts existing order", () => {
+    const existing = [msg("a"), msg("b"), msg("c")];
+    const incoming = [msg("c"), msg("b")];
+
+    const result = mergeTailWindow(existing, incoming).map((m) => m.info.id);
+    expect(result).toEqual(["a", "b", "c"]);
   });
 
   it("appends a disjoint newer window after older history", () => {
@@ -150,13 +222,13 @@ describe("mergeFullMessage", () => {
   });
 });
 
-function userMsg(id: string, text: string): MessageWithParts {
+function userMsg(id: string, text: string, created = 1): MessageWithParts {
   return {
     info: {
       id,
       sessionID: "ses-1",
       role: "user",
-      time: { created: 1 },
+      time: { created },
     } as unknown as Message,
     parts: [
       {
@@ -217,6 +289,19 @@ describe("dropSupersededOptimistic", () => {
     );
 
     expect(cleaned).toBe(messages);
+    expect(removedIds.size).toBe(0);
+  });
+
+  it("keeps a newer optimistic message when only old authoritative text matches", () => {
+    const optimistic = userMsg("optimistic-10000", "continue", 10_000);
+    const oldAuthoritative = userMsg("msg_old", "continue", 1_000);
+
+    const { messages: cleaned, removedIds } = dropSupersededOptimistic(
+      [oldAuthoritative, optimistic],
+      [oldAuthoritative],
+    );
+
+    expect(cleaned).toEqual([oldAuthoritative, optimistic]);
     expect(removedIds.size).toBe(0);
   });
 

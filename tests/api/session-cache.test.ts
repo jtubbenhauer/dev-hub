@@ -3,6 +3,10 @@ import { NextRequest } from "next/server";
 
 const mockAuth = vi.fn();
 vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
+vi.mock("@/lib/opencode/proxy-target", () => ({
+  resolveOpenCodeTarget: vi.fn().mockResolvedValue({}),
+  OpenCodeTargetError: class OpenCodeTargetError extends Error {},
+}));
 
 const mockRun = vi.fn();
 const mockOnConflictDoUpdate = vi.fn().mockReturnValue({ run: mockRun });
@@ -36,6 +40,11 @@ vi.mock("@/drizzle/schema", () => ({
     workspaceId: "cm_workspaceId",
     userId: "cm_userId",
   },
+  recoveredMessages: {
+    sessionId: "rm_sessionId",
+    workspaceId: "rm_workspaceId",
+    userId: "rm_userId",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -65,7 +74,7 @@ describe("POST /api/sessions/cache", () => {
     mockDeleteWhere.mockReturnValue({ run: mockRun });
   });
 
-  it("deletes orphaned cachedMessages when syncing sessions", async () => {
+  it("preserves message history when a session is omitted from sync", async () => {
     const { POST } = await import("@/app/api/sessions/cache/route");
 
     const req = makeRequest({
@@ -80,23 +89,7 @@ describe("POST /api/sessions/cache", () => {
     expect(res.status).toBe(200);
 
     expect(mockTransaction).toHaveBeenCalledOnce();
-    expect(mockDelete).toHaveBeenCalledTimes(2);
-
-    const { notInArray } = await import("drizzle-orm");
-
-    expect(mockDelete).toHaveBeenNthCalledWith(1, {
-      id: "cs_id",
-      workspaceId: "cs_workspaceId",
-      userId: "cs_userId",
-    });
-
-    expect(mockDelete).toHaveBeenNthCalledWith(2, {
-      sessionId: "cm_sessionId",
-      workspaceId: "cm_workspaceId",
-      userId: "cm_userId",
-    });
-
-    expect(notInArray).toHaveBeenCalledWith("cm_sessionId", ["s1", "s2"]);
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 
   it("does NOT delete cached data when incoming is empty without force flag", async () => {
@@ -125,7 +118,7 @@ describe("POST /api/sessions/cache", () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
 
-    expect(mockDelete).toHaveBeenCalledTimes(2);
+    expect(mockDelete).toHaveBeenCalledTimes(3);
     expect(mockDelete).toHaveBeenNthCalledWith(1, {
       id: "cs_id",
       workspaceId: "cs_workspaceId",
@@ -136,9 +129,27 @@ describe("POST /api/sessions/cache", () => {
       workspaceId: "cm_workspaceId",
       userId: "cm_userId",
     });
+    expect(mockDelete).toHaveBeenNthCalledWith(3, {
+      sessionId: "rm_sessionId",
+      workspaceId: "rm_workspaceId",
+      userId: "rm_userId",
+    });
 
     const { notInArray } = await import("drizzle-orm");
     const notInArrayCalls = vi.mocked(notInArray).mock.calls;
     expect(notInArrayCalls).toHaveLength(0);
+  });
+
+  it("deletes cached metadata and history for one session", async () => {
+    const { DELETE } = await import("@/app/api/sessions/cache/route");
+    const response = await DELETE(
+      new NextRequest(
+        "http://localhost:3000/api/sessions/cache?workspaceId=ws-1&sessionId=session-1",
+        { method: "DELETE" },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockDelete).toHaveBeenCalledTimes(3);
   });
 });

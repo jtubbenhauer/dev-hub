@@ -232,7 +232,7 @@ export const sessionNotes = sqliteTable(
 export const cachedSessions = sqliteTable(
   "cached_sessions",
   {
-    id: text("id").primaryKey(),
+    id: text("id").notNull(),
     workspaceId: text("workspace_id").notNull(),
     userId: text("user_id").notNull(),
     title: text("title"),
@@ -243,6 +243,7 @@ export const cachedSessions = sqliteTable(
     cachedAt: integer("cached_at").notNull(),
   },
   (table) => [
+    primaryKey({ columns: [table.userId, table.workspaceId, table.id] }),
     index("cached_sessions_workspace_id_cached_at_idx").on(
       table.workspaceId,
       table.cachedAt,
@@ -257,11 +258,45 @@ export const cachedMessages = sqliteTable(
     workspaceId: text("workspace_id").notNull(),
     userId: text("user_id").notNull(),
     messagesJson: text("messages_json").notNull(),
+    authoritativeMessageIdsJson: text("authoritative_message_ids_json")
+      .notNull()
+      .default("[]"),
     cachedAt: integer("cached_at").notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.sessionId, table.workspaceId] }),
+    primaryKey({
+      columns: [table.userId, table.workspaceId, table.sessionId],
+    }),
     index("cached_messages_workspace_id_idx").on(table.workspaceId),
     index("cached_messages_user_id_idx").on(table.userId),
+  ],
+);
+
+export const recoveredMessages = sqliteTable(
+  "recovered_messages",
+  {
+    sessionId: text("session_id").notNull(),
+    workspaceId: text("workspace_id").notNull(),
+    userId: text("user_id").notNull(),
+    messageId: text("message_id").notNull(),
+    sequence: integer("sequence").notNull(),
+    messageJson: text("message_json").notNull(),
+    recoveredAt: integer("recovered_at").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.userId,
+        table.workspaceId,
+        table.sessionId,
+        table.messageId,
+      ],
+    }),
+    index("recovered_messages_lookup_idx").on(
+      table.userId,
+      table.workspaceId,
+      table.sessionId,
+      table.sequence,
+    ),
   ],
 );

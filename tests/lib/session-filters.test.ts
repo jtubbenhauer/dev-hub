@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   filterSessionsByAge,
+  getUnifiedFallbackSession,
   getSessionAgeCutoff,
+  isSessionListLoading,
   parseSessionAgeFilter,
   type SessionAgeFilter,
 } from "@/lib/session-filters";
@@ -115,5 +117,43 @@ describe("filterSessionsByAge", () => {
       NOW,
     );
     expect(result.map((s) => s.id)).toEqual(["boundary"]);
+  });
+});
+
+describe("isSessionListLoading", () => {
+  it("stops blocking unified rendering once the active workspace is loaded", () => {
+    const workspaceStates = {
+      active: { sessionsLoaded: true },
+      background: { sessionsLoaded: false },
+    };
+
+    expect(isSessionListLoading(workspaceStates, "active")).toBe(false);
+  });
+
+  it("keeps loading while the active workspace has not completed", () => {
+    expect(
+      isSessionListLoading({ active: { sessionsLoaded: false } }, "active"),
+    ).toBe(true);
+  });
+});
+
+describe("getUnifiedFallbackSession", () => {
+  const sessions = [
+    { id: "newest", workspaceId: "workspace-b" },
+    { id: "older", workspaceId: "workspace-a" },
+  ];
+
+  it("selects the newest loaded session when unified mode has no active chat", () => {
+    expect(getUnifiedFallbackSession(true, null, sessions)).toEqual(
+      sessions[0],
+    );
+  });
+
+  it("does not replace an existing active chat", () => {
+    expect(getUnifiedFallbackSession(true, "active", sessions)).toBeNull();
+  });
+
+  it("does not cross workspaces outside unified mode", () => {
+    expect(getUnifiedFallbackSession(false, null, sessions)).toBeNull();
   });
 });

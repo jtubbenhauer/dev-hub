@@ -85,6 +85,116 @@ describe("chat store queued message handling", () => {
     );
   });
 
+  it("renders a file attachment optimistically, since OpenCode never emits file part events", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 204 })),
+    );
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-1": {
+          sessions: { "sess-1": makeSession("sess-1") },
+          sessionsLoaded: true,
+          messages: { "sess-1": [] },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+        },
+      },
+    });
+
+    await useChatStore
+      .getState()
+      .sendMessage(
+        "sess-1",
+        "check this",
+        "ws-1",
+        undefined,
+        undefined,
+        undefined,
+        [
+          {
+            mime: "application/pdf",
+            dataUrl: "data:application/pdf;base64,JVBERi0=",
+            filename: "report.pdf",
+          },
+        ],
+      );
+
+    const parts =
+      useChatStore.getState().workspaceStates["ws-1"].messages["sess-1"][0]
+        .parts;
+    const fileParts = parts.filter((part) => part.type === "file");
+
+    expect(fileParts).toHaveLength(1);
+    expect(fileParts[0]).toMatchObject({
+      type: "file",
+      mime: "application/pdf",
+      filename: "report.pdf",
+    });
+  });
+
+  it("does not render a file chip for inlined text attachments like CSV", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 204 })),
+    );
+
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-1": {
+          sessions: { "sess-1": makeSession("sess-1") },
+          sessionsLoaded: true,
+          messages: { "sess-1": [] },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+        },
+      },
+    });
+
+    await useChatStore
+      .getState()
+      .sendMessage(
+        "sess-1",
+        "check this",
+        "ws-1",
+        undefined,
+        undefined,
+        undefined,
+        [
+          {
+            mime: "text/plain",
+            dataUrl: "data:text/plain;base64,YSxiCjEsMgo=",
+            filename: "rows.csv",
+          },
+        ],
+      );
+
+    const parts =
+      useChatStore.getState().workspaceStates["ws-1"].messages["sess-1"][0]
+        .parts;
+
+    expect(parts.filter((part) => part.type === "file")).toHaveLength(0);
+  });
+
   it("queues on 504 (timeout) and keeps optimistic message visible", async () => {
     vi.stubGlobal(
       "fetch",
@@ -344,7 +454,7 @@ describe("chat store queued message handling", () => {
                   id: "optimistic-old",
                   sessionID: "sess-1",
                   role: "user",
-                  time: { created: Date.now() },
+                  time: { created: 2_000 },
                   agent: "",
                   model: { providerID: "", modelID: "" },
                 },
@@ -462,6 +572,7 @@ describe("chat store queued message handling", () => {
               text: "already delivered",
               workspaceId: "ws-1",
               optimisticMessageId: "optimistic-recovered",
+              queuedAt: 1_000,
             },
           ],
         ],
@@ -511,6 +622,102 @@ describe("chat store queued message handling", () => {
     expect(persisted.queuedMessages[0][0]).toBe("ws-1");
     expect(persisted.queuedMessages[0][1][0].text).toBe("pending");
     expect(persisted.queuedWorkspaceIds).toEqual(["ws-1"]);
+  });
+
+  it("partialize omits queued messages carrying attachments so base64 data never hits the storage quota", () => {
+    useChatStore.setState({
+      queuedMessages: new Map([
+        [
+          "ws-1",
+          [
+            {
+              sessionId: "sess-1",
+              text: "text only",
+              workspaceId: "ws-1",
+              optimisticMessageId: "optimistic-1",
+            },
+            {
+              sessionId: "sess-1",
+              text: "with attachment",
+              workspaceId: "ws-1",
+              optimisticMessageId: "optimistic-2",
+              attachments: [
+                {
+                  mime: "application/pdf",
+                  dataUrl: `data:application/pdf;base64,${"A".repeat(5000)}`,
+                  filename: "big.pdf",
+                },
+              ],
+            },
+          ],
+        ],
+      ]),
+      queuedWorkspaceIds: new Set(["ws-1"]),
+    });
+
+    const partialize = useChatStore.persist.getOptions().partialize!;
+    const persisted = partialize(useChatStore.getState()) as {
+      queuedMessages: Array<[string, Array<{ text: string }>]>;
+      queuedWorkspaceIds: string[];
+    };
+
+    expect(persisted.queuedMessages[0][1]).toHaveLength(1);
+    expect(persisted.queuedMessages[0][1][0].text).toBe("text only");
+    expect(JSON.stringify(persisted)).not.toContain("base64");
+  });
+
+  it("partialize drops a workspace entirely when every queued message has attachments", () => {
+    useChatStore.setState({
+      queuedMessages: new Map([
+        [
+          "ws-1",
+          [
+            {
+              sessionId: "sess-1",
+              text: "only attachment message",
+              workspaceId: "ws-1",
+              optimisticMessageId: "optimistic-1",
+              attachments: [
+                {
+                  mime: "text/plain",
+                  dataUrl: "data:text/plain;base64,AAAA",
+                  filename: "notes.md",
+                },
+              ],
+            },
+          ],
+        ],
+      ]),
+      queuedWorkspaceIds: new Set(["ws-1"]),
+    });
+
+    const partialize = useChatStore.persist.getOptions().partialize!;
+    const persisted = partialize(useChatStore.getState()) as {
+      queuedMessages: Array<[string, unknown[]]>;
+      queuedWorkspaceIds: string[];
+    };
+
+    expect(persisted.queuedMessages).toHaveLength(0);
+    expect(persisted.queuedWorkspaceIds).toEqual([]);
+  });
+
+  it("keeps working when localStorage rejects a write with a quota error", () => {
+    const setItem = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new DOMException("quota exceeded", "QuotaExceededError");
+      });
+
+    try {
+      expect(() =>
+        useChatStore.setState({ queuedWorkspaceIds: new Set(["ws-quota"]) }),
+      ).not.toThrow();
+      expect(useChatStore.getState().queuedWorkspaceIds.has("ws-quota")).toBe(
+        true,
+      );
+    } finally {
+      setItem.mockRestore();
+    }
   });
 
   it("merge rehydrates queuedMessages back into a Map and queuedWorkspaceIds into a Set", () => {

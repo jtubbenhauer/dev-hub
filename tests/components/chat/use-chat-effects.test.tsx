@@ -13,15 +13,14 @@ describe("useChatEffects active message sync", () => {
     vi.useRealTimers();
   });
 
-  it("requests a fresh snapshot for an idle selected session", async () => {
+  it("loads once without polling the full history while idle", async () => {
     const store = useChatStore.getState();
     vi.spyOn(store, "setActiveWorkspaceId").mockImplementation(() => {});
     vi.spyOn(store, "fetchSessions").mockResolvedValue();
-    vi.spyOn(store, "fetchMessages").mockResolvedValue();
+    const fetchMessages = vi.spyOn(store, "fetchMessages").mockResolvedValue();
     vi.spyOn(store, "fetchCommands").mockResolvedValue();
     vi.spyOn(store, "fetchPinnedSessions").mockResolvedValue();
     vi.spyOn(store, "fetchSessionNotes").mockResolvedValue();
-    vi.spyOn(store, "getStreamingStatus").mockReturnValue("idle");
     const refreshMessages = vi
       .spyOn(store, "_refreshMessagesFromRemote")
       .mockResolvedValue();
@@ -39,9 +38,8 @@ describe("useChatEffects active message sync", () => {
       await vi.advanceTimersByTimeAsync(4000);
     });
 
-    expect(refreshMessages).toHaveBeenCalledWith("sess-a", "ws-a", {
-      fresh: true,
-    });
+    expect(fetchMessages).toHaveBeenCalledOnce();
+    expect(refreshMessages).not.toHaveBeenCalled();
     unmount();
   });
 });

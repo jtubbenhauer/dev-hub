@@ -19,8 +19,6 @@ export function useChatEffects({
     setActiveWorkspaceId,
     fetchSessions,
     fetchMessages,
-    _refreshMessagesFromRemote: refreshMessagesFromRemote,
-    getStreamingStatus,
     fetchCommands,
     fetchPinnedSessions,
     fetchSessionNotes,
@@ -54,22 +52,6 @@ export function useChatEffects({
     if (!activeSessionId || !activeWorkspaceId) return;
     fetchMessages(activeSessionId, activeWorkspaceId);
   }, [activeSessionId, activeWorkspaceId, fetchMessages]);
-
-  useEffect(() => {
-    if (!activeSessionId || !activeWorkspaceId) return;
-    const interval = setInterval(() => {
-      if (getStreamingStatus() !== "idle") return;
-      void refreshMessagesFromRemote(activeSessionId, activeWorkspaceId, {
-        fresh: true,
-      });
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [
-    activeSessionId,
-    activeWorkspaceId,
-    getStreamingStatus,
-    refreshMessagesFromRemote,
-  ]);
 
   // Flush queued messages when a remote workspace recovers
   const previousHealthStatusRef = useRef<Record<string, string | undefined>>(

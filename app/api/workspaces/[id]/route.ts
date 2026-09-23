@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db";
-import { workspaces, settings, cachedSessions } from "@/drizzle/schema";
+import {
+  workspaces,
+  settings,
+  cachedSessions,
+  cachedMessages,
+  recoveredMessages,
+} from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { exec } from "node:child_process";
 import { removeWorktree, pruneWorktrees } from "@/lib/git/worktrees";
@@ -114,7 +120,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const [updated] = await db
     .select()
     .from(workspaces)
-    .where(eq(workspaces.id, id));
+    .where(and(eq(workspaces.id, id), eq(workspaces.userId, session.user.id)));
+
+  if (!updated) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   return NextResponse.json(updated);
 }
@@ -191,11 +201,38 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  await db.delete(workspaces).where(eq(workspaces.id, id));
+  await db
+    .delete(workspaces)
+    .where(and(eq(workspaces.id, id), eq(workspaces.userId, session.user.id)));
 
   try {
-    await db.delete(cachedSessions).where(eq(cachedSessions.workspaceId, id));
-  } catch {}
+    await db
+      .delete(cachedSessions)
+      .where(
+        and(
+          eq(cachedSessions.workspaceId, id),
+          eq(cachedSessions.userId, session.user.id),
+        ),
+      );
+    await db
+      .delete(cachedMessages)
+      .where(
+        and(
+          eq(cachedMessages.workspaceId, id),
+          eq(cachedMessages.userId, session.user.id),
+        ),
+      );
+    await db
+      .delete(recoveredMessages)
+      .where(
+        and(
+          eq(recoveredMessages.workspaceId, id),
+          eq(recoveredMessages.userId, session.user.id),
+        ),
+      );
+  } catch {
+    // Workspace deletion must succeed even if best-effort cache cleanup fails.
+  }
 
   return NextResponse.json({
     deleted: true,

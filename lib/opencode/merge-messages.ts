@@ -1,6 +1,72 @@
 import type { MessageWithParts, Part } from "@/lib/opencode/types";
 import { getPartTruncation } from "@/lib/opencode/truncate-messages";
 
+const OPTIMISTIC_CLOCK_SKEW_MS = 5_000;
+
+export interface RecoveredMessageEntry {
+  sequence: number;
+  message: MessageWithParts;
+}
+
+export function mergeRecoveredMessages(
+  authoritative: MessageWithParts[],
+  recovered: RecoveredMessageEntry[],
+): MessageWithParts[] {
+  const recoveredById = new Map(
+    recovered.map((entry) => [entry.message.info.id, entry.message]),
+  );
+  // A shared id means both copies describe the same turn. Authoritative info
+  // always wins, but archived parts are kept wherever the authoritative copy
+  // is only a truncated view of content the archive still holds in full.
+  const reconciled = authoritative.map((message) => {
+    const archived = recoveredById.get(message.info.id);
+    if (!archived) return message;
+    const candidate = mergeMessage(archived, message);
+    const unchanged =
+      candidate.parts.length === message.parts.length &&
+      candidate.parts.every((part, index) => part === message.parts[index]);
+    return unchanged ? message : candidate;
+  });
+
+  const authoritativeIds = new Set(
+    authoritative.map((message) => message.info.id),
+  );
+  const recoveredOnly = recovered
+    .filter((entry) => !authoritativeIds.has(entry.message.info.id))
+    .sort(
+      (left, right) =>
+        left.message.info.time.created - right.message.info.time.created ||
+        left.sequence - right.sequence,
+    );
+  if (recoveredOnly.length === 0) return reconciled;
+
+  const merged: MessageWithParts[] = [];
+  let authoritativeIndex = 0;
+  let recoveredIndex = 0;
+  while (
+    authoritativeIndex < reconciled.length &&
+    recoveredIndex < recoveredOnly.length
+  ) {
+    const authoritativeMessage = reconciled[authoritativeIndex];
+    const recoveredEntry = recoveredOnly[recoveredIndex];
+    if (
+      recoveredEntry.message.info.time.created <=
+      authoritativeMessage.info.time.created
+    ) {
+      merged.push(recoveredEntry.message);
+      recoveredIndex += 1;
+    } else {
+      merged.push(authoritativeMessage);
+      authoritativeIndex += 1;
+    }
+  }
+  merged.push(...reconciled.slice(authoritativeIndex));
+  merged.push(
+    ...recoveredOnly.slice(recoveredIndex).map((entry) => entry.message),
+  );
+  return merged;
+}
+
 // Windowed/cached message responses must be MERGED into the in-memory array,
 // never used to replace it — replacing drops older loaded history and live SSE
 // messages. Message IDs are treated as opaque identity keys; ordering always
@@ -42,38 +108,54 @@ export function mergeTailWindow(
   if (existing.length === 0) return incoming;
   if (incoming.length === 0) return existing;
 
-  const incomingById = new Map(incoming.map((m) => [m.info.id, m]));
-
-  const overlapIndexes: number[] = [];
-  existing.forEach((m, index) => {
-    if (incomingById.has(m.info.id)) overlapIndexes.push(index);
-  });
+  const existingIndexById = new Map(
+    existing.map((message, index) => [message.info.id, index]),
+  );
+  const hasOverlap = incoming.some((message) =>
+    existingIndexById.has(message.info.id),
+  );
 
   // A tail window is always the newest slice, so if it shares nothing with
   // existing, existing must be older history — keep it before the window.
-  if (overlapIndexes.length === 0) {
+  if (!hasOverlap) {
     return [...existing, ...incoming];
   }
 
-  const firstOverlap = overlapIndexes[0];
-  const lastOverlap = overlapIndexes[overlapIndexes.length - 1];
-  const existingById = new Map(existing.map((m) => [m.info.id, m]));
+  const merged: MessageWithParts[] = [];
+  const mergedIndexById = new Map<string, number>();
+  const pendingIncoming: MessageWithParts[] = [];
+  let existingIndex = 0;
 
-  const prefix = existing
-    .slice(0, firstOverlap)
-    .filter((m) => !incomingById.has(m.info.id));
-  const suffix = existing
-    .slice(lastOverlap + 1)
-    .filter((m) => !incomingById.has(m.info.id));
+  // Incoming order can contradict the order already held (a message moved
+  // behind an anchor we consumed). Folding a repeat id into its emitted slot
+  // keeps every id exactly once instead of appending a second copy.
+  const emit = (message: MessageWithParts): void => {
+    const emittedIndex = mergedIndexById.get(message.info.id);
+    if (emittedIndex !== undefined) {
+      merged[emittedIndex] = mergeMessage(merged[emittedIndex], message);
+      return;
+    }
+    mergedIndexById.set(message.info.id, merged.length);
+    merged.push(message);
+  };
 
-  const merged = incoming.map((incomingMessage) => {
-    const existingMessage = existingById.get(incomingMessage.info.id);
-    return existingMessage
-      ? mergeMessage(existingMessage, incomingMessage)
-      : incomingMessage;
-  });
+  for (const incomingMessage of incoming) {
+    const overlapIndex = existingIndexById.get(incomingMessage.info.id);
+    if (overlapIndex === undefined || overlapIndex < existingIndex) {
+      pendingIncoming.push(incomingMessage);
+      continue;
+    }
 
-  return [...prefix, ...merged, ...suffix];
+    for (const older of existing.slice(existingIndex, overlapIndex))
+      emit(older);
+    for (const pending of pendingIncoming.splice(0)) emit(pending);
+    emit(mergeMessage(existing[overlapIndex], incomingMessage));
+    existingIndex = overlapIndex + 1;
+  }
+
+  for (const pending of pendingIncoming) emit(pending);
+  for (const older of existing.slice(existingIndex)) emit(older);
+  return merged;
 }
 
 // Merge an older window (from loadOlderMessages) onto the head. Returns the
@@ -118,14 +200,17 @@ export function dropSupersededOptimistic(
   messages: MessageWithParts[],
   authoritative: MessageWithParts[],
 ): { messages: MessageWithParts[]; removedIds: Set<string> } {
-  const realUserTexts = new Set<string>();
+  const realUserTimesByText = new Map<string, number[]>();
   for (const m of authoritative) {
     if (m.info.role !== "user") continue;
     if (m.info.id.startsWith("optimistic-")) continue;
     const text = extractTextContent(m);
-    if (text) realUserTexts.add(text);
+    if (!text) continue;
+    const times = realUserTimesByText.get(text) ?? [];
+    times.push(m.info.time.created);
+    realUserTimesByText.set(text, times);
   }
-  if (realUserTexts.size === 0) {
+  if (realUserTimesByText.size === 0) {
     return { messages, removedIds: new Set() };
   }
 
@@ -134,7 +219,12 @@ export function dropSupersededOptimistic(
     if (!m.info.id.startsWith("optimistic-")) return true;
     if (m.info.role !== "user") return true;
     const text = extractTextContent(m);
-    if (text && realUserTexts.has(text)) {
+    const candidateTimes = text ? realUserTimesByText.get(text) : undefined;
+    const matchingIndex = candidateTimes?.findIndex(
+      (created) => created >= m.info.time.created - OPTIMISTIC_CLOCK_SKEW_MS,
+    );
+    if (matchingIndex !== undefined && matchingIndex >= 0 && candidateTimes) {
+      candidateTimes.splice(matchingIndex, 1);
       removedIds.add(m.info.id);
       return false;
     }

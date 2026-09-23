@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type {
   Session,
   Message,
@@ -44,12 +44,7 @@ export type StreamingStatus =
   | "error";
 
 const MAX_CACHED_SESSIONS = 15;
-
-// OpenCode's /session endpoint defaults to returning 100 sessions ordered by
-// recency, and includes subagent child sessions in that window. Workspaces with
-// heavy subagent activity can have hundreds of children in the most-recent 100,
-// crowding out the top-level sessions the UI actually renders (`!parentID`).
-// Bumping this ensures older top-level sessions still surface in the list.
+const ALL_ROOT_SESSION_LIMIT = 5_000;
 const SESSION_FETCH_LIMIT = 500;
 
 interface LruEntry {
@@ -66,6 +61,7 @@ interface QueuedMessage {
   variant?: string;
   attachments?: Array<{ mime: string; dataUrl: string; filename: string }>;
   optimisticMessageId: string;
+  queuedAt?: number;
 }
 
 export interface SessionWithWorkspace extends Session {
@@ -186,6 +182,7 @@ const _fetchSessionsInFlight = new Set<string>();
 
 // Dedup in-flight remote message refreshes (keyed by "workspaceId:sessionId")
 const _refreshMessagesInFlight = new Map<string, Promise<void>>();
+const _freshRefreshRequested = new Set<string>();
 
 // RAF-batched buffer for message.updated events.
 // Keyed: sessionId → Message (latest info wins)
@@ -202,6 +199,59 @@ let messageFlushHandle: number | null = null;
 
 // Fallback for routing events for child sessions not yet in ws.sessions
 const sessionSourceWorkspace = new Map<string, string>();
+type SessionDeletionStatus = "optimistic" | "confirmed";
+const MAX_CONFIRMED_DELETION_TOMBSTONES = 1_000;
+const deletedSessionIdsByWorkspace = new Map<
+  string,
+  Map<string, SessionDeletionStatus>
+>();
+const removedMessageIdsBySession = new Map<string, Set<string>>();
+const sessionCacheMutations = new Map<string, Promise<void>>();
+const sessionDeletionMutations = new Map<string, Promise<void>>();
+const sessionCachePurgeMutations = new Map<string, Promise<void>>();
+const purgedSessionCacheKeys = new Set<string>();
+
+function markSessionDeleted(
+  workspaceId: string,
+  sessionId: string,
+  status: SessionDeletionStatus = "optimistic",
+): void {
+  const deleted =
+    deletedSessionIdsByWorkspace.get(workspaceId) ??
+    new Map<string, SessionDeletionStatus>();
+  const existing = deleted.get(sessionId);
+  deleted.set(sessionId, existing === "confirmed" ? existing : status);
+  if (
+    status === "confirmed" &&
+    deleted.size > MAX_CONFIRMED_DELETION_TOMBSTONES
+  ) {
+    for (const [deletedSessionId, deletedStatus] of deleted) {
+      if (deletedStatus === "confirmed" && deletedSessionId !== sessionId) {
+        deleted.delete(deletedSessionId);
+      }
+      if (deleted.size <= MAX_CONFIRMED_DELETION_TOMBSTONES) break;
+    }
+  }
+  deletedSessionIdsByWorkspace.set(workspaceId, deleted);
+}
+
+function clearSessionDeleted(
+  workspaceId: string,
+  sessionId: string,
+  includeConfirmed = false,
+): void {
+  const deleted = deletedSessionIdsByWorkspace.get(workspaceId);
+  if (deleted?.get(sessionId) === "confirmed" && !includeConfirmed) return;
+  deleted?.delete(sessionId);
+  if (deleted?.size === 0) deletedSessionIdsByWorkspace.delete(workspaceId);
+}
+
+function getSessionDeletionStatus(
+  workspaceId: string,
+  sessionId: string,
+): SessionDeletionStatus | undefined {
+  return deletedSessionIdsByWorkspace.get(workspaceId)?.get(sessionId);
+}
 
 // Exported for tests — resets all module-level memoization caches between runs
 export function _resetModuleCaches() {
@@ -231,10 +281,17 @@ export function _resetModuleCaches() {
 
   _fetchSessionsInFlight.clear();
   _refreshMessagesInFlight.clear();
+  _freshRefreshRequested.clear();
   pendingPartUpdates.clear();
   pendingPartDeltas.clear();
   pendingMessageUpdates.clear();
   sessionSourceWorkspace.clear();
+  deletedSessionIdsByWorkspace.clear();
+  removedMessageIdsBySession.clear();
+  sessionCacheMutations.clear();
+  sessionDeletionMutations.clear();
+  sessionCachePurgeMutations.clear();
+  purgedSessionCacheKeys.clear();
 }
 const flushingQueuedWorkspaces = new Set<string>();
 
@@ -559,6 +616,20 @@ function flushPendingMessageUpdates(
         const ws = nextWorkspaceStates[wsId] ?? emptyWorkspaceState();
 
         const optimisticId = ws.optimisticMessageIds[sessionId];
+        const replacesOptimistic = Boolean(
+          info.role === "user" && optimisticId,
+        );
+        // The canonical user message arrives with no parts and OpenCode never
+        // sends its file parts, so carry the locally rendered ones across.
+        const carriedFileParts = replacesOptimistic
+          ? (
+              (ws.messages[sessionId] ?? []).find(
+                (m) => m.info.id === optimisticId,
+              )?.parts ?? []
+            )
+              .filter((part) => part.id.startsWith(LOCAL_FILE_PART_PREFIX))
+              .map((part) => ({ ...part, messageID: info.id }) as Part)
+          : [];
         const sessionMessages = (ws.messages[sessionId] ?? []).filter(
           (m) =>
             !(
@@ -584,7 +655,7 @@ function flushPendingMessageUpdates(
             ? sessionMessages.map((m, i) =>
                 i === existingIndex ? { ...m, info } : m,
               )
-            : [...sessionMessages, { info, parts: [] }];
+            : [...sessionMessages, { info, parts: carriedFileParts }];
 
         nextWorkspaceStates[wsId] = {
           ...ws,
@@ -696,15 +767,17 @@ interface ChatState {
   hasMoreBeforeBySession: Record<string, boolean>;
   isLoadingOlderBySession: Record<string, boolean>;
   messageLoadErrorBySession: Record<string, string>;
+  recoveredMessageIdsBySession: Record<string, Set<string>>;
 
   // Workspace/session setters
   setActiveSession: (sessionId: string | null) => void;
   setActiveWorkspaceId: (workspaceId: string | null) => void;
+  setActiveWorkspaceSession: (workspaceId: string, sessionId: string) => void;
 
   // Session CRUD
   fetchSessions: (workspaceId: string) => Promise<void>;
   createSession: (workspaceId: string) => Promise<Session | null>;
-  deleteSession: (sessionId: string, workspaceId: string) => Promise<void>;
+  deleteSession: (sessionId: string, workspaceId: string) => Promise<boolean>;
   removeSessionLocal: (
     sessionId: string,
     workspaceId: string,
@@ -955,6 +1028,64 @@ interface PersistedChatState {
   queuedWorkspaceIds?: string[];
 }
 
+export const LOCAL_FILE_PART_PREFIX = "local-file-";
+
+// OpenCode never emits a message.part.updated event for file parts, so an
+// attachment would stay invisible until a full refetch. The client already
+// holds the data it just uploaded, so it renders those parts itself. A later
+// fetch replaces them, since mergeParts keeps only the incoming parts.
+function buildLocalFileParts(
+  attachments:
+    | Array<{ mime: string; dataUrl: string; filename: string }>
+    | undefined,
+  sessionId: string,
+  messageId: string,
+): Part[] {
+  if (!attachments?.length) return [];
+
+  const fileParts: Part[] = [];
+  for (const [index, attachment] of attachments.entries()) {
+    const promptPart = createAttachmentPromptPart(attachment);
+    if (promptPart.type !== "file") continue;
+    fileParts.push({
+      id: `${LOCAL_FILE_PART_PREFIX}${messageId}-${index}`,
+      sessionID: sessionId,
+      messageID: messageId,
+      type: "file",
+      mime: promptPart.mime,
+      filename: promptPart.filename,
+      url: promptPart.url,
+    } as Part);
+  }
+  return fileParts;
+}
+
+let hasWarnedAboutStorageQuota = false;
+
+// A failed write must not throw: persist runs on every store update, so an
+// unhandled quota error would break the whole chat UI rather than one save.
+const quotaTolerantLocalStorage: Storage = {
+  get length() {
+    return localStorage.length;
+  },
+  clear: () => localStorage.clear(),
+  key: (index: number) => localStorage.key(index),
+  getItem: (name: string) => localStorage.getItem(name),
+  removeItem: (name: string) => localStorage.removeItem(name),
+  setItem: (name: string, value: string) => {
+    try {
+      localStorage.setItem(name, value);
+    } catch {
+      if (!hasWarnedAboutStorageQuota) {
+        hasWarnedAboutStorageQuota = true;
+        console.warn(
+          `Chat state exceeded the browser storage quota; it will not be restored after a refresh.`,
+        );
+      }
+    }
+  },
+};
+
 function addQueuedMessage(
   state: Pick<ChatState, "queuedMessages" | "queuedWorkspaceIds">,
   workspaceId: string,
@@ -995,23 +1126,145 @@ function removeQueuedMessage(
   };
 }
 
-// Dedup gate for flushQueuedMessages: after fetching latest server messages,
-// treat a queued message as "already delivered" if any user message in the
-// session shares the same text AND is not the optimistic entry we're about
-// to replay. The optimistic id starts with "optimistic-" so we can exclude
-// it. No time window — server messages are inherently non-optimistic once
-// they come from a fresh fetch, and we've already dropped optimistic entries
-// tied to older queue attempts by the time we get here.
+function enqueueWorkspaceMutation(
+  mutations: Map<string, Promise<void>>,
+  workspaceId: string,
+  action: () => Promise<void>,
+): Promise<void> {
+  const previous = mutations.get(workspaceId) ?? Promise.resolve();
+  const mutation = previous.catch(() => undefined).then(action);
+  mutations.set(workspaceId, mutation);
+  void mutation
+    .finally(() => {
+      if (mutations.get(workspaceId) === mutation) {
+        mutations.delete(workspaceId);
+      }
+    })
+    .catch(() => undefined);
+  return mutation;
+}
+
+function persistSessionMetadata(
+  workspaceId: string,
+  sessions: Session[],
+): void {
+  void enqueueWorkspaceMutation(
+    sessionCacheMutations,
+    workspaceId,
+    async () => {
+      const response = await fetch("/api/sessions/cache", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId, sessions }),
+      });
+      if (!response.ok) throw new Error("Failed to persist session metadata");
+    },
+  ).catch((error: unknown) => {
+    if (!(error instanceof Error)) throw error;
+  });
+}
+
+async function purgeArchivedMessages(
+  workspaceId: string,
+  sessionId: string,
+  fromMessageId?: string,
+): Promise<void> {
+  const params = new URLSearchParams({ workspaceId, sessionId });
+  if (fromMessageId) params.set("from", fromMessageId);
+  const response = await fetch(`/api/sessions/messages?${params}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Failed to purge archived messages");
+}
+
+async function purgeExactArchivedMessage(
+  workspaceId: string,
+  sessionId: string,
+  messageId: string,
+): Promise<void> {
+  const params = new URLSearchParams({
+    workspaceId,
+    sessionId,
+    message: messageId,
+  });
+  const response = await fetch(`/api/sessions/messages?${params}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Failed to purge archived message");
+}
+
+async function purgeCachedSessionMetadata(
+  workspaceId: string,
+  sessionId: string,
+): Promise<void> {
+  const key = sessionKey(workspaceId, sessionId);
+  if (purgedSessionCacheKeys.has(key)) return;
+  const existing = sessionCachePurgeMutations.get(key);
+  if (existing) return existing;
+
+  const mutation = enqueueWorkspaceMutation(
+    sessionCacheMutations,
+    workspaceId,
+    async () => {
+      const params = new URLSearchParams({ workspaceId, sessionId });
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const response = await fetch(`/api/sessions/cache?${params}`, {
+            method: "DELETE",
+            signal: AbortSignal.timeout(5_000),
+          });
+          if (response.ok) {
+            purgedSessionCacheKeys.add(key);
+            if (
+              purgedSessionCacheKeys.size > MAX_CONFIRMED_DELETION_TOMBSTONES
+            ) {
+              const oldestKey = purgedSessionCacheKeys.values().next().value;
+              if (oldestKey !== undefined) {
+                purgedSessionCacheKeys.delete(oldestKey);
+              }
+            }
+            return;
+          }
+          lastError = new Error("Failed to purge cached session metadata");
+        } catch (error) {
+          lastError =
+            error instanceof Error
+              ? error
+              : new Error("Failed to purge cached session metadata");
+        }
+      }
+      throw lastError ?? new Error("Failed to purge cached session metadata");
+    },
+  );
+  sessionCachePurgeMutations.set(key, mutation);
+  void mutation
+    .finally(() => sessionCachePurgeMutations.delete(key))
+    .catch(() => undefined);
+  return mutation;
+}
+
 function isMessageAlreadyOnServer(
-  state: Pick<ChatState, "workspaceStates">,
+  state: Pick<ChatState, "workspaceStates" | "recoveredMessageIdsBySession">,
   workspaceId: string,
   queued: QueuedMessage,
 ): boolean {
   const ws = state.workspaceStates[workspaceId];
   const messages = ws?.messages?.[queued.sessionId] ?? [];
+  const recoveredIds =
+    state.recoveredMessageIdsBySession[
+      sessionKey(workspaceId, queued.sessionId)
+    ] ?? new Set<string>();
+  const queuedAt =
+    queued.queuedAt ??
+    Number.parseInt(queued.optimisticMessageId.slice("optimistic-".length), 10);
   return messages.some((entry) => {
     if (entry.info.role !== "user") return false;
     if (entry.info.id.startsWith("optimistic-")) return false;
+    if (recoveredIds.has(entry.info.id)) return false;
+    if (Number.isFinite(queuedAt) && entry.info.time.created < queuedAt) {
+      return false;
+    }
     const partText = (entry.parts ?? [])
       .filter((p): p is Extract<Part, { type: "text" }> => p.type === "text")
       .map((p) => p.text)
@@ -1036,6 +1289,7 @@ export const useChatStore = create<ChatState>()(
       hasMoreBeforeBySession: {},
       isLoadingOlderBySession: {},
       messageLoadErrorBySession: {},
+      recoveredMessageIdsBySession: {},
       globalEventSource: null,
       sseReconnectAttempts: 0,
       sseReconnectTimer: null,
@@ -1056,6 +1310,27 @@ export const useChatStore = create<ChatState>()(
             });
           }
         }
+      },
+
+      setActiveWorkspaceSession: (workspaceId, sessionId) => {
+        set((state) => {
+          const wsUpdate = updateWorkspace(state, workspaceId, (ws) => ({
+            lastViewedAt: { ...ws.lastViewedAt, [sessionId]: Date.now() },
+          }));
+          const stateAfterWsUpdate = { ...state, ...wsUpdate };
+          const lruUpdate = touchLru(
+            stateAfterWsUpdate,
+            sessionId,
+            workspaceId,
+          );
+          return {
+            ...wsUpdate,
+            ...lruUpdate,
+            activeWorkspaceId: workspaceId,
+            activeSessionId: sessionId,
+            streamingError: null,
+          };
+        });
       },
 
       setActiveWorkspaceId: (workspaceId) => {
@@ -1140,18 +1415,31 @@ export const useChatStore = create<ChatState>()(
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10_000);
-          const response = await fetch(
-            buildProxyUrl("session", workspaceId, {
-              limit: String(SESSION_FETCH_LIMIT),
-            }),
-            {
-              signal: controller.signal,
-            },
-          );
+          const requestOptions = { signal: controller.signal };
+          const [rootsResult, recentResult] = await Promise.allSettled([
+            fetch(
+              buildProxyUrl("session", workspaceId, {
+                roots: "true",
+                limit: String(ALL_ROOT_SESSION_LIMIT),
+              }),
+              requestOptions,
+            ),
+            fetch(
+              buildProxyUrl("session", workspaceId, {
+                limit: String(SESSION_FETCH_LIMIT),
+              }),
+              requestOptions,
+            ),
+          ]);
           clearTimeout(timeoutId);
-          if (!response.ok) {
+
+          if (rootsResult.status === "rejected") {
+            throw rootsResult.reason;
+          }
+          const rootsResponse = rootsResult.value;
+          if (!rootsResponse.ok) {
             console.warn(
-              `[chat] fetchSessions failed: ${response.status}, falling back to cache`,
+              `[chat] fetchSessions failed: ${rootsResponse.status}, falling back to cache`,
             );
             set((state) => {
               if (state.workspaceStates[workspaceId]?.sessionsLoaded)
@@ -1163,20 +1451,54 @@ export const useChatStore = create<ChatState>()(
             return;
           }
 
-          const data: Session[] = await response.json();
+          let rootSessions: Session[] = (
+            (await rootsResponse.json()) as Session[]
+          ).filter((session) => !session.parentID);
+          let recentSessions = Object.values(
+            get().workspaceStates[workspaceId]?.sessions ?? {},
+          ).filter((session) => Boolean(session.parentID));
+          if (recentResult.status === "fulfilled" && recentResult.value.ok) {
+            const liveRecentSessions: Session[] =
+              await recentResult.value.json();
+            recentSessions = liveRecentSessions;
+          } else {
+            console.warn(
+              "[chat] recent child session fetch failed, preserving cached children",
+            );
+          }
+
+          const deletedIds =
+            deletedSessionIdsByWorkspace.get(workspaceId) ?? new Set<string>();
+          rootSessions = rootSessions.filter(
+            (session) => !deletedIds.has(session.id),
+          );
+          recentSessions = recentSessions.filter(
+            (session) => !deletedIds.has(session.id),
+          );
           const sessionsMap: Record<string, Session> = {};
-          for (const session of data) {
+          for (const session of Object.values(
+            get().workspaceStates[workspaceId]?.sessions ?? {},
+          )) {
+            const isCached =
+              "fromCache" in session && session.fromCache === true;
+            if (!session.parentID && !isCached && !deletedIds.has(session.id)) {
+              sessionsMap[session.id] = session;
+            }
+          }
+          for (const session of recentSessions) {
             sessionsMap[session.id] = session;
           }
+          for (const session of rootSessions) {
+            sessionsMap[session.id] = session;
+          }
+          const data = Object.values(sessionsMap);
           set((state) => {
             const wsUpdate = updateWorkspace(state, workspaceId, () => ({
               sessions: sessionsMap,
               sessionsLoaded: true,
             }));
-            // A full capped response cannot prove omitted sessions were deleted.
             const ws = wsUpdate.workspaceStates?.[workspaceId];
             if (!ws) return wsUpdate;
-            const isCompleteResponse = data.length < SESSION_FETCH_LIMIT;
             const validIds = new Set(Object.keys(sessionsMap));
             const prune = <T>(record: Record<string, T>): Record<string, T> => {
               const pruned: Record<string, T> = {};
@@ -1192,33 +1514,31 @@ export const useChatStore = create<ChatState>()(
                   ...ws,
                   sessionStatuses: prune(ws.sessionStatuses),
                   todos: prune(ws.todos),
-                  ...(isCompleteResponse
-                    ? {
-                        sessionAgents: prune(ws.sessionAgents),
-                        sessionModels: prune(ws.sessionModels),
-                        sessionVariants: prune(ws.sessionVariants),
-                        lastViewedAt: prune(ws.lastViewedAt),
-                      }
-                    : {}),
+                  sessionAgents: prune(ws.sessionAgents),
+                  sessionModels: prune(ws.sessionModels),
+                  sessionVariants: prune(ws.sessionVariants),
+                  lastViewedAt: prune(ws.lastViewedAt),
                 },
               },
             };
           });
 
-          fetch("/api/sessions/cache", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ workspaceId, sessions: data }),
-          }).catch(() => {});
+          const currentDeletedIds =
+            deletedSessionIdsByWorkspace.get(workspaceId) ?? new Set<string>();
+          persistSessionMetadata(
+            workspaceId,
+            data.filter((session) => !currentDeletedIds.has(session.id)),
+          );
 
-          // Auto-select the most recently updated session if none is selected for this workspace
           const { activeWorkspaceId, activeSessionId } = get();
-          if (activeWorkspaceId === workspaceId && !activeSessionId) {
+          const activeSessionIsValid =
+            activeSessionId !== null && activeSessionId in sessionsMap;
+          if (activeWorkspaceId === workspaceId && !activeSessionIsValid) {
             const mostRecent = data
-              .filter((s) => !s.parentID)
+              .filter((session) => !session.parentID)
               .sort((a, b) => b.time.updated - a.time.updated)[0];
+            get().setActiveSession(mostRecent?.id ?? null);
             if (mostRecent) {
-              get().setActiveSession(mostRecent.id);
               get().refreshActiveSessionStatus(workspaceId);
             }
           }
@@ -1268,6 +1588,9 @@ export const useChatStore = create<ChatState>()(
               messages: { ...ws.messages, [session.id]: [] },
             })),
           }));
+          clearSessionDeleted(workspaceId, session.id, true);
+          purgedSessionCacheKeys.delete(sessionKey(workspaceId, session.id));
+          persistSessionMetadata(workspaceId, [session]);
           return session;
         } catch {
           return null;
@@ -1275,63 +1598,114 @@ export const useChatStore = create<ChatState>()(
       },
 
       deleteSession: async (sessionId, workspaceId) => {
-        try {
-          await fetch(buildProxyUrl(`session/${sessionId}`, workspaceId), {
-            method: "DELETE",
-          });
-          sessionSourceWorkspace.delete(sessionId);
-          set((state) => {
-            const ws =
-              state.workspaceStates[workspaceId] ?? emptyWorkspaceState();
-            const { [sessionId]: _s, ...remainingSessions } = ws.sessions;
-            const { [sessionId]: _m, ...remainingMessages } = ws.messages;
-            const { [sessionId]: _o, ...remainingOptimistic } =
-              ws.optimisticMessageIds;
-            const { [sessionId]: _st, ...remainingStatuses } =
-              ws.sessionStatuses;
-            const { [sessionId]: _t, ...remainingTodos } = ws.todos;
-            const { [sessionId]: _a, ...remainingSessionAgents } =
-              ws.sessionAgents;
-            const { [sessionId]: _sm, ...remainingSessionModels } =
-              ws.sessionModels;
-            const { [sessionId]: _sv, ...remainingSessionVariants } =
-              ws.sessionVariants;
-            const { [sessionId]: _lv, ...remainingLastViewedAt } =
-              ws.lastViewedAt;
+        markSessionDeleted(workspaceId, sessionId);
+        let wasDeleted = false;
+        await enqueueWorkspaceMutation(
+          sessionDeletionMutations,
+          workspaceId,
+          async () => {
+            try {
+              const response = await fetch(
+                buildProxyUrl(`session/${sessionId}`, workspaceId),
+                { method: "DELETE" },
+              );
+              if (
+                !response.ok &&
+                response.status !== 404 &&
+                response.status !== 410
+              ) {
+                throw new Error("Failed to delete session");
+              }
+              wasDeleted = true;
+              markSessionDeleted(workspaceId, sessionId, "confirmed");
+              sessionSourceWorkspace.delete(sessionId);
+              set((state) => {
+                const key = sessionKey(workspaceId, sessionId);
+                const ws =
+                  state.workspaceStates[workspaceId] ?? emptyWorkspaceState();
+                if (!(sessionId in ws.sessions)) {
+                  if (!(key in state.recoveredMessageIdsBySession))
+                    return state;
+                  const { [key]: _recovered, ...remainingRecoveredIds } =
+                    state.recoveredMessageIdsBySession;
+                  return {
+                    recoveredMessageIdsBySession: remainingRecoveredIds,
+                  };
+                }
+                const { [key]: _recovered, ...remainingRecoveredIds } =
+                  state.recoveredMessageIdsBySession;
+                const { [sessionId]: _s, ...remainingSessions } = ws.sessions;
+                const { [sessionId]: _m, ...remainingMessages } = ws.messages;
+                const { [sessionId]: _o, ...remainingOptimistic } =
+                  ws.optimisticMessageIds;
+                const { [sessionId]: _st, ...remainingStatuses } =
+                  ws.sessionStatuses;
+                const { [sessionId]: _t, ...remainingTodos } = ws.todos;
+                const { [sessionId]: _a, ...remainingSessionAgents } =
+                  ws.sessionAgents;
+                const { [sessionId]: _sm, ...remainingSessionModels } =
+                  ws.sessionModels;
+                const { [sessionId]: _sv, ...remainingSessionVariants } =
+                  ws.sessionVariants;
+                const { [sessionId]: _lv, ...remainingLastViewedAt } =
+                  ws.lastViewedAt;
 
-            let nextActiveSessionId = state.activeSessionId;
-            if (state.activeSessionId === sessionId) {
-              const nextSession = Object.values(remainingSessions)
-                .filter((s) => !s.parentID)
-                .sort((a, b) => b.time.updated - a.time.updated)[0];
-              nextActiveSessionId = nextSession?.id ?? null;
-            }
+                let nextActiveSessionId = state.activeSessionId;
+                if (state.activeSessionId === sessionId) {
+                  const nextSession = Object.values(remainingSessions)
+                    .filter((s) => !s.parentID)
+                    .sort((a, b) => b.time.updated - a.time.updated)[0];
+                  nextActiveSessionId = nextSession?.id ?? null;
+                }
 
-            return {
-              activeSessionId: nextActiveSessionId,
-              messageAccessOrder: state.messageAccessOrder.filter(
-                (e) => e.sessionId !== sessionId,
-              ),
-              workspaceStates: {
-                ...state.workspaceStates,
-                [workspaceId]: {
-                  ...ws,
-                  sessions: remainingSessions,
-                  messages: remainingMessages,
-                  optimisticMessageIds: remainingOptimistic,
-                  sessionStatuses: remainingStatuses,
-                  todos: remainingTodos,
-                  sessionAgents: remainingSessionAgents,
-                  sessionModels: remainingSessionModels,
-                  sessionVariants: remainingSessionVariants,
-                  lastViewedAt: remainingLastViewedAt,
+                return {
+                  activeSessionId: nextActiveSessionId,
+                  messageAccessOrder: state.messageAccessOrder.filter(
+                    (e) => e.sessionId !== sessionId,
+                  ),
+                  recoveredMessageIdsBySession: remainingRecoveredIds,
+                  workspaceStates: {
+                    ...state.workspaceStates,
+                    [workspaceId]: {
+                      ...ws,
+                      sessions: remainingSessions,
+                      messages: remainingMessages,
+                      optimisticMessageIds: remainingOptimistic,
+                      sessionStatuses: remainingStatuses,
+                      todos: remainingTodos,
+                      sessionAgents: remainingSessionAgents,
+                      sessionModels: remainingSessionModels,
+                      sessionVariants: remainingSessionVariants,
+                      lastViewedAt: remainingLastViewedAt,
+                    },
+                  },
+                };
+              });
+              void purgeCachedSessionMetadata(workspaceId, sessionId).catch(
+                (error: unknown) => {
+                  if (!(error instanceof Error)) throw error;
+                  set({ streamingError: error.message });
                 },
-              },
-            };
-          });
-        } catch {
-          // Silently fail
-        }
+              );
+            } catch (error) {
+              if (
+                getSessionDeletionStatus(workspaceId, sessionId) === "confirmed"
+              ) {
+                wasDeleted = true;
+                void purgeCachedSessionMetadata(workspaceId, sessionId).catch(
+                  (cacheError: unknown) => {
+                    if (!(cacheError instanceof Error)) throw cacheError;
+                    set({ streamingError: cacheError.message });
+                  },
+                );
+                return;
+              }
+              clearSessionDeleted(workspaceId, sessionId);
+              set({ streamingError: extractErrorString(error) });
+            }
+          },
+        );
+        return wasDeleted;
       },
 
       removeSessionLocal: (sessionId, workspaceId) => {
@@ -1340,6 +1714,7 @@ export const useChatStore = create<ChatState>()(
         if (!ws || !(sessionId in ws.sessions)) return null;
 
         sessionSourceWorkspace.delete(sessionId);
+        markSessionDeleted(workspaceId, sessionId);
 
         const snapshot: SessionSnapshot = {
           sessionId,
@@ -1403,6 +1778,13 @@ export const useChatStore = create<ChatState>()(
       },
 
       restoreSessionLocal: (snapshot) => {
+        if (
+          getSessionDeletionStatus(snapshot.workspaceId, snapshot.sessionId) ===
+          "confirmed"
+        ) {
+          return;
+        }
+        clearSessionDeleted(snapshot.workspaceId, snapshot.sessionId);
         set((state) => {
           const ws =
             state.workspaceStates[snapshot.workspaceId] ??
@@ -1555,7 +1937,10 @@ export const useChatStore = create<ChatState>()(
       _refreshMessagesFromRemote: (sessionId, workspaceId, options) => {
         const key = sessionKey(workspaceId, sessionId);
         const existing = _refreshMessagesInFlight.get(key);
-        if (existing) return existing;
+        if (existing) {
+          if (options?.fresh) _freshRefreshRequested.add(key);
+          return existing;
+        }
 
         const request = (async () => {
           try {
@@ -1588,7 +1973,23 @@ export const useChatStore = create<ChatState>()(
               total: number;
               source: "cache" | "remote" | "stale-cache";
               cachedAt?: number;
+              recoveredMessageIds?: string[];
             };
+            if (deletedSessionIdsByWorkspace.get(workspaceId)?.has(sessionId)) {
+              return;
+            }
+            const removedIds =
+              removedMessageIdsBySession.get(sessionId) ?? new Set<string>();
+            const receivedMessages = data.messages.filter(
+              (message) => !removedIds.has(message.info.id),
+            );
+            const recoveredIds = new Set(data.recoveredMessageIds ?? []);
+            const incomingIds = new Set(
+              receivedMessages.map((message) => message.info.id),
+            );
+            const authoritativeMessages = receivedMessages.filter(
+              (message) => !recoveredIds.has(message.info.id),
+            );
             const isStaleCache = data.source === "stale-cache";
 
             set((state) => {
@@ -1598,11 +1999,11 @@ export const useChatStore = create<ChatState>()(
                 }
                 const merged = mergeTailWindow(
                   ws.messages[sessionId] ?? [],
-                  data.messages,
+                  receivedMessages,
                 );
                 const { messages: cleaned } = dropSupersededOptimistic(
                   merged,
-                  data.messages,
+                  authoritativeMessages,
                 );
                 const fallbackUpdatedAt = ws.sessions[sessionId]?.time.updated;
                 const currentTodoUpdatedAt = ws.todoUpdatedAt?.[sessionId];
@@ -1624,7 +2025,7 @@ export const useChatStore = create<ChatState>()(
                 const seededAgent = ws.sessionAgents[sessionId]
                   ? {}
                   : (() => {
-                      const lastUserMessage = [...data.messages]
+                      const lastUserMessage = [...authoritativeMessages]
                         .reverse()
                         .find((m) => m.info.role === "user");
                       const agent =
@@ -1672,9 +2073,23 @@ export const useChatStore = create<ChatState>()(
                       : "Showing cached messages because live refresh failed",
                   }
                 : remainingErrors;
+              const retainedRecoveredIds = new Set(
+                [...(state.recoveredMessageIdsBySession[key] ?? [])].filter(
+                  (messageId) => !incomingIds.has(messageId),
+                ),
+              );
+              for (const messageId of recoveredIds) {
+                if (!removedIds.has(messageId)) {
+                  retainedRecoveredIds.add(messageId);
+                }
+              }
               return {
                 ...wsUpdate,
                 ...lruUpdate,
+                recoveredMessageIdsBySession: {
+                  ...state.recoveredMessageIdsBySession,
+                  [key]: retainedRecoveredIds,
+                },
                 hasMoreBeforeBySession: {
                   ...state.hasMoreBeforeBySession,
                   [key]: data.hasMore,
@@ -1695,6 +2110,11 @@ export const useChatStore = create<ChatState>()(
             }));
           } finally {
             _refreshMessagesInFlight.delete(key);
+            if (_freshRefreshRequested.delete(key)) {
+              void get()._refreshMessagesFromRemote(sessionId, workspaceId, {
+                fresh: true,
+              });
+            }
           }
         })();
 
@@ -1747,25 +2167,53 @@ export const useChatStore = create<ChatState>()(
           const data = (await response.json()) as {
             messages: MessageWithParts[];
             hasMore: boolean;
+            recoveredMessageIds?: string[];
           };
+          if (deletedSessionIdsByWorkspace.get(workspaceId)?.has(sessionId)) {
+            return;
+          }
+          const removedIds =
+            removedMessageIdsBySession.get(sessionId) ?? new Set<string>();
+          const olderMessages = data.messages.filter(
+            (message) => !removedIds.has(message.info.id),
+          );
 
           set((s) =>
             updateWorkspace(s, workspaceId, (ws) => {
               const { messages: mergedMessages } = mergePrependWindow(
                 ws.messages[sessionId] ?? [],
-                data.messages,
+                olderMessages,
               );
               return {
                 messages: { ...ws.messages, [sessionId]: mergedMessages },
               };
             }),
           );
-          set((s) => ({
-            hasMoreBeforeBySession: {
-              ...s.hasMoreBeforeBySession,
-              [key]: data.hasMore,
-            },
-          }));
+          set((s) => {
+            const loadedIds = new Set(
+              (s.workspaceStates[workspaceId]?.messages[sessionId] ?? []).map(
+                (message) => message.info.id,
+              ),
+            );
+            const recoveredIds = new Set(
+              [...(s.recoveredMessageIdsBySession[key] ?? [])].filter(
+                (messageId) => loadedIds.has(messageId),
+              ),
+            );
+            for (const messageId of data.recoveredMessageIds ?? []) {
+              if (!removedIds.has(messageId)) recoveredIds.add(messageId);
+            }
+            return {
+              hasMoreBeforeBySession: {
+                ...s.hasMoreBeforeBySession,
+                [key]: data.hasMore,
+              },
+              recoveredMessageIdsBySession: {
+                ...s.recoveredMessageIdsBySession,
+                [key]: recoveredIds,
+              },
+            };
+          });
         } catch {
           // Best effort — leave the currently loaded messages untouched.
         } finally {
@@ -1837,9 +2285,23 @@ export const useChatStore = create<ChatState>()(
       },
 
       revertSession: async (sessionId, workspaceId, messageID) => {
+        const key = sessionKey(workspaceId, sessionId);
+        if (get().recoveredMessageIdsBySession[key]?.has(messageID)) {
+          return null;
+        }
         const ws = get().workspaceStates[workspaceId];
         const msgs = ws?.messages[sessionId] ?? [];
         const idx = msgs.findIndex((m) => m.info.id === messageID);
+        const revertedMessageIds =
+          idx >= 0 ? msgs.slice(idx).map((message) => message.info.id) : [];
+        const removedIds =
+          removedMessageIdsBySession.get(sessionId) ?? new Set<string>();
+        for (const revertedMessageId of revertedMessageIds) {
+          removedIds.add(revertedMessageId);
+        }
+        if (revertedMessageIds.length > 0) {
+          removedMessageIdsBySession.set(sessionId, removedIds);
+        }
 
         let revertedText: string | null = null;
         if (idx >= 0) {
@@ -1859,8 +2321,9 @@ export const useChatStore = create<ChatState>()(
           );
         }
 
+        let upstreamReverted = false;
         try {
-          await fetch(
+          const response = await fetch(
             buildProxyUrl(`session/${sessionId}/revert`, workspaceId),
             {
               method: "POST",
@@ -1868,14 +2331,25 @@ export const useChatStore = create<ChatState>()(
               body: JSON.stringify({ messageID }),
             },
           );
-        } catch {
-          if (idx >= 0) {
+          if (!response.ok) throw new Error("Failed to revert session");
+          upstreamReverted = true;
+          await purgeArchivedMessages(workspaceId, sessionId, messageID);
+        } catch (error) {
+          if (!upstreamReverted && idx >= 0) {
+            for (const revertedMessageId of revertedMessageIds) {
+              removedIds.delete(revertedMessageId);
+            }
+            if (removedIds.size === 0) {
+              removedMessageIdsBySession.delete(sessionId);
+            }
             set((state) =>
               updateWorkspace(state, workspaceId, () => ({
                 messages: { ...ws!.messages },
               })),
             );
           }
+          set({ streamingError: extractErrorString(error) });
+          return null;
         }
 
         return revertedText;
@@ -1896,7 +2370,8 @@ export const useChatStore = create<ChatState>()(
         }
         set({ streamingError: null });
 
-        const optimisticId = `optimistic-${Date.now()}`;
+        const queuedAt = Date.now();
+        const optimisticId = `optimistic-${queuedAt}`;
         const queuedMessage: QueuedMessage = {
           sessionId,
           text,
@@ -1906,13 +2381,14 @@ export const useChatStore = create<ChatState>()(
           variant,
           attachments,
           optimisticMessageId: optimisticId,
+          queuedAt,
         };
         const optimisticMessage: MessageWithParts = {
           info: {
             id: optimisticId,
             sessionID: sessionId,
             role: "user",
-            time: { created: Date.now() },
+            time: { created: queuedAt },
             agent: agent ?? "",
             model: model ?? { providerID: "", modelID: "" },
           },
@@ -1924,6 +2400,7 @@ export const useChatStore = create<ChatState>()(
               type: "text",
               text,
             },
+            ...buildLocalFileParts(attachments, sessionId, optimisticId),
           ],
         };
 
@@ -2689,6 +3166,9 @@ export const useChatStore = create<ChatState>()(
           case "message.updated": {
             const info = properties.info as Message;
             if (!info) return;
+            if (removedMessageIdsBySession.get(info.sessionID)?.has(info.id)) {
+              break;
+            }
             sessionSourceWorkspace.set(info.sessionID, sourceWorkspaceId);
 
             let byMessage = pendingMessageUpdates.get(info.sessionID);
@@ -2705,11 +3185,26 @@ export const useChatStore = create<ChatState>()(
           case "message.removed": {
             const sessionID = properties.sessionID as string;
             const messageID = properties.messageID as string;
+            const removedIds =
+              removedMessageIdsBySession.get(sessionID) ?? new Set<string>();
+            removedIds.add(messageID);
+            removedMessageIdsBySession.set(sessionID, removedIds);
+            const pendingMessages = pendingMessageUpdates.get(sessionID);
+            pendingMessages?.delete(messageID);
+            if (pendingMessages?.size === 0) {
+              pendingMessageUpdates.delete(sessionID);
+            }
+            pendingPartUpdates.get(sessionID)?.delete(messageID);
             pendingPartDeltas.clearMessage(sessionID, messageID);
             const wsId =
               findWorkspaceForSession(get().workspaceStates, sessionID) ??
               sourceWorkspaceId;
-
+            void purgeExactArchivedMessage(wsId, sessionID, messageID).catch(
+              (error: unknown) => {
+                if (!(error instanceof Error)) throw error;
+                set({ streamingError: error.message });
+              },
+            );
             set((state) =>
               updateWorkspace(state, wsId, (ws) => ({
                 messages: {
@@ -2726,6 +3221,13 @@ export const useChatStore = create<ChatState>()(
           case "message.part.updated": {
             const part = properties.part as Part;
             if (!part) return;
+            if (
+              removedMessageIdsBySession
+                .get(part.sessionID)
+                ?.has(part.messageID)
+            ) {
+              break;
+            }
             sessionSourceWorkspace.set(part.sessionID, sourceWorkspaceId);
             const existing = findPendingOrLoadedPart(get(), {
               sessionID: part.sessionID,
@@ -2763,10 +3265,16 @@ export const useChatStore = create<ChatState>()(
             const messageID = properties.messageID as string;
             const partID = properties.partID as string;
             pendingPartDeltas.remove(sessionID, messageID, partID);
+            const pendingByMessage = pendingPartUpdates.get(sessionID);
+            const pendingByPart = pendingByMessage?.get(messageID);
+            pendingByPart?.delete(partID);
+            if (pendingByPart?.size === 0) pendingByMessage?.delete(messageID);
+            if (pendingByMessage?.size === 0) {
+              pendingPartUpdates.delete(sessionID);
+            }
             const wsId =
               findWorkspaceForSession(get().workspaceStates, sessionID) ??
               sourceWorkspaceId;
-
             set((state) =>
               updateWorkspace(state, wsId, (ws) => ({
                 messages: {
@@ -2779,6 +3287,9 @@ export const useChatStore = create<ChatState>()(
                 },
               })),
             );
+            void get()._refreshMessagesFromRemote(sessionID, wsId, {
+              fresh: true,
+            });
             break;
           }
 
@@ -2786,6 +3297,19 @@ export const useChatStore = create<ChatState>()(
           case "session.updated": {
             const info = properties.info as Session;
             if (!info) return;
+            if (
+              eventType === "session.updated" &&
+              deletedSessionIdsByWorkspace.get(sourceWorkspaceId)?.has(info.id)
+            ) {
+              break;
+            }
+            if (eventType === "session.created") {
+              clearSessionDeleted(sourceWorkspaceId, info.id, true);
+              purgedSessionCacheKeys.delete(
+                sessionKey(sourceWorkspaceId, info.id),
+              );
+            }
+            persistSessionMetadata(sourceWorkspaceId, [info]);
             set((state) =>
               updateWorkspace(state, sourceWorkspaceId, (ws) => ({
                 sessions: { ...ws.sessions, [info.id]: info },
@@ -2802,9 +3326,38 @@ export const useChatStore = create<ChatState>()(
           case "session.deleted": {
             const info = properties.info as Session;
             if (!info) return;
+            const wasAlreadyDeleted =
+              deletedSessionIdsByWorkspace
+                .get(sourceWorkspaceId)
+                ?.has(info.id) === true;
             sessionSourceWorkspace.delete(info.id);
+            markSessionDeleted(sourceWorkspaceId, info.id, "confirmed");
+            removedMessageIdsBySession.delete(info.id);
+            pendingMessageUpdates.delete(info.id);
+            pendingPartUpdates.delete(info.id);
             pendingPartDeltas.clearSession(info.id);
+            void purgeCachedSessionMetadata(sourceWorkspaceId, info.id).catch(
+              (error: unknown) => {
+                if (!(error instanceof Error)) throw error;
+                set({ streamingError: error.message });
+              },
+            );
+            if (wasAlreadyDeleted) {
+              set((state) => {
+                const key = sessionKey(sourceWorkspaceId, info.id);
+                if (!(key in state.recoveredMessageIdsBySession)) return state;
+                const { [key]: _recovered, ...remainingRecoveredIds } =
+                  state.recoveredMessageIdsBySession;
+                return {
+                  recoveredMessageIdsBySession: remainingRecoveredIds,
+                };
+              });
+              break;
+            }
             set((state) => {
+              const key = sessionKey(sourceWorkspaceId, info.id);
+              const { [key]: _recovered, ...remainingRecoveredIds } =
+                state.recoveredMessageIdsBySession;
               const ws =
                 state.workspaceStates[sourceWorkspaceId] ??
                 emptyWorkspaceState();
@@ -2837,6 +3390,7 @@ export const useChatStore = create<ChatState>()(
                 messageAccessOrder: state.messageAccessOrder.filter(
                   (e) => e.sessionId !== info.id,
                 ),
+                recoveredMessageIdsBySession: remainingRecoveredIds,
                 workspaceStates: {
                   ...state.workspaceStates,
                   [sourceWorkspaceId]: {
@@ -3085,17 +3639,15 @@ export const useChatStore = create<ChatState>()(
           const status = state.getStreamingStatus();
           if (status === "idle") {
             state.clearStreamingPoll();
+            const { activeSessionId, activeWorkspaceId } = state;
+            if (activeSessionId && activeWorkspaceId === workspaceId) {
+              void state._refreshMessagesFromRemote(
+                activeSessionId,
+                workspaceId,
+                { fresh: true },
+              );
+            }
             return;
-          }
-          const { activeSessionId, activeWorkspaceId } = state;
-          if (activeSessionId && activeWorkspaceId === workspaceId) {
-            void state._refreshMessagesFromRemote(
-              activeSessionId,
-              workspaceId,
-              {
-                fresh: true,
-              },
-            );
           }
           void state.refreshActiveSessionStatus(workspaceId);
         }, 4000);
@@ -3563,8 +4115,12 @@ export const useChatStore = create<ChatState>()(
             return;
           }
           const sessionsMap: Record<string, Session> = {};
+          const deletedIds =
+            deletedSessionIdsByWorkspace.get(workspaceId) ?? new Set<string>();
           for (const session of data) {
-            sessionsMap[session.id] = session;
+            if (!deletedIds.has(session.id)) {
+              sessionsMap[session.id] = session;
+            }
           }
           set((state) => {
             const ws = state.workspaceStates[workspaceId];
@@ -3774,6 +4330,7 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: "dev-hub-chat",
+      storage: createJSONStorage(() => quotaTolerantLocalStorage),
       partialize: (state): PersistedChatState => {
         const wsStates: PersistedChatState["workspaceStates"] = {};
         for (const [wsId, ws] of Object.entries(state.workspaceStates)) {
@@ -3786,11 +4343,24 @@ export const useChatStore = create<ChatState>()(
             todoUpdatedAt: ws.todoUpdatedAt,
           };
         }
+        // Base64 attachments exceed the ~5MB localStorage quota, and persisting
+        // them without their data would replay a file-less prompt. Such
+        // messages are skipped here; they still flush while the tab is open.
+        const persistableQueuedMessages: Array<[string, QueuedMessage[]]> = [];
+        for (const [wsId, messages] of state.queuedMessages.entries()) {
+          const withoutAttachments = messages.filter(
+            (message) => !message.attachments?.length,
+          );
+          if (withoutAttachments.length > 0) {
+            persistableQueuedMessages.push([wsId, withoutAttachments]);
+          }
+        }
+
         return {
           activeSessionId: state.activeSessionId,
           workspaceStates: wsStates,
-          queuedMessages: Array.from(state.queuedMessages.entries()),
-          queuedWorkspaceIds: Array.from(state.queuedWorkspaceIds),
+          queuedMessages: persistableQueuedMessages,
+          queuedWorkspaceIds: persistableQueuedMessages.map(([wsId]) => wsId),
         };
       },
       merge: (persisted, current) => {

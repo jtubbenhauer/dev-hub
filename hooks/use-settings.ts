@@ -63,6 +63,7 @@ export const SETTINGS_KEYS = {
   TERMINAL_FONT: "terminal-font",
   DISABLE_FILE_TABS: "disable-file-tabs",
   CHAT_FILE_OPEN_MODE: "chat-file-open-mode",
+  CHAT_SIDEBAR_TABS_OPEN_MODE: "chat-sidebar-tabs-open-mode",
   NOTIFICATIONS_SOUND_ENABLED: "notifications-sound-enabled",
   NOTIFICATIONS_PUSH_ENABLED: "notifications-push-enabled",
 } as const;
@@ -637,6 +638,19 @@ export function useChatFileOpenSetting(): {
   return {
     fileOpenMode: resolveChatFileOpenMode(
       data?.[SETTINGS_KEYS.CHAT_FILE_OPEN_MODE],
+    ),
+    isLoading,
+  };
+}
+
+export function useChatSidebarTabsOpenSetting(): {
+  sidebarTabsOpenMode: ChatFileOpenMode;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  return {
+    sidebarTabsOpenMode: resolveChatFileOpenMode(
+      data?.[SETTINGS_KEYS.CHAT_SIDEBAR_TABS_OPEN_MODE],
     ),
     isLoading,
   };

@@ -37,6 +37,7 @@ import {
   useSoundSettings,
   useFileTabsSetting,
   useChatFileOpenSetting,
+  useChatSidebarTabsOpenSetting,
   useNotificationSettings,
   SETTINGS_KEYS,
   FONT_SIZE_OPTIONS,
@@ -159,6 +160,8 @@ function EditorSettingsCard() {
     useFileTabsSetting();
   const { fileOpenMode, isLoading: isLoadingChatFileOpenMode } =
     useChatFileOpenSetting();
+  const { sidebarTabsOpenMode, isLoading: isLoadingSidebarTabsOpenMode } =
+    useChatSidebarTabsOpenSetting();
   const mutation = useSettingsMutation();
   const [customNvimAppName, setCustomNvimAppName] = useState("");
 
@@ -169,7 +172,8 @@ function EditorSettingsCard() {
     isLoadingEditorType ||
     isLoadingNvim ||
     isLoadingFileTabs ||
-    isLoadingChatFileOpenMode;
+    isLoadingChatFileOpenMode ||
+    isLoadingSidebarTabsOpenMode;
 
   // Sync custom nvim app name from server (during render)
   const [prevNvimAppName, setPrevNvimAppName] = useState(nvimAppName);
@@ -266,6 +270,22 @@ function EditorSettingsCard() {
             nextMode === "dialog"
               ? "Chat files will open in a dialog"
               : "Chat files will open in the sidebar",
+          ),
+      },
+    );
+  };
+
+  const handleSidebarTabsOpenModeChange = (value: string) => {
+    const nextMode: ChatFileOpenMode =
+      value === "dialog" ? "dialog" : "sidebar";
+    mutation.mutate(
+      { key: SETTINGS_KEYS.CHAT_SIDEBAR_TABS_OPEN_MODE, value: nextMode },
+      {
+        onSuccess: () =>
+          toast.success(
+            nextMode === "dialog"
+              ? "Files/Git tab files will open in a dialog"
+              : "Files/Git tab files will open in the sidebar",
           ),
       },
     );
@@ -516,6 +536,34 @@ function EditorSettingsCard() {
             disabled={mutation.isPending}
           >
             <SelectTrigger id="chat-file-open-mode" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CHAT_FILE_OPEN_MODES.map((mode) => (
+                <SelectItem key={mode} value={mode}>
+                  {mode === "sidebar" ? "Sidebar (default)" : "Dialog"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="chat-sidebar-tabs-open-mode">
+              Open Files/Git tab files in
+            </Label>
+            <p className="text-muted-foreground text-xs">
+              Choose where files clicked in the chat side panel&apos;s Files and
+              Git tabs appear
+            </p>
+          </div>
+          <Select
+            value={sidebarTabsOpenMode}
+            onValueChange={handleSidebarTabsOpenModeChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="chat-sidebar-tabs-open-mode" className="w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

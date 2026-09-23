@@ -10,6 +10,7 @@ import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
 import { GitSyncControls } from "@/components/chat/git-sync-controls";
 import { GitRevertDialog } from "@/components/chat/git-revert-dialog";
 import { GitRevertAction } from "@/components/chat/git-revert-action";
+import { useGitDiffDialog } from "@/components/chat/git-diff-dialog";
 import { useGitRevert } from "@/hooks/use-git-revert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -117,6 +118,8 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
   const commitMutation = useGitCommit(workspaceId);
 
   const [commitMessage, setCommitMessage] = useState("");
+  const { isDialogMode, openDiffDialog, diffDialog } =
+    useGitDiffDialog(workspaceId);
 
   const GIT_LIST_STORAGE_KEY = "dev-hub:git-tab-list-height";
   const GIT_LIST_MIN_HEIGHT = 80;
@@ -322,13 +325,14 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
 
   const selectRow = useCallback(
     (row: GitRow) => {
+      if (isDialogMode) return openDiffDialog(row.path, row.staged);
       setGitTabSelection({
         workspaceId,
         path: row.path,
         staged: row.section === "staged",
       });
     },
-    [workspaceId, setGitTabSelection],
+    [isDialogMode, openDiffDialog, workspaceId, setGitTabSelection],
   );
 
   const selectionWorkspaceId = gitTabSelection?.workspaceId;
@@ -675,6 +679,7 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
         onOpenChange={(open) => !open && clearRevert()}
         onConfirm={confirmRevert}
       />
+      {diffDialog}
     </div>
   );
 }

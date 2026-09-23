@@ -20,6 +20,8 @@ import { FileTree } from "@/components/editor/file-tree";
 import { SplitPanelFileTabs } from "@/components/chat/split-panel-file-tabs";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useChatStore } from "@/stores/chat-store";
+import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
+import { useChatSidebarTabsOpenSetting } from "@/hooks/use-settings";
 import {
   useFileComments,
   useResolveFileComment,
@@ -89,6 +91,7 @@ export function SplitPanelFiles({
   const getPersistedFiles = useSidePanelStore((s) => s.getPersistedFiles);
 
   const activeSessionId = useChatStore((s) => s.activeSessionId);
+  const { sidebarTabsOpenMode } = useChatSidebarTabsOpenSetting();
 
   const expandedPaths = useSidePanelStore((s) => s.expandedPaths);
   const toggleExpandedPath = useSidePanelStore((s) => s.toggleExpandedPath);
@@ -311,6 +314,14 @@ export function SplitPanelFiles({
 
   const handleFileClick = useCallback(
     (path: string) => {
+      if (sidebarTabsOpenMode === "dialog") {
+        void useChatFileDialogStore
+          .getState()
+          .openFile(workspaceId, path, () =>
+            toast.error(`Could not open ${path}`),
+          );
+        return;
+      }
       const existingTab = openFiles.find((f) => f.path === path);
       if (existingTab) {
         useSidePanelStore.getState().setActiveTab(path);
@@ -318,7 +329,7 @@ export function SplitPanelFiles({
       }
       loadFile(path);
     },
-    [openFiles, loadFile],
+    [sidebarTabsOpenMode, workspaceId, openFiles, loadFile],
   );
 
   const handleTreeFileClick = useCallback(

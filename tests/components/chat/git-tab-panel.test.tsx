@@ -90,6 +90,22 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+let sidebarTabsOpenMode: "sidebar" | "dialog" = "sidebar";
+vi.mock("@/hooks/use-settings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/use-settings")>()),
+  useChatSidebarTabsOpenSetting: () => ({
+    sidebarTabsOpenMode,
+    isLoading: false,
+  }),
+}));
+
+const openChatFileDialog = vi.fn();
+vi.mock("@/stores/chat-file-dialog-store", () => ({
+  useChatFileDialogStore: {
+    getState: () => ({ openFile: openChatFileDialog }),
+  },
+}));
+
 import { GitTabPanel } from "@/components/chat/git-tab-panel";
 import { useGitStatus, useGitFileDiffs } from "@/hooks/use-git";
 import { toast } from "sonner";
@@ -137,6 +153,7 @@ function renderPanel() {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStore();
+  sidebarTabsOpenMode = "sidebar";
   mockUseGitFileDiffs.mockReturnValue(new Map() as DiffMap);
   mockUseGitStatus.mockReturnValue({ data: undefined });
 });
@@ -232,6 +249,51 @@ describe("GitTabPanel", () => {
       path: "src/changed.ts",
       staged: false,
     });
+  });
+
+  it("opens the diff in a dialog instead of inline when dialog mode is set", async () => {
+    const user = userEvent.setup();
+    sidebarTabsOpenMode = "dialog";
+    mockUseGitStatus.mockReturnValue({
+      data: makeStatus({
+        staged: [{ path: "src/staged.ts", index: "M", workingDir: " " }],
+      }),
+    });
+
+    renderPanel();
+
+    await user.click(screen.getByText("src/staged.ts"));
+
+    expect(setGitTabSelection).not.toHaveBeenCalled();
+    const dialog = await screen.findByTestId("git-diff-dialog");
+    const diffView = screen.getByTestId("side-panel-diff-view");
+    expect(dialog).toContainElement(diffView);
+    expect(diffView).toHaveAttribute("data-file-path", "src/staged.ts");
+    expect(diffView).toHaveAttribute("data-staged", "true");
+  });
+
+  it("opens the file in the chat file dialog from the diff dialog", async () => {
+    const user = userEvent.setup();
+    sidebarTabsOpenMode = "dialog";
+    mockUseGitStatus.mockReturnValue({
+      data: makeStatus({
+        unstaged: [{ path: "src/changed.ts", index: " ", workingDir: "M" }],
+      }),
+    });
+
+    renderPanel();
+
+    await user.click(screen.getByText("src/changed.ts"));
+    await user.click(await screen.findByTestId("git-diff-dialog-open-file"));
+
+    expect(openChatFileDialog).toHaveBeenCalledWith(
+      "ws-1",
+      "src/changed.ts",
+      expect.any(Function),
+    );
+    await waitFor(() =>
+      expect(screen.queryByTestId("git-diff-dialog")).not.toBeInTheDocument(),
+    );
   });
 
   it("renders not-a-repo state when isRepo is false", () => {

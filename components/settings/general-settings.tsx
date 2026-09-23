@@ -28,6 +28,7 @@ import {
   useMobileFontSizeSetting,
   useTabSizeSetting,
   useEditorTypeSetting,
+  useExternalEditorSetting,
   useNvimAppNameSetting,
   useShellRcPathSetting,
   useTerminalScrollbackSetting,
@@ -65,6 +66,12 @@ import type {
 } from "@/hooks/use-settings";
 import { useTheme } from "@/components/providers/theme-provider";
 import { SOUND_OPTIONS, soundSrc, playSound } from "@/lib/sounds";
+import {
+  DEFAULT_EDITOR_FLAVOR,
+  EDITOR_FLAVOR_LABELS,
+  EDITOR_FLAVOR_OPTIONS,
+  type EditorFlavor,
+} from "@/lib/vscode";
 
 export function GeneralSettings() {
   return (
@@ -146,6 +153,7 @@ function EditorSettingsCard() {
     useMobileFontSizeSetting();
   const { tabSize, isLoading: isLoadingTab } = useTabSizeSetting();
   const { editorType, isLoading: isLoadingEditorType } = useEditorTypeSetting();
+  const { externalEditor } = useExternalEditorSetting();
   const { nvimAppName, isLoading: isLoadingNvim } = useNvimAppNameSetting();
   const { isFileTabsDisabled, isLoading: isLoadingFileTabs } =
     useFileTabsSetting();
@@ -185,6 +193,17 @@ function EditorSettingsCard() {
       {
         onSuccess: () =>
           toast.success(`Editor set to ${editorTypeLabel(next)}`),
+      },
+    );
+  };
+
+  const handleExternalEditorChange = (value: string) => {
+    const next = value as EditorFlavor;
+    mutation.mutate(
+      { key: SETTINGS_KEYS.EXTERNAL_EDITOR, value: next },
+      {
+        onSuccess: () =>
+          toast.success(`External editor set to ${EDITOR_FLAVOR_LABELS[next]}`),
       },
     );
   };
@@ -302,6 +321,32 @@ function EditorSettingsCard() {
                 <SelectItem key={type} value={type}>
                   {editorTypeLabel(type)}
                   {type === DEFAULT_EDITOR_TYPE ? " (default)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="external-editor">External editor</Label>
+            <p className="text-muted-foreground text-xs">
+              Which app the &quot;Open in&quot; action launches
+            </p>
+          </div>
+          <Select
+            value={externalEditor}
+            onValueChange={handleExternalEditorChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="external-editor" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {EDITOR_FLAVOR_OPTIONS.map((flavor) => (
+                <SelectItem key={flavor} value={flavor}>
+                  {EDITOR_FLAVOR_LABELS[flavor]}
+                  {flavor === DEFAULT_EDITOR_FLAVOR ? " (default)" : ""}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -13,6 +13,11 @@ import {
   isValidActivationKeyConfig,
 } from "@/lib/leader-key-utils";
 import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds";
+import {
+  DEFAULT_EDITOR_FLAVOR,
+  EDITOR_FLAVOR_OPTIONS,
+  type EditorFlavor,
+} from "@/lib/vscode";
 import type { WorkspaceProvider } from "@/types";
 
 interface SelectedModel {
@@ -50,6 +55,7 @@ export const SETTINGS_KEYS = {
   SOUND_ERRORS_ENABLED: "sound-errors-enabled",
   SOUND_ERRORS_ID: "sound-errors-id",
   EDITOR_TYPE: "editor-type",
+  EXTERNAL_EDITOR: "external-editor",
   NVIM_APPNAME: "nvim-appname",
   AUTO_COLOR_WORKSPACES: "auto-color-workspaces",
   PANEL_NAVIGATION: "panel-navigation", // deprecated — panel nav removed
@@ -508,6 +514,21 @@ export function useEditorTypeSetting(): {
     typeof raw === "string" && EDITOR_TYPE_OPTIONS.includes(raw as EditorType);
   return {
     editorType: isValid ? (raw as EditorType) : DEFAULT_EDITOR_TYPE,
+    isLoading,
+  };
+}
+
+export function useExternalEditorSetting(): {
+  externalEditor: EditorFlavor;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.EXTERNAL_EDITOR];
+  const isValid =
+    typeof raw === "string" &&
+    EDITOR_FLAVOR_OPTIONS.includes(raw as EditorFlavor);
+  return {
+    externalEditor: isValid ? (raw as EditorFlavor) : DEFAULT_EDITOR_FLAVOR,
     isLoading,
   };
 }

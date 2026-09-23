@@ -1,0 +1,19 @@
+tests/lib/chat/streaming-label.test.ts
+  s_29851abacf97c1::t_42bcd31a49d0c8 5,45-47,49,52,64,66,72,75-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "98b4b88c5734639a6c9e5628404b66a8e50039c9",
+  "prompts": {},
+  "sessions": {
+    "s_29851abacf97c1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f332da47cffeZGqAA4gvDYpiQs",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

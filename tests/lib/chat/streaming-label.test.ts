@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   formatRetryLabel,
-  truncateRetryReason,
+  normalizeRetryReason,
 } from "@/lib/chat/streaming-label";
 
 const NOW = 1_000_000;
@@ -42,12 +42,14 @@ describe("formatRetryLabel", () => {
     expect(label).toBe("Retrying... attempt 3 · 2s");
   });
 
-  it("truncates a long reason", () => {
+  it("preserves the complete structured rate-limit error", () => {
+    const reason =
+      'This request would exceed your account\'s rate limit. Please try again later.: {"type":"error","error":{"type":"rate_limit_error","message":"This request would exceed your account\'s rate limit. Please try again later."},"request_id":"req_test"}';
     const label = formatRetryLabel(
-      { type: "retry", attempt: 1, message: "x".repeat(120), next: NOW },
+      { type: "retry", attempt: 1, message: reason, next: NOW },
       NOW,
     );
-    expect(label).toBe(`Retrying... attempt 1 · ${"x".repeat(80)}...`);
+    expect(label).toBe(`Retrying... attempt 1 · ${reason}`);
   });
 
   it("rounds the countdown up to the next whole second", () => {
@@ -59,19 +61,19 @@ describe("formatRetryLabel", () => {
   });
 });
 
-describe("truncateRetryReason", () => {
+describe("normalizeRetryReason", () => {
   it("leaves short reasons untouched", () => {
-    expect(truncateRetryReason("Provider is overloaded")).toBe(
+    expect(normalizeRetryReason("Provider is overloaded")).toBe(
       "Provider is overloaded",
     );
   });
 
   it("trims surrounding whitespace", () => {
-    expect(truncateRetryReason("  Overloaded \n")).toBe("Overloaded");
+    expect(normalizeRetryReason("  Overloaded \n")).toBe("Overloaded");
   });
 
-  it("keeps a reason of exactly the max length intact", () => {
-    const reason = "y".repeat(80);
-    expect(truncateRetryReason(reason)).toBe(reason);
+  it("keeps long reasons intact", () => {
+    const reason = "y".repeat(200);
+    expect(normalizeRetryReason(reason)).toBe(reason);
   });
 });

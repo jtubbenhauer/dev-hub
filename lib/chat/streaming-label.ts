@@ -1,13 +1,9 @@
 import type { SessionStatus } from "@/lib/opencode/types";
 
-const MAX_REASON_LENGTH = 80;
-
 type RetryStatus = Extract<SessionStatus, { type: "retry" }>;
 
-export function truncateRetryReason(reason: string): string {
-  const trimmed = reason.trim();
-  if (trimmed.length <= MAX_REASON_LENGTH) return trimmed;
-  return `${trimmed.slice(0, MAX_REASON_LENGTH)}...`;
+export function normalizeRetryReason(reason: string): string {
+  return reason.trim();
 }
 
 // OpenCode sends the retry reason on the session.status event as `message`
@@ -18,7 +14,7 @@ export function formatRetryLabel(status: RetryStatus, now: number): string {
   let label = `Retrying... attempt ${status.attempt}`;
   if (secondsUntilRetry > 0) label += ` · ${secondsUntilRetry}s`;
 
-  const reason = truncateRetryReason(status.message ?? "");
+  const reason = normalizeRetryReason(status.message ?? "");
   if (reason) label += ` · ${reason}`;
 
   return label;

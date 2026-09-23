@@ -1,0 +1,41 @@
+app/api/files/raw/route.ts
+  s_b4d6589d5c9de9::t_cd0a38390969ed 1-159
+components/chat/chat-file-dialog.tsx
+  s_ca9b486d23e789::t_2211ee53f3281a 17-18,103-118,127-128
+components/chat/split-panel-files.tsx
+  s_ca9b486d23e789::t_8ab9d512add177 37-38,109,215-220,270-272,516,522-537,598-602
+lib/side-panel-open-file.ts
+  s_ca9b486d23e789::t_03967a0c47f6e0 2,10-15
+packages/agent/src/routes/files.ts
+  s_ca9b486d23e789::t_987d2244e912db 24,244-273
+stores/chat-file-dialog-store.ts
+  s_ca9b486d23e789::t_9c9573ea3bccee 2,48-56
+tests/api/files-raw.test.ts
+  s_b4d6589d5c9de9::t_24e98c4cfa7c49 1-179
+tests/stores/chat-file-dialog-store.test.ts
+  s_ca9b486d23e789::t_34bb290d90d9f2 40-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a4c7a86c813e0fa2acad1e179ca3c3e6f4b27dd0",
+  "prompts": {},
+  "sessions": {
+    "s_b4d6589d5c9de9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f323a989affet2Xfxj8bswwIdA",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_ca9b486d23e789": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f328247eeffedXQmU2b8DAgSNd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -54,6 +54,7 @@ import {
 } from "@/lib/chat-navigation";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { getDescendantActivity } from "@/lib/chat/descendant-activity";
+import { getQueuedUserMessageIds } from "@/lib/chat/queued-messages";
 import {
   filterSessionsByAge,
   parseSessionAgeFilter,
@@ -105,6 +106,7 @@ interface AvailableVariants {
 }
 
 const EMPTY_LAST_VIEWED: Record<string, number> = {};
+const EMPTY_ID_SET = new Set<string>();
 
 export function ChatInterface() {
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(() =>
@@ -697,6 +699,13 @@ export function ChatInterface() {
         isMessageVisible(m, { showThinking, showToolCalls }),
       ),
     [activeMessagesRaw, showThinking, showToolCalls],
+  );
+  const queuedUserMessageIds = useMemo(
+    () =>
+      streamingStatus === "streaming"
+        ? getQueuedUserMessageIds(activeMessagesRaw)
+        : EMPTY_ID_SET,
+    [activeMessagesRaw, streamingStatus],
   );
   const isMessagesLoaded = useChatStore((state) => {
     const {
@@ -1583,6 +1592,7 @@ export function ChatInterface() {
                           key={msg.info.id}
                           message={msg}
                           showAvatar={showAvatar}
+                          isQueued={queuedUserMessageIds.has(msg.info.id)}
                           onRevert={canRevert ? handleRevert : undefined}
                         />
                       );

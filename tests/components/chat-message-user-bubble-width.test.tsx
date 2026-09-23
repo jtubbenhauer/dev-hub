@@ -95,3 +95,28 @@ describe("user message bubble width constraints", () => {
     expect(bubble.classList.contains("w-full")).toBe(false);
   });
 });
+
+describe("queued user message label", () => {
+  function renderWithQueued(isQueued: boolean) {
+    return render(
+      <ChatDisplayContext.Provider value={displaySettings}>
+        <ChatMessage
+          message={makeUserMessage("msg-1", "Hello")}
+          isQueued={isQueued}
+        />
+      </ChatDisplayContext.Provider>,
+    );
+  }
+
+  it("shows a Queued label when the agent has not processed the message", () => {
+    const { getByText } = renderWithQueued(true);
+
+    expect(getByText("Queued")).toBeInTheDocument();
+  });
+
+  it("hides the label once the message is no longer queued", () => {
+    const { queryByText } = renderWithQueued(false);
+
+    expect(queryByText("Queued")).not.toBeInTheDocument();
+  });
+});

@@ -60,6 +60,7 @@ function useThrottledValue<T>(value: T, delayMs: number): T {
 interface ChatMessageProps {
   message: MessageWithParts;
   showAvatar?: boolean;
+  isQueued?: boolean;
   onRevert?: (messageId: string) => void;
 }
 
@@ -187,6 +188,7 @@ export const ChatMessage = memo(
   function ChatMessage({
     message,
     showAvatar = true,
+    isQueued = false,
     onRevert,
   }: ChatMessageProps) {
     const { info, parts } = message;
@@ -380,6 +382,14 @@ export const ChatMessage = memo(
                   repo={githubRepo?.repo}
                 />
               </div>
+              {isQueued && (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] font-medium tracking-wider uppercase"
+                >
+                  Queued
+                </Badge>
+              )}
             </>
           ) : (
             <div className="w-full min-w-0 space-y-3 overflow-hidden">
@@ -471,6 +481,7 @@ export const ChatMessage = memo(
     prev.message.parts === next.message.parts &&
     prev.message.info === next.message.info &&
     prev.showAvatar === next.showAvatar &&
+    prev.isQueued === next.isQueued &&
     prev.onRevert === next.onRevert,
 );
 

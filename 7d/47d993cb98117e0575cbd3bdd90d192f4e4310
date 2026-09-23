@@ -1,0 +1,27 @@
+components/chat/prompt-input.tsx
+  s_b4d6589d5c9de9::t_4212301763ae98 35-36,719-724,756,758-759,1094
+lib/attachment-utils.ts
+  s_b4d6589d5c9de9::t_986097ab220866 1-2,32-49,52-97,99-101,103-108,112-114,120-124,140-143,146,155-161,164,170,176-193,202
+lib/office-text.ts
+  s_b4d6589d5c9de9::t_a625743562720a 1-273
+tests/lib/attachment-utils.test.ts
+  s_b4d6589d5c9de9::t_d97f23e8d45b86 9-10,21-22,25-26,30-64,94-138,149,155-160,171,177,188-204,210-235,250-311
+tests/lib/office-text.test.ts
+  s_b4d6589d5c9de9::t_3e12a44a27790d 1-256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7d47d993cb98117e0575cbd3bdd90d192f4e4310",
+  "prompts": {},
+  "sessions": {
+    "s_b4d6589d5c9de9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f323a989affet2Xfxj8bswwIdA",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

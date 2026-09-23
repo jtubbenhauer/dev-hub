@@ -1,0 +1,28 @@
+components/workspace/vscode-target-editor.tsx
+  s_f45976a41bddf9::t_80ff96471e8a0c 7
+  s_f45976a41bddf9::t_f8a9c78f4e3e91 88
+  s_f45976a41bddf9::t_913b7db7e26913 1-6,8-87,89-155
+components/workspace/workspace-card.tsx
+  s_f45976a41bddf9::t_f4ea89f905702e 355-357
+  s_f45976a41bddf9::t_6da6175ccd464a 10
+components/chat/chat-interface.tsx
+  s_f45976a41bddf9::t_ee91846eda8cca 35
+components/ui/vscode-icon.tsx
+  s_f45976a41bddf9::t_c62cda3a29a8af 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "789f5c75592759966d6313b0c8345dc53bc450e9",
+  "prompts": {},
+  "sessions": {
+    "s_f45976a41bddf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f379059c3ffekAKR5fZMi9Wit4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

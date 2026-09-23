@@ -1,0 +1,52 @@
+tests/components/chat/use-session-management.test.ts
+  s_f45976a41bddf9::t_3420d8504b5eff 56-57
+app/api/workspaces/worktrees/route.ts
+  s_f45976a41bddf9::t_3420d8504b5eff 222-223
+tests/api/start.test.ts
+  s_f45976a41bddf9::t_3420d8504b5eff 139-140,176-177
+tests/components/terminal/terminal-drawer.test.tsx
+  s_f45976a41bddf9::t_3420d8504b5eff 60-61
+tests/lib/backend.test.ts
+  s_f45976a41bddf9::t_3420d8504b5eff 26-27
+tests/components/session-picker.test.tsx
+  s_f45976a41bddf9::t_3420d8504b5eff 82-83
+tests/lib/resume.test.ts
+  s_f45976a41bddf9::t_3420d8504b5eff 43-44
+tests/lib/behaviour.test.ts
+  s_f45976a41bddf9::t_29a520f8cbc529 23-24
+types/index.ts
+  s_f45976a41bddf9::t_d4bd8fc5f7e258 43-44
+tests/stores/workspace-store.test.ts
+  s_f45976a41bddf9::t_3420d8504b5eff 21-22
+tests/api/opencode-restart.test.ts
+  s_f45976a41bddf9::t_3420d8504b5eff 59-60
+tests/api/health.test.ts
+  s_f45976a41bddf9::t_3420d8504b5eff 146-147,176-177
+tests/api/opencode-proxy.test.ts
+  s_f45976a41bddf9::t_3420d8504b5eff 74-75
+drizzle/schema.ts
+  s_f45976a41bddf9::t_e8d6e71bb8a822 54-55
+tests/components/workspace-context-panel.test.tsx
+  s_f45976a41bddf9::t_3420d8504b5eff 34-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "76a96645185b6750d0186f064e85a2d1d66bf53b",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f45976a41bddf9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f379059c3ffekAKR5fZMi9Wit4",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

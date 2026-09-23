@@ -1,0 +1,23 @@
+drizzle/migrations/0014_purple_arachne.sql
+  s_4bc2e42952dfdf::t_2bdf6732fd90a4 1-2
+drizzle/migrations/meta/0014_snapshot.json
+  s_4bc2e42952dfdf::t_533dce402ef3ca 1-1064
+drizzle/migrations/meta/_journal.json
+  s_4bc2e42952dfdf::t_a3fc4f4c94f821 102-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "176e47cacd0c1895852b3cae37241f1632369a0c",
+  "prompts": {},
+  "sessions": {
+    "s_4bc2e42952dfdf": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f379059c3ffekAKR5fZMi9Wit4",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

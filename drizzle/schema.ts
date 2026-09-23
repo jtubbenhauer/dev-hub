@@ -51,6 +51,8 @@ export const workspaces = sqliteTable(
     agentUrl: text("agent_url"),
     providerMeta: text("provider_meta", { mode: "json" }),
     shellCommand: text("shell_command"),
+    sshTarget: text("ssh_target"),
+    sshPath: text("ssh_path"),
     worktreeSymlinks: text("worktree_symlinks", { mode: "json" }).$type<
       string[]
     >(),

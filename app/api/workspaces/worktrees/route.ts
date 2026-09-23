@@ -219,6 +219,8 @@ export async function POST(request: NextRequest) {
     providerMeta: null,
     shellCommand: null,
     color: null,
+    sshTarget: null,
+    sshPath: null,
     worktreeSymlinks: null,
     linkedTaskId: null,
     linkedTaskMeta: null,

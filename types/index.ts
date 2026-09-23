@@ -40,6 +40,8 @@ export interface Workspace {
   agentUrl: string | null;
   providerMeta: Record<string, unknown> | null;
   shellCommand: string | null;
+  sshTarget: string | null;
+  sshPath: string | null;
   worktreeSymlinks: string[] | null;
   linkedTaskId: string | null;
   linkedTaskMeta: LinkedTaskMeta | null;

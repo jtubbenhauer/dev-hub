@@ -57,6 +57,8 @@ const TEST_WORKSPACE: Workspace = {
   agentUrl: null,
   providerMeta: null,
   shellCommand: null,
+  sshTarget: null,
+  sshPath: null,
   worktreeSymlinks: null,
   linkedTaskId: null,
   linkedTaskMeta: null,

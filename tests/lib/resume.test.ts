@@ -40,6 +40,8 @@ const mockWorkspace: Workspace = {
     providerWorkspaceId: "remote-workspace-123",
   },
   shellCommand: "test-cli exec",
+  sshTarget: null,
+  sshPath: null,
   worktreeSymlinks: null,
   linkedTaskId: null,
   linkedTaskMeta: null,

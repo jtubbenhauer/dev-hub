@@ -6,6 +6,8 @@ import {
   MAX_FILE_SIZE,
   MAX_ATTACHMENTS,
   ALLOWED_MIME_TYPES,
+  FILE_INPUT_ACCEPT,
+  isAttachableFile,
   getAttachmentMimeType,
   createAttachmentPromptPart,
 } from "@/lib/attachment-utils";
@@ -16,21 +18,50 @@ function createMockFile(name: string, size: number, type: string): File {
 }
 
 describe("constants", () => {
-  it("MAX_FILE_SIZE is 10MB", () => {
-    expect(MAX_FILE_SIZE).toBe(10 * 1024 * 1024);
+  it("MAX_FILE_SIZE is 20MB", () => {
+    expect(MAX_FILE_SIZE).toBe(20 * 1024 * 1024);
   });
 
-  it("MAX_ATTACHMENTS is 5", () => {
-    expect(MAX_ATTACHMENTS).toBe(5);
+  it("MAX_ATTACHMENTS is 10", () => {
+    expect(MAX_ATTACHMENTS).toBe(10);
   });
 
   it("ALLOWED_MIME_TYPES includes all supported types", () => {
-    expect(ALLOWED_MIME_TYPES).toContain("image/png");
-    expect(ALLOWED_MIME_TYPES).toContain("image/jpeg");
-    expect(ALLOWED_MIME_TYPES).toContain("image/gif");
-    expect(ALLOWED_MIME_TYPES).toContain("image/webp");
-    expect(ALLOWED_MIME_TYPES).toContain("application/pdf");
-    expect(ALLOWED_MIME_TYPES).toHaveLength(5);
+    expect(ALLOWED_MIME_TYPES).toEqual([
+      "image/png",
+      "image/jpeg",
+      "image/gif",
+      "image/webp",
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "text/csv",
+    ]);
+  });
+
+  it("excludes legacy Office MIME types that cannot be text-extracted", () => {
+    expect(ALLOWED_MIME_TYPES).not.toContain("application/msword");
+    expect(ALLOWED_MIME_TYPES).not.toContain("application/vnd.ms-excel");
+  });
+
+  it("FILE_INPUT_ACCEPT exposes every allowed MIME type to the file picker", () => {
+    const acceptedValues = FILE_INPUT_ACCEPT.split(",");
+    for (const mimeType of ALLOWED_MIME_TYPES) {
+      expect(acceptedValues).toContain(mimeType);
+    }
+  });
+
+  it("FILE_INPUT_ACCEPT exposes document extensions for browsers that report other MIME types", () => {
+    const acceptedValues = FILE_INPUT_ACCEPT.split(",");
+    for (const extension of [".docx", ".xlsx", ".csv", ".md"]) {
+      expect(acceptedValues).toContain(extension);
+    }
+  });
+
+  it("does not offer legacy Office extensions in the file picker", () => {
+    const acceptedValues = FILE_INPUT_ACCEPT.split(",");
+    expect(acceptedValues).not.toContain(".doc");
+    expect(acceptedValues).not.toContain(".xls");
   });
 });
 
@@ -60,6 +91,51 @@ describe("validateAttachment", () => {
     expect(validateAttachment(file)).toEqual({ valid: true });
   });
 
+  it("rejects legacy .doc files with guidance to convert", () => {
+    const file = createMockFile("report.doc", 1024, "application/msword");
+    const result = validateAttachment(file);
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("Legacy Office files are not supported");
+    expect(result.error).toContain(".docx");
+  });
+
+  it("rejects legacy .xls files with guidance to convert", () => {
+    const file = createMockFile("data.xls", 1024, "application/vnd.ms-excel");
+    const result = validateAttachment(file);
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("Legacy Office files are not supported");
+  });
+
+  it("still accepts a .csv that the browser reports as application/vnd.ms-excel", () => {
+    const file = createMockFile("rows.csv", 1024, "application/vnd.ms-excel");
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
+  it("returns valid: true for Word file", () => {
+    const file = createMockFile(
+      "report.docx",
+      1024,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
+  it("returns valid: true for Excel file", () => {
+    const file = createMockFile(
+      "data.xlsx",
+      1024,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
+  it("returns valid: true for CSV file", () => {
+    const file = createMockFile("rows.csv", 1024, "text/csv");
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
   it("returns valid: true for Markdown file", () => {
     const file = createMockFile("notes.md", 1024, "text/markdown");
     expect(validateAttachment(file)).toEqual({ valid: true });
@@ -70,13 +146,18 @@ describe("validateAttachment", () => {
     expect(validateAttachment(file)).toEqual({ valid: true });
   });
 
-  it("returns valid: false for PDF file exceeding 10MB limit", () => {
+  it("returns valid: false for PDF file exceeding the size limit", () => {
     const size = MAX_FILE_SIZE + 1;
     const file = createMockFile("big.pdf", size, "application/pdf");
     const result = validateAttachment(file);
     expect(result.valid).toBe(false);
     expect(result.error).toContain("big.pdf");
-    expect(result.error).toContain("10MB");
+    expect(result.error).toContain(`${MAX_FILE_SIZE / (1024 * 1024)}MB limit`);
+  });
+
+  it("accepts a file just under the size limit", () => {
+    const file = createMockFile("big.pdf", MAX_FILE_SIZE, "application/pdf");
+    expect(validateAttachment(file)).toEqual({ valid: true });
   });
 
   it("returns valid: false for unsupported file type", () => {
@@ -87,13 +168,13 @@ describe("validateAttachment", () => {
     expect(result.error).toContain("Unsupported file type");
   });
 
-  it("returns valid: false for file exceeding 10MB limit", () => {
+  it("returns valid: false for file exceeding the size limit", () => {
     const size = MAX_FILE_SIZE + 1;
     const file = createMockFile("big.png", size, "image/png");
     const result = validateAttachment(file);
     expect(result.valid).toBe(false);
     expect(result.error).toContain("big.png");
-    expect(result.error).toContain("10MB");
+    expect(result.error).toContain(`${MAX_FILE_SIZE / (1024 * 1024)}MB limit`);
   });
 
   it("returns valid: false for empty mime type", () => {
@@ -104,10 +185,53 @@ describe("validateAttachment", () => {
   });
 });
 
+describe("isAttachableFile", () => {
+  it("accepts document files pasted from the clipboard", () => {
+    const file = createMockFile("rows.csv", 1024, "text/csv");
+    expect(isAttachableFile(file)).toBe(true);
+  });
+
+  it("accepts Markdown files by extension when the MIME type is text/markdown", () => {
+    const file = createMockFile("notes.md", 1024, "text/markdown");
+    expect(isAttachableFile(file)).toBe(true);
+  });
+
+  it("rejects clipboard files that are not attachable", () => {
+    const file = createMockFile("clipboard.html", 1024, "text/html");
+    expect(isAttachableFile(file)).toBe(false);
+  });
+});
+
 describe("getAttachmentMimeType", () => {
   it("uses an OpenCode-compatible MIME type for Markdown files", () => {
     const file = createMockFile("notes.md", 1024, "text/markdown");
     expect(getAttachmentMimeType(file)).toBe("text/plain");
+  });
+
+  it("remaps CSV files to text/plain because models reject text/csv", () => {
+    const file = createMockFile("rows.csv", 1024, "text/csv");
+    expect(getAttachmentMimeType(file)).toBe("text/plain");
+  });
+
+  it("preserves the MIME type for file types models accept directly", () => {
+    const file = createMockFile("doc.pdf", 1024, "application/pdf");
+    expect(getAttachmentMimeType(file)).toBe("application/pdf");
+  });
+
+  it("remaps Word and Excel files to text/plain because their text is extracted", () => {
+    const docx = createMockFile(
+      "memo.docx",
+      1024,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    const xlsx = createMockFile(
+      "data.xlsx",
+      1024,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+
+    expect(getAttachmentMimeType(docx)).toBe("text/plain");
+    expect(getAttachmentMimeType(xlsx)).toBe("text/plain");
   });
 });
 
@@ -122,6 +246,68 @@ describe("createAttachmentPromptPart", () => {
     expect(part.type).toBe("text");
     expect("text" in part && part.text).toContain("# Heading");
     expect("text" in part && part.text).toContain("notes.md");
+  });
+
+  it("converts CSV attachments to text context instead of a rejected file part", () => {
+    const part = createAttachmentPromptPart({
+      mime: "text/plain",
+      dataUrl: `data:text/plain;base64,${btoa("name,city\nAda,London\n")}`,
+      filename: "rows.csv",
+    });
+
+    expect(part.type).toBe("text");
+    expect("text" in part && part.text).toContain("name,city");
+    expect("text" in part && part.text).toContain("Ada,London");
+    expect("text" in part && part.text).toContain("rows.csv");
+  });
+
+  it("never emits a text/csv file part, which models reject", () => {
+    const part = createAttachmentPromptPart({
+      mime: "text/csv",
+      dataUrl: `data:text/csv;base64,${btoa("a,b\n1,2\n")}`,
+      filename: "rows.csv",
+    });
+
+    expect(part.type).not.toBe("file");
+    expect("mime" in part).toBe(false);
+  });
+
+  it("inlines extracted Word content and flags the fidelity loss", () => {
+    const part = createAttachmentPromptPart({
+      mime: "text/plain",
+      dataUrl: `data:text/plain;base64,${btoa("Codeword: PLATYPUS")}`,
+      filename: "memo.docx",
+    });
+
+    expect(part.type).toBe("text");
+    expect("text" in part && part.text).toContain("Codeword: PLATYPUS");
+    expect("text" in part && part.text).toContain("Text extracted from");
+    expect("text" in part && part.text).toContain(
+      "formatting and embedded images are not preserved",
+    );
+  });
+
+  it("inlines extracted Excel content instead of sending a rejected file part", () => {
+    const part = createAttachmentPromptPart({
+      mime: "text/plain",
+      dataUrl: `data:text/plain;base64,${btoa("# Sheet1\na,b")}`,
+      filename: "data.xlsx",
+    });
+
+    expect(part.type).toBe("text");
+    expect("mime" in part).toBe(false);
+    expect("text" in part && part.text).toContain("a,b");
+  });
+
+  it("keeps PDF attachments as file parts", () => {
+    const part = createAttachmentPromptPart({
+      mime: "application/pdf",
+      dataUrl: "data:application/pdf;base64,JVBERi0=",
+      filename: "doc.pdf",
+    });
+
+    expect(part.type).toBe("file");
+    expect("mime" in part && part.mime).toBe("application/pdf");
   });
 });
 

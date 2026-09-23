@@ -32,6 +32,8 @@ import { VariantSelector } from "@/components/chat/variant-selector";
 import type { Attachment } from "@/lib/attachment-utils";
 import {
   MAX_ATTACHMENTS,
+  FILE_INPUT_ACCEPT,
+  isAttachableFile,
   validateAttachment,
   fileToDataUrl,
   generateAttachmentId,
@@ -714,8 +716,12 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
                 },
               ];
             });
-          } catch {
-            toast.error(`Failed to read file "${file.name}"`);
+          } catch (error) {
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : `Failed to read file "${file.name}"`,
+            );
           }
         }
       },
@@ -747,15 +753,10 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       (e: React.ClipboardEvent) => {
         const items = Array.from(e.clipboardData.items);
         const pastedFiles = items
-          .filter(
-            (item) =>
-              item.kind === "file" &&
-              (item.type.startsWith("image/") ||
-                item.type === "application/pdf" ||
-                item.type === "text/markdown"),
-          )
+          .filter((item) => item.kind === "file")
           .map((item) => item.getAsFile())
-          .filter((f): f is File => f !== null);
+          .filter((f): f is File => f !== null)
+          .filter(isAttachableFile);
         if (pastedFiles.length > 0) {
           e.preventDefault();
           addFiles(pastedFiles);
@@ -1090,7 +1091,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/markdown,.md"
+          accept={FILE_INPUT_ACCEPT}
           multiple
           className="hidden"
           onChange={handleFileInputChange}

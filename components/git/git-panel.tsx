@@ -58,6 +58,8 @@ import {
   applyLeaderFileResolution,
   parseStoredViewMode,
   isValidViewMode,
+  SORT_LABELS,
+  getNextSortMode,
 } from "@/lib/git-panel-logic";
 import type {
   SortMode,
@@ -91,13 +93,6 @@ import { useGitFolderGrouping } from "@/hooks/use-git-folder-grouping";
 import type { Workspace } from "@/types";
 
 type BottomPanel = "branches" | "log" | "stashes" | null;
-
-const SORT_LABELS: Record<SortMode, string> = {
-  "name-asc": "Name A-Z",
-  "name-desc": "Name Z-A",
-  status: "Status",
-  path: "Full path",
-};
 
 function formatRelativeDate(dateString: string): string {
   const date = new Date(dateString);
@@ -463,9 +458,7 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
 
   // Cycle through sort modes
   const cycleSortMode = useCallback(() => {
-    const modes: SortMode[] = ["name-asc", "name-desc", "status", "path"];
-    const idx = modes.indexOf(sortMode);
-    setSortMode(modes[(idx + 1) % modes.length]);
+    setSortMode(getNextSortMode(sortMode));
   }, [sortMode]);
 
   // Stable handler refs for leader key useMemo (avoids re-registering on every render)

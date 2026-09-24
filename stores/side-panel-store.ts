@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 
 import type { OpenFile } from "@/types";
 
-const VALID_PANEL_TABS = ["status", "files", "git"] as const;
+const VALID_PANEL_TABS = ["status", "files", "git", "compare"] as const;
 
 type ActivePanelTab = (typeof VALID_PANEL_TABS)[number];
 
@@ -48,6 +48,7 @@ interface SidePanelState {
     path: string;
     staged: boolean;
   } | null;
+  branchCompareBaseRefs: Record<string, string>;
 
   openFileInTab: (path: string, content: string, language: string) => void;
   openFile: (path: string, content: string, language: string) => void;
@@ -58,6 +59,7 @@ interface SidePanelState {
   setGitTabSelection: (
     sel: { workspaceId: string; path: string; staged: boolean } | null,
   ) => void;
+  setBranchCompareBaseRef: (workspaceId: string, baseRef: string) => void;
   updateFileContent: (path: string, content: string) => void;
   markFileSaved: (path: string) => void;
   closePanel: () => void;
@@ -94,6 +96,7 @@ export const useSidePanelStore = create<SidePanelState>()(
       workspaceFileStates: {},
       fileViewModes: {},
       gitTabSelection: null,
+      branchCompareBaseRefs: {},
 
       openFileInTab: (path, content, language) => {
         const { openFiles } = get();
@@ -164,6 +167,14 @@ export const useSidePanelStore = create<SidePanelState>()(
         })),
 
       setGitTabSelection: (sel) => set({ gitTabSelection: sel }),
+
+      setBranchCompareBaseRef: (workspaceId, baseRef) =>
+        set((state) => ({
+          branchCompareBaseRefs: {
+            ...state.branchCompareBaseRefs,
+            [workspaceId]: baseRef,
+          },
+        })),
 
       updateFileContent: (path, content) =>
         set((state) => ({
@@ -316,6 +327,7 @@ export const useSidePanelStore = create<SidePanelState>()(
         expandedPaths: state.expandedPaths,
         activePanelTab: state.activePanelTab,
         workspaceFileStates: state.workspaceFileStates,
+        branchCompareBaseRefs: state.branchCompareBaseRefs,
       }),
     },
   ),

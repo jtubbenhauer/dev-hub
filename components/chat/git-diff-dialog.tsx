@@ -18,14 +18,18 @@ import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 interface GitDiffDialogTarget {
   path: string;
   staged: boolean;
+  baseRef?: string;
 }
 
 export function useGitDiffDialog(workspaceId: string) {
   const { sidebarTabsOpenMode } = useChatSidebarTabsOpenSetting();
   const [target, setTarget] = useState<GitDiffDialogTarget | null>(null);
-  const openDiffDialog = useCallback((path: string, staged: boolean) => {
-    setTarget({ path, staged });
-  }, []);
+  const openDiffDialog = useCallback(
+    (path: string, staged: boolean, baseRef?: string) => {
+      setTarget({ path, staged, baseRef });
+    },
+    [],
+  );
   const diffDialog = (
     <GitDiffDialog
       workspaceId={workspaceId}
@@ -77,6 +81,11 @@ function GitDiffDialog({
               Staged
             </span>
           )}
+          {target?.baseRef && (
+            <span className="text-muted-foreground shrink-0 font-mono text-xs">
+              vs {target.baseRef}
+            </span>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -95,6 +104,7 @@ function GitDiffDialog({
               workspaceId={workspaceId}
               filePath={target.path}
               staged={target.staged}
+              baseRef={target.baseRef}
             />
           )}
         </div>

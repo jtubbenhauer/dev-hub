@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { GitStatusResult, Workspace } from "@/types";
 
 vi.mock("@/hooks/use-git", () => ({
@@ -11,6 +12,12 @@ vi.mock("@/hooks/use-git", () => ({
 vi.mock("@/components/chat/git-tab-panel", () => ({
   GitTabPanel: ({ workspaceId }: { workspaceId: string }) => (
     <div data-testid="git-tab-panel">git:{workspaceId}</div>
+  ),
+}));
+
+vi.mock("@/components/chat/git-branch-compare-panel", () => ({
+  GitBranchComparePanel: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="git-branch-compare-panel">compare:{workspaceId}</div>
   ),
 }));
 
@@ -60,15 +67,17 @@ const workspace = { id: "ws-1", name: "repo" } as unknown as Workspace;
 
 function renderPanel() {
   return render(
-    <SidePanel
-      width={320}
-      handleDragStart={vi.fn()}
-      workspaceId="ws-1"
-      workspace={workspace}
-      activeTodos={[]}
-      messages={[]}
-      workspacePath="/repo"
-    />,
+    <TooltipProvider>
+      <SidePanel
+        width={320}
+        handleDragStart={vi.fn()}
+        workspaceId="ws-1"
+        workspace={workspace}
+        activeTodos={[]}
+        messages={[]}
+        workspacePath="/repo"
+      />
+    </TooltipProvider>,
   );
 }
 
@@ -79,12 +88,17 @@ beforeEach(() => {
 });
 
 describe("SidePanel tabs", () => {
-  it("renders three tab buttons: Status, Files, Git", () => {
+  it("renders tab buttons: Status, Files, Git, Compare", () => {
     renderPanel();
 
+    expect(
+      screen.getByRole("button", { name: "Branch comparison" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Status/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Files/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Git/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Working changes" }),
+    ).toBeInTheDocument();
   });
 
   it("activates GitTabPanel when the Git tab is clicked", async () => {
@@ -93,10 +107,23 @@ describe("SidePanel tabs", () => {
 
     expect(screen.queryByTestId("git-tab-panel")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Git/ }));
+    await user.click(screen.getByRole("button", { name: "Working changes" }));
 
     expect(screen.getByTestId("git-tab-panel")).toBeInTheDocument();
     expect(screen.queryByTestId("mcp-status")).not.toBeInTheDocument();
+  });
+
+  it("activates GitBranchComparePanel when the Compare tab is clicked", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(screen.getByRole("button", { name: "Branch comparison" }));
+
+    expect(screen.getByTestId("git-branch-compare-panel")).toHaveTextContent(
+      "compare:ws-1",
+    );
+    expect(screen.queryByTestId("git-tab-panel")).not.toBeInTheDocument();
+    expect(useSidePanelStore.getState().activePanelTab).toBe("compare");
   });
 
   it("shows the unique-path count badge (conflicted/staged+unstaged counted once)", () => {
@@ -115,7 +142,9 @@ describe("SidePanel tabs", () => {
     renderPanel();
 
     // Unique paths across all buckets: a.ts, b.ts, c.ts => 3
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Working changes" }),
+    ).toHaveTextContent("3");
   });
 
   it("does not render a badge when there are no changes", () => {
@@ -123,8 +152,8 @@ describe("SidePanel tabs", () => {
 
     renderPanel();
 
-    const gitButton = screen.getByRole("button", { name: /Git/ });
-    expect(gitButton).toHaveTextContent("Git");
+    const gitButton = screen.getByRole("button", { name: "Working changes" });
+    expect(gitButton).toHaveTextContent("");
     expect(gitButton.querySelector("span")).toBeNull();
   });
 
@@ -138,7 +167,7 @@ describe("SidePanel tabs", () => {
 
     renderPanel();
 
-    const gitButton = screen.getByRole("button", { name: /Git/ });
+    const gitButton = screen.getByRole("button", { name: "Working changes" });
     expect(gitButton.querySelector("span")).toBeNull();
   });
 });

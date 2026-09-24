@@ -31,8 +31,11 @@ vi.mock("@/components/review/monaco-review-editor", () => ({
 }));
 
 const useGitFileContentMock = vi.fn();
+const useGitFileContentAtRefMock = vi.fn();
 vi.mock("@/hooks/use-git", () => ({
   useGitFileContent: (...args: unknown[]) => useGitFileContentMock(...args),
+  useGitFileContentAtRef: (...args: unknown[]) =>
+    useGitFileContentAtRefMock(...args),
 }));
 
 import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
@@ -68,6 +71,13 @@ function fileContent(path: string) {
 beforeEach(() => {
   capturedProps = undefined;
   useGitFileContentMock.mockReset();
+  useGitFileContentAtRefMock.mockReset();
+  useGitFileContentAtRefMock.mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isPlaceholderData: false,
+    error: null,
+  });
 });
 
 describe("SidePanelDiffView", () => {
@@ -159,5 +169,38 @@ describe("SidePanelDiffView", () => {
     );
     expect(screen.getByTestId("diff-loading")).toBeInTheDocument();
     expect(screen.queryByTestId("diff-error")).not.toBeInTheDocument();
+  });
+
+  it("uses the ref-based query (and disables the working query) when baseRef is set", async () => {
+    mockHook({ data: fileContent("a.ts") });
+    useGitFileContentAtRefMock.mockReturnValue({
+      data: {
+        original: "base\n",
+        current: "branch\n",
+        path: "a.ts",
+        language: "typescript",
+      },
+      isLoading: false,
+      isPlaceholderData: false,
+      error: null,
+    });
+    render(
+      <SidePanelDiffView workspaceId="ws1" filePath="a.ts" baseRef="main" />,
+    );
+    await screen.findByTestId("monaco-review-editor");
+    expect(useGitFileContentAtRefMock).toHaveBeenCalledWith(
+      "ws1",
+      "a.ts",
+      "main",
+    );
+    expect(useGitFileContentMock).toHaveBeenCalledWith(null, "a.ts", false);
+    const passed = capturedProps?.fileContent as { original: string };
+    expect(passed.original).toBe("base\n");
+  });
+
+  it("disables the ref-based query when baseRef is not set", () => {
+    mockHook({ isLoading: true });
+    render(<SidePanelDiffView workspaceId="ws1" filePath="a.ts" />);
+    expect(useGitFileContentAtRefMock).toHaveBeenCalledWith(null, "a.ts", null);
   });
 });

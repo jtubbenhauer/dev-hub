@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useGitFileContent } from "@/hooks/use-git";
+import { useGitFileContent, useGitFileContentAtRef } from "@/hooks/use-git";
 
 // Heavy Monaco editor — load via next/dynamic (never a static import in chat
 // components). Mirrors components/git/pr-diff-editor.tsx.
@@ -22,16 +22,26 @@ export function SidePanelDiffView({
   workspaceId,
   filePath,
   staged = false,
+  baseRef = null,
 }: {
   workspaceId: string;
   filePath: string;
   staged?: boolean;
+  baseRef?: string | null;
 }) {
-  const { data, isLoading, isPlaceholderData, error } = useGitFileContent(
-    workspaceId,
+  const workingChangesQuery = useGitFileContent(
+    baseRef ? null : workspaceId,
     filePath,
     staged,
   );
+  const branchCompareQuery = useGitFileContentAtRef(
+    baseRef ? workspaceId : null,
+    filePath,
+    baseRef,
+  );
+  const { data, isLoading, isPlaceholderData, error } = baseRef
+    ? branchCompareQuery
+    : workingChangesQuery;
 
   // Error-first: a query error wins even when `data` is undefined.
   if (error) {

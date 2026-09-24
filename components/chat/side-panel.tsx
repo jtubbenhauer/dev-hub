@@ -2,9 +2,14 @@
 
 import { useMemo } from "react";
 
-import { GripVertical, X } from "lucide-react";
+import { FileText, GitCompare, GripVertical, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useGitStatus } from "@/hooks/use-git";
 
@@ -13,6 +18,7 @@ import type { Todo, MessageWithParts } from "@/lib/opencode/types";
 
 import { McpStatusPanel } from "./mcp-status";
 import { GitTabPanel } from "@/components/chat/git-tab-panel";
+import { GitBranchComparePanel } from "@/components/chat/git-branch-compare-panel";
 import { SessionFilesPanel } from "./session-files-panel";
 import { SplitPanelFiles } from "./split-panel-files";
 import { TaskProgressPanel } from "./task-progress";
@@ -85,17 +91,37 @@ export function SidePanel({
             >
               Files
             </button>
-            <button
-              className={`flex items-center gap-1 border-b-2 px-1 pb-1.5 text-xs transition-colors ${activePanelTab === "git" ? "text-foreground border-primary font-medium" : "text-muted-foreground hover:text-foreground/70 border-transparent"}`}
-              onClick={() => setActivePanelTab("git")}
-            >
-              Git
-              {dirtyCount > 0 && (
-                <span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[10px] tabular-nums">
-                  {dirtyCount}
-                </span>
-              )}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  aria-label="Working changes"
+                  data-testid="side-panel-tab-git"
+                  className={`flex items-center gap-1 border-b-2 px-1 pb-1.5 text-xs transition-colors ${activePanelTab === "git" ? "text-foreground border-primary font-medium" : "text-muted-foreground hover:text-foreground/70 border-transparent"}`}
+                  onClick={() => setActivePanelTab("git")}
+                >
+                  <FileText className="size-3.5" />
+                  {dirtyCount > 0 && (
+                    <span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[10px] tabular-nums">
+                      {dirtyCount}
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Working changes</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  aria-label="Branch comparison"
+                  data-testid="side-panel-tab-compare"
+                  className={`flex items-center border-b-2 px-1 pb-1.5 text-xs transition-colors ${activePanelTab === "compare" ? "text-foreground border-primary font-medium" : "text-muted-foreground hover:text-foreground/70 border-transparent"}`}
+                  onClick={() => setActivePanelTab("compare")}
+                >
+                  <GitCompare className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Branch comparison</TooltipContent>
+            </Tooltip>
           </div>
           <Button
             size="icon-xs"
@@ -155,6 +181,9 @@ export function SidePanel({
           />
         )}
         {activePanelTab === "git" && <GitTabPanel workspaceId={workspaceId} />}
+        {activePanelTab === "compare" && (
+          <GitBranchComparePanel workspaceId={workspaceId} />
+        )}
       </div>
     </>
   );

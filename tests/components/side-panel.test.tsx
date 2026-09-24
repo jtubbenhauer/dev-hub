@@ -71,6 +71,15 @@ let currentTab: "status" | "files" = "status";
 
 import type { SidePanelProps } from "@/components/chat/side-panel";
 import { SidePanel } from "@/components/chat/side-panel";
+import { TooltipProvider } from "@/components/ui/tooltip";
+
+function renderSidePanel(props: SidePanelProps) {
+  return render(
+    <TooltipProvider>
+      <SidePanel {...props} />
+    </TooltipProvider>,
+  );
+}
 
 const defaultProps = {
   width: 400,
@@ -91,14 +100,14 @@ describe("SidePanel", () => {
   });
 
   it("renders Status and Files tab labels", () => {
-    render(<SidePanel {...defaultProps} />);
+    renderSidePanel(defaultProps);
     expect(screen.getByText("Status")).toBeInTheDocument();
     expect(screen.getByText("Files")).toBeInTheDocument();
   });
 
   it("clicking Files tab calls setActivePanelTab('files')", async () => {
     const user = userEvent.setup();
-    render(<SidePanel {...defaultProps} />);
+    renderSidePanel(defaultProps);
     await user.click(screen.getByText("Files"));
     expect(mockSetActivePanelTab).toHaveBeenCalledWith("files");
   });
@@ -106,13 +115,13 @@ describe("SidePanel", () => {
   it("clicking Status tab calls setActivePanelTab('status')", async () => {
     currentTab = "files";
     const user = userEvent.setup();
-    render(<SidePanel {...defaultProps} />);
+    renderSidePanel(defaultProps);
     await user.click(screen.getByText("Status"));
     expect(mockSetActivePanelTab).toHaveBeenCalledWith("status");
   });
 
   it("renders Status content when activePanelTab is status", () => {
-    render(<SidePanel {...defaultProps} />);
+    renderSidePanel(defaultProps);
     expect(screen.getByTestId("workspace-context-panel")).toBeInTheDocument();
     expect(screen.getByTestId("mcp-status-panel")).toBeInTheDocument();
     expect(screen.getByTestId("session-files-panel")).toBeInTheDocument();
@@ -121,7 +130,7 @@ describe("SidePanel", () => {
 
   it("renders SplitPanelFiles when activePanelTab is files", () => {
     currentTab = "files";
-    render(<SidePanel {...defaultProps} />);
+    renderSidePanel(defaultProps);
     expect(screen.getByTestId("split-panel-files")).toBeInTheDocument();
     expect(
       screen.queryByTestId("workspace-context-panel"),
@@ -130,13 +139,13 @@ describe("SidePanel", () => {
 
   it("close button calls closePanel", async () => {
     const user = userEvent.setup();
-    render(<SidePanel {...defaultProps} />);
+    renderSidePanel(defaultProps);
     await user.click(screen.getByTestId("side-panel-close"));
     expect(mockClosePanel).toHaveBeenCalled();
   });
 
   it("renders resize handle", () => {
-    render(<SidePanel {...defaultProps} />);
+    renderSidePanel(defaultProps);
     expect(screen.getByTestId("side-panel-resize-handle")).toBeInTheDocument();
   });
 
@@ -145,17 +154,17 @@ describe("SidePanel", () => {
       ...defaultProps,
       activeTodos: [{ id: "1", content: "todo" }],
     } as unknown as SidePanelProps;
-    render(<SidePanel {...propsWithTodos} />);
+    renderSidePanel(propsWithTodos);
     expect(screen.getByTestId("task-progress-panel")).toBeInTheDocument();
   });
 
   it("does not render TaskProgressPanel when activeTodos is empty", () => {
-    render(<SidePanel {...defaultProps} />);
+    renderSidePanel(defaultProps);
     expect(screen.queryByTestId("task-progress-panel")).not.toBeInTheDocument();
   });
 
   it("highlights active tab with font-medium", () => {
-    render(<SidePanel {...defaultProps} />);
+    renderSidePanel(defaultProps);
     const statusTab = screen.getByText("Status");
     expect(statusTab.className).toContain("font-medium");
     expect(statusTab.className).toContain("text-foreground");

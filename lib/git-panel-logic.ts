@@ -3,6 +3,25 @@ import type { GitStatusResult, ReviewChangedFile } from "@/types";
 
 export type SortMode = "name-asc" | "name-desc" | "status" | "path";
 
+export const SORT_LABELS: Record<SortMode, string> = {
+  "name-asc": "Name A-Z",
+  "name-desc": "Name Z-A",
+  status: "Status",
+  path: "Full path",
+};
+
+export const SORT_MODE_ORDER: SortMode[] = [
+  "name-asc",
+  "name-desc",
+  "status",
+  "path",
+];
+
+export function getNextSortMode(mode: SortMode): SortMode {
+  const index = SORT_MODE_ORDER.indexOf(mode);
+  return SORT_MODE_ORDER[(index + 1) % SORT_MODE_ORDER.length];
+}
+
 export type GitViewMode = "working" | "branch" | "last-commit";
 
 const VALID_GIT_VIEW_MODES: readonly GitViewMode[] = [

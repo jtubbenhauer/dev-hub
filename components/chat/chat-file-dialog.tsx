@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, FileCode2, Loader2, Save } from "lucide-react";
+import { Download, ExternalLink, FileCode2, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,12 @@ import {
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 import { PdfViewer } from "@/components/editor/pdf-viewer";
-import { PDF_LANGUAGE } from "@/lib/file-preview";
+import { getRawFileUrl, PDF_LANGUAGE } from "@/lib/file-preview";
+import { downloadTextFile } from "@/lib/download-file";
+
+function getFileName(filePath: string): string {
+  return filePath.split("/").pop() || filePath;
+}
 
 export function ChatFileDialog() {
   const isOpen = useChatFileDialogStore((state) => state.isOpen);
@@ -116,6 +121,32 @@ export function ChatFileDialog() {
               <span className="hidden sm:inline">Save</span>
             </Button>
           )}
+          {file &&
+            (file.language === PDF_LANGUAGE ? (
+              <Button variant="ghost" size="sm" className="size-8 p-0" asChild>
+                <a
+                  href={getRawFileUrl(file.workspaceId, file.path)}
+                  download={getFileName(file.path)}
+                  aria-label="Download file"
+                  title="Download file"
+                >
+                  <Download className="size-3.5" />
+                </a>
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="size-8 p-0"
+                onClick={() =>
+                  downloadTextFile(getFileName(file.path), file.content)
+                }
+                aria-label="Download file"
+                title="Download file"
+              >
+                <Download className="size-3.5" />
+              </Button>
+            ))}
         </DialogHeader>
 
         <div className="min-h-0 flex-1">

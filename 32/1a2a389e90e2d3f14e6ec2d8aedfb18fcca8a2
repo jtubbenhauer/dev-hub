@@ -1,0 +1,47 @@
+components/chat/git-branch-compare-panel.tsx
+  s_50de2b473b1ad3::t_7c93b62736b9c6 1-321
+components/chat/git-diff-dialog.tsx
+  s_50de2b473b1ad3::t_1bbefabf6d7f99 21,27-32,84-88,107
+components/chat/side-panel-diff-view.tsx
+  s_a26ff178f37e76::t_1b330ba0bcea8d 4,25,30,32-33,37-44
+components/chat/side-panel.tsx
+  s_50de2b473b1ad3::t_21c53c03919eea 5,8-12,21,94-124,184-186
+components/git/git-panel.tsx
+  s_50de2b473b1ad3::t_40d4637d16f6e7 61-62,461
+lib/git-panel-logic.ts
+  s_50de2b473b1ad3::t_6517e4c534d620 6-24
+stores/side-panel-store.ts
+  s_a26ff178f37e76::t_5afcfd26471c33 6,51,62,99,171-178,330
+tests/components/chat/git-branch-compare-panel.test.tsx
+  s_50de2b473b1ad3::t_661301a1e6f2c6 1-263
+tests/components/chat/side-panel-diff-view.test.tsx
+  s_50de2b473b1ad3::t_b28386e8e14aef 34,37-38,74-80,173-205
+tests/components/chat/side-panel-tabs.test.tsx
+  s_50de2b473b1ad3::t_500d34c41648a8 5,18-23,70-80,91,94-96,99-101,110,116-128,145-147,155-156,170
+tests/components/side-panel.test.tsx
+  s_50de2b473b1ad3::t_dd95e35a535fbb 74-82,103,110,118,124,133,142,148,157,162,167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "321a2a389e90e2d3f14e6ec2d8aedfb18fcca8a2",
+  "prompts": {},
+  "sessions": {
+    "s_50de2b473b1ad3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f2ec78c5effeTEiFRmYr29gkzZ",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a26ff178f37e76": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f34617d4affea9EtlbGJ2diXNP",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

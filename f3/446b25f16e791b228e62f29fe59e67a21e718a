@@ -1,0 +1,19 @@
+components/chat/chat-file-dialog.tsx
+  s_6fc2c17f89d362::t_8968a27e7108ee 5,18-23,124-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f3446b25f16e791b228e62f29fe59e67a21e718a",
+  "prompts": {},
+  "sessions": {
+    "s_6fc2c17f89d362": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f2f470b08ffeJ3SxymGyPuLwjg",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

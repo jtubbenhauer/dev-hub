@@ -1,0 +1,87 @@
+.env.example
+  s_1eea3fb2ee5514::t_2558d76e6a0d78 13-19
+app/api/chat-suggest/route.ts
+  s_1eea3fb2ee5514::t_2e5f4b13b6c6d5 1-114
+components/chat/chat-suggestion-chips.tsx
+  s_1eea3fb2ee5514::t_3b5df92096efe9 1-28
+components/chat/prompt-input.tsx
+  s_1eea3fb2ee5514::t_ace16ab30cde29 53-55,117-127,235,257-293,295,298,300-307,542,592-627,632-652,711-714,1130-1189
+components/chat/use-chat-suggestion.ts
+  s_1eea3fb2ee5514::t_62cd95014d6502 1-236
+components/settings/chat-suggestion-settings.tsx
+  s_a26ff178f37e76::t_80d50ede88e706 1-67
+components/settings/general-settings.tsx
+  s_1eea3fb2ee5514::t_4818ef496509c9 69,85
+hooks/use-settings.ts
+  s_1eea3fb2ee5514::t_239d37b1c6f733 16,70,673-682
+lib/chat-suggest/constants.ts
+  s_1eea3fb2ee5514::t_107f9b29e42697 1
+lib/chat-suggest/context.ts
+  s_44c2a40dcf7088::t_5298947eb1bc5d 1-90
+lib/chat-suggest/llm.ts
+  s_1eea3fb2ee5514::t_9350693a5be65e 1-102
+lib/chat-suggest/match.ts
+  s_7037274037f442::t_6895678b7ba1fe 1-46
+lib/chat-suggest/prompts.ts
+  s_1eea3fb2ee5514::t_61987025aae612 1-111
+tests/api/chat-suggest.test.ts
+  s_1eea3fb2ee5514::t_90dd4a4fcb269e 1-126
+tests/components/chat-suggestion-settings.test.tsx
+  s_a26ff178f37e76::t_d61e701853bc66 1-49
+tests/components/chat/prompt-input-comments.test.tsx
+  s_1eea3fb2ee5514::t_4d633fb9ba786b 49-52
+tests/components/chat/prompt-input-mobile-enter.test.tsx
+  s_1eea3fb2ee5514::t_b31c95be9bb25b 54-57
+tests/components/chat/prompt-input-pr.test.tsx
+  s_1eea3fb2ee5514::t_f47b77b0961bed 49-52
+tests/components/chat/prompt-input-suggestion.test.tsx
+  s_a26ff178f37e76::t_107d4e7f7cc304 1-327
+tests/lib/chat-suggest/context.test.ts
+  s_1eea3fb2ee5514::t_12d5614fcd8593 1-95
+tests/lib/chat-suggest/llm.test.ts
+  s_1eea3fb2ee5514::t_016baed6a0988a 1-66
+tests/lib/chat-suggest/match.test.ts
+  s_1eea3fb2ee5514::t_2ad3415f0d99be 1-63
+tests/lib/chat-suggest/prompts.test.ts
+  s_1eea3fb2ee5514::t_8b3b6de1c0a6c8 1-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3f508755ffc8f4c5f67232622b2cf23630028b5f",
+  "prompts": {},
+  "sessions": {
+    "s_1eea3fb2ee5514": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f2a112d10ffeRaXOcfZ7PunqCq",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_44c2a40dcf7088": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3282de71ffeBoESmAAfqSTM65",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_7037274037f442": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f2a2a3c13ffejf18n9M4cj1ioW",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a26ff178f37e76": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f34617d4affea9EtlbGJ2diXNP",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

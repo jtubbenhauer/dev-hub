@@ -51,6 +51,10 @@ vi.mock("@/components/chat/variant-selector", () => ({
 }));
 vi.mock("@/hooks/use-settings", () => ({
   useModelAllowlist: () => ({ allowlist: [], setAllowlist: vi.fn() }),
+  useChatSuggestionsSetting: () => ({
+    isChatSuggestionsEnabled: false,
+    isLoading: false,
+  }),
 }));
 vi.mock("@/hooks/use-git", () => ({
   useWorkspaceGitHub: vi.fn().mockReturnValue(null),

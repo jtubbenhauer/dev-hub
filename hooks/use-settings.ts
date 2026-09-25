@@ -13,6 +13,7 @@ import {
   isValidActivationKeyConfig,
 } from "@/lib/leader-key-utils";
 import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds";
+import { CHAT_SUGGESTIONS_ENABLED_SETTING_KEY } from "@/lib/chat-suggest/constants";
 import {
   DEFAULT_EDITOR_FLAVOR,
   EDITOR_FLAVOR_OPTIONS,
@@ -66,6 +67,7 @@ export const SETTINGS_KEYS = {
   CHAT_SIDEBAR_TABS_OPEN_MODE: "chat-sidebar-tabs-open-mode",
   NOTIFICATIONS_SOUND_ENABLED: "notifications-sound-enabled",
   NOTIFICATIONS_PUSH_ENABLED: "notifications-push-enabled",
+  CHAT_SUGGESTIONS_ENABLED: CHAT_SUGGESTIONS_ENABLED_SETTING_KEY,
 } as const;
 
 export type EditorType = "monaco" | "neovim";
@@ -667,4 +669,14 @@ export function useNotificationSettings(): {
   const isPushEnabled =
     data?.[SETTINGS_KEYS.NOTIFICATIONS_PUSH_ENABLED] !== false;
   return { isSoundEnabled, isPushEnabled, isLoading };
+}
+
+export function useChatSuggestionsSetting(): {
+  isChatSuggestionsEnabled: boolean;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.CHAT_SUGGESTIONS_ENABLED];
+  // Default: true (suggestions are on unless explicitly disabled)
+  return { isChatSuggestionsEnabled: raw !== false, isLoading };
 }

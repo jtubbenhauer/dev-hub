@@ -66,6 +66,7 @@ import type {
   ChatFileOpenMode,
 } from "@/hooks/use-settings";
 import { useTheme } from "@/components/providers/theme-provider";
+import { ChatSuggestionSettingsCard } from "@/components/settings/chat-suggestion-settings";
 import { SOUND_OPTIONS, soundSrc, playSound } from "@/lib/sounds";
 import {
   DEFAULT_EDITOR_FLAVOR,
@@ -81,6 +82,7 @@ export function GeneralSettings() {
       <EditorSettingsCard />
       <TerminalSettingsCard />
       <CommandSettingsCard />
+      <ChatSuggestionSettingsCard />
       <NotificationSettingsCard />
       <SoundSettingsCard />
     </div>

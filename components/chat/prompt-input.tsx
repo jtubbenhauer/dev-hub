@@ -50,6 +50,9 @@ import { fetchPrContext, formatPrContextForAI } from "@/lib/pr-context";
 import { useWorkspaceGitHub } from "@/hooks/use-git";
 import { useHasCoarsePointer } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
+import { useChatSuggestion } from "@/components/chat/use-chat-suggestion";
+import { ChatSuggestionChips } from "@/components/chat/chat-suggestion-chips";
+import { getNextWordChunk } from "@/lib/chat-suggest/match";
 import { toast } from "sonner";
 
 export interface PromptInputHandle {
@@ -110,6 +113,17 @@ function saveDraftsToStorage(drafts: Map<string, SessionDraft>): void {
 }
 
 const sessionDrafts = loadDraftsFromStorage();
+
+const SUGGESTION_ACCEPT_COUNT_STORAGE_KEY = "dev-hub-chat-suggestion-accepts";
+const SUGGESTION_HINT_ACCEPT_LIMIT = 3;
+
+function readSuggestionAcceptCount(): number {
+  if (typeof window === "undefined") return 0;
+  const stored = Number(
+    localStorage.getItem(SUGGESTION_ACCEPT_COUNT_STORAGE_KEY),
+  );
+  return Number.isFinite(stored) ? stored : 0;
+}
 
 interface SelectedModel {
   providerID: string;
@@ -218,6 +232,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       PrContextChip[]
     >([]);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const ghostOverlayRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [prevSessionId, setPrevSessionId] = useState(sessionId);
 
@@ -239,13 +254,57 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       setAttachments(draft?.attachments ?? []);
     }
 
+    const isAnyPickerOpen =
+      pickerQuery !== null ||
+      commandQuery !== null ||
+      planArgQuery !== null ||
+      prPickerQuery !== null;
+    const [isCaretAtEnd, setIsCaretAtEnd] = useState(true);
+    const [isComposing, setIsComposing] = useState(false);
+    const [suggestionAcceptCount, setSuggestionAcceptCount] = useState(
+      readSuggestionAcceptCount,
+    );
+    const {
+      ghostText: suggestionGhostText,
+      replySuggestions,
+      dismissSuggestion,
+    } = useChatSuggestion({
+      workspaceId,
+      sessionId,
+      typedText: value,
+      isStreaming,
+      isEnabled: !disabled,
+      isLiveCompletionEnabled: !hasCoarsePointer && !isComposing,
+    });
+    const isGhostTextHidden =
+      isAnyPickerOpen || hasCoarsePointer || isComposing || !isCaretAtEnd;
+    const ghostText = isGhostTextHidden ? null : suggestionGhostText;
+    const shouldShowAcceptHint =
+      suggestionAcceptCount < SUGGESTION_HINT_ACCEPT_LIMIT;
+    const shouldShowSuggestionChips =
+      hasCoarsePointer && !value && !disabled && replySuggestions.length > 0;
+
+    const syncCaretPosition = useCallback((textarea: HTMLTextAreaElement) => {
+      setIsCaretAtEnd(
+        textarea.selectionStart === textarea.selectionEnd &&
+          textarea.selectionEnd === textarea.value.length,
+      );
+    }, []);
+
     useEffect(() => {
-      // Resize textarea after session switch restores text
+      // Resize textarea after session switch restores text, and to fit ghost text
       const textarea = textareaRef.current;
       if (!textarea) return;
+      const ghostOverlay = ghostOverlayRef.current;
       textarea.style.height = "auto";
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
-    }, [value]);
+      if (ghostOverlay) ghostOverlay.style.height = "auto";
+      const ghostHeight = ghostText ? (ghostOverlay?.scrollHeight ?? 0) : 0;
+      const contentHeight = Math.max(textarea.scrollHeight, ghostHeight);
+      const nextHeight = `${Math.min(contentHeight, 200)}px`;
+      textarea.style.height = nextHeight;
+      // Sized to the textarea, not the wrapper, which has an inline-block baseline gap
+      if (ghostOverlay) ghostOverlay.style.height = nextHeight;
+    }, [value, ghostText]);
 
     useEffect(() => {
       if (!sessionId) return;
@@ -480,6 +539,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         const newValue = e.target.value;
         setValue(newValue);
         autoResize();
+        syncCaretPosition(e.target);
 
         // Detect @ trigger and track the query after it
         const cursor = e.target.selectionStart ?? newValue.length;
@@ -529,11 +589,67 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         setCommandQuery(null);
         setPlanArgQuery(null);
       },
-      [autoResize],
+      [autoResize, syncCaretPosition],
+    );
+
+    const acceptSuggestionText = useCallback(
+      (acceptedText: string) => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        textarea.focus();
+        textarea.setSelectionRange(value.length, value.length);
+        // insertText goes through the browser's edit history, so ⌘Z undoes it
+        const isInsertedNatively =
+          typeof document.execCommand === "function" &&
+          document.execCommand("insertText", false, acceptedText);
+        if (!isInsertedNatively) {
+          const nextValue = value + acceptedText;
+          setValue(nextValue);
+          requestAnimationFrame(() => {
+            textareaRef.current?.setSelectionRange(
+              nextValue.length,
+              nextValue.length,
+            );
+          });
+        }
+        setIsCaretAtEnd(true);
+        setSuggestionAcceptCount((previousCount) => {
+          const nextCount = previousCount + 1;
+          try {
+            localStorage.setItem(
+              SUGGESTION_ACCEPT_COUNT_STORAGE_KEY,
+              String(nextCount),
+            );
+          } catch {}
+          return nextCount;
+        });
+      },
+      [value],
     );
 
     const handleKeyDown = useCallback(
       (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        const textarea = event.currentTarget;
+        const isCursorAtEnd =
+          textarea.selectionStart === value.length &&
+          textarea.selectionEnd === value.length;
+        if (ghostText && isCursorAtEnd && !event.nativeEvent.isComposing) {
+          const hasNonAltModifier =
+            event.metaKey || event.ctrlKey || event.shiftKey;
+          // → accepts all, ⌥→ one word. Tab stays bound to agent cycling.
+          if (event.key === "ArrowRight" && !hasNonAltModifier) {
+            event.preventDefault();
+            acceptSuggestionText(
+              event.altKey ? getNextWordChunk(ghostText) : ghostText,
+            );
+            return;
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            dismissSuggestion();
+            return;
+          }
+        }
         if (
           event.key === "Escape" &&
           (pickerQuery !== null ||
@@ -592,6 +708,10 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       },
       [
         handleSubmit,
+        value,
+        ghostText,
+        acceptSuggestionText,
+        dismissSuggestion,
         pickerQuery,
         commandQuery,
         planArgQuery,
@@ -1007,19 +1127,66 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
             </div>
           )}
 
-          {/* Textarea */}
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            onFocus={handleFocus}
-            onPaste={handlePaste}
-            placeholder="Send a message... (@ for files, ## for PRs)"
-            disabled={disabled}
-            rows={1}
-            className="placeholder:text-muted-foreground max-h-[200px] w-full resize-none bg-transparent px-3 py-2 text-base focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-          />
+          {shouldShowSuggestionChips && (
+            <ChatSuggestionChips
+              replies={replySuggestions}
+              onSelect={acceptSuggestionText}
+            />
+          )}
+
+          {/* Textarea with suggestion ghost text rendered behind it */}
+          <div className="relative">
+            {ghostText && (
+              <div
+                ref={ghostOverlayRef}
+                aria-hidden="true"
+                data-testid="chat-suggestion-ghost"
+                className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden px-3 py-2 text-base break-words whitespace-pre-wrap md:text-sm"
+              >
+                <span className="invisible">{value}</span>
+                {/* Keyed by the full suggestion so only a new suggestion fades in */}
+                <span
+                  key={value + ghostText}
+                  className="text-muted-foreground/60 animate-in fade-in duration-150"
+                >
+                  {ghostText}
+                  {shouldShowAcceptHint && (
+                    <kbd
+                      data-testid="chat-suggestion-hint"
+                      className="border-muted-foreground/30 ml-1.5 rounded border px-1 font-sans text-[10px]"
+                    >
+                      →
+                    </kbd>
+                  )}
+                </span>
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onFocus={handleFocus}
+              onPaste={handlePaste}
+              onSelect={(event) => syncCaretPosition(event.currentTarget)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => setIsComposing(false)}
+              onScroll={(event) => {
+                if (ghostOverlayRef.current) {
+                  ghostOverlayRef.current.scrollTop =
+                    event.currentTarget.scrollTop;
+                }
+              }}
+              placeholder={
+                ghostText && !value
+                  ? ""
+                  : "Send a message... (@ for files, ## for PRs)"
+              }
+              disabled={disabled}
+              rows={1}
+              className="placeholder:text-muted-foreground relative max-h-[200px] w-full resize-none bg-transparent px-3 py-2 text-base focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+            />
+          </div>
 
           {/* Footer bar */}
           <div className="flex items-center gap-1 border-t px-2 py-1.5">

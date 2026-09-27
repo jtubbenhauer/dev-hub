@@ -4,10 +4,7 @@ export type OmoRpcListener = (record: JsonlRecord) => void;
 
 export class OmoRpcListeners {
   private readonly genericListeners = new Set<OmoRpcListener>();
-  private readonly sessionListeners = new Map<
-    string,
-    Set<OmoRpcListener>
-  >();
+  private readonly sessionListeners = new Map<string, Set<OmoRpcListener>>();
 
   add(listener: OmoRpcListener): () => void {
     this.genericListeners.add(listener);
@@ -34,10 +31,15 @@ export class OmoRpcListeners {
   }
 
   dispatch(record: JsonlRecord, sessionId?: string): void {
-    for (const listener of this.genericListeners) listener(record);
+    this.dispatchTo(this.genericListeners, record);
     if (sessionId === undefined) return;
-    for (const listener of this.sessionListeners.get(sessionId) ?? []) {
-      listener(record);
+    this.dispatchTo(this.sessionListeners.get(sessionId) ?? new Set(), record);
+  }
+
+  dispatchAll(record: JsonlRecord): void {
+    this.dispatchTo(this.genericListeners, record);
+    for (const listeners of this.sessionListeners.values()) {
+      this.dispatchTo(listeners, record);
     }
   }
 
@@ -47,5 +49,23 @@ export class OmoRpcListeners {
       count += listeners.size;
     }
     return count;
+  }
+
+  clear(): void {
+    this.genericListeners.clear();
+    this.sessionListeners.clear();
+  }
+
+  private dispatchTo(
+    listeners: ReadonlySet<OmoRpcListener>,
+    record: JsonlRecord,
+  ): void {
+    for (const listener of listeners) {
+      try {
+        listener(record);
+      } catch {
+        continue;
+      }
+    }
   }
 }

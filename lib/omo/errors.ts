@@ -78,3 +78,11 @@ export class OmoEngineRefusedError extends Error {
     );
   }
 }
+
+export class OmoTransportGoneError extends Error {
+  readonly name = "OmoTransportGoneError";
+
+  constructor() {
+    super("The OmO RPC transport disconnected");
+  }
+}

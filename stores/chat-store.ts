@@ -3182,6 +3182,83 @@ export const useChatStore = create<ChatState>()(
             break;
           }
 
+          case "message.rekeyed": {
+            const sessionID = properties.sessionID as string;
+            const fromMessageID = properties.fromMessageID as string;
+            const toMessageID = properties.toMessageID as string;
+            const info = properties.info as Message;
+            const parts = properties.parts as Part[];
+            set((state) => {
+              pendingMessageUpdates.get(sessionID)?.delete(fromMessageID);
+              pendingPartUpdates.get(sessionID)?.delete(fromMessageID);
+              pendingPartDeltas.clearMessage(sessionID, fromMessageID);
+
+              const wsId =
+                findWorkspaceForSession(state.workspaceStates, sessionID) ??
+                sourceWorkspaceId;
+              const ws =
+                state.workspaceStates[wsId] ?? emptyWorkspaceState();
+              const optimisticId =
+                info.role === "user"
+                  ? ws.optimisticMessageIds[sessionID]
+                  : undefined;
+              const carriedFileParts = optimisticId
+                ? (
+                    (ws.messages[sessionID] ?? []).find(
+                      (message) => message.info.id === optimisticId,
+                    )?.parts ?? []
+                  )
+                    .filter((part) =>
+                      part.id.startsWith(LOCAL_FILE_PART_PREFIX),
+                    )
+                    .map((part) => ({ ...part, messageID: info.id }) as Part)
+                : [];
+              const retainedMessages: MessageWithParts[] = [];
+              let insertionIndex = -1;
+              for (const message of ws.messages[sessionID] ?? []) {
+                if (
+                  message.info.id === fromMessageID ||
+                  message.info.id === toMessageID
+                ) {
+                  if (insertionIndex < 0) {
+                    insertionIndex = retainedMessages.length;
+                  }
+                  continue;
+                }
+                if (optimisticId && message.info.id === optimisticId) continue;
+                retainedMessages.push(message);
+              }
+              const nextMessages = [...retainedMessages];
+              nextMessages.splice(
+                insertionIndex < 0 ? nextMessages.length : insertionIndex,
+                0,
+                { info, parts: [...parts, ...carriedFileParts] },
+              );
+              const optimisticMessageIds = optimisticId
+                ? Object.fromEntries(
+                    Object.entries(ws.optimisticMessageIds).filter(
+                      ([key]) => key !== sessionID,
+                    ),
+                  )
+                : ws.optimisticMessageIds;
+
+              return {
+                workspaceStates: {
+                  ...state.workspaceStates,
+                  [wsId]: {
+                    ...ws,
+                    optimisticMessageIds,
+                    messages: {
+                      ...ws.messages,
+                      [sessionID]: nextMessages,
+                    },
+                  },
+                },
+              };
+            });
+            break;
+          }
+
           case "message.removed": {
             const sessionID = properties.sessionID as string;
             const messageID = properties.messageID as string;

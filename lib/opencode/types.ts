@@ -6,7 +6,7 @@ import type {
   ToolPart,
   ReasoningPart,
   StepFinishPart,
-  Event,
+  Event as SdkEvent,
   Provider,
   Model,
   SessionStatus,
@@ -31,13 +31,36 @@ export type {
   ToolPart,
   ReasoningPart,
   StepFinishPart,
-  Event,
   Provider,
   Model,
   SessionStatus,
   Todo,
   Agent,
 };
+
+export interface MessageRekeyedEvent {
+  readonly type: "message.rekeyed";
+  readonly properties: {
+    readonly sessionID: string;
+    readonly fromMessageID: string;
+    readonly toMessageID: string;
+    readonly info: Message;
+    readonly parts: Part[];
+  };
+}
+
+export interface MessagePartDeltaEvent {
+  readonly type: "message.part.delta";
+  readonly properties: {
+    readonly sessionID: string;
+    readonly messageID: string;
+    readonly partID: string;
+    readonly field: string;
+    readonly delta: string;
+  };
+}
+
+export type Event = SdkEvent | MessagePartDeltaEvent | MessageRekeyedEvent;
 export type {
   Command,
   PermissionRequest,

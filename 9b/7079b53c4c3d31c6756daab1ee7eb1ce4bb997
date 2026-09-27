@@ -1,0 +1,25 @@
+packages/agent/src/omo/daemon.ts
+  s_2f3e69fa0f4dc0::t_a2db489beca1e4 1-203
+packages/agent/src/omo/sessions.ts
+  s_2f3e69fa0f4dc0::t_4e16f35914b195 1-320
+packages/agent/tests/omo/daemon.test.ts
+  s_2f3e69fa0f4dc0::t_e067a3ae996e91 1-139
+packages/agent/tests/routes/omo-sessions.test.ts
+  s_2f3e69fa0f4dc0::t_668065f0bcf314 1-233
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9b7079b53c4c3d31c6756daab1ee7eb1ce4bb997",
+  "prompts": {},
+  "sessions": {
+    "s_2f3e69fa0f4dc0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1b33c9dcffeRPKX4FN8d5HzWN",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

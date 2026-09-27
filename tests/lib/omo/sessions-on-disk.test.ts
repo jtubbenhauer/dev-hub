@@ -61,7 +61,7 @@ function userMessageEntry(id: string, parentId: string | null, text: string) {
     type: "message",
     id,
     parentId,
-    timestamp: "2024-12-03T14:00:01.000Z",
+    timestamp: 1733234401000,
     message: { role: "user", content: text, timestamp: 1733234401000 },
   };
 }
@@ -71,7 +71,7 @@ function sessionInfoEntry(id: string, parentId: string | null, name: string) {
     type: "session_info",
     id,
     parentId,
-    timestamp: "2024-12-03T14:00:02.000Z",
+    timestamp: 1733234402000,
     name,
   };
 }

@@ -2,34 +2,103 @@ import { createReadStream, type Dirent } from "node:fs";
 import { open, readdir, realpath, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import type {
-  OmoSessionHeader,
-  OmoSessionOnDiskSummary,
-  SessionEntry,
-  SessionInfoEntry,
-  SessionMessageEntry,
-} from "@/lib/omo/session-file-types";
-
-export type {
-  AgentMessageLike,
-  OmoSessionHeader,
-  OmoSessionOnDiskSummary,
-  SessionBranchSummaryEntry,
-  SessionCompactionEntry,
-  SessionCustomEntry,
-  SessionCustomMessageEntry,
-  SessionEntry,
-  SessionInfoEntry,
-  SessionLabelEntry,
-  SessionMessageEntry,
-  SessionModelChangeEntry,
-  SessionThinkingLevelChangeEntry,
-} from "@/lib/omo/session-file-types";
 
 const HEADER_SCAN_CAP_BYTES = 1_048_576;
 const ENTRIES_TOTAL_CAP_BYTES = 67_108_864;
 const TITLE_MAX_CHARS = 80;
 const EPOCH_SECONDS_HEURISTIC_THRESHOLD = 1e12;
+
+export interface OmoSessionHeader {
+  readonly type: "session";
+  readonly version: number;
+  readonly id: string;
+  readonly timestamp: string;
+  readonly cwd: string;
+  readonly parentSession?: string;
+}
+
+export interface AgentMessageLike {
+  readonly role: string;
+  readonly content: unknown;
+  readonly timestamp?: number;
+}
+
+interface SessionEntryBase {
+  readonly id: string;
+  readonly parentId: string | null;
+  readonly timestamp: number;
+}
+
+export interface SessionMessageEntry extends SessionEntryBase {
+  readonly type: "message";
+  readonly message: AgentMessageLike;
+}
+
+export interface SessionModelChangeEntry extends SessionEntryBase {
+  readonly type: "model_change";
+  readonly provider: string;
+  readonly modelId: string;
+}
+
+export interface SessionThinkingLevelChangeEntry extends SessionEntryBase {
+  readonly type: "thinking_level_change";
+  readonly thinkingLevel: string;
+}
+
+export interface SessionCompactionEntry extends SessionEntryBase {
+  readonly type: "compaction";
+  readonly summary: string;
+  readonly firstKeptEntryId: string;
+  readonly tokensBefore: number;
+  readonly usage?: unknown;
+  readonly details?: unknown;
+  readonly fromHook?: boolean;
+}
+
+export interface SessionBranchSummaryEntry extends SessionEntryBase {
+  readonly type: "branch_summary";
+  readonly fromId: string | null;
+  readonly summary: string;
+  readonly usage?: unknown;
+  readonly details?: unknown;
+  readonly fromHook?: boolean;
+}
+
+export interface SessionCustomEntry extends SessionEntryBase {
+  readonly type: "custom";
+  readonly customType: string;
+  readonly data?: unknown;
+}
+
+export interface SessionCustomMessageEntry extends SessionEntryBase {
+  readonly type: "custom_message";
+  readonly customType: string;
+  readonly content: unknown;
+  readonly display: boolean;
+  readonly details?: unknown;
+}
+
+export interface SessionLabelEntry extends SessionEntryBase {
+  readonly type: "label";
+  readonly targetId: string;
+  readonly label?: string;
+}
+
+export interface SessionInfoEntry extends SessionEntryBase {
+  readonly type: "session_info";
+  readonly name: string;
+}
+
+export type SessionEntry =
+  | SessionMessageEntry
+  | SessionModelChangeEntry
+  | SessionThinkingLevelChangeEntry
+  | SessionCompactionEntry
+  | SessionBranchSummaryEntry
+  | SessionCustomEntry
+  | SessionCustomMessageEntry
+  | SessionLabelEntry
+  | SessionInfoEntry;
 
 const KNOWN_ENTRY_TYPES = new Set<string>([
   "message",
@@ -42,6 +111,15 @@ const KNOWN_ENTRY_TYPES = new Set<string>([
   "label",
   "session_info",
 ]);
+
+export interface OmoSessionOnDiskSummary {
+  readonly durableId: string;
+  readonly sessionPath: string;
+  readonly forkedFrom: string | null;
+  readonly title: string;
+  readonly createdMs: number;
+  readonly updatedMs: number;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

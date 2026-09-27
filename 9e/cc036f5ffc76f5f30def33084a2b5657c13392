@@ -1,0 +1,33 @@
+lib/omo/agent-dir.ts
+  s_a26ff178f37e76::t_8623d8436705bb 1-14
+lib/omo/binary.ts
+  s_3435e264a929e6::t_3e76b6c68cf2c3 1-50
+lib/omo/errors.ts
+  s_a26ff178f37e76::t_702a4787f5cf49 1-19
+tests/lib/omo/binary.test.ts
+  s_3435e264a929e6::t_392d4500704b80 1-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9ecc036f5ffc76f5f30def33084a2b5657c13392",
+  "prompts": {},
+  "sessions": {
+    "s_3435e264a929e6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1b30353fffeB3JWRK3TYeqauq",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a26ff178f37e76": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f34617d4affea9EtlbGJ2diXNP",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+drizzle/migrations/0016_conscious_dakota_north.sql
+  s_3fcc6bfe0d2762::t_4bfacbb5b13ca2 1-25
+drizzle/migrations/meta/0016_snapshot.json
+  s_3fcc6bfe0d2762::t_09c3d9159c6b42 1-1339
+drizzle/migrations/meta/_journal.json
+  s_3fcc6bfe0d2762::t_c15f6b03f98358 116-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c346d5d446520a258afce2ec31c3da1ff9af05f0",
+  "prompts": {},
+  "sessions": {
+    "s_3fcc6bfe0d2762": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1b2f661effe7caxs0ws2V4Ico",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

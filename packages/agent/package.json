@@ -6,17 +6,22 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node --import tsx src/index.ts",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@devhub/shared": "workspace:*",
     "@hono/node-server": "^1.14.3",
+    "@hono/node-ws": "^1.2.0",
     "hono": "^4.7.11",
     "simple-git": "^3.32.3"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.0",
+    "ws": "^8.19.0"
   }
 }

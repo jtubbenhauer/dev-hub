@@ -1,0 +1,31 @@
+lib/omo/adapter/entries-to-messages.ts
+  s_44c2a40dcf7088::t_1931d705ca736d 1-100
+lib/omo/adapter/entry-content.ts
+  s_44c2a40dcf7088::t_87fb9aab07b53e 1-222
+lib/omo/adapter/entry-message-builders.ts
+  s_44c2a40dcf7088::t_c9fe41b7d30da7 1-211
+lib/omo/adapter/entry-message-fields.ts
+  s_44c2a40dcf7088::t_2a632b2c605a04 1-71
+lib/omo/adapter/shapes.ts
+  s_44c2a40dcf7088::t_ff3d6c28c0d3b7 1-223
+tests/lib/omo/adapter/entries-to-messages.test.ts
+  s_44c2a40dcf7088::t_4059fd83836b3b 1-189
+tests/lib/omo/adapter/shapes.test.ts
+  s_44c2a40dcf7088::t_cf95e202993c1c 1-248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d41a6ac3627d742d5ef07645fd03fc8f127759ec",
+  "prompts": {},
+  "sessions": {
+    "s_44c2a40dcf7088": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3282de71ffeBoESmAAfqSTM65",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

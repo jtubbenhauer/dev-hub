@@ -1,0 +1,23 @@
+lib/omo/daemon.ts
+  s_44c2a40dcf7088::t_ae36f17c2ba2d0 1-204
+lib/omo/errors.ts
+  s_44c2a40dcf7088::t_efbeda4a6f23e5 20-80
+tests/lib/omo/daemon.test.ts
+  s_44c2a40dcf7088::t_e88297677b1f2d 1-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3d4ebb90ba130c83f6cfa617c745e2022c407c2e",
+  "prompts": {},
+  "sessions": {
+    "s_44c2a40dcf7088": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3282de71ffeBoESmAAfqSTM65",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

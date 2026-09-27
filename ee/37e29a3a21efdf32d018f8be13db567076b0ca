@@ -1,0 +1,16 @@
+lib/omo/sessions-on-disk.ts
+  h_c7f8735263030f 1-330
+tests/lib/omo/sessions-on-disk.test.ts
+  h_c7f8735263030f 1-400
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ee37e29a3a21efdf32d018f8be13db567076b0ca",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

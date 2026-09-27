@@ -1,0 +1,19 @@
+lib/omo/jsonl.ts
+  s_a26ff178f37e76::t_e5babc8257b175 1-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6ee030e2322f5bd39280793a241b03f0feb4dbf1",
+  "prompts": {},
+  "sessions": {
+    "s_a26ff178f37e76": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f34617d4affea9EtlbGJ2diXNP",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

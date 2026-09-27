@@ -4,8 +4,11 @@ import {
   integer,
   primaryKey,
   index,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+
+export type OmoSessionKind = "interactive" | "worker";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -53,6 +56,7 @@ export const workspaces = sqliteTable(
     shellCommand: text("shell_command"),
     sshTarget: text("ssh_target"),
     sshPath: text("ssh_path"),
+    engine: text("engine"),
     worktreeSymlinks: text("worktree_symlinks", { mode: "json" }).$type<
       string[]
     >(),
@@ -67,6 +71,44 @@ export const workspaces = sqliteTable(
       .default(sql`(unixepoch())`),
   },
   (table) => [index("workspaces_user_id_idx").on(table.userId)],
+);
+
+export const omoSessionIndex = sqliteTable(
+  "omo_session_index",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    durableId: text("durable_id").notNull(),
+    sessionPath: text("session_path"),
+    parentDurableId: text("parent_durable_id"),
+    kind: text("kind").$type<OmoSessionKind>().notNull(),
+    agent: text("agent"),
+    category: text("category"),
+    context: text("context"),
+    contextAuthoritative: integer("context_authoritative")
+      .notNull()
+      .default(0),
+    replacedByDurableId: text("replaced_by_durable_id"),
+    title: text("title").notNull(),
+    createdMs: integer("created_ms").notNull(),
+    updatedMs: integer("updated_ms").notNull(),
+    leafKnown: integer("leaf_known").notNull().default(0),
+    leafEntryId: text("leaf_entry_id"),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.durableId] }),
+    index("omo_session_index_workspace_idx").on(table.workspaceId),
+    index("omo_session_index_parent_idx").on(
+      table.workspaceId,
+      table.parentDurableId,
+    ),
+    uniqueIndex("omo_session_index_path_uq").on(
+      table.workspaceId,
+      table.sessionPath,
+    ),
+  ],
 );
 
 export const commandHistory = sqliteTable(

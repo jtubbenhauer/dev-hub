@@ -9,6 +9,8 @@ import path from "node:path";
 import type { WorkspaceBackendType } from "@/types";
 import { getAutoColorForNewWorkspace } from "@/lib/workspace-colors";
 import { backfillSshTargets } from "@/lib/workspaces/ssh-target";
+import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
+import { isChatEngine } from "@/lib/engine/types";
 
 function detectPackageManager(
   dirPath: string,
@@ -169,6 +171,16 @@ async function createRemoteWorkspace(
 ) {
   const agentUrl = body.agentUrl;
   const opencodeUrl = body.opencodeUrl;
+  const normalizedOpencodeUrl =
+    typeof opencodeUrl === "string" ? opencodeUrl : null;
+  const requestedEngine =
+    body.engine === undefined
+      ? null
+      : isChatEngine(body.engine)
+        ? body.engine
+        : "opencode";
+  const resolvedEngine =
+    requestedEngine ?? (await resolveWorkspaceEngine(userId, null));
 
   if (!agentUrl || typeof agentUrl !== "string") {
     return NextResponse.json(
@@ -177,7 +189,10 @@ async function createRemoteWorkspace(
     );
   }
 
-  if (!opencodeUrl || typeof opencodeUrl !== "string") {
+  if (
+    resolvedEngine === "opencode" &&
+    normalizedOpencodeUrl === null
+  ) {
     return NextResponse.json(
       { error: "opencodeUrl is required for remote workspaces" },
       { status: 400 },
@@ -220,8 +235,9 @@ async function createRemoteWorkspace(
     packageManager: null,
     quickCommands: null,
     backend: "remote" as const,
+    engine: requestedEngine,
     provider,
-    opencodeUrl,
+    opencodeUrl: normalizedOpencodeUrl,
     agentUrl,
     providerMeta,
     shellCommand,

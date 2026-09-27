@@ -15,6 +15,10 @@ import {
 import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds";
 import { CHAT_SUGGESTIONS_ENABLED_SETTING_KEY } from "@/lib/chat-suggest/constants";
 import {
+  CHAT_ENGINE_SETTING_KEY,
+  type ChatEngine,
+} from "@/lib/engine/types";
+import {
   DEFAULT_EDITOR_FLAVOR,
   EDITOR_FLAVOR_OPTIONS,
   type EditorFlavor,
@@ -65,6 +69,7 @@ export const SETTINGS_KEYS = {
   DISABLE_FILE_TABS: "disable-file-tabs",
   CHAT_FILE_OPEN_MODE: "chat-file-open-mode",
   CHAT_SIDEBAR_TABS_OPEN_MODE: "chat-sidebar-tabs-open-mode",
+  CHAT_ENGINE: CHAT_ENGINE_SETTING_KEY,
   NOTIFICATIONS_SOUND_ENABLED: "notifications-sound-enabled",
   NOTIFICATIONS_PUSH_ENABLED: "notifications-push-enabled",
   CHAT_SUGGESTIONS_ENABLED: CHAT_SUGGESTIONS_ENABLED_SETTING_KEY,
@@ -73,6 +78,7 @@ export const SETTINGS_KEYS = {
 export type EditorType = "monaco" | "neovim";
 export const EDITOR_TYPE_OPTIONS: EditorType[] = ["monaco", "neovim"];
 export const DEFAULT_EDITOR_TYPE: EditorType = "monaco";
+export const DEFAULT_CHAT_ENGINE: ChatEngine = "opencode";
 
 export const CHAT_FILE_OPEN_MODES = ["sidebar", "dialog"] as const;
 export type ChatFileOpenMode = (typeof CHAT_FILE_OPEN_MODES)[number];

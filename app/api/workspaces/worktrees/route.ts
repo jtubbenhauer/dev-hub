@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
       agentUrl: parentWorkspace.agentUrl,
       opencodeUrl: parentWorkspace.opencodeUrl,
       provider: parentWorkspace.provider,
+      engine: parentRow.engine,
       linkedTaskId: resolvedTaskId,
       linkedTaskMeta: resolvedTaskMeta,
       color: autoColor,
@@ -218,6 +219,7 @@ export async function POST(request: NextRequest) {
     agentUrl: null,
     providerMeta: null,
     shellCommand: null,
+    engine: null,
     color: null,
     sshTarget: null,
     sshPath: null,
@@ -253,11 +255,15 @@ export async function POST(request: NextRequest) {
 
     // Resolve symlink paths: use explicitly provided list, or look up parent's saved config
     let resolvedSymlinksLegacy: string[] = [];
+    let inheritedEngine: string | null = null;
     if (Array.isArray(symlinkPaths)) {
       resolvedSymlinksLegacy = symlinkPaths;
     } else {
       const [parentRow] = await db
-        .select({ worktreeSymlinks: workspaces.worktreeSymlinks })
+        .select({
+          worktreeSymlinks: workspaces.worktreeSymlinks,
+          engine: workspaces.engine,
+        })
         .from(workspaces)
         .where(eq(workspaces.path, resolvedParent));
       if (
@@ -266,6 +272,7 @@ export async function POST(request: NextRequest) {
       ) {
         resolvedSymlinksLegacy = parentRow.worktreeSymlinks;
       }
+      inheritedEngine = parentRow?.engine ?? null;
     }
 
     let symlinkResultLegacy:
@@ -305,6 +312,7 @@ export async function POST(request: NextRequest) {
       packageManager,
       quickCommands: null,
       backend: "local" as const,
+      engine: inheritedEngine,
       linkedTaskId: legacyTaskId,
       linkedTaskMeta: legacyTaskMeta,
       color: autoColor,

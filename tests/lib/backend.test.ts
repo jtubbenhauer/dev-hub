@@ -25,6 +25,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     shellCommand: null,
     sshTarget: null,
     sshPath: null,
+    engine: null,
     worktreeSymlinks: null,
     linkedTaskId: null,
     linkedTaskMeta: null,

@@ -39,7 +39,7 @@ export function ChatSuggestionSettingsCard() {
       <CardHeader>
         <CardTitle>Chat Suggestions</CardTitle>
         <CardDescription>
-          Suggest replies to the agent as you type. Press → to accept, ⌥→ to
+          Suggest replies to the agent as you type. Press Tab to accept, ⌥Tab to
           accept one word, Esc to dismiss.
         </CardDescription>
       </CardHeader>

@@ -71,8 +71,12 @@ export function useSessionNavigation({
   );
 
   useEffect(() => {
-    const handleTabCycle = (e: KeyboardEvent) => {
-      if (e.key !== "Tab") return;
+    // Ctrl+. next agent, Ctrl+Shift+. previous. Uses e.code because Shift
+    // turns "." into ">" on most layouts.
+    const handleAgentCycle = (e: KeyboardEvent) => {
+      const isAgentCycleKey =
+        e.code === "Period" && e.ctrlKey && !e.metaKey && !e.altKey;
+      if (!isAgentCycleKey) return;
       const agents = primaryAgentsRef.current;
       if (agents.length < 2) return;
 
@@ -99,8 +103,8 @@ export function useSessionNavigation({
       }
     };
 
-    window.addEventListener("keydown", handleTabCycle);
-    return () => window.removeEventListener("keydown", handleTabCycle);
+    window.addEventListener("keydown", handleAgentCycle);
+    return () => window.removeEventListener("keydown", handleAgentCycle);
   }, [clearSessionModel]);
 
   return { handleModelChange };

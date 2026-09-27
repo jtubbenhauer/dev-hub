@@ -186,12 +186,47 @@ describe("PromptInput chat suggestions", () => {
     expect(screen.queryByTestId("chat-suggestion-ghost")).toBeNull();
   });
 
-  it("leaves Tab alone so it can keep cycling agents", async () => {
+  it("accepts the whole suggestion with Tab", async () => {
     const { user, textarea } = await renderWithReplies("agent-tab");
     await user.type(textarea, "Ok");
     await screen.findByTestId("chat-suggestion-ghost");
+
+    await user.keyboard("{Tab}");
+    expect(textarea).toHaveValue(TOP_REPLY);
+    expect(textarea).toHaveFocus();
+  });
+
+  it("accepts one word with Alt+Tab", async () => {
+    const { user, textarea } = await renderWithReplies("agent-alt-tab");
+    await user.type(textarea, "ok");
+    await screen.findByTestId("chat-suggestion-ghost");
+
+    await user.keyboard("{Alt>}{Tab}{/Alt}");
+    expect(textarea).toHaveValue("ok great. ");
+    expect(textarea).toHaveFocus();
+  });
+
+  it("keeps focus in the input on Tab when no suggestion is shown", async () => {
+    const { user, textarea } = await renderWithReplies("agent-tab-none");
+    await user.type(textarea, "zzq");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByTestId("chat-suggestion-ghost")).toBeNull();
+
     const isTabDefaultAllowed = fireEvent.keyDown(textarea, { key: "Tab" });
-    expect(isTabDefaultAllowed).toBe(true);
+    expect(isTabDefaultAllowed).toBe(false);
+    expect(textarea).toHaveValue("zzq");
+  });
+
+  it("still lets Shift+Tab move focus out of the input", async () => {
+    const { user, textarea } = await renderWithReplies("agent-shift-tab");
+    await user.type(textarea, "Ok");
+    await screen.findByTestId("chat-suggestion-ghost");
+
+    const isShiftTabDefaultAllowed = fireEvent.keyDown(textarea, {
+      key: "Tab",
+      shiftKey: true,
+    });
+    expect(isShiftTabDefaultAllowed).toBe(true);
     expect(textarea).toHaveValue("Ok");
   });
 
@@ -245,20 +280,16 @@ describe("PromptInput chat suggestions", () => {
     expect(screen.getByTestId("chat-suggestion-ghost")).toBeInTheDocument();
   });
 
-  it("shows the → hint until three suggestions have been accepted", async () => {
-    localStorage.setItem("dev-hub-chat-suggestion-accepts", "2");
+  it("always shows the Tab hint after the suggestion", async () => {
     const { user, textarea } = await renderWithReplies("agent-hint");
-    await user.type(textarea, "Ok");
-    expect(
-      await screen.findByTestId("chat-suggestion-hint"),
-    ).toBeInTheDocument();
-
-    await user.keyboard("{ArrowRight}");
-    expect(localStorage.getItem("dev-hub-chat-suggestion-accepts")).toBe("3");
-    await user.clear(textarea);
-    await user.type(textarea, "Wh");
-    await screen.findByTestId("chat-suggestion-ghost");
-    expect(screen.queryByTestId("chat-suggestion-hint")).toBeNull();
+    for (const prefix of ["Ok", "Wh", "Ok", "Wh"]) {
+      await user.clear(textarea);
+      await user.type(textarea, prefix);
+      expect(
+        await screen.findByTestId("chat-suggestion-hint"),
+      ).toHaveTextContent("Tab");
+      await user.keyboard("{Tab}");
+    }
   });
 
   it("requests a live completion when typing diverges from the replies", async () => {

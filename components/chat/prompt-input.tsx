@@ -114,17 +114,6 @@ function saveDraftsToStorage(drafts: Map<string, SessionDraft>): void {
 
 const sessionDrafts = loadDraftsFromStorage();
 
-const SUGGESTION_ACCEPT_COUNT_STORAGE_KEY = "dev-hub-chat-suggestion-accepts";
-const SUGGESTION_HINT_ACCEPT_LIMIT = 3;
-
-function readSuggestionAcceptCount(): number {
-  if (typeof window === "undefined") return 0;
-  const stored = Number(
-    localStorage.getItem(SUGGESTION_ACCEPT_COUNT_STORAGE_KEY),
-  );
-  return Number.isFinite(stored) ? stored : 0;
-}
-
 interface SelectedModel {
   providerID: string;
   modelID: string;
@@ -261,9 +250,6 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       prPickerQuery !== null;
     const [isCaretAtEnd, setIsCaretAtEnd] = useState(true);
     const [isComposing, setIsComposing] = useState(false);
-    const [suggestionAcceptCount, setSuggestionAcceptCount] = useState(
-      readSuggestionAcceptCount,
-    );
     const {
       ghostText: suggestionGhostText,
       replySuggestions,
@@ -279,8 +265,6 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     const isGhostTextHidden =
       isAnyPickerOpen || hasCoarsePointer || isComposing || !isCaretAtEnd;
     const ghostText = isGhostTextHidden ? null : suggestionGhostText;
-    const shouldShowAcceptHint =
-      suggestionAcceptCount < SUGGESTION_HINT_ACCEPT_LIMIT;
     const shouldShowSuggestionChips =
       hasCoarsePointer && !value && !disabled && replySuggestions.length > 0;
 
@@ -613,16 +597,6 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           });
         }
         setIsCaretAtEnd(true);
-        setSuggestionAcceptCount((previousCount) => {
-          const nextCount = previousCount + 1;
-          try {
-            localStorage.setItem(
-              SUGGESTION_ACCEPT_COUNT_STORAGE_KEY,
-              String(nextCount),
-            );
-          } catch {}
-          return nextCount;
-        });
       },
       [value],
     );
@@ -636,8 +610,9 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         if (ghostText && isCursorAtEnd && !event.nativeEvent.isComposing) {
           const hasNonAltModifier =
             event.metaKey || event.ctrlKey || event.shiftKey;
-          // → accepts all, ⌥→ one word. Tab stays bound to agent cycling.
-          if (event.key === "ArrowRight" && !hasNonAltModifier) {
+          // Tab / → accept all, ⌥Tab / ⌥→ accept one word.
+          const isAcceptKey = event.key === "Tab" || event.key === "ArrowRight";
+          if (isAcceptKey && !hasNonAltModifier) {
             event.preventDefault();
             acceptSuggestionText(
               event.altKey ? getNextWordChunk(ghostText) : ghostText,
@@ -649,6 +624,16 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
             dismissSuggestion();
             return;
           }
+        }
+        // Tab never moves focus out of the chat box; Shift+Tab still does.
+        if (
+          event.key === "Tab" &&
+          !event.shiftKey &&
+          !event.metaKey &&
+          !event.ctrlKey
+        ) {
+          event.preventDefault();
+          return;
         }
         if (
           event.key === "Escape" &&
@@ -1150,14 +1135,12 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
                   className="text-muted-foreground/60 animate-in fade-in duration-150"
                 >
                   {ghostText}
-                  {shouldShowAcceptHint && (
-                    <kbd
-                      data-testid="chat-suggestion-hint"
-                      className="border-muted-foreground/30 ml-1.5 rounded border px-1 font-sans text-[10px]"
-                    >
-                      →
-                    </kbd>
-                  )}
+                  <kbd
+                    data-testid="chat-suggestion-hint"
+                    className="border-muted-foreground/30 ml-1.5 rounded border px-1 font-sans text-[10px]"
+                  >
+                    Tab
+                  </kbd>
                 </span>
               </div>
             )}

@@ -1,0 +1,37 @@
+lib/omo/rpc-client.ts
+  s_44c2a40dcf7088::t_c3a3db7de20418 1-233
+lib/omo/rpc-listeners.ts
+  s_44c2a40dcf7088::t_9d9a301588aaad 1-51
+lib/omo/rpc-protocol.ts
+  s_44c2a40dcf7088::t_10251e7decab28 1-117
+lib/omo/rpc-session-buffer.ts
+  s_44c2a40dcf7088::t_90e0ff4cc67c9a 1-64
+lib/omo/rpc-transport.ts
+  s_44c2a40dcf7088::t_d3ad9691ccc61d 1-37
+tests/lib/omo/rpc-client-buffer-cases.ts
+  s_44c2a40dcf7088::t_7ed51843edf59e 1-132
+tests/lib/omo/rpc-client-fixture.ts
+  s_44c2a40dcf7088::t_299ea51aeff52c 1-65
+tests/lib/omo/rpc-client-handshake-cases.ts
+  s_44c2a40dcf7088::t_167ec7c0526db0 1-104
+tests/lib/omo/rpc-client-response-cases.ts
+  s_44c2a40dcf7088::t_145a88411abecf 1-124
+tests/lib/omo/rpc-client.test.ts
+  s_44c2a40dcf7088::t_3bbd6171e85983 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a9e91e3080cf02735f031b310b6df62fefc1651f",
+  "prompts": {},
+  "sessions": {
+    "s_44c2a40dcf7088": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3282de71ffeBoESmAAfqSTM65",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

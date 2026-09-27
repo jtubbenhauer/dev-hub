@@ -1,0 +1,31 @@
+packages/agent/src/index.ts
+  s_ec088fb374481c::t_e3584257c992b2 2,8,19,29,36,39
+packages/agent/src/omo/jsonl.ts
+  s_ec088fb374481c::t_00519091f9625e 1-73
+pnpm-lock.yaml
+  s_45caf0260c80a5::t_6a06627801f073 222-224,235-237,244-249,1025-1032,2609,3608,6688-6696,6807-6814,6822-6835,6851-6855,8409-8417,8454,9247,9270,9285,9292,9307,10721-10746,12202-12216,12232-12260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fc100f25ab27b2b96b74ccfc27ce1cc9b05670ef",
+  "prompts": {},
+  "sessions": {
+    "s_45caf0260c80a5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1aee96b8ffeQ7Lql5VCDMl9p2",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_ec088fb374481c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1aef0ed7ffe7uDz4r5SauQp4U",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

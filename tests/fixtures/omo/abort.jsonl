@@ -1,0 +1,12 @@
+{"type":"open_session","id":"abort-open-1","cwd":"/TMP","retain_on_disconnect":false,"direction":"client_to_server","timestamp":"2026-09-28T10:06:00.000Z"}
+{"type":"response","id":"abort-open-1","command":"open_session","success":true,"data":{"sessionId":"rpc-abort-1","state":{"sessionId":"durable-abort-1","sessionFile":"/TMP/abort.jsonl","cwd":"/TMP","isStreaming":false,"pendingQuestions":[]}},"direction":"server_to_client","timestamp":"2026-09-28T10:06:00.010Z"}
+{"type":"prompt","id":"abort-prompt-1","sessionId":"rpc-abort-1","message":"Write a long explanation of JSONL framing.","direction":"client_to_server","timestamp":"2026-09-28T10:06:00.020Z"}
+{"type":"response","id":"abort-prompt-1","command":"prompt","success":true,"data":{"disposition":"started"},"sessionId":"rpc-abort-1","direction":"server_to_client","timestamp":"2026-09-28T10:06:00.030Z"}
+{"type":"agent_start","sessionId":"rpc-abort-1","direction":"server_to_client","timestamp":"2026-09-28T10:06:00.040Z"}
+{"type":"message_start","sessionId":"rpc-abort-1","message":{"role":"assistant","content":[],"provider":"openai","model":"gpt-5.6-sol","timestamp":1790589960045},"direction":"server_to_client","timestamp":"2026-09-28T10:06:00.045Z"}
+{"type":"message_update","sessionId":"rpc-abort-1","usage":{"input":20,"output":3,"cacheRead":0,"cacheWrite":0,"totalTokens":23,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"assistantMessageEvent":{"type":"text_delta","contentIndex":0,"delta":"JSONL uses one JSON object"},"direction":"server_to_client","timestamp":"2026-09-28T10:06:00.050Z"}
+{"type":"abort","id":"abort-request-1","sessionId":"rpc-abort-1","direction":"client_to_server","timestamp":"2026-09-28T10:06:00.055Z"}
+{"type":"message_end","sessionId":"rpc-abort-1","message":{"role":"assistant","content":[{"type":"text","text":"JSONL uses one JSON object"}],"provider":"openai","model":"gpt-5.6-sol","stopReason":"aborted","timestamp":1790589960060},"direction":"server_to_client","timestamp":"2026-09-28T10:06:00.060Z"}
+{"type":"agent_end","sessionId":"rpc-abort-1","messages":[],"willRetry":false,"direction":"server_to_client","timestamp":"2026-09-28T10:06:00.065Z"}
+{"type":"agent_settled","sessionId":"rpc-abort-1","direction":"server_to_client","timestamp":"2026-09-28T10:06:00.070Z"}
+{"type":"response","id":"abort-request-1","command":"abort","success":true,"sessionId":"rpc-abort-1","direction":"server_to_client","timestamp":"2026-09-28T10:06:00.075Z"}

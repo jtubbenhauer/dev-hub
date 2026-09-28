@@ -206,9 +206,18 @@ export async function DELETE(request: NextRequest) {
   const url = new URL(request.url);
   const workspaceId = url.searchParams.get("workspaceId");
   const sessionId = url.searchParams.get("sessionId");
-  if (!workspaceId || !sessionId) {
+  if (!workspaceId) {
     return NextResponse.json(
-      { error: "workspaceId and sessionId are required" },
+      { error: "workspaceId is required" },
+      { status: 400 },
+    );
+  }
+  if (sessionId === null) {
+    return purgeWorkspaceCache(session.user.id, workspaceId);
+  }
+  if (!sessionId) {
+    return NextResponse.json(
+      { error: "sessionId must not be empty" },
       { status: 400 },
     );
   }
@@ -259,6 +268,57 @@ export async function DELETE(request: NextRequest) {
           eq(recoveredMessages.userId, userId),
           eq(recoveredMessages.workspaceId, workspaceId),
           eq(recoveredMessages.sessionId, sessionId),
+        ),
+      )
+      .run();
+  });
+
+  return NextResponse.json({ deleted: true });
+}
+
+async function purgeWorkspaceCache(
+  userId: string,
+  workspaceId: string,
+): Promise<NextResponse> {
+  // The purge is DB-only, so an ownership check suffices for either engine and
+  // never starts an OpenCode server.
+  try {
+    await resolveOmoWorkspace(userId, workspaceId);
+  } catch (error) {
+    if (error instanceof OpenCodeTargetError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    throw error;
+  }
+
+  db.transaction((transaction) => {
+    transaction
+      .delete(cachedSessions)
+      .where(
+        and(
+          eq(cachedSessions.userId, userId),
+          eq(cachedSessions.workspaceId, workspaceId),
+        ),
+      )
+      .run();
+    transaction
+      .delete(cachedMessages)
+      .where(
+        and(
+          eq(cachedMessages.userId, userId),
+          eq(cachedMessages.workspaceId, workspaceId),
+        ),
+      )
+      .run();
+    transaction
+      .delete(recoveredMessages)
+      .where(
+        and(
+          eq(recoveredMessages.userId, userId),
+          eq(recoveredMessages.workspaceId, workspaceId),
         ),
       )
       .run();

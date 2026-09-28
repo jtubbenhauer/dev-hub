@@ -11,6 +11,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { exec } from "node:child_process";
 import { removeWorktree, pruneWorktrees } from "@/lib/git/worktrees";
+import { isChatEngine } from "@/lib/engine/types";
 import type { LinkedTaskMeta, WorkspaceProvider } from "@/types";
 
 interface RouteParams {
@@ -65,6 +66,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     color?: string | null;
     linkedTaskId?: string | null;
     linkedTaskMeta?: LinkedTaskMeta | null;
+    engine?: unknown;
   };
   const {
     name,
@@ -79,7 +81,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     color,
     linkedTaskId,
     linkedTaskMeta,
+    engine,
   } = body;
+
+  if (engine !== undefined && engine !== null && !isChatEngine(engine)) {
+    return NextResponse.json(
+      { error: 'engine must be "opencode", "omo", or null' },
+      { status: 400 },
+    );
+  }
 
   const updateData: Record<string, unknown> = {};
   if (name !== undefined) updateData.name = name;
@@ -107,6 +117,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (linkedTaskMeta !== undefined && linkedTaskId !== null) {
     updateData.linkedTaskMeta = linkedTaskMeta;
   }
+  if (engine !== undefined) updateData.engine = engine;
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });

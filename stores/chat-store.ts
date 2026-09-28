@@ -177,6 +177,9 @@ let partFlushHandle: number | null = null;
 // Aborted when SSE reconnects or disconnects to prevent stale responses.
 let sseOnopenAbortController: AbortController | null = null;
 
+// engineRev used by the last connectGlobalSSE; a mismatch forces a new connection.
+let sseLastConnectedEngineRev = 0;
+
 // Dedup in-flight fetchSessions calls to prevent duplicate API requests
 const _fetchSessionsInFlight = new Set<string>();
 
@@ -851,8 +854,16 @@ interface ChatState {
   sseReconnectAttempts: number;
   sseReconnectTimer: ReturnType<typeof setTimeout> | null;
   sseWorkspaceIds: string[];
-  connectGlobalSSE: (workspaceIds: string[]) => void;
+  // Bumped by resetWorkspace (engine switch); older connections are stale.
+  engineRev: number;
+  // Bumped on every connect or close; stale reconnect timers never fire.
+  sseGeneration: number;
+  connectGlobalSSE: (
+    workspaceIds: string[],
+    options?: { force?: boolean },
+  ) => void;
   disconnectGlobalSSE: () => void;
+  resetWorkspace: (workspaceId: string) => void;
   refreshActiveSessionStatus: (workspaceId: string) => Promise<void>;
   handleVisibilityRestored: () => void;
 
@@ -1294,6 +1305,8 @@ export const useChatStore = create<ChatState>()(
       sseReconnectAttempts: 0,
       sseReconnectTimer: null,
       sseWorkspaceIds: [],
+      engineRev: 0,
+      sseGeneration: 0,
 
       setActiveSession: (sessionId) => {
         set({ activeSessionId: sessionId });
@@ -2864,12 +2877,16 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      connectGlobalSSE: (workspaceIds) => {
+      connectGlobalSSE: (workspaceIds, options) => {
         const existing = get().globalEventSource;
         const currentIds = get().sseWorkspaceIds;
+        const connectedRev = get().engineRev;
+        const isForced =
+          options?.force === true || connectedRev !== sseLastConnectedEngineRev;
 
         // Skip reconnection if already connected with the same workspace IDs
         if (
+          !isForced &&
           existing &&
           existing.readyState !== EventSource.CLOSED &&
           workspaceIds.length === currentIds.length &&
@@ -2880,7 +2897,11 @@ export const useChatStore = create<ChatState>()(
 
         if (workspaceIds.length === 0) {
           if (existing) existing.close();
-          set({ globalEventSource: null, sseWorkspaceIds: [] });
+          set({
+            globalEventSource: null,
+            sseWorkspaceIds: [],
+            sseGeneration: get().sseGeneration + 1,
+          });
           return;
         }
 
@@ -2892,10 +2913,24 @@ export const useChatStore = create<ChatState>()(
 
         // Overlap: both EventSources run concurrently (~100-500ms) until new one opens.
         // Safe because handleEvent is idempotent — duplicate events are harmless.
-        const oldEventSource = existing;
+        // A forced connect (engine switch) closes the old source immediately
+        // instead, so no event from the previous engine can reach the store.
+        if (isForced) {
+          if (existing) existing.close();
+          if (sseOnopenAbortController) {
+            sseOnopenAbortController.abort();
+            sseOnopenAbortController = null;
+          }
+        }
+        const oldEventSource = isForced ? null : existing;
 
-        const url = `/api/opencode/events?workspaceIds=${workspaceIds.join(",")}`;
+        const connectGeneration = get().sseGeneration + 1;
+        sseLastConnectedEngineRev = connectedRev;
+        const url = `/api/opencode/events?workspaceIds=${workspaceIds.join(",")}&engineRev=${connectedRev}`;
         const newEventSource = new EventSource(url);
+        const isCurrentSource = () =>
+          get().engineRev === connectedRev &&
+          get().globalEventSource === newEventSource;
 
         const safetyTimeout = oldEventSource
           ? setTimeout(() => {
@@ -2916,6 +2951,7 @@ export const useChatStore = create<ChatState>()(
             oldEventSource.close();
           }
           if (safetyTimeout) clearTimeout(safetyTimeout);
+          if (!isCurrentSource()) return;
 
           console.log(
             `[chat] Global SSE connected for ${workspaceIds.length} workspace(s)`,
@@ -2955,6 +2991,8 @@ export const useChatStore = create<ChatState>()(
         };
 
         newEventSource.onmessage = (evt) => {
+          // Rev only: an overlapping same-rev source must keep delivering.
+          if (get().engineRev !== connectedRev) return;
           try {
             const { workspaceId, event } = JSON.parse(evt.data) as {
               workspaceId: string;
@@ -2975,6 +3013,7 @@ export const useChatStore = create<ChatState>()(
             oldEventSource.close();
           }
           if (safetyTimeout) clearTimeout(safetyTimeout);
+          if (!isCurrentSource()) return;
 
           const attempts = get().sseReconnectAttempts;
           const backoffMs = Math.min(1000 * 2 ** Math.min(attempts, 5), 30000);
@@ -2984,9 +3023,14 @@ export const useChatStore = create<ChatState>()(
             globalEventSource: null,
           });
 
+          // globalEventSource is already null here, so the timer is guarded by
+          // the connect generation instead of source identity.
           const timer = setTimeout(() => {
             set({ sseReconnectTimer: null });
-            if (!get().globalEventSource) {
+            if (
+              get().sseGeneration === connectGeneration &&
+              !get().globalEventSource
+            ) {
               get().connectGlobalSSE(workspaceIds);
             }
           }, backoffMs);
@@ -2996,6 +3040,7 @@ export const useChatStore = create<ChatState>()(
         set({
           globalEventSource: newEventSource,
           sseWorkspaceIds: workspaceIds,
+          sseGeneration: connectGeneration,
         });
       },
 
@@ -3023,6 +3068,87 @@ export const useChatStore = create<ChatState>()(
             sessionSourceWorkspace.delete(sessionId);
           }
         }
+      },
+
+      resetWorkspace: (workspaceId) => {
+        const state = get();
+        const workspace = state.workspaceStates[workspaceId];
+        const sessionIds = new Set<string>([
+          ...Object.keys(workspace?.sessions ?? {}),
+          ...Object.keys(workspace?.messages ?? {}),
+          ...Object.keys(workspace?.sessionStatuses ?? {}),
+        ]);
+        for (const [sessionId, wsId] of sessionSourceWorkspace) {
+          if (wsId === workspaceId) sessionIds.add(sessionId);
+        }
+        for (const [sessionId, byMessage] of pendingMessageUpdates) {
+          for (const { sourceWorkspaceId } of byMessage.values()) {
+            if (sourceWorkspaceId === workspaceId) sessionIds.add(sessionId);
+          }
+        }
+        for (const sessionId of sessionIds) {
+          pendingMessageUpdates.delete(sessionId);
+          pendingPartUpdates.delete(sessionId);
+          pendingPartDeltas.clearSession(sessionId);
+          removedMessageIdsBySession.delete(sessionId);
+          sessionSourceWorkspace.delete(sessionId);
+        }
+
+        const isActiveWorkspace = state.activeWorkspaceId === workspaceId;
+        if (isActiveWorkspace) get().clearStreamingPoll();
+        const keyPrefix = `${workspaceId}:`;
+        const omitWorkspaceKeys = <T>(
+          record: Record<string, T>,
+        ): Record<string, T> =>
+          Object.fromEntries(
+            Object.entries(record).filter(
+              ([key]) => !key.startsWith(keyPrefix),
+            ),
+          );
+        const isWorkspaceSession = (sessionId: string | null) =>
+          sessionId !== null &&
+          (isActiveWorkspace || sessionIds.has(sessionId));
+
+        set((current) => {
+          const nextQueuedMessages = new Map(current.queuedMessages);
+          nextQueuedMessages.delete(workspaceId);
+          const nextQueuedWorkspaceIds = new Set(current.queuedWorkspaceIds);
+          nextQueuedWorkspaceIds.delete(workspaceId);
+          return {
+            engineRev: current.engineRev + 1,
+            workspaceStates: {
+              ...current.workspaceStates,
+              [workspaceId]: emptyWorkspaceState(),
+            },
+            messageAccessOrder: current.messageAccessOrder.filter(
+              (entry) => entry.workspaceId !== workspaceId,
+            ),
+            queuedMessages: nextQueuedMessages,
+            queuedWorkspaceIds: nextQueuedWorkspaceIds,
+            hasMoreBeforeBySession: omitWorkspaceKeys(
+              current.hasMoreBeforeBySession,
+            ),
+            isLoadingOlderBySession: omitWorkspaceKeys(
+              current.isLoadingOlderBySession,
+            ),
+            messageLoadErrorBySession: omitWorkspaceKeys(
+              current.messageLoadErrorBySession,
+            ),
+            recoveredMessageIdsBySession: omitWorkspaceKeys(
+              current.recoveredMessageIdsBySession,
+            ),
+            activeSessionId: isWorkspaceSession(current.activeSessionId)
+              ? null
+              : current.activeSessionId,
+            optimisticStreamingSessionId: isWorkspaceSession(
+              current.optimisticStreamingSessionId,
+            )
+              ? null
+              : current.optimisticStreamingSessionId,
+            streamingError: isActiveWorkspace ? null : current.streamingError,
+          };
+        });
+        get().connectGlobalSSE(get().sseWorkspaceIds, { force: true });
       },
 
       refreshActiveSessionStatus: async (workspaceId) => {

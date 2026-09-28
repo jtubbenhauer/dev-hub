@@ -8,6 +8,7 @@ import { useCommandStore } from "@/stores/command-store";
 import { useGitStatus, useAgentHealth } from "@/hooks/use-git";
 import { useWorkspaceResume } from "@/hooks/use-workspace-resume";
 import { VscodeTargetEditor } from "@/components/workspace/vscode-target-editor";
+import { WorkspaceEngineEditor } from "@/components/workspace/workspace-engine-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -352,6 +353,7 @@ export function WorkspaceCard({
           </div>
           <div className="flex items-center gap-1">
             <QuickCommandsEditor workspace={workspace} />
+            <WorkspaceEngineEditor workspace={workspace} />
             {workspace.backend === "remote" && (
               <VscodeTargetEditor workspace={workspace} />
             )}

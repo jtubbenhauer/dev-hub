@@ -867,9 +867,9 @@ describe("SSE event handling — session lifecycle", () => {
     );
     store.removeSessionLocal("sess-1", "ws-a");
 
-    const wasDeleted = await store.deleteSession("sess-1", "ws-a");
+    const deletion = await store.deleteSession("sess-1", "ws-a");
 
-    expect(wasDeleted).toBe(true);
+    expect(deletion).toEqual({ isDeleted: true });
   });
 
   it("reports a genuine upstream deletion failure", async () => {
@@ -881,9 +881,12 @@ describe("SSE event handling — session lifecycle", () => {
     );
     store.removeSessionLocal("sess-1", "ws-a");
 
-    const wasDeleted = await store.deleteSession("sess-1", "ws-a");
+    const deletion = await store.deleteSession("sess-1", "ws-a");
 
-    expect(wasDeleted).toBe(false);
+    expect(deletion).toEqual({
+      isDeleted: false,
+      failureMessage: "Failed to delete chat",
+    });
   });
 
   it("does not restore a deletion already confirmed by SSE", () => {

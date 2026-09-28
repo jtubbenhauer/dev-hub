@@ -949,6 +949,7 @@ function SessionItem({
             event.stopPropagation();
             onDelete();
           }}
+          title="Delete"
         >
           <Trash2 className="text-muted-foreground size-3" />
         </Button>

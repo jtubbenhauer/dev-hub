@@ -181,10 +181,10 @@ export function useSessionManagement({
 
       const timer = setTimeout(async () => {
         pendingDeletions.current.delete(deletionKey);
-        const wasDeleted = await deleteSession(sessionId, workspaceId);
-        if (!wasDeleted) {
+        const deletion = await deleteSession(sessionId, workspaceId);
+        if (!deletion.isDeleted) {
           restoreSessionLocal(snapshot);
-          toast.error("Failed to delete chat");
+          toast.error(deletion.failureMessage);
         }
       }, 5000);
 

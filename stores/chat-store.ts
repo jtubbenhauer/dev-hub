@@ -35,6 +35,11 @@ import {
   reconcilePartSnapshot,
 } from "@/lib/opencode/part-delta";
 import { getDescendantActivity } from "@/lib/chat/descendant-activity";
+import {
+  readSessionDeletionFailureMessage,
+  SESSION_DELETION_FAILED_MESSAGE,
+  type SessionDeletionResult,
+} from "@/lib/chat/session-deletion";
 
 export type StreamingStatus =
   | "idle"
@@ -781,7 +786,10 @@ interface ChatState {
   // Session CRUD
   fetchSessions: (workspaceId: string) => Promise<void>;
   createSession: (workspaceId: string) => Promise<Session | null>;
-  deleteSession: (sessionId: string, workspaceId: string) => Promise<boolean>;
+  deleteSession: (
+    sessionId: string,
+    workspaceId: string,
+  ) => Promise<SessionDeletionResult>;
   removeSessionLocal: (
     sessionId: string,
     workspaceId: string,
@@ -1685,6 +1693,7 @@ export const useChatStore = create<ChatState>()(
       deleteSession: async (sessionId, workspaceId) => {
         markSessionDeleted(workspaceId, sessionId);
         let wasDeleted = false;
+        let failureMessage = SESSION_DELETION_FAILED_MESSAGE;
         await enqueueWorkspaceMutation(
           sessionDeletionMutations,
           workspaceId,
@@ -1699,6 +1708,8 @@ export const useChatStore = create<ChatState>()(
                 response.status !== 404 &&
                 response.status !== 410
               ) {
+                failureMessage =
+                  await readSessionDeletionFailureMessage(response);
                 throw new Error("Failed to delete session");
               }
               wasDeleted = true;
@@ -1790,7 +1801,9 @@ export const useChatStore = create<ChatState>()(
             }
           },
         );
-        return wasDeleted;
+        return wasDeleted
+          ? { isDeleted: true }
+          : { isDeleted: false, failureMessage };
       },
 
       removeSessionLocal: (sessionId, workspaceId) => {

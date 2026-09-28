@@ -186,6 +186,7 @@ describe("useSessionManagement", () => {
     vi.mocked(useIsMobile).mockReturnValue(false);
     vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     storeMocks.removeSessionLocal.mockReturnValue({ sessionId: "session-1" });
+    storeMocks.deleteSession.mockResolvedValue({ isDeleted: true });
     const promptInputRef = {
       current: null,
     } as RefObject<PromptInputHandle | null>;
@@ -211,7 +212,10 @@ describe("useSessionManagement", () => {
     vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     const snapshot = { sessionId: "session-1" };
     storeMocks.removeSessionLocal.mockReturnValue(snapshot);
-    storeMocks.deleteSession.mockResolvedValue(false);
+    storeMocks.deleteSession.mockResolvedValue({
+      isDeleted: false,
+      failureMessage: "Failed to delete chat",
+    });
     const promptInputRef = {
       current: null,
     } as RefObject<PromptInputHandle | null>;
@@ -237,7 +241,7 @@ describe("useSessionManagement", () => {
     storeMocks.removeSessionLocal.mockImplementation(
       (sessionId: string, workspaceId: string) => ({ sessionId, workspaceId }),
     );
-    storeMocks.deleteSession.mockResolvedValue(true);
+    storeMocks.deleteSession.mockResolvedValue({ isDeleted: true });
     const promptInputRef = {
       current: null,
     } as RefObject<PromptInputHandle | null>;

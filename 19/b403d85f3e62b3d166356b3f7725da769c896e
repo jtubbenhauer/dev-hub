@@ -1,0 +1,14 @@
+vitest.config.ts
+  h_c7f8735263030f 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "19b403d85f3e62b3d166356b3f7725da769c896e",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -12,6 +12,7 @@ type CatalogFixtureOptions = {
   readonly routingHandle?: string;
   readonly sessionFile?: string;
   readonly omitSessionFile?: boolean;
+  readonly selectedModel?: { readonly provider: string; readonly id: string };
   readonly openError?: {
     readonly code: "host_draining" | "host_memory_pressure";
     readonly retryAfterMs: number;
@@ -23,7 +24,11 @@ type CatalogFixtureOptions = {
 
 type ProbeOpenOptions = Pick<
   CatalogFixtureOptions,
-  "durableId" | "routingHandle" | "sessionFile" | "omitSessionFile"
+  | "durableId"
+  | "routingHandle"
+  | "sessionFile"
+  | "omitSessionFile"
+  | "selectedModel"
 >;
 
 function isRecord(value: unknown): value is JsonlRecord {
@@ -69,6 +74,7 @@ export function withProbeOpen(
       cwd: "/TMP",
       isStreaming: false,
       pendingQuestions: [],
+      ...(options.selectedModel ? { model: options.selectedModel } : {}),
       ...(!options.omitSessionFile
         ? { sessionFile: options.sessionFile ?? "/TMP/catalog.jsonl" }
         : {}),

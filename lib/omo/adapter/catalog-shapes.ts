@@ -48,8 +48,14 @@ export type OmoCatalogModelRow = {
   readonly thinkingLevels: readonly string[] | undefined;
 };
 
+export type OmoSelectedModel = {
+  readonly provider: string;
+  readonly id: string;
+};
+
 type BuildCatalogInput = {
   readonly models: readonly OmoCatalogModelRow[];
+  readonly selectedModel: OmoSelectedModel | undefined;
   readonly fallbackThinkingLevels: ReadonlyMap<string, readonly string[]>;
   readonly commandsResponse: JsonlRecord;
   readonly surfacesResponse: JsonlRecord;
@@ -117,18 +123,36 @@ export function readThinkingLevels(response: JsonlRecord): readonly string[] {
   );
 }
 
+// The picker takes the first option matching any default, so expose exactly
+// one: the model omo itself selects for new sessions, else the first model.
+function defaultModel(
+  models: readonly OmoCatalogModelRow[],
+  selectedModel: OmoSelectedModel | undefined,
+): Record<string, string> {
+  const chosen =
+    models.find(
+      (model) =>
+        model.provider === selectedModel?.provider &&
+        model.id === selectedModel.id,
+    ) ?? models[0];
+  if (chosen === undefined) return {};
+  return {
+    [chosen.provider]: chosen.id,
+    code: `${chosen.provider}/${chosen.id}`,
+  };
+}
+
 function buildProviders(
   models: readonly OmoCatalogModelRow[],
+  selectedModel: OmoSelectedModel | undefined,
   fallbackThinkingLevels: ReadonlyMap<string, readonly string[]>,
 ): OmoCatalogProviders {
   const providerModels = new Map<string, Record<string, OmoCatalogModel>>();
-  const defaults: Record<string, string> = {};
   for (const model of models) {
     let mappedModels = providerModels.get(model.provider);
     if (mappedModels === undefined) {
       mappedModels = {};
       providerModels.set(model.provider, mappedModels);
-      defaults[model.provider] = model.id;
     }
     const levels =
       model.thinkingLevels ??
@@ -146,7 +170,7 @@ function buildProviders(
       name: id,
       models: modelsById,
     })),
-    default: defaults,
+    default: defaultModel(models, selectedModel),
   };
 }
 
@@ -202,7 +226,11 @@ function buildMcp(response: JsonlRecord): OmoCatalogMcp {
 export function buildCatalog(input: BuildCatalogInput): OmoCatalog {
   const { agents, commands } = buildCommands(input.commandsResponse);
   return {
-    providers: buildProviders(input.models, input.fallbackThinkingLevels),
+    providers: buildProviders(
+      input.models,
+      input.selectedModel,
+      input.fallbackThinkingLevels,
+    ),
     agents,
     commands,
     mcp: buildMcp(input.surfacesResponse),

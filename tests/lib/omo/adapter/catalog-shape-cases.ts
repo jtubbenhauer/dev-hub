@@ -67,7 +67,7 @@ describe("getCatalog shapes and cleanup", () => {
           },
         },
       ],
-      default: { openai: "gpt-5.6-sol" },
+      default: { openai: "gpt-5.6-sol", code: "openai/gpt-5.6-sol" },
     });
     expect(catalog.agents).toEqual([
       {
@@ -85,6 +85,46 @@ describe("getCatalog shapes and cleanup", () => {
       "durable-catalog-1",
       "/TMP/catalog.jsonl",
     );
+  });
+
+  it("defaults to the model omo selects for new sessions, not the first model", async () => {
+    fixture = await createRegistryFixture(
+      await catalogFixtures({
+        selectedModel: { provider: "anthropic", id: "claude-opus-5-5" },
+        models: [
+          {
+            provider: "chatgpt",
+            id: "codex-spark",
+            name: "Codex Spark",
+            thinkingLevels: [],
+          },
+          {
+            provider: "anthropic",
+            id: "claude-haiku",
+            name: "Haiku",
+            thinkingLevels: [],
+          },
+          {
+            provider: "anthropic",
+            id: "claude-opus-5-5",
+            name: "Opus 5.5",
+            thinkingLevels: [],
+          },
+        ],
+      }),
+    );
+    const { source } = createStubSessionSource(fixture.workspacePath);
+
+    const catalog = await getCatalog(
+      fixture.runtime,
+      fixture.workspacePath,
+      source,
+    );
+
+    expect(catalog.providers.default).toEqual({
+      anthropic: "claude-opus-5-5",
+      code: "anthropic/claude-opus-5-5",
+    });
   });
 
   it("queries thinking levels for a model that does not report them", async () => {

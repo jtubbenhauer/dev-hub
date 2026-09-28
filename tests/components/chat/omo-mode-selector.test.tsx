@@ -51,6 +51,7 @@ const omoCatalog = buildCatalog({
       thinkingLevels: ["off", "low", "high"],
     },
   ],
+  selectedModel: undefined,
   fallbackThinkingLevels: new Map(),
   commandsResponse: {
     type: "response",

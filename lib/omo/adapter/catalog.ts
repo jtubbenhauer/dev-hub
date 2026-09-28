@@ -11,6 +11,7 @@ import {
   readThinkingLevels,
   type OmoCatalog,
   type OmoCatalogModelRow,
+  type OmoSelectedModel,
 } from "@/lib/omo/adapter/catalog-shapes";
 
 export type {
@@ -27,7 +28,20 @@ type ProbeIdentity = {
   readonly routingHandle: string;
   readonly rawProbeId: string;
   readonly sessionFile: string | undefined;
+  readonly selectedModel: OmoSelectedModel | undefined;
 };
+
+function selectedModel(state: Record<string, unknown>) {
+  const model = state["model"];
+  if (
+    !isJsonObject(model) ||
+    typeof model["provider"] !== "string" ||
+    typeof model["id"] !== "string"
+  ) {
+    return undefined;
+  }
+  return { provider: model["provider"], id: model["id"] };
+}
 
 function isInternalRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -46,6 +60,7 @@ function probeIdentity(opened: OmoOpenedSession): ProbeIdentity {
     routingHandle: opened.sessionId,
     rawProbeId: state["sessionId"],
     sessionFile,
+    selectedModel: selectedModel(state),
   };
 }
 
@@ -133,6 +148,7 @@ async function queryProbe(
   });
   return buildCatalog({
     models,
+    selectedModel: identity.selectedModel,
     fallbackThinkingLevels,
     commandsResponse,
     surfacesResponse,

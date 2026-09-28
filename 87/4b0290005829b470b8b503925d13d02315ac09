@@ -1,0 +1,35 @@
+lib/omo/adapter/catalog-cache.ts
+  s_ca8d0cc1f0a151::t_e332f0403bf5fc 1-122
+lib/omo/adapter/catalog.ts
+  s_ca8d0cc1f0a151::t_436d94d2855019 1-186
+lib/opencode/types.ts
+  s_36cbcc6328633c::t_df63b4e65baed5 19-21,66-72
+tests/lib/omo/adapter/catalog-shape-cases.ts
+  s_ca8d0cc1f0a151::t_445a9cb453e7bd 1-177
+tests/lib/omo/adapter/catalog.test.ts
+  s_36cbcc6328633c::t_6f3818cfb143ec 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "874b0290005829b470b8b503925d13d02315ac09",
+  "prompts": {},
+  "sessions": {
+    "s_36cbcc6328633c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a714cfbffe5JXCstdxOPuc9M",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_ca8d0cc1f0a151": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a709e4effeBl3S3uyeNT1chE",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+app/api/sessions/cache/route.ts
+  s_63e8c702bbca90::t_3b061f22ff27e4 209,211-220,278-328
+app/api/workspaces/[id]/route.ts
+  s_63e8c702bbca90::t_8928c9154af0be 14,69,84,87-93,120
+components/settings/chat-engine-settings.tsx
+  s_63e8c702bbca90::t_16f720c1cc1fc3 1-111
+components/workspace/workspace-engine-editor.tsx
+  s_63e8c702bbca90::t_8922198a05f2f5 1-173
+hooks/use-chat-engine.ts
+  s_63e8c702bbca90::t_5f94c87502fa64 1-62
+tests/api/workspaces-engine-put.test.ts
+  s_63e8c702bbca90::t_b3bf5cca1f207d 1-142
+tests/components/settings/chat-engine-setting.test.tsx
+  s_63e8c702bbca90::t_763604be0cc4d3 1-217
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c4291cf0ee66f9bb38e92793b12db682ecaeeb44",
+  "prompts": {},
+  "sessions": {
+    "s_63e8c702bbca90": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f19f6ea90ffeJkueO3RI20GB7G",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -36,9 +36,31 @@ function withSessionMetadata(state: ToolState, sessionId: string): ToolState {
   };
 }
 
+function toolPartMatchesTask(part: ToolPart, taskId: string): boolean {
+  const state = part.state;
+  const input = state.input;
+  if (isRecord(input) && input.task_id === taskId) return true;
+  const metadata = "metadata" in state ? state.metadata : undefined;
+  if (isRecord(metadata) && metadata.task_id === taskId) return true;
+  const output = "output" in state ? state.output : undefined;
+  return typeof output === "string" && output.includes(taskId);
+}
+
+function toolPartForTask(
+  candidates: readonly TrackedToolPart[],
+  taskId: string | undefined,
+): TrackedToolPart | undefined {
+  const matched =
+    taskId === undefined
+      ? undefined
+      : candidates.find((tracked) => toolPartMatchesTask(tracked.part, taskId));
+  if (matched) return matched;
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
 export function createLiveTaskEventHandler(
   options: LiveAdapterOptions,
-  latestTaskTool: () => TrackedToolPart | undefined,
+  taskToolParts: () => readonly TrackedToolPart[],
   replacePart: (tracked: TrackedToolPart, part: ToolPart) => Event,
 ): (record: JsonlRecord) => LiveAdapterResult {
   const childSessions = new Map<string, ChildSessionState>();
@@ -81,7 +103,9 @@ export function createLiveTaskEventHandler(
         properties: { info: session },
       });
 
-      const taskTool = latestTaskTool();
+      const taskId =
+        typeof task.task_id === "string" ? task.task_id : undefined;
+      const taskTool = toolPartForTask(taskToolParts(), taskId);
       if (taskTool) {
         const nextPart = buildOmoToolPart({
           ...taskTool.part,

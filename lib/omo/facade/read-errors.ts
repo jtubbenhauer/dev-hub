@@ -1,4 +1,8 @@
-import { OmoCommandError, OmoTransportGoneError } from "@/lib/omo/errors";
+import {
+  isOmoTransportErrnoError,
+  OmoCommandError,
+  OmoTransportGoneError,
+} from "@/lib/omo/errors";
 import {
   OmoCorruptIndexRowError,
   OmoEngineUnavailableError,
@@ -41,7 +45,8 @@ export function isHistoryFallbackError(error: unknown): boolean {
     hasErrorName(error, "OmoTransportGoneError") ||
     hasErrorName(error, "OmoEngineUnavailableError") ||
     hasErrorName(error, "OmoCorruptIndexRowError") ||
-    (error instanceof Error && numberProperty(error, "statusCode") === 503)
+    (error instanceof Error && numberProperty(error, "statusCode") === 503) ||
+    isOmoTransportErrnoError(error)
   );
 }
 

@@ -95,7 +95,8 @@ export async function readOmoMessages(
   rawId: string,
   query: URLSearchParams,
 ): Promise<Response> {
-  if (!(await context.source.authorizeSession(rawId))) {
+  const row = await getOmoIndexRow(context.workspace.id, rawId);
+  if (row === null && !(await context.source.authorizeSession(rawId))) {
     return sessionNotFoundResponse();
   }
   try {

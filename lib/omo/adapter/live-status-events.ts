@@ -13,7 +13,7 @@ export interface LiveStatusEventHandlers {
   readonly handleAgentSettled: () => LiveAdapterResult;
   readonly handleRetryStart: (record: JsonlRecord) => LiveAdapterResult;
   readonly handleRetryEnd: (record: JsonlRecord) => LiveAdapterResult;
-  readonly handleCompactionEnd: () => LiveAdapterResult;
+  readonly handleCompactionEnd: (record: JsonlRecord) => LiveAdapterResult;
   readonly handleModelChanged: (record: JsonlRecord) => LiveAdapterResult;
   readonly handleSetSessionNameResponse: (
     record: JsonlRecord,
@@ -107,13 +107,18 @@ export function createLiveStatusEventHandlers(
     ]);
   };
 
-  const handleCompactionEnd = (): LiveAdapterResult =>
-    resultWithEvents([
+  const handleCompactionEnd = (record: JsonlRecord): LiveAdapterResult => {
+    if (record.aborted === true || typeof record.errorMessage === "string") {
+      return emptyResult();
+    }
+    if (!isRecord(record.result)) return emptyResult();
+    return resultWithEvents([
       {
         type: "session.compacted",
         properties: { sessionID: options.sessionId },
       },
     ]);
+  };
 
   const handleModelChanged = (record: JsonlRecord): LiveAdapterResult => {
     if (!isRecord(record.model)) return emptyResult();

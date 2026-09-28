@@ -1,4 +1,5 @@
 import {
+  isOmoTransportErrnoError,
   OmoCommandError,
   OmoDaemonNotRunningError,
   OmoEngineRefusedError,
@@ -110,7 +111,8 @@ export function responseForOmoWriteError(error: unknown): Response | null {
     isNamedError(error, "OmoEngineUnavailableError") ||
     isNamedError(error, "OmoDaemonNotRunningError") ||
     isNamedError(error, "OmoTransportGoneError") ||
-    isNamedError(error, "OmoEngineRefusedError")
+    isNamedError(error, "OmoEngineRefusedError") ||
+    isOmoTransportErrnoError(error)
   ) {
     return jsonResponse({ error: "engine_unavailable" }, { status: 503 });
   }

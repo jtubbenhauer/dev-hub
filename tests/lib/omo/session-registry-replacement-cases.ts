@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { OmoRegistryEvent } from "@/lib/omo/session-registry";
 import {
   createRegistryContext,
@@ -74,6 +74,23 @@ describe("OmoSessionRegistry successor handoff", () => {
       });
     });
 
+    // A dialog asked on the old routing handle just before the handoff must
+    // survive and be re-asked under the successor's session id.
+    context.host.emit({
+      type: "extension_ui_request",
+      sessionId: "route-old",
+      id: "uuid-pre-handoff-1",
+      method: "confirm",
+      title: "Continue?",
+      message: "Proceed with the risky step?",
+    });
+    await vi.waitFor(() => {
+      expect(events.some((event) => event.type === "question.asked")).toBe(
+        true,
+      );
+    });
+    events.length = 0;
+
     context.host.emit({
       type: "session_replaced",
       sessionId: "route-old",
@@ -85,8 +102,13 @@ describe("OmoSessionRegistry successor handoff", () => {
     expect(events.map((event) => event.type)).toEqual([
       "session.created",
       "session.deleted",
+      "question.asked",
       "session.metadata_moved",
     ]);
+    const rekeyed = events.find((event) => event.type === "question.asked");
+    expect(rekeyed).toMatchObject({
+      properties: { sessionID: "omo_new" },
+    });
     expect(
       context.runtime.registry.findBinding(context.workspace.id, "old", null),
     ).toBeUndefined();

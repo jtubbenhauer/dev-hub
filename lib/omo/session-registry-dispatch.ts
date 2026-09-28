@@ -1,3 +1,4 @@
+import type { SessionStatus } from "@opencode-ai/sdk";
 import type { Effect } from "@/lib/omo/adapter/live-adapter-types";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoRpcClient } from "@/lib/omo/rpc-client";
@@ -31,8 +32,12 @@ export class OmoRegistryDispatcher {
   private readonly client: OmoRpcClient;
   private readonly refreshIndex: OmoRegistryDispatcherOptions["refreshIndex"];
   private readonly sinks = new Map<string, Set<OmoRegistryEventSink>>();
-  private readonly events = new Map<string, OmoRegistryEvent[]>();
-  private readonly records = new Map<string, JsonlRecord[]>();
+  // Per-session latest status only (busy/idle/retry) — bounded by session
+  // count, unlike the unbounded event log this replaced.
+  private readonly sessionStatuses = new Map<
+    string,
+    Map<string, SessionStatus>
+  >();
 
   constructor(options: OmoRegistryDispatcherOptions) {
     this.client = options.client;
@@ -43,12 +48,13 @@ export class OmoRegistryDispatcher {
     binding: OmoSessionBinding,
     record: JsonlRecord,
   ): readonly OmoRegistryEvent[] {
-    this.appendWorkspaceValue(this.records, binding.workspaceId, record);
     const result = binding.adapter.handle(record);
+    const dialogEvents = binding.dialogs.handle(record, result.events);
+    const events = [...result.events, ...dialogEvents];
     if (record["type"] === "entry_appended") this.queueLeaf(binding, record);
     for (const effect of result.effects) this.applyEffect(binding, effect);
-    this.emit(binding.workspaceId, result.events);
-    return result.events;
+    this.emit(binding.workspaceId, events);
+    return events;
   }
 
   emitEvent(workspaceId: string, event: OmoRegistryEvent): void {
@@ -71,12 +77,15 @@ export class OmoRegistryDispatcher {
     return tail;
   }
 
-  eventsForWorkspace(workspaceId: string): readonly OmoRegistryEvent[] {
-    return this.events.get(workspaceId) ?? [];
+  sessionStatusesForWorkspace(
+    workspaceId: string,
+  ): Record<string, SessionStatus> {
+    const statuses = this.sessionStatuses.get(workspaceId);
+    return statuses === undefined ? {} : Object.fromEntries(statuses);
   }
 
-  recordsForWorkspace(workspaceId: string): readonly JsonlRecord[] {
-    return this.records.get(workspaceId) ?? [];
+  deleteSessionStatus(workspaceId: string, sessionID: string): void {
+    this.sessionStatuses.get(workspaceId)?.delete(sessionID);
   }
 
   subscribe(workspaceId: string, sink: OmoRegistryEventSink): () => void {
@@ -108,8 +117,7 @@ export class OmoRegistryDispatcher {
       for (const _sink of workspaceSinks) this.client.removeSubscriber();
     }
     this.sinks.clear();
-    this.events.clear();
-    this.records.clear();
+    this.sessionStatuses.clear();
   }
 
   private queueLeaf(binding: OmoSessionBinding, record: JsonlRecord): void {
@@ -124,26 +132,40 @@ export class OmoRegistryDispatcher {
       typeof timestamp === "string" || typeof timestamp === "number"
         ? normalizeTimestampMs(timestamp)
         : Date.now();
-    const tail = this.enqueueLeaf(binding.workspaceId, binding.durableId, () =>
-      setOmoLeafAndActivity(
-        binding.workspaceId,
-        binding.durableId,
-        entryId,
-        activityMs,
+    binding.effectTail = this.continueEffectTail(binding, () =>
+      this.enqueueLeaf(binding.workspaceId, binding.durableId, () =>
+        setOmoLeafAndActivity(
+          binding.workspaceId,
+          binding.durableId,
+          entryId,
+          activityMs,
+        ),
       ),
     );
-    binding.effectTail = tail;
   }
 
   private applyEffect(binding: OmoSessionBinding, effect: Effect): void {
     if (!this.isMergeEffect(effect)) return;
-    const tail = binding.effectTail.then(async () => {
+    binding.effectTail = this.continueEffectTail(binding, async () => {
       await mergeOmoSessionIndexFromTaskEvent(binding.workspaceId, [
         effect.mergeFromTaskEvent,
       ]);
       await this.refreshIndex(binding.workspace);
     });
-    binding.effectTail = tail;
+  }
+
+  // Chains onto whatever effectTail already holds instead of replacing it,
+  // and swallows a prior rejection so one failed effect never blocks the
+  // next one from running.
+  private continueEffectTail(
+    binding: OmoSessionBinding,
+    next: () => Promise<void>,
+  ): Promise<void> {
+    return binding.effectTail
+      .catch((error: unknown) => {
+        console.error("OmO effect chain step failed", error);
+      })
+      .then(next);
   }
 
   private isMergeEffect(effect: Effect): effect is MergeFromTaskEventEffect {
@@ -162,7 +184,13 @@ export class OmoRegistryDispatcher {
   private emit(workspaceId: string, events: readonly OmoRegistryEvent[]): void {
     const sinks = [...(this.sinks.get(workspaceId) ?? [])];
     for (const event of events) {
-      this.appendWorkspaceValue(this.events, workspaceId, event);
+      if (event.type === "session.status") {
+        this.setSessionStatus(
+          workspaceId,
+          event.properties.sessionID,
+          event.properties.status,
+        );
+      }
       for (const sink of sinks) {
         try {
           sink(event);
@@ -173,13 +201,16 @@ export class OmoRegistryDispatcher {
     }
   }
 
-  private appendWorkspaceValue<T>(
-    map: Map<string, T[]>,
+  private setSessionStatus(
     workspaceId: string,
-    value: T,
+    sessionID: string,
+    status: SessionStatus,
   ): void {
-    const values = map.get(workspaceId) ?? [];
-    values.push(value);
-    map.set(workspaceId, values);
+    let statuses = this.sessionStatuses.get(workspaceId);
+    if (statuses === undefined) {
+      statuses = new Map();
+      this.sessionStatuses.set(workspaceId, statuses);
+    }
+    statuses.set(sessionID, status);
   }
 }

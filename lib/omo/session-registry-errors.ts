@@ -41,6 +41,14 @@ export class OmoHydrationOverflowError extends Error {
   }
 }
 
+export class OmoHydrationAbortedError extends Error {
+  readonly name = "OmoHydrationAbortedError";
+
+  constructor(readonly durableId: string) {
+    super(`OmO session ${durableId} hydration was aborted before it completed`);
+  }
+}
+
 export class OmoEngineUnavailableError extends Error {
   readonly name = "OmoEngineUnavailableError";
   readonly code = "engine_unavailable";

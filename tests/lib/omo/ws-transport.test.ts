@@ -4,8 +4,9 @@ import type { IncomingMessage } from "node:http";
 import { once } from "node:events";
 import type { Duplex } from "node:stream";
 import WebSocket, { WebSocketServer } from "ws";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { OmoRpcClient, WebSocketTransport } from "@/lib/omo/rpc-client";
+import { OmoTransportGoneError } from "@/lib/omo/errors";
 
 const REQUIRED_CAPABILITIES = [
   "multi_session",
@@ -144,5 +145,38 @@ describe("WebSocketTransport", () => {
     for (const socket of server.clients) socket.close();
 
     await expect(disconnected).resolves.toBeUndefined();
+  });
+
+  it("refuses to connect to a non-loopback origin without ever sending the bearer token", async () => {
+    const connectionAttempted = vi.fn();
+    const { server } = await startServer();
+    server.on("connection", connectionAttempted);
+
+    await expect(
+      new WebSocketTransport({
+        url: "ws://agent.example.com:7500/omo/rpc",
+        token: "secret-token",
+      }).connect(),
+    ).rejects.toBeInstanceOf(OmoTransportGoneError);
+
+    expect(connectionAttempted).not.toHaveBeenCalled();
+  });
+
+  it("closes the connection when the server sends a frame over the 16 MiB cap", async () => {
+    const { server, url } = await startServer();
+    const connected = waitForConnection(server);
+    const stream = await new WebSocketTransport({
+      url,
+      token: "secret-token",
+    }).connect();
+    streams.push(stream);
+    const { socket: serverSocket } = await connected;
+    const errored = new Promise<void>((resolve) => {
+      stream.once("error", () => resolve());
+    });
+
+    serverSocket.send("x".repeat(16 * 1024 * 1024 + 1));
+
+    await errored;
   });
 });

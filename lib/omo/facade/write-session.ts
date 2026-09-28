@@ -1,5 +1,8 @@
 import { buildOmoSession } from "@/lib/omo/adapter/shapes";
-import { getOmoWriteIndexRow } from "@/lib/omo/facade/write-access";
+import {
+  attachOmoWriteSession,
+  getOmoWriteIndexRow,
+} from "@/lib/omo/facade/write-access";
 import { requiredString } from "@/lib/omo/facade/write-body";
 import type { OmoWriteContext } from "@/lib/omo/facade/write-types";
 import {
@@ -16,6 +19,7 @@ import {
   type OmoSessionIndexRow,
 } from "@/lib/omo/session-index";
 import { isJsonObject } from "@/lib/omo/session-registry-records";
+import { OmoNotFoundError } from "@/lib/omo/session-source";
 
 function sessionFromRow(context: OmoWriteContext, row: OmoSessionIndexRow) {
   return buildOmoSession({
@@ -101,7 +105,12 @@ export async function deleteOmoSession(
     });
     context.runtime.registry.cleanupBinding(binding);
   }
-  await context.source.remove(rawId);
+  try {
+    await context.source.remove(rawId);
+  } catch (error) {
+    // A session deleted before its first persisted turn has no file yet.
+    if (!(error instanceof OmoNotFoundError)) throw error;
+  }
   await deleteOmoIndexRowWithDescendants(context.workspace.id, rawId);
   return noContentResponse();
 }
@@ -113,10 +122,7 @@ export async function renameOmoSession(
 ): Promise<Response> {
   const title = requiredString(body, "title");
   if (title === null) return invalidRequestResponse();
-  const binding = await context.runtime.registry.attach({
-    workspace: context.workspace,
-    durableId: rawId,
-  });
+  const binding = await attachOmoWriteSession(context, rawId);
   await context.runtime.registry.request(binding, {
     type: "set_session_name",
     name: title,

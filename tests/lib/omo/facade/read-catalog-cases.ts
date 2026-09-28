@@ -42,4 +42,21 @@ describe("handleOmoRead catalog routes", () => {
     });
     expect(fixture.getCatalog).toHaveBeenCalledTimes(4);
   });
+
+  it("returns engine_unavailable for every catalog route when the socket is missing", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    fixture.getCatalog.mockRejectedValue(
+      Object.assign(new Error("connect ENOENT"), { code: "ENOENT" }),
+    );
+
+    // When / Then
+    for (const path of ["/config/providers", "/agent", "/command", "/mcp"]) {
+      const response = await fixture.request(path);
+      expect(response.status).toBe(503);
+      expect(await readJson(response)).toEqual({
+        error: "engine_unavailable",
+      });
+    }
+  });
 });

@@ -90,6 +90,16 @@ export function sendOmoRequest(
   });
 }
 
+export function writeOmoRecord(
+  socket: Duplex | undefined,
+  record: JsonlRecord,
+): void {
+  if (socket === undefined || socket.destroyed) {
+    throw new OmoTransportGoneError();
+  }
+  socket.write(encodeJsonl(record));
+}
+
 export function rejectPendingOmoRequests(
   pendingRequests: Map<string, OmoPendingRequest>,
 ): void {

@@ -1,4 +1,5 @@
 import { resolveOmoAgentDir, resolveOmoSocketPath } from "@/lib/omo/agent-dir";
+import { ensureOmoDaemon } from "@/lib/omo/daemon";
 import { OmoTransportGoneError } from "@/lib/omo/errors";
 import { RemoteAgentSessionSource } from "@/lib/omo/remote-session-source";
 import { OmoRpcClient, WebSocketTransport } from "@/lib/omo/rpc-client";
@@ -9,6 +10,7 @@ import {
   LocalFsSessionSource,
   type SessionSource,
 } from "@/lib/omo/session-source";
+import { isTrustedAgentOrigin } from "@/lib/workspaces/agent-origin";
 import { RemoteBackend } from "@/lib/workspaces/backend";
 
 export type OmoRuntimeWorkspace = OmoSessionRegistryWorkspace & {
@@ -48,11 +50,13 @@ function getRemoteOmoRuntime(
   const client = new OmoRpcClient({
     transport: new WebSocketTransport({ url: hostKey, token }),
   });
+  const registry = new RemoteOmoSessionRegistry(client, source);
   const runtime: OmoRuntime = {
     client,
-    registry: new RemoteOmoSessionRegistry(client, source),
+    registry,
     dialogs: new Map(),
     catalog: new Map(),
+    dialogLedger: registry.dialogLedger,
   };
   runtimes.set(hostKey, runtime);
   return runtime;
@@ -73,6 +77,10 @@ export function getOmoRuntimeForWorkspace(
     };
   }
   if (!workspace.agentUrl) throw new OmoTransportGoneError();
+  // The shared agent token must never reach a user-editable, untrusted origin.
+  if (!isTrustedAgentOrigin(workspace.agentUrl)) {
+    throw new OmoTransportGoneError();
+  }
   const backend = new RemoteBackend(workspace.agentUrl, "");
   const source = new RemoteAgentSessionSource({
     sessionsUrl: backend.getOmoSessionsUrl(),
@@ -83,4 +91,18 @@ export function getOmoRuntimeForWorkspace(
     runtime: getRemoteOmoRuntime(hostKey, token, source),
     source,
   };
+}
+
+// Security: the only entry point facade contexts may use to resolve a
+// workspace's runtime/source pair, so a remote workspace never falls back
+// to the local unix socket and filesystem.
+export const createOmoContext = getOmoRuntimeForWorkspace;
+
+export async function ensureOmoConnectionIfNeeded(
+  workspace: Pick<OmoRuntimeWorkspace, "backend">,
+  runtime: OmoRuntime,
+): Promise<void> {
+  if (workspace.backend === "remote") return;
+  if (runtime.client.isConnected) return;
+  await ensureOmoDaemon().catch(() => undefined);
 }

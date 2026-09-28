@@ -126,6 +126,44 @@ describe("handleOmoWrite session mutation routes", () => {
     expect(remaining).toEqual([]);
   });
 
+  it("deletes a session that has no persisted file yet", async () => {
+    // Given
+    const fixture = await useWriteFixture();
+    const { OmoNotFoundError } = await import("@/lib/omo/session-source");
+    insertWriteIndexRow(fixture.sqlite, { durableId: "fresh" });
+    fixture.source.authorized.add("fresh");
+    fixture.source.remove.mockRejectedValueOnce(new OmoNotFoundError("fresh"));
+    fixture.client.request.mockResolvedValue({ data: { sessions: [] } });
+
+    // When
+    const response = await fixture.request("/session/omo_fresh", {
+      method: "DELETE",
+    });
+
+    // Then
+    expect(response.status).toBe(204);
+    const remaining = fixture.sqlite
+      .prepare("SELECT durable_id FROM omo_session_index")
+      .all();
+    expect(remaining).toEqual([]);
+  });
+
+  it("returns 404 for an unauthorized rename and never attaches", async () => {
+    // Given
+    const fixture = await useWriteFixture();
+
+    // When
+    const response = await fixture.request("/session/omo_unknown", {
+      method: "PATCH",
+      body: { title: "New title" },
+    });
+
+    // Then
+    expect(response.status).toBe(404);
+    expect(await writeJson(response)).toEqual({ error: "session_not_found" });
+    expect(fixture.registry.attach).not.toHaveBeenCalled();
+  });
+
   it("persists a rename before successor metadata is cloned", async () => {
     // Given
     const fixture = await useWriteFixture();

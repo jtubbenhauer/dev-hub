@@ -1,21 +1,15 @@
-import { resolveOmoAgentDir, resolveOmoSocketPath } from "@/lib/omo/agent-dir";
 import { getOmoDialogLedger } from "@/lib/omo/facade/read-runtime";
 import type { OmoReadWorkspace } from "@/lib/omo/facade/read-types";
 import type { OmoWriteContext } from "@/lib/omo/facade/write-types";
-import { getOmoRuntime } from "@/lib/omo/session-registry";
-import { LocalFsSessionSource } from "@/lib/omo/session-source";
+import { createOmoContext } from "@/lib/omo/runtime";
 
 export function createOmoWriteContext(
   workspace: OmoReadWorkspace,
 ): OmoWriteContext {
-  const agentDir = resolveOmoAgentDir();
-  const runtime = getOmoRuntime(resolveOmoSocketPath(agentDir));
+  const { runtime, source } = createOmoContext(workspace);
   return {
     runtime,
-    source: new LocalFsSessionSource({
-      agentDir,
-      workspacePath: workspace.path,
-    }),
+    source,
     dialogs: getOmoDialogLedger(runtime),
     workspace,
   };

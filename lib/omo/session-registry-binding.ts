@@ -1,6 +1,11 @@
+import {
+  createDialogAdapter,
+  type DialogAdapter,
+} from "@/lib/omo/adapter/dialogs";
 import { createLiveAdapter } from "@/lib/omo/adapter/live-events";
+import type { DialogLedger } from "@/lib/omo/dialog-ledger";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
-import type { OmoOpenedSession } from "@/lib/omo/rpc-client";
+import type { OmoOpenedSession, OmoRpcClient } from "@/lib/omo/rpc-client";
 import { OmoRegistryRecordBuffer } from "@/lib/omo/session-registry-lock";
 import { createOmoBindingReady } from "@/lib/omo/session-registry-ready";
 import type { OmoOpenedState } from "@/lib/omo/session-registry-records";
@@ -25,6 +30,9 @@ type OmoOpenedBindingInput = {
   readonly request: OmoAttachRequest;
   readonly canonicalPath: string;
   readonly generation: number;
+  readonly client: OmoRpcClient;
+  readonly dialogLedger: DialogLedger;
+  readonly skillPrefixes: readonly string[];
 };
 
 type OmoSuccessorBindingInput = {
@@ -32,20 +40,42 @@ type OmoSuccessorBindingInput = {
   readonly durableId: string;
   readonly sessionPath: string;
   readonly generation: number;
+  readonly client: OmoRpcClient;
+  readonly dialogLedger: DialogLedger;
+  readonly skillPrefixes: readonly string[];
 };
 
 function createRegistryLiveAdapter(
   sessionId: string,
   workspaceId: string,
   workspacePath: string,
+  skillPrefixes: readonly string[],
 ) {
-  const options = {
+  return createLiveAdapter({
     sessionId,
     workspaceId,
     workspacePath,
-    skillPrefixes: [],
-  };
-  return createLiveAdapter(options);
+    skillPrefixes,
+  });
+}
+
+function createRegistryDialogAdapter(
+  client: OmoRpcClient,
+  ledger: DialogLedger,
+  routingHandle: string,
+  durableId: string,
+  workspaceId: string,
+): DialogAdapter {
+  return createDialogAdapter({
+    ledger,
+    routingHandle,
+    durableId,
+    workspaceId,
+    sendResponse: (record) => {
+      client.sendFireAndForget(record);
+      return Promise.resolve();
+    },
+  });
 }
 
 export function createOmoOpenedBinding(
@@ -65,6 +95,14 @@ export function createOmoOpenedBinding(
       `omo_${openedState.durableId}`,
       request.workspace.id,
       request.workspace.path,
+      input.skillPrefixes,
+    ),
+    dialogs: createRegistryDialogAdapter(
+      input.client,
+      input.dialogLedger,
+      input.routingHandle,
+      openedState.durableId,
+      request.workspace.id,
     ),
     openedState,
     ...createOmoBindingReady(),
@@ -92,6 +130,14 @@ export function createOmoSuccessorBinding(
       `omo_${durableId}`,
       previous.workspaceId,
       previous.workspace.path,
+      input.skillPrefixes,
+    ),
+    dialogs: createRegistryDialogAdapter(
+      input.client,
+      input.dialogLedger,
+      previous.routingHandle,
+      durableId,
+      previous.workspaceId,
     ),
     openedState: {
       ...previous.openedState,

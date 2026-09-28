@@ -7,6 +7,7 @@ import {
   rejectPendingOmoRequests,
   routeOmoRecord,
   sendOmoRequest,
+  writeOmoRecord,
   type OmoPendingRequest,
 } from "@/lib/omo/rpc-connection";
 import { OmoRpcLifecycle } from "@/lib/omo/rpc-lifecycle";
@@ -100,6 +101,14 @@ export class OmoRpcClient {
       await this.connect();
     }
     return this.sendRequest(record, options, false);
+  }
+
+  // Writes a record verbatim with no id rewrite and no pending-request
+  // tracking, for host commands that never send a "response" (for example
+  // extension_ui_response, which must echo the host's original request id).
+  sendFireAndForget(record: JsonlRecord): void {
+    this.lifecycle.recordExternalActivity();
+    writeOmoRecord(this.socket, record);
   }
 
   on(listener: OmoRpcListener): () => void {

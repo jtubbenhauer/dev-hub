@@ -2,6 +2,9 @@ import { Duplex } from "node:stream";
 import WebSocket, { type RawData } from "ws";
 import { OmoTransportGoneError } from "@/lib/omo/errors";
 import type { Transport } from "@/lib/omo/rpc-transport";
+import { isTrustedAgentOrigin } from "@/lib/workspaces/agent-origin";
+
+const MAX_WS_FRAME_BYTES = 16 * 1024 * 1024;
 
 type WebSocketTransportOptions = {
   readonly url: string;
@@ -120,9 +123,13 @@ export class WebSocketTransport implements Transport {
   }
 
   connect(): Promise<Duplex> {
+    if (!isTrustedAgentOrigin(this.url)) {
+      return Promise.reject(new OmoTransportGoneError());
+    }
     const webSocket = new WebSocket(this.url, {
       headers: { Authorization: `Bearer ${this.token}` },
       perMessageDeflate: false,
+      maxPayload: MAX_WS_FRAME_BYTES,
     });
     return new Promise((resolve, reject) => {
       const cleanup = (): void => {

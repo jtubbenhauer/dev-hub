@@ -8,7 +8,6 @@ import { readOmoMessages } from "@/lib/omo/facade/read-messages";
 import {
   createOmoReadContext,
   getOmoDialogLedger,
-  getOmoReadRuntime,
 } from "@/lib/omo/facade/read-runtime";
 import {
   listOmoSessions,
@@ -20,8 +19,11 @@ import {
 import {
   jsonResponse,
   unsupportedResponse,
+  type OmoReadContext,
   type OmoReadRequest,
 } from "@/lib/omo/facade/read-types";
+import { ensureOmoConnectionIfNeeded } from "@/lib/omo/runtime";
+import { getOmoIndexRow } from "@/lib/omo/session-index";
 
 export type {
   OmoReadRequest,
@@ -46,9 +48,9 @@ function rawOmoId(publicId: string): string | null {
   return rawId.length > 0 ? rawId : null;
 }
 
-async function healthResponse(): Promise<Response> {
+async function healthResponse(context: OmoReadContext): Promise<Response> {
   try {
-    const protocol = await getOmoReadRuntime().client.connect();
+    const protocol = await context.runtime.client.connect();
     return jsonResponse({
       healthy: true,
       version: protocol.serverVersion ?? String(protocol.protocolVersion),
@@ -58,23 +60,32 @@ async function healthResponse(): Promise<Response> {
   }
 }
 
+async function isOmoIdKnown(
+  context: OmoReadContext,
+  rawId: string,
+): Promise<boolean> {
+  const row = await getOmoIndexRow(context.workspace.id, rawId);
+  if (row !== null) return true;
+  return context.source.authorizeSession(rawId);
+}
+
 async function readSessionRoute(
-  request: OmoReadRequest,
+  context: OmoReadContext,
   path: string,
+  query: URLSearchParams,
 ): Promise<Response> {
   const match = /^\/session\/([^/]+)(?:\/(message|children|todo))?$/.exec(path);
   if (match === null) return unsupportedResponse();
   const publicId = match[1];
   const rawId = publicId === undefined ? null : rawOmoId(publicId);
   if (rawId === null) return unsupportedResponse();
-  const context = createOmoReadContext(request.workspace);
   switch (match[2]) {
     case "message":
-      return readOmoMessages(context, rawId, request.query);
+      return readOmoMessages(context, rawId, query);
     case "children":
       return readOmoChildren(context, rawId);
     case "todo":
-      if (!(await context.source.authorizeSession(rawId))) {
+      if (!(await isOmoIdKnown(context, rawId))) {
         return jsonResponse({ error: "session_not_found" }, { status: 404 });
       }
       return readOmoTodos();
@@ -88,31 +99,30 @@ async function readSessionRoute(
 async function routeOmoRead(request: OmoReadRequest): Promise<Response> {
   if (request.method !== "GET") return unsupportedResponse();
   const path = normalizedPath(request.path);
-  if (path === "/global/health") return healthResponse();
+  const context = createOmoReadContext(request.workspace);
+  await ensureOmoConnectionIfNeeded(request.workspace, context.runtime);
+  if (path === "/global/health") return healthResponse(context);
   if (path === "/permission") return jsonResponse([]);
   if (path === "/session/identities") {
     return readOmoSessionIdentities(request.workspace);
   }
   if (path === "/question") {
     return jsonResponse(
-      getOmoDialogLedger(getOmoReadRuntime()).requestsForWorkspace(
+      getOmoDialogLedger(context.runtime).requestsForWorkspace(
         request.workspace.id,
       ),
     );
   }
   if (path === "/session/status") {
-    return readOmoSessionStatus(createOmoReadContext(request.workspace));
+    return readOmoSessionStatus(context);
   }
   if (path === "/session") {
-    return listOmoSessions(createOmoReadContext(request.workspace));
+    return listOmoSessions(context);
   }
   if (CATALOG_ROUTES.has(path as OmoCatalogRoute)) {
-    return readOmoCatalog(
-      createOmoReadContext(request.workspace),
-      path as OmoCatalogRoute,
-    );
+    return readOmoCatalog(context, path as OmoCatalogRoute);
   }
-  return readSessionRoute(request, path);
+  return readSessionRoute(context, path, request.query);
 }
 
 export async function handleOmoRead(

@@ -1,4 +1,5 @@
 import type { Event } from "@/lib/opencode/types";
+import type { DialogAdapter } from "@/lib/omo/adapter/dialogs";
 import type { LiveAdapter } from "@/lib/omo/adapter/live-adapter-types";
 import type { OmoSessionIndexRow } from "@/lib/omo/session-index";
 import type { OmoRegistryRecordBuffer } from "@/lib/omo/session-registry-lock";
@@ -51,6 +52,7 @@ export interface OmoSessionBinding {
   readonly sessionPath: string | null;
   readonly generation: number;
   readonly adapter: LiveAdapter;
+  readonly dialogs: DialogAdapter;
   readonly openedState: OmoOpenedState;
   readonly ready: Promise<OmoSessionBinding>;
   readonly resolveReady: (binding: OmoSessionBinding) => void;

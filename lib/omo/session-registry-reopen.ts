@@ -1,4 +1,5 @@
 import { OmoCommandError } from "@/lib/omo/errors";
+import type { DialogLedger } from "@/lib/omo/dialog-ledger";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoSessionRegistry } from "@/lib/omo/session-registry-core";
 import { OmoEngineUnavailableError } from "@/lib/omo/session-registry-errors";
@@ -10,6 +11,8 @@ const DEFAULT_PATH_IN_USE_RETRY_MS = 2_000;
 
 export type OmoSessionRegistryOptions = {
   readonly getSubscriberCount?: (workspaceId: string) => number;
+  readonly dialogLedger?: DialogLedger;
+  readonly getSkillPrefixes?: (workspacePath: string) => readonly string[];
 };
 
 type OmoLifecycleRecordInput = {
@@ -53,7 +56,7 @@ function retryAfterMs(error: OmoCommandError): number {
     : DEFAULT_PATH_IN_USE_RETRY_MS;
 }
 
-function wait(delayMs: number): Promise<void> {
+export function wait(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
@@ -110,19 +113,30 @@ function reattachSubscribedBindings(
         durableId: binding.durableId,
         sessionPath: binding.sessionPath,
       })
-      .catch((error: unknown) => {
-        binding.failure =
-          error instanceof Error ? error : new Error(String(error));
-      });
+      .catch((error: unknown) =>
+        registry.reportBindingFailure(binding, error, "OmO reattach"),
+      );
   }
 }
 
-export async function openOmoSessionWithPathRetry<T>(
-  open: () => Promise<T>,
-): Promise<T> {
+export type OmoPathRetryOptions = {
+  readonly open: () => Promise<void>;
+  readonly wait: (delayMs: number) => Promise<void>;
+  readonly releaseLock: () => void;
+  readonly reacquireLock: () => Promise<void>;
+  readonly findExisting: () => OmoSessionBinding | undefined;
+};
+
+// Releases the shared open lock between retries so an unrelated attach for a
+// different session is never blocked behind this one's session_path_in_use
+// backoff, then re-checks for a binding a concurrent attach may have opened.
+export async function openOmoSessionWithPathRetry(
+  options: OmoPathRetryOptions,
+): Promise<OmoSessionBinding | undefined> {
   for (let retryCount = 0; ; retryCount += 1) {
     try {
-      return await open();
+      await options.open();
+      return undefined;
     } catch (error) {
       if (
         !(error instanceof OmoCommandError) ||
@@ -131,7 +145,11 @@ export async function openOmoSessionWithPathRetry<T>(
       ) {
         throw error;
       }
-      await wait(retryAfterMs(error));
+      options.releaseLock();
+      await options.wait(retryAfterMs(error));
+      await options.reacquireLock();
+      const existing = options.findExisting();
+      if (existing !== undefined) return existing;
     }
   }
 }

@@ -1,5 +1,6 @@
 import { OmoTransportGoneError } from "@/lib/omo/errors";
 import { retryAutoSuspendRequest } from "@/lib/workspaces/auto-suspend-retry";
+import { isTrustedAgentOrigin } from "@/lib/workspaces/agent-origin";
 import type { Workspace } from "@/types";
 
 const REMOTE_DAEMON_RETRY_DELAYS_MS = [2_000] as const;
@@ -22,6 +23,9 @@ export async function requestRemoteOmoDaemon(
   const { workspace, userId, operation } = options;
   const agentUrl = workspace.agentUrl;
   if (workspace.backend !== "remote" || !agentUrl) {
+    throw new OmoTransportGoneError();
+  }
+  if (!isTrustedAgentOrigin(agentUrl)) {
     throw new OmoTransportGoneError();
   }
 

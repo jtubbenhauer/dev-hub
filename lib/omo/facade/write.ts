@@ -13,6 +13,7 @@ import {
 import { promptOmoSession } from "@/lib/omo/facade/write-prompt";
 import { revertOmoSession } from "@/lib/omo/facade/write-revert";
 import { createOmoWriteContext } from "@/lib/omo/facade/write-runtime";
+import { ensureOmoConnectionIfNeeded } from "@/lib/omo/runtime";
 import {
   createOmoSession,
   deleteOmoSession,
@@ -161,6 +162,7 @@ async function routeSessionWrite(
 
 async function routeOmoWrite(request: OmoWriteRequest): Promise<Response> {
   const context = createOmoWriteContext(request.workspace);
+  await ensureOmoConnectionIfNeeded(request.workspace, context.runtime);
   const path = normalizedPath(request.path);
   const question = /^\/question\/([^/]+)\/(reply|reject)$/.exec(path);
   if (question !== null) {

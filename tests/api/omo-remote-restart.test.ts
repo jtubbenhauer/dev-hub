@@ -64,7 +64,7 @@ function remoteWorkspace(): Workspace {
     backend: "remote",
     provider: "rig",
     opencodeUrl: null,
-    agentUrl: "http://10.0.0.1:7500",
+    agentUrl: "https://agent.example:7500",
     providerMeta: { providerId: "provider-1" },
     shellCommand: null,
     sshTarget: null,
@@ -100,6 +100,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useRealTimers();
   vi.stubEnv("DEVHUB_AGENT_TOKEN", "agent-secret");
+  vi.stubEnv("DEVHUB_AGENT_ALLOWED_ORIGINS", "https://agent.example:7500");
   const workspace = remoteWorkspace();
   mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
   mocks.resolveEngine.mockResolvedValue("omo");
@@ -135,7 +136,7 @@ describe("remote omo restart and status", () => {
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://10.0.0.1:7500/omo/daemon/ensure",
+      "https://agent.example:7500/omo/daemon/ensure",
       expect.objectContaining({
         method: "POST",
         headers: { Authorization: "Bearer agent-secret" },
@@ -218,7 +219,7 @@ describe("remote omo restart and status", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ healthy: true });
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://10.0.0.1:7500/omo/daemon/status",
+      "https://agent.example:7500/omo/daemon/status",
       expect.objectContaining({
         method: "GET",
         headers: { Authorization: "Bearer agent-secret" },

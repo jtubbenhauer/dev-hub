@@ -40,6 +40,11 @@ import {
   SESSION_DELETION_FAILED_MESSAGE,
   type SessionDeletionResult,
 } from "@/lib/chat/session-deletion";
+import {
+  CHAT_ENGINE_SETTING_KEY,
+  isChatEngine,
+  type ChatEngine,
+} from "@/lib/engine/types";
 
 export type StreamingStatus =
   | "idle"
@@ -191,7 +196,26 @@ const _fetchSessionsInFlight = new Set<string>();
 
 // Dedup in-flight remote message refreshes (keyed by "workspaceId:sessionId")
 const _refreshMessagesInFlight = new Map<string, Promise<void>>();
-const _freshRefreshRequested = new Set<string>();
+// Highest refresh mode requested for a session while a refresh is already
+// in flight. Mode precedence is replace > fresh > normal (D22) — a replace
+// requested mid-flight always re-runs once the in-flight request settles.
+type RefreshMode = "normal" | "fresh" | "replace";
+const _refreshModeRequested = new Map<string, RefreshMode>();
+
+function refreshModeRank(mode: RefreshMode): number {
+  if (mode === "replace") return 2;
+  if (mode === "fresh") return 1;
+  return 0;
+}
+
+function refreshModeFromOptions(options?: {
+  fresh?: boolean;
+  replace?: boolean;
+}): RefreshMode {
+  if (options?.replace) return "replace";
+  if (options?.fresh) return "fresh";
+  return "normal";
+}
 
 // RAF-batched buffer for message.updated events.
 // Keyed: sessionId → Message (latest info wins)
@@ -262,6 +286,194 @@ function getSessionDeletionStatus(
   return deletedSessionIdsByWorkspace.get(workspaceId)?.get(sessionId);
 }
 
+// Per-workspace chat-engine detection for SSE onopen wiring (D23). Cached
+// indefinitely per workspace id — invalidated by resetWorkspace, which runs
+// whenever a workspace's engine changes.
+const _workspaceEngineCache = new Map<string, ChatEngine>();
+let _globalChatEngineCache: ChatEngine | null = null;
+let _globalChatEngineFetch: Promise<ChatEngine> | null = null;
+
+async function fetchGlobalChatEngine(): Promise<ChatEngine> {
+  if (_globalChatEngineCache) return _globalChatEngineCache;
+  if (_globalChatEngineFetch) return _globalChatEngineFetch;
+  _globalChatEngineFetch = (async (): Promise<ChatEngine> => {
+    try {
+      const response = await fetch("/api/settings");
+      if (!response.ok) return "opencode";
+      const data = (await response.json()) as Record<string, unknown> | null;
+      const value = data?.[CHAT_ENGINE_SETTING_KEY];
+      return isChatEngine(value) ? value : "opencode";
+    } catch {
+      return "opencode";
+    }
+  })();
+  const engine = await _globalChatEngineFetch;
+  _globalChatEngineCache = engine;
+  _globalChatEngineFetch = null;
+  return engine;
+}
+
+async function getWorkspaceEngine(workspaceId: string): Promise<ChatEngine> {
+  const cached = _workspaceEngineCache.get(workspaceId);
+  if (cached) return cached;
+  try {
+    const response = await fetch(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}`,
+    );
+    if (!response.ok) return "opencode";
+    const workspace = (await response.json()) as unknown;
+    const override =
+      typeof workspace === "object" &&
+      workspace !== null &&
+      "engine" in workspace &&
+      typeof (workspace as { engine?: unknown }).engine === "string"
+        ? (workspace as { engine: string }).engine
+        : null;
+    const engine =
+      override !== null
+        ? isChatEngine(override)
+          ? override
+          : "opencode"
+        : await fetchGlobalChatEngine();
+    _workspaceEngineCache.set(workspaceId, engine);
+    return engine;
+  } catch {
+    return "opencode";
+  }
+}
+
+// D23 — coalesced per-workspace pins/notes refetch after session.metadata_moved.
+const METADATA_MOVED_COALESCE_MS = 500;
+const metadataMovedRefetchTimers = new Map<
+  string,
+  ReturnType<typeof setTimeout>
+>();
+
+function scheduleMetadataMovedRefetch(
+  workspaceId: string,
+  get: () => ChatState,
+): void {
+  if (metadataMovedRefetchTimers.has(workspaceId)) return;
+  const timer = setTimeout(() => {
+    metadataMovedRefetchTimers.delete(workspaceId);
+    void get().fetchPinnedSessions(workspaceId);
+    void get().fetchSessionNotes(workspaceId);
+  }, METADATA_MOVED_COALESCE_MS);
+  metadataMovedRefetchTimers.set(workspaceId, timer);
+}
+
+// D23 — coalesced per-workspace reconcileOmoSessionIdentities trigger from SSE onopen.
+const IDENTITIES_RECONCILE_COALESCE_MS = 2_000;
+const identitiesReconcileTimers = new Map<
+  string,
+  ReturnType<typeof setTimeout>
+>();
+
+function scheduleOmoIdentitiesReconcile(
+  workspaceId: string,
+  get: () => ChatState,
+): void {
+  if (identitiesReconcileTimers.has(workspaceId)) return;
+  const timer = setTimeout(() => {
+    identitiesReconcileTimers.delete(workspaceId);
+    void get().reconcileOmoSessionIdentities(workspaceId);
+  }, IDENTITIES_RECONCILE_COALESCE_MS);
+  identitiesReconcileTimers.set(workspaceId, timer);
+}
+
+// D23 — reconcileOmoSessionIdentities: per-workspace single-flight with a
+// trailing re-run flag, so a mutation racing the in-flight fetch always gets
+// a subsequent pass instead of being silently dropped.
+interface OmoIdentitiesResponse {
+  roots: string[];
+  children: string[];
+  replaced: Array<{ old: string; new: string; info: Session }>;
+}
+
+const reconcileOmoIdentitiesInFlight = new Map<string, Promise<void>>();
+const reconcileOmoIdentitiesTrailing = new Set<string>();
+
+async function runReconcileOmoSessionIdentitiesOnce(
+  workspaceId: string,
+  get: () => ChatState,
+): Promise<void> {
+  const ws = get().workspaceStates[workspaceId];
+  const snapshotSessions = ws?.sessions ?? {};
+  const snapshotIds = new Set(Object.keys(snapshotSessions));
+  const snapshotGen = get().sessionMutationGen[workspaceId] ?? 0;
+
+  let response: OmoIdentitiesResponse;
+  try {
+    const res = await fetch(buildProxyUrl("session/identities", workspaceId));
+    if (!res.ok) return;
+    response = (await res.json()) as OmoIdentitiesResponse;
+  } catch {
+    return;
+  }
+
+  if ((get().sessionMutationGen[workspaceId] ?? 0) !== snapshotGen) {
+    reconcileOmoIdentitiesTrailing.add(workspaceId);
+    return;
+  }
+
+  const known = new Set([...response.roots, ...response.children]);
+  const replacedOldIds = new Set(response.replaced.map((entry) => entry.old));
+  for (const sessionId of snapshotIds) {
+    if (known.has(sessionId) && !replacedOldIds.has(sessionId)) continue;
+    const info = snapshotSessions[sessionId];
+    if (!info) continue;
+    get().handleEvent(
+      { type: "session.deleted", properties: { info } },
+      workspaceId,
+    );
+  }
+
+  for (const entry of response.replaced) {
+    const currentSessions =
+      get().workspaceStates[workspaceId]?.sessions ?? snapshotSessions;
+    const alreadyKnown = entry.new in currentSessions;
+    if (
+      !alreadyKnown &&
+      !deletedSessionIdsByWorkspace.get(workspaceId)?.has(entry.new)
+    ) {
+      get().handleEvent(
+        { type: "session.created", properties: { info: entry.info } },
+        workspaceId,
+      );
+    }
+  }
+
+  void get().fetchPinnedSessions(workspaceId);
+  void get().fetchSessionNotes(workspaceId);
+}
+
+async function reconcileOmoSessionIdentitiesImpl(
+  workspaceId: string,
+  get: () => ChatState,
+): Promise<void> {
+  const existing = reconcileOmoIdentitiesInFlight.get(workspaceId);
+  if (existing) {
+    reconcileOmoIdentitiesTrailing.add(workspaceId);
+    return existing;
+  }
+
+  const run = (async () => {
+    do {
+      reconcileOmoIdentitiesTrailing.delete(workspaceId);
+      await runReconcileOmoSessionIdentitiesOnce(workspaceId, get);
+    } while (reconcileOmoIdentitiesTrailing.has(workspaceId));
+  })().finally(() => {
+    reconcileOmoIdentitiesInFlight.delete(workspaceId);
+  });
+  reconcileOmoIdentitiesInFlight.set(workspaceId, run);
+  return run;
+}
+
+// Exported for tests — module-level RAF buffers aren't otherwise observable.
+export function _debugPendingMessageUpdateSessionIds(): string[] {
+  return [...pendingMessageUpdates.keys()];
+}
+
 // Exported for tests — resets all module-level memoization caches between runs
 export function _resetModuleCaches() {
   _unifiedSessionsCache = EMPTY_UNIFIED_SESSIONS;
@@ -290,7 +502,7 @@ export function _resetModuleCaches() {
 
   _fetchSessionsInFlight.clear();
   _refreshMessagesInFlight.clear();
-  _freshRefreshRequested.clear();
+  _refreshModeRequested.clear();
   pendingPartUpdates.clear();
   pendingPartDeltas.clear();
   pendingMessageUpdates.clear();
@@ -301,6 +513,20 @@ export function _resetModuleCaches() {
   sessionDeletionMutations.clear();
   sessionCachePurgeMutations.clear();
   purgedSessionCacheKeys.clear();
+
+  _workspaceEngineCache.clear();
+  _globalChatEngineCache = null;
+  _globalChatEngineFetch = null;
+  for (const timer of metadataMovedRefetchTimers.values()) {
+    clearTimeout(timer);
+  }
+  metadataMovedRefetchTimers.clear();
+  for (const timer of identitiesReconcileTimers.values()) {
+    clearTimeout(timer);
+  }
+  identitiesReconcileTimers.clear();
+  reconcileOmoIdentitiesInFlight.clear();
+  reconcileOmoIdentitiesTrailing.clear();
 }
 const flushingQueuedWorkspaces = new Set<string>();
 
@@ -761,6 +987,10 @@ interface ChatState {
   messageAccessOrder: LruEntry[];
   queuedMessages: Map<string, QueuedMessage[]>;
   queuedWorkspaceIds: Set<string>;
+  // Bumped per workspace by local createSession/deleteSession and by the
+  // session.created/session.deleted reducers — reconcileOmoSessionIdentities
+  // uses it to detect a mutation racing its in-flight identities fetch (D23).
+  sessionMutationGen: Record<string, number>;
 
   // UI focus
   activeWorkspaceId: string | null;
@@ -804,7 +1034,7 @@ interface ChatState {
   _refreshMessagesFromRemote: (
     sessionId: string,
     workspaceId: string,
-    options?: { fresh?: boolean },
+    options?: { fresh?: boolean; replace?: boolean },
   ) => Promise<void>;
   loadOlderMessages: (sessionId: string, workspaceId: string) => Promise<void>;
   loadFullToolOutput: (
@@ -873,6 +1103,7 @@ interface ChatState {
   ) => void;
   disconnectGlobalSSE: () => void;
   resetWorkspace: (workspaceId: string) => void;
+  reconcileOmoSessionIdentities: (workspaceId: string) => Promise<void>;
   refreshActiveSessionStatus: (workspaceId: string) => Promise<void>;
   handleVisibilityRestored: () => void;
 
@@ -1176,6 +1407,42 @@ function removeQueuedMessage(
   };
 }
 
+function removeQueuedMessagesForSession(
+  state: Pick<ChatState, "queuedMessages" | "queuedWorkspaceIds">,
+  workspaceId: string,
+  sessionId: string,
+): Pick<ChatState, "queuedMessages" | "queuedWorkspaceIds"> {
+  const existing = state.queuedMessages.get(workspaceId);
+  if (!existing || !existing.some((m) => m.sessionId === sessionId)) {
+    return state;
+  }
+  const filtered = existing.filter((m) => m.sessionId !== sessionId);
+  const nextQueuedMessages = new Map(state.queuedMessages);
+  const nextQueuedWorkspaceIds = new Set(state.queuedWorkspaceIds);
+  if (filtered.length === 0) {
+    nextQueuedMessages.delete(workspaceId);
+    nextQueuedWorkspaceIds.delete(workspaceId);
+  } else {
+    nextQueuedMessages.set(workspaceId, filtered);
+  }
+  return {
+    queuedMessages: nextQueuedMessages,
+    queuedWorkspaceIds: nextQueuedWorkspaceIds,
+  };
+}
+
+function bumpSessionMutationGen(
+  set: (fn: (state: ChatState) => Partial<ChatState>) => void,
+  workspaceId: string,
+): void {
+  set((state) => ({
+    sessionMutationGen: {
+      ...state.sessionMutationGen,
+      [workspaceId]: (state.sessionMutationGen[workspaceId] ?? 0) + 1,
+    },
+  }));
+}
+
 function enqueueWorkspaceMutation(
   mutations: Map<string, Promise<void>>,
   workspaceId: string,
@@ -1323,6 +1590,30 @@ function isMessageAlreadyOnServer(
   });
 }
 
+// D22 — replace-mode window: wholesale swap of a session's messages for the
+// authoritative remote window, re-appending only a still-unmatched optimistic
+// user message (dropSupersededOptimistic decides "unmatched" the same way the
+// normal merge path does).
+function replaceSessionWindow(
+  ws: WorkspaceState,
+  sessionId: string,
+  receivedMessages: MessageWithParts[],
+  authoritativeMessages: MessageWithParts[],
+): MessageWithParts[] {
+  const optimisticId = ws.optimisticMessageIds[sessionId];
+  const optimisticMessage = optimisticId
+    ? (ws.messages[sessionId] ?? []).find((m) => m.info.id === optimisticId)
+    : undefined;
+  if (!optimisticMessage) return receivedMessages;
+  const { removedIds } = dropSupersededOptimistic(
+    [...receivedMessages, optimisticMessage],
+    authoritativeMessages,
+  );
+  return removedIds.has(optimisticMessage.info.id)
+    ? receivedMessages
+    : [...receivedMessages, optimisticMessage];
+}
+
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
@@ -1331,6 +1622,7 @@ export const useChatStore = create<ChatState>()(
       messageAccessOrder: [],
       queuedMessages: new Map(),
       queuedWorkspaceIds: new Set(),
+      sessionMutationGen: {},
       activeWorkspaceId: null,
       activeSessionId: null,
       streamingError: null,
@@ -1684,6 +1976,7 @@ export const useChatStore = create<ChatState>()(
           clearSessionDeleted(workspaceId, session.id, true);
           purgedSessionCacheKeys.delete(sessionKey(workspaceId, session.id));
           persistSessionMetadata(workspaceId, [session]);
+          bumpSessionMutationGen(set, workspaceId);
           return session;
         } catch {
           return null;
@@ -1714,6 +2007,7 @@ export const useChatStore = create<ChatState>()(
               }
               wasDeleted = true;
               markSessionDeleted(workspaceId, sessionId, "confirmed");
+              bumpSessionMutationGen(set, workspaceId);
               sessionSourceWorkspace.delete(sessionId);
               set((state) => {
                 const key = sessionKey(workspaceId, sessionId);
@@ -2034,11 +2328,17 @@ export const useChatStore = create<ChatState>()(
 
       _refreshMessagesFromRemote: (sessionId, workspaceId, options) => {
         const key = sessionKey(workspaceId, sessionId);
+        const requestedMode = refreshModeFromOptions(options);
         const existing = _refreshMessagesInFlight.get(key);
         if (existing) {
-          if (options?.fresh) _freshRefreshRequested.add(key);
+          const previousMode = _refreshModeRequested.get(key) ?? "normal";
+          if (refreshModeRank(requestedMode) > refreshModeRank(previousMode)) {
+            _refreshModeRequested.set(key, requestedMode);
+          }
           return existing;
         }
+
+        const isReplaceMode = requestedMode === "replace";
 
         const request = (async () => {
           try {
@@ -2048,6 +2348,7 @@ export const useChatStore = create<ChatState>()(
               limit: String(INITIAL_MESSAGE_LIMIT),
             });
             if (options?.fresh) params.set("fresh", "1");
+            if (isReplaceMode) params.set("replace", "1");
 
             const response = await fetch(`/api/sessions/messages?${params}`, {
               signal: AbortSignal.timeout(30_000),
@@ -2090,19 +2391,31 @@ export const useChatStore = create<ChatState>()(
             );
             const isStaleCache = data.source === "stale-cache";
 
+            if (isReplaceMode) {
+              pendingMessageUpdates.delete(sessionId);
+              pendingPartUpdates.delete(sessionId);
+              pendingPartDeltas.clearSession(sessionId);
+            }
+
             set((state) => {
               const wsUpdate = updateWorkspace(state, workspaceId, (ws) => {
                 if (isStaleCache && (ws.messages[sessionId]?.length ?? 0) > 0) {
                   return {};
                 }
-                const merged = mergeTailWindow(
-                  ws.messages[sessionId] ?? [],
-                  receivedMessages,
-                );
-                const { messages: cleaned } = dropSupersededOptimistic(
-                  merged,
-                  authoritativeMessages,
-                );
+                const cleaned = isReplaceMode
+                  ? replaceSessionWindow(
+                      ws,
+                      sessionId,
+                      receivedMessages,
+                      authoritativeMessages,
+                    )
+                  : dropSupersededOptimistic(
+                      mergeTailWindow(
+                        ws.messages[sessionId] ?? [],
+                        receivedMessages,
+                      ),
+                      authoritativeMessages,
+                    ).messages;
                 const fallbackUpdatedAt = ws.sessions[sessionId]?.time.updated;
                 const currentTodoUpdatedAt = ws.todoUpdatedAt?.[sessionId];
                 const backfilledTodoUpdatedAt = getTodoUpdatedAt(
@@ -2208,9 +2521,12 @@ export const useChatStore = create<ChatState>()(
             }));
           } finally {
             _refreshMessagesInFlight.delete(key);
-            if (_freshRefreshRequested.delete(key)) {
+            const rerunMode = _refreshModeRequested.get(key);
+            if (rerunMode) {
+              _refreshModeRequested.delete(key);
               void get()._refreshMessagesFromRemote(sessionId, workspaceId, {
-                fresh: true,
+                fresh: rerunMode !== "normal",
+                replace: rerunMode === "replace",
               });
             }
           }
@@ -2665,6 +2981,15 @@ export const useChatStore = create<ChatState>()(
           );
 
           for (const message of queued) {
+            // The session was confirmed-deleted since this batch was
+            // snapshotted (D23) — replaying it would recreate an old-id
+            // optimistic bucket the store has already torn down.
+            if (
+              getSessionDeletionStatus(workspaceId, message.sessionId) ===
+              "confirmed"
+            ) {
+              continue;
+            }
             if (isMessageAlreadyOnServer(get(), workspaceId, message)) {
               set((state) =>
                 updateWorkspace(state, workspaceId, (ws) => {
@@ -3073,6 +3398,14 @@ export const useChatStore = create<ChatState>()(
               set,
             );
           }
+
+          for (const wsId of workspaceIds) {
+            void getWorkspaceEngine(wsId).then((engine) => {
+              if (engine !== "omo") return;
+              if (!isCurrentSource()) return;
+              scheduleOmoIdentitiesReconcile(wsId, get);
+            });
+          }
         };
 
         newEventSource.onmessage = (evt) => {
@@ -3156,6 +3489,7 @@ export const useChatStore = create<ChatState>()(
       },
 
       resetWorkspace: (workspaceId) => {
+        _workspaceEngineCache.delete(workspaceId);
         const state = get();
         const workspace = state.workspaceStates[workspaceId];
         const sessionIds = new Set<string>([
@@ -3235,6 +3569,9 @@ export const useChatStore = create<ChatState>()(
         });
         get().connectGlobalSSE(get().sseWorkspaceIds, { force: true });
       },
+
+      reconcileOmoSessionIdentities: (workspaceId) =>
+        reconcileOmoSessionIdentitiesImpl(workspaceId, get),
 
       refreshActiveSessionStatus: async (workspaceId) => {
         const { activeSessionId, activeWorkspaceId } = get();
@@ -3595,6 +3932,7 @@ export const useChatStore = create<ChatState>()(
               purgedSessionCacheKeys.delete(
                 sessionKey(sourceWorkspaceId, info.id),
               );
+              bumpSessionMutationGen(set, sourceWorkspaceId);
             }
             persistSessionMetadata(sourceWorkspaceId, [info]);
             set((state) =>
@@ -3619,6 +3957,7 @@ export const useChatStore = create<ChatState>()(
                 ?.has(info.id) === true;
             sessionSourceWorkspace.delete(info.id);
             markSessionDeleted(sourceWorkspaceId, info.id, "confirmed");
+            bumpSessionMutationGen(set, sourceWorkspaceId);
             removedMessageIdsBySession.delete(info.id);
             pendingMessageUpdates.delete(info.id);
             pendingPartUpdates.delete(info.id);
@@ -3663,6 +4002,8 @@ export const useChatStore = create<ChatState>()(
                 ws.sessionVariants;
               const { [info.id]: _lv, ...remainingLastViewedAt } =
                 ws.lastViewedAt;
+              const { [info.id]: _tua, ...remainingTodoUpdatedAt } =
+                ws.todoUpdatedAt ?? {};
 
               let nextActiveSessionId = state.activeSessionId;
               if (state.activeSessionId === info.id) {
@@ -3678,6 +4019,11 @@ export const useChatStore = create<ChatState>()(
                   (e) => e.sessionId !== info.id,
                 ),
                 recoveredMessageIdsBySession: remainingRecoveredIds,
+                ...removeQueuedMessagesForSession(
+                  state,
+                  sourceWorkspaceId,
+                  info.id,
+                ),
                 workspaceStates: {
                   ...state.workspaceStates,
                   [sourceWorkspaceId]: {
@@ -3687,14 +4033,44 @@ export const useChatStore = create<ChatState>()(
                     optimisticMessageIds: remainingOptimistic,
                     sessionStatuses: remainingStatuses,
                     todos: remainingTodos,
+                    todoUpdatedAt: remainingTodoUpdatedAt,
                     sessionAgents: remainingSessionAgents,
                     sessionModels: remainingSessionModels,
                     sessionVariants: remainingSessionVariants,
                     lastViewedAt: remainingLastViewedAt,
+                    questions: ws.questions.filter(
+                      (q) => q.sessionID !== info.id,
+                    ),
+                    permissions: ws.permissions.filter(
+                      (p) => p.sessionID !== info.id,
+                    ),
                   },
                 },
               };
             });
+            break;
+          }
+
+          case "session.resync_required": {
+            const sessionID = properties.sessionID as string | undefined;
+            if (!sessionID) break;
+            const ws = get().workspaceStates[sourceWorkspaceId];
+            // Ignore an event for a session whose message bucket was never
+            // initialized — refreshing would only create an orphan bucket
+            // via updateWorkspace's empty-workspace fallback (D22).
+            if (!ws || !(sessionID in ws.messages)) break;
+            void get()._refreshMessagesFromRemote(
+              sessionID,
+              sourceWorkspaceId,
+              {
+                replace: true,
+              },
+            );
+            break;
+          }
+
+          case "session.metadata_moved": {
+            scheduleMetadataMovedRefetch(sourceWorkspaceId, get);
             break;
           }
 

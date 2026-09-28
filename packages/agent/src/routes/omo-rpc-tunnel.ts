@@ -10,6 +10,7 @@ import { createJsonlLineDecoder, encodeJsonlLine } from "../omo/jsonl.js";
 const HIGH_WATER_BYTES = 8 * 1024 * 1024;
 const LOW_WATER_BYTES = 2 * 1024 * 1024;
 const BACKPRESSURE_POLL_MS = 50;
+const MAX_FRAME_BYTES = 16 * 1024 * 1024;
 
 export interface RpcSocket extends EventEmitter {
   readonly destroyed: boolean;
@@ -117,6 +118,10 @@ export class OmoRpcTunnel {
     }
     const line = encodeJsonlLine(message);
     const bytes = Buffer.byteLength(line);
+    if (bytes > MAX_FRAME_BYTES) {
+      this.close(1009, "Frame too large");
+      return;
+    }
     const rpcSocket = this.rpcSocket;
     if (!rpcSocket || this.isSocketWriteBlocked) {
       this.enqueueFrame({ line, bytes });

@@ -76,6 +76,39 @@ The app starts on `http://localhost:3000` by default. Set `PORT` and `HOSTNAME` 
 
 On first visit you'll be prompted to create a user account.
 
+## OpenCode session retention
+
+Preview an ancestor-safe retention plan without deleting anything:
+
+```bash
+pnpm opencode:cleanup -- --months 3
+```
+
+Write the complete deletion-root manifest for review:
+
+```bash
+pnpm opencode:cleanup -- --months 3 --manifest /tmp/opencode-retention.json
+```
+
+Apply requires the exact dry-run count and a non-existing backup path:
+
+Stop Dev Hub and every OpenCode process first. The command refuses to apply
+while the OpenCode database is open by another process.
+
+```bash
+pnpm opencode:cleanup -- \
+  --months 3 \
+  --apply \
+  --confirm-delete-count <dry-run-count> \
+  --backup ~/Backups/opencode-before-retention.db
+```
+
+The tool retains recently updated sessions and every ancestor needed to reach
+them. Deletions use `opencode session delete`, so old descendant subtrees are
+removed through OpenCode rather than direct SQL. The database file does not
+shrink automatically; stop OpenCode and run `opencode db "VACUUM"` separately
+after verifying the cleanup.
+
 ## Project Structure
 
 Dev Hub is a pnpm monorepo with three packages:
@@ -115,8 +148,21 @@ The agent runs inside the container with two environment variables:
 ```bash
 export WORKSPACE_PATH=/workspace/repo   # required
 export AGENT_PORT=7500                   # optional, default 7500
+export DEVHUB_AGENT_TOKEN=...            # required for omo routes; must match dev-hub's value
 npx tsx src/index.ts
 ```
+
+For omo (OmO Native) remote workspaces, dev-hub sends `DEVHUB_AGENT_TOKEN` only to trusted agent origins: loopback, or an exact origin listed in `DEVHUB_AGENT_ALLOWED_ORIGINS` (comma-separated). Non-loopback agent URLs must use `https`/`wss`.
+
+### OmO Native engine
+
+Each workspace can use OpenCode (default) or omo. Set it per workspace, or change the global default in Settings. Other optional environment variables:
+
+- `OMO_BIN`: path to the `omo` binary (default: `~/.bun/bin/omo`, then `omo` on PATH)
+- `OMO_CODING_AGENT_DIR`: omo agent directory (default `~/.omo/agent`)
+- `OMO_IDLE_DISCONNECT_MS`: how long before dev-hub closes an idle daemon connection (default 600000)
+
+Dev-hub starts the shared `omo daemon` on first use if it isn't running. It never stops it.
 
 See `packages/agent/README.md` or `.opencode/plans/provider-contract-spec.md` for the full contract spec.
 

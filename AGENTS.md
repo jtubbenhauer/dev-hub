@@ -227,7 +227,9 @@ This app is self-hosted (localhost). CDN, SEO, image optimisation, and compressi
 - **OpenCode:** default engine. Dev-hub talks to the OpenCode server via its SDK (`lib/opencode/**`).
 - **omo (OmO Native):** optional engine. Dev-hub attaches over JSON-RPC to the shared `omo daemon` socket. Adapter code lives in `lib/omo/**`; the remote-workspace side lives in `packages/agent/src/omo/**`.
 - **Never stop the omo daemon.** Dev-hub may start it if missing and may close its own idle connections, but it must NEVER stop, kill, or restart the shared daemon. Other clients depend on it.
-- **Tests never use a real omo.** Use the recorded fixtures in `tests/fixtures/omo/**` and the fake host in `tests/helpers/omo-fake-host.ts`.
+- **Tests never use a real omo.** Use the fixtures in `tests/fixtures/omo/**` (currently hand-authored from senpi's `rpc.md`; see their README for `source:`) and the fake host in `tests/helpers/omo-fake-host.ts`.
+- **Agent package tests** run under `pnpm --filter @devhub/agent test`, which is part of `pnpm check`. Root vitest excludes `packages/**`.
+- **Env:** `OMO_BIN`, `OMO_CODING_AGENT_DIR`, `OMO_IDLE_DISCONNECT_MS`, `DEVHUB_AGENT_TOKEN`, `DEVHUB_AGENT_ALLOWED_ORIGINS` (see `.env.example`).
 - **Re-capture fixtures:** `pnpm tsx scripts/omo-capture-fixtures.ts` (needs omo installed and a configured model provider). See `tests/fixtures/omo/README.md`.
 
 ## Common Gotchas

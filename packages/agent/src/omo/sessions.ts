@@ -1,7 +1,7 @@
 import { createReadStream, type Dirent } from "node:fs";
 import { open, readdir, realpath, rm, stat } from "node:fs/promises";
 import { join, sep } from "node:path";
-import { createInterface } from "node:readline";
+import { createJsonlLineDecoder } from "./jsonl.js";
 
 const HEADER_SCAN_CAP_BYTES = 1_048_576;
 const ENTRIES_TOTAL_CAP_BYTES = 67_108_864;
@@ -172,31 +172,44 @@ function extractFirstUserText(entry: {
     : trimmed;
 }
 
+function parseSessionHeaderLine(
+  headerLine: string | undefined,
+): OmoSessionHeader | null {
+  if (!headerLine) return null;
+  try {
+    const parsed: unknown = JSON.parse(headerLine);
+    return isSessionHeader(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readSessionHeader(
+  filePath: string,
+): Promise<OmoSessionHeader | null> {
+  const window = await readLeadingWindow(filePath, HEADER_SCAN_CAP_BYTES);
+  return parseSessionHeaderLine(window.split("\n")[0]);
+}
+
+async function realpathOrNull(path: string): Promise<string | null> {
+  try {
+    return await realpath(path);
+  } catch {
+    return null;
+  }
+}
+
 async function readSessionSummaryIfMatching(
   filePath: string,
   targetRealCwd: string,
 ): Promise<OmoSessionOnDiskSummary | null> {
   const window = await readLeadingWindow(filePath, HEADER_SCAN_CAP_BYTES);
   const lines = window.split("\n");
-  const headerLine = lines[0];
-  if (!headerLine) return null;
+  const header = parseSessionHeaderLine(lines[0]);
+  if (!header) return null;
 
-  let header: OmoSessionHeader;
-  try {
-    const parsed: unknown = JSON.parse(headerLine);
-    if (!isSessionHeader(parsed)) return null;
-    header = parsed;
-  } catch {
-    return null;
-  }
-
-  let headerRealCwd: string;
-  try {
-    headerRealCwd = await realpath(header.cwd);
-  } catch {
-    return null;
-  }
-  if (headerRealCwd !== targetRealCwd) return null;
+  const headerRealCwd = await realpathOrNull(header.cwd);
+  if (headerRealCwd === null || headerRealCwd !== targetRealCwd) return null;
 
   let sessionInfoName: string | null = null;
   let firstUserText: string | null = null;
@@ -272,32 +285,37 @@ export async function readOmoSessionEntries(
 ): Promise<SessionEntry[]> {
   const entries: SessionEntry[] = [];
   const stream = createReadStream(sessionPath, {
-    encoding: "utf8",
     end: ENTRIES_TOTAL_CAP_BYTES - 1,
   });
-  const lineReader = createInterface({ input: stream, crlfDelay: Infinity });
 
   let isFirstLine = true;
-
-  for await (const line of lineReader) {
+  const consumeLine = (line: string): void => {
     if (isFirstLine) {
       isFirstLine = false;
-      continue;
+      return;
     }
-    if (!line.trim()) continue;
+    if (!line.trim()) return;
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(line);
     } catch (error) {
-      if (error instanceof SyntaxError) continue;
+      if (error instanceof SyntaxError) return;
       throw error;
     }
 
-    if (!isSessionEntry(parsed)) continue;
-
+    if (!isSessionEntry(parsed)) return;
     entries.push(normalizeSessionEntry(parsed));
+  };
+
+  // createJsonlLineDecoder enforces a 16 MiB cap per record, silently
+  // discarding any line that exceeds it instead of buffering it unbounded.
+  const decoder = createJsonlLineDecoder(consumeLine, () => {});
+
+  for await (const chunk of stream) {
+    decoder.write(chunk as Buffer);
   }
+  decoder.end();
 
   return entries;
 }
@@ -305,6 +323,8 @@ export async function readOmoSessionEntries(
 export async function deleteOmoSession(
   agentDir: string,
   sessionPath: string,
+  expectedSessionId: string,
+  workspacePath: string,
 ): Promise<void> {
   const sessionsRoot = await realpath(join(agentDir, "sessions"));
   const realSessionPath = await realpath(sessionPath);
@@ -316,5 +336,25 @@ export async function deleteOmoSession(
       "Refusing to delete a session outside the sessions directory",
     );
   }
+
+  // Re-verify identity immediately before rm to close the TOCTOU window
+  // between the realpath check above and the delete below: the file at
+  // realSessionPath could have been swapped (e.g. via a symlink race)
+  // since it was looked up in the session listing.
+  const targetRealCwd = await realpathOrNull(workspacePath);
+  const header = await readSessionHeader(realSessionPath);
+  const headerRealCwd =
+    header === null ? null : await realpathOrNull(header.cwd);
+  if (
+    header === null ||
+    header.id !== expectedSessionId ||
+    targetRealCwd === null ||
+    headerRealCwd !== targetRealCwd
+  ) {
+    throw new Error(
+      "Refusing to delete a session that no longer matches its expected identity",
+    );
+  }
+
   await rm(realSessionPath);
 }

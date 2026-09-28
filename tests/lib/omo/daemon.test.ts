@@ -111,6 +111,41 @@ describe("ensureOmoDaemon", () => {
     }
   });
 
+  it("throttles a retry after a failed ensure to one attempt per 30s", async () => {
+    vi.useFakeTimers();
+    try {
+      mockExecFile.mockImplementationOnce((_bin, _args, _options, callback) => {
+        callback(exitError(3), "", "");
+      });
+
+      await expect(
+        ensureOmoDaemon({ bin: "/opt/omo", agentDir: "/state/omo" }),
+      ).rejects.toBeInstanceOf(OmoDaemonNotRunningError);
+      const callsAfterFirstFailure = mockExecFile.mock.calls.length;
+
+      await expect(
+        ensureOmoDaemon({ bin: "/opt/omo", agentDir: "/state/omo" }),
+      ).rejects.toBeInstanceOf(OmoDaemonNotRunningError);
+      expect(mockExecFile.mock.calls.length).toBe(callsAfterFirstFailure);
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      mockExecFile.mockImplementationOnce((_bin, _args, _options, callback) => {
+        callback(
+          null,
+          '{"socket":"/state/omo/rpc/rpc.sock","pid":42,"instanceId":"instance-2","engineVersion":"2026.9.27","action":"start"}\n',
+          "",
+        );
+      });
+
+      await expect(
+        ensureOmoDaemon({ bin: "/opt/omo", agentDir: "/state/omo" }),
+      ).resolves.toMatchObject({ instanceId: "instance-2" });
+      expect(mockExecFile.mock.calls.length).toBe(callsAfterFirstFailure + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shares an in-flight ensure across HMR module instances", async () => {
     const callsBeforeEnsure = mockExecFile.mock.calls.length;
     mockExecFile.mockImplementationOnce((_bin, _args, _options, callback) => {

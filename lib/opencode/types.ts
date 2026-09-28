@@ -52,6 +52,21 @@ export interface MessageRekeyedEvent {
   };
 }
 
+export interface SessionResyncRequiredEvent {
+  readonly type: "session.resync_required";
+  readonly properties: {
+    readonly sessionID: string;
+  };
+}
+
+export interface SessionMetadataMovedEvent {
+  readonly type: "session.metadata_moved";
+  readonly properties: {
+    readonly sessionID: string;
+    readonly fromSessionID: string;
+  };
+}
+
 export interface MessagePartDeltaEvent {
   readonly type: "message.part.delta";
   readonly properties: {
@@ -69,7 +84,9 @@ export type Event =
   | EventQuestionReplied
   | EventQuestionRejected
   | MessagePartDeltaEvent
-  | MessageRekeyedEvent;
+  | MessageRekeyedEvent
+  | SessionResyncRequiredEvent
+  | SessionMetadataMovedEvent;
 export type {
   Command,
   PermissionRequest,

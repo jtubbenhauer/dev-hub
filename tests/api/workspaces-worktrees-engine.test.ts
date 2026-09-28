@@ -134,7 +134,7 @@ describe("workspace engine creation", () => {
         body: JSON.stringify({
           backend: "remote",
           engine: "omo",
-          agentUrl: "http://agent.test",
+          agentUrl: "http://127.0.0.1:7500",
         }),
       }),
     );

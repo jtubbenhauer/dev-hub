@@ -148,6 +148,28 @@ describe("handleOmoRead message history", () => {
     ]);
   });
 
+  it("serves empty history for an attached session with no file yet", async () => {
+    const fixture = await useReadFixture();
+    fixture.sqlite
+      .prepare(
+        `INSERT INTO omo_session_index
+         (workspace_id, durable_id, session_path, kind, title, created_ms,
+          updated_ms, updated_at)
+         VALUES ('workspace-1', 'fresh', NULL, 'interactive', 'Fresh', 1, 1, 1)`,
+      )
+      .run();
+    fixture.registry.attach.mockResolvedValue(createBinding("fresh"));
+    fixture.registry.request.mockResolvedValue({
+      data: { entries: [], leafId: null },
+    });
+
+    const response = await fixture.request("/session/omo_fresh/message");
+
+    expect(response.status).toBe(200);
+    expect(messageIds(await readJson(response))).toEqual([]);
+    expect(fixture.source.authorizeSession).not.toHaveBeenCalled();
+  });
+
   it("authorizes before attach and strips the public prefix once", async () => {
     const fixture = await useReadFixture();
     fixture.source.authorized.add("exact-id");

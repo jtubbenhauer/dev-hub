@@ -1,3 +1,5 @@
+import type { SessionStatus } from "@opencode-ai/sdk";
+import { DialogLedger } from "@/lib/omo/dialog-ledger";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoRpcClient } from "@/lib/omo/rpc-client";
 import { getOmoIndexRow } from "@/lib/omo/session-index";
@@ -9,7 +11,10 @@ import {
   type OmoBindOpenedInput,
 } from "@/lib/omo/session-registry-binding";
 import { OmoRegistryDispatcher } from "@/lib/omo/session-registry-dispatch";
-import { OmoWorkspacePathConflictError } from "@/lib/omo/session-registry-errors";
+import {
+  OmoHydrationAbortedError,
+  OmoWorkspacePathConflictError,
+} from "@/lib/omo/session-registry-errors";
 import { handleOmoSessionReplacement } from "@/lib/omo/session-registry-replacement";
 import {
   canonicalWorkspacePath,
@@ -35,6 +40,7 @@ import type {
 export class OmoSessionRegistry {
   readonly attachCoordinator = new OmoAttachCoordinator();
   readonly openLock = this.attachCoordinator.openLock;
+  readonly dialogLedger: DialogLedger;
   private readonly byDurableId = new Map<string, OmoSessionBinding>();
   private readonly byRoutingHandle = new Map<string, OmoSessionBinding>();
   private readonly bySessionPath = new Map<string, OmoSessionBinding>();
@@ -44,11 +50,15 @@ export class OmoSessionRegistry {
   private readonly dispatcher: OmoRegistryDispatcher;
   private readonly stopGlobalListener: () => void;
   private readonly getSubscriberCount: (workspaceId: string) => number;
+  private readonly getSkillPrefixes: (
+    workspacePath: string,
+  ) => readonly string[];
 
   constructor(
     readonly client: OmoRpcClient,
     options: OmoSessionRegistryOptions = {},
   ) {
+    this.dialogLedger = options.dialogLedger ?? new DialogLedger();
     this.dispatcher = new OmoRegistryDispatcher({
       client,
       refreshIndex: (workspace) => this.refreshIndexFromHost(workspace),
@@ -56,6 +66,7 @@ export class OmoSessionRegistry {
     this.getSubscriberCount =
       options.getSubscriberCount ??
       ((workspaceId) => this.dispatcher.subscriberCount(workspaceId));
+    this.getSkillPrefixes = options.getSkillPrefixes ?? (() => []);
     this.stopGlobalListener = client.on(this.routeBoundRecord.bind(this));
   }
 
@@ -126,6 +137,9 @@ export class OmoSessionRegistry {
       request: input.request,
       canonicalPath: input.canonicalPath,
       generation,
+      client: this.client,
+      dialogLedger: this.dialogLedger,
+      skillPrefixes: this.getSkillPrefixes(input.request.workspace.path),
     });
     binding.unregisterSession = this.client.onSession(
       binding.routingHandle,
@@ -167,6 +181,9 @@ export class OmoSessionRegistry {
       durableId,
       sessionPath,
       generation,
+      client: this.client,
+      dialogLedger: this.dialogLedger,
+      skillPrefixes: this.getSkillPrefixes(previous.workspace.path),
     });
     previous.unregisterSession = () => undefined;
     this.byDurableId.delete(
@@ -208,13 +225,30 @@ export class OmoSessionRegistry {
     record: JsonlRecord,
   ): readonly OmoRegistryEvent[] {
     if (record["type"] === "session_replaced") {
-      void handleOmoSessionReplacement(this, binding, record).catch((error) => {
-        binding.failure =
-          error instanceof Error ? error : new Error(String(error));
-      });
+      void handleOmoSessionReplacement(this, binding, record).catch(
+        (error: unknown) =>
+          this.reportBindingFailure(binding, error, "OmO session replacement"),
+      );
       return [];
     }
     return this.dispatcher.dispatch(binding, record);
+  }
+
+  reportBindingFailure(
+    binding: OmoSessionBinding,
+    error: unknown,
+    context: string,
+  ): void {
+    const failure = error instanceof Error ? error : new Error(String(error));
+    binding.failure = failure;
+    console.error(`${context} failed`, failure);
+    this.emitEvent(binding.workspaceId, {
+      type: "session.error",
+      properties: {
+        sessionID: `omo_${binding.durableId}`,
+        error: { name: "UnknownError", data: { message: failure.message } },
+      },
+    });
   }
 
   emitEvent(workspaceId: string, event: OmoRegistryEvent): void {
@@ -232,8 +266,13 @@ export class OmoSessionRegistry {
     }
     binding.unregisterSession();
     binding.unregisterSession = () => undefined;
+    const wasHydrating =
+      binding.state === "hydrating" || binding.state === "cutover";
     binding.state = "detached";
     binding.failure = undefined;
+    if (wasHydrating) {
+      binding.rejectReady(new OmoHydrationAbortedError(binding.durableId));
+    }
   }
 
   isCurrent(binding: OmoSessionBinding): boolean {
@@ -254,12 +293,10 @@ export class OmoSessionRegistry {
     return this.dispatcher.enqueueLeaf(workspaceId, durableId, mutation);
   }
 
-  eventsForWorkspace(workspaceId: string): readonly OmoRegistryEvent[] {
-    return this.dispatcher.eventsForWorkspace(workspaceId);
-  }
-
-  recordsForWorkspace(workspaceId: string): readonly JsonlRecord[] {
-    return this.dispatcher.recordsForWorkspace(workspaceId);
+  sessionStatusesForWorkspace(
+    workspaceId: string,
+  ): Record<string, SessionStatus> {
+    return this.dispatcher.sessionStatusesForWorkspace(workspaceId);
   }
 
   subscribe(workspaceId: string, sink: OmoRegistryEventSink): () => void {
@@ -285,6 +322,10 @@ export class OmoSessionRegistry {
     }
     binding.unregisterSession();
     if (binding.state !== "replaced") binding.state = "closed";
+    this.dispatcher.deleteSessionStatus(
+      binding.workspaceId,
+      `omo_${binding.durableId}`,
+    );
     const stillOwned = [...this.byRoutingHandle.values()].some(
       (candidate) =>
         candidate.canonicalWorkspacePath === binding.canonicalWorkspacePath,

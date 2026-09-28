@@ -39,6 +39,22 @@ function daemonErrorStatus(kind: OmoDaemonErrorKind): 400 | 501 | 502 | 503 {
   }
 }
 
+const DAEMON_ERROR_MESSAGES: Record<OmoDaemonErrorKind, string> = {
+  usage: "The omo daemon command rejected its arguments",
+  unsupported_platform:
+    "OmO Native requires a POSIX platform with Unix socket support",
+  not_running: "The omo daemon is not running",
+  engine_refused: "The omo engine failed to start",
+};
+
+function daemonErrorResponse(error: OmoDaemonError): {
+  error: string;
+  kind: OmoDaemonErrorKind;
+} {
+  console.error(`[agent] omo daemon error (${error.kind}):`, error.message);
+  return { error: DAEMON_ERROR_MESSAGES[error.kind], kind: error.kind };
+}
+
 export function omoSessionRoutes(workspacePath: string): Hono {
   const app = new Hono();
   app.use("*", bearerAuthMiddleware());
@@ -50,7 +66,7 @@ export function omoSessionRoutes(workspacePath: string): Hono {
     } catch (error) {
       if (error instanceof OmoDaemonError) {
         return c.json(
-          { error: error.message, kind: error.kind },
+          daemonErrorResponse(error),
           daemonErrorStatus(error.kind),
         );
       }
@@ -65,7 +81,7 @@ export function omoSessionRoutes(workspacePath: string): Hono {
     } catch (error) {
       if (error instanceof OmoDaemonError) {
         return c.json(
-          { error: error.message, kind: error.kind },
+          daemonErrorResponse(error),
           daemonErrorStatus(error.kind),
         );
       }
@@ -109,7 +125,12 @@ export function omoSessionRoutes(workspacePath: string): Hono {
     const summary = summaries.find((s) => s.durableId === c.req.param("id"));
     if (!summary) return c.json({ error: "Session not found" }, 404);
 
-    await deleteOmoSession(agentDir, summary.sessionPath);
+    await deleteOmoSession(
+      agentDir,
+      summary.sessionPath,
+      summary.durableId,
+      workspacePath,
+    );
     return c.json({ deleted: true });
   });
 

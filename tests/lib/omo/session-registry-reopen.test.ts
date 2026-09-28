@@ -195,6 +195,55 @@ describe("OmoSessionRegistry lifecycle reopening", () => {
     expect(recordsOfType(fixture, "open_session")).toHaveLength(2);
   });
 
+  it("releases the open lock while retrying session_path_in_use so an unrelated attach is not blocked", async () => {
+    // Given a retry delay long enough to observe blocking if the lock leaked
+    fixture = await createRegistryFixture([
+      {
+        type: "open_session",
+        response: {
+          success: false,
+          error: "session path is in use",
+          errorCode: "session_path_in_use",
+          errorData: { retry_after_ms: 200 },
+        },
+      },
+      openFixture({
+        durableId: "unrelated",
+        sessionPath: "/sessions/unrelated.jsonl",
+      }),
+      entriesFixture([], null),
+      openFixture({
+        durableId: "path-retry-b",
+        sessionPath: "/sessions/path-retry-b.jsonl",
+      }),
+      entriesFixture([], null),
+    ]);
+    insertIndexRow(fixture.sqlite, {
+      durableId: "path-retry-b",
+      sessionPath: "/sessions/path-retry-b.jsonl",
+    });
+
+    // When the sleeping attach and an unrelated attach both start
+    const sleepingAttach = fixture.runtime.registry.attach({
+      workspace: fixture.workspace,
+      durableId: "path-retry-b",
+      sessionPath: "/sessions/path-retry-b.jsonl",
+    });
+    const startedAt = Date.now();
+    const unrelatedAttach = fixture.runtime.registry.attach({
+      workspace: fixture.workspace,
+      durableId: "unrelated",
+      sessionPath: "/sessions/unrelated.jsonl",
+    });
+
+    // Then the unrelated attach finishes well before the 200ms retry delay
+    await unrelatedAttach;
+    const unrelatedElapsedMs = Date.now() - startedAt;
+    await sleepingAttach;
+
+    expect(unrelatedElapsedMs).toBeLessThan(150);
+  });
+
   it("reattaches only workspaces with active subscribers after reconnect", async () => {
     // Given
     fixture = await createRegistryFixture([

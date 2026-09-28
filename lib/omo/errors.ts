@@ -86,3 +86,19 @@ export class OmoTransportGoneError extends Error {
     super("The OmO RPC transport disconnected");
   }
 }
+
+const TRANSPORT_ERRNO_CODES = new Set([
+  "ENOENT",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EPIPE",
+  "ETIMEDOUT",
+]);
+
+export function isOmoTransportErrnoError(
+  error: unknown,
+): error is NodeJS.ErrnoException {
+  if (!(error instanceof Error) || !("code" in error)) return false;
+  const code = (error as NodeJS.ErrnoException).code;
+  return typeof code === "string" && TRANSPORT_ERRNO_CODES.has(code);
+}

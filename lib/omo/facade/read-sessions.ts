@@ -56,11 +56,23 @@ function titleFromState(
     : undefined;
 }
 
-function liveSessionIds(response: Readonly<Record<string, unknown>>): string[] {
+// Cwd rule matches refreshOmoIndexFromHost: never index/list a foreign cwd.
+function liveSessionIds(
+  response: Readonly<Record<string, unknown>>,
+  workspacePath: string,
+  canonicalPath: string,
+): string[] {
   const data = response["data"];
   if (!isJsonObject(data) || !Array.isArray(data["sessions"])) return [];
   return data["sessions"].flatMap((value) => {
     if (!isJsonObject(value) || value["kind"] === "worker") return [];
+    const cwd = value["cwd"];
+    if (
+      typeof cwd !== "string" ||
+      (cwd !== workspacePath && cwd !== canonicalPath)
+    ) {
+      return [];
+    }
     const durableId = value["durableSessionId"];
     return typeof durableId === "string" ? [durableId] : [];
   });
@@ -72,12 +84,19 @@ async function liveSummaries(
   if (!context.runtime.client.isConnected) return [];
   try {
     await context.runtime.registry.refreshIndexFromHost(context.workspace);
+    const canonicalPath = await context.runtime.registry.canonicalWorkspacePath(
+      context.workspace,
+    );
     const response = await context.runtime.client.request({
       type: "list_sessions",
       include_workers: false,
     });
     const summaries: OmoSessionOnDiskSummary[] = [];
-    for (const durableId of liveSessionIds(response)) {
+    for (const durableId of liveSessionIds(
+      response,
+      context.workspace.path,
+      canonicalPath,
+    )) {
       const row = await getOmoIndexRow(context.workspace.id, durableId);
       const now = Date.now();
       summaries.push({
@@ -129,17 +148,18 @@ export async function readOmoSession(
   context: OmoReadContext,
   rawId: string,
 ): Promise<Response> {
-  if (!(await context.source.authorizeSession(rawId))) {
-    return sessionNotFoundResponse();
-  }
   const [row, summaries] = await Promise.all([
     getOmoIndexRow(context.workspace.id, rawId),
     context.source.list(),
   ]);
+  if (row?.replacedByDurableId != null) return sessionNotFoundResponse();
   const summary = summaries.find((candidate) => candidate.durableId === rawId);
   let session: Session;
   if (summary !== undefined) {
     session = sessionFromSummary(context, summary);
+    if (row?.parentDurableId) {
+      session = { ...session, parentID: `omo_${row.parentDurableId}` };
+    }
   } else if (row !== null) {
     session = sessionFromRow(context, row);
   } else {
@@ -163,7 +183,8 @@ export async function readOmoChildren(
   context: OmoReadContext,
   rawId: string,
 ): Promise<Response> {
-  if (!(await context.source.authorizeSession(rawId))) {
+  const parentRow = await getOmoIndexRow(context.workspace.id, rawId);
+  if (parentRow === null && !(await context.source.authorizeSession(rawId))) {
     return sessionNotFoundResponse();
   }
   if (context.runtime.client.isConnected) {
@@ -177,46 +198,9 @@ export async function readOmoChildren(
   return jsonResponse(rows.map((row) => sessionFromRow(context, row)));
 }
 
-function statusFromEvent(value: unknown): {
-  readonly sessionID: string;
-  readonly status: SessionStatus;
-} | null {
-  if (!isJsonObject(value) || value["type"] !== "session.status") return null;
-  const properties = value["properties"];
-  if (
-    !isJsonObject(properties) ||
-    typeof properties["sessionID"] !== "string"
-  ) {
-    return null;
-  }
-  const status = properties["status"];
-  if (!isJsonObject(status)) return null;
-  if (status["type"] === "busy" || status["type"] === "idle") {
-    return {
-      sessionID: properties["sessionID"],
-      status: { type: status["type"] },
-    };
-  }
-  if (
-    status["type"] === "retry" &&
-    typeof status["attempt"] === "number" &&
-    typeof status["message"] === "string" &&
-    typeof status["next"] === "number"
-  ) {
-    return {
-      sessionID: properties["sessionID"],
-      status: {
-        type: "retry",
-        attempt: status["attempt"],
-        message: status["message"],
-        next: status["next"],
-      },
-    };
-  }
-  return null;
-}
-
-export function readOmoSessionStatus(context: OmoReadContext): Response {
+function sessionStatusesForWorkspace(
+  context: OmoReadContext,
+): Record<string, SessionStatus> {
   const statuses: Record<string, SessionStatus> = {};
   for (const binding of context.runtime.registry.bindingsForLifecycle()) {
     if (
@@ -229,13 +213,16 @@ export function readOmoSessionStatus(context: OmoReadContext): Response {
       };
     }
   }
-  for (const event of context.runtime.registry.eventsForWorkspace(
-    context.workspace.id,
-  )) {
-    const current = statusFromEvent(event);
-    if (current !== null) statuses[current.sessionID] = current.status;
-  }
-  return jsonResponse(statuses);
+  return {
+    ...statuses,
+    ...context.runtime.registry.sessionStatusesForWorkspace(
+      context.workspace.id,
+    ),
+  };
+}
+
+export function readOmoSessionStatus(context: OmoReadContext): Response {
+  return jsonResponse(sessionStatusesForWorkspace(context));
 }
 
 export function readOmoTodos(): Response {

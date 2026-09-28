@@ -242,7 +242,7 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
         case "auto_retry_end":
           return statusHandlers.handleRetryEnd(record);
         case "compaction_end":
-          return statusHandlers.handleCompactionEnd();
+          return statusHandlers.handleCompactionEnd(record);
         case "model_changed":
           return statusHandlers.handleModelChanged(record);
         case "session_replaced":

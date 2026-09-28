@@ -21,13 +21,21 @@ function finiteNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+const GENERIC_SKILL_PATTERN = /^\$([a-z0-9][a-z0-9_-]*)\s/;
+
 function skillFromText(
   text: string,
   skillPrefixes: readonly string[],
 ): { readonly skill?: string; readonly text: string } {
-  const skill = skillPrefixes.find((name) => text.startsWith(`$${name} `));
-  if (!skill) return { text };
-  return { skill, text: text.slice(skill.length + 2) };
+  if (skillPrefixes.length > 0) {
+    const skill = skillPrefixes.find((name) => text.startsWith(`$${name} `));
+    if (skill) return { skill, text: text.slice(skill.length + 2) };
+    return { text };
+  }
+  const match = GENERIC_SKILL_PATTERN.exec(text);
+  const skill = match?.[1];
+  if (!match || skill === undefined) return { text };
+  return { skill, text: text.slice(match[0].length) };
 }
 
 function buildContentPart(

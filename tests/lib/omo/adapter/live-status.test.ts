@@ -133,6 +133,30 @@ describe("createLiveAdapter status events", () => {
     ]);
   });
 
+  it("does not emit session.compacted when compaction was aborted", () => {
+    const result = createLiveAdapter(OPTIONS).handle({
+      type: "compaction_end",
+      reason: "manual",
+      result: null,
+      aborted: true,
+      willRetry: false,
+    });
+
+    expect(result).toEqual({ events: [], effects: [] });
+  });
+
+  it("does not emit session.compacted when compaction failed with an error", () => {
+    const result = createLiveAdapter(OPTIONS).handle({
+      type: "compaction_end",
+      reason: "manual",
+      result: null,
+      aborted: false,
+      errorMessage: "API quota exceeded",
+    });
+
+    expect(result).toEqual({ events: [], effects: [] });
+  });
+
   it("maps a successful set_session_name response to a complete session", () => {
     const result = createLiveAdapter(OPTIONS).handle({
       type: "response",

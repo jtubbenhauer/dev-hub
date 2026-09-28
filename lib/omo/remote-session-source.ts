@@ -1,4 +1,5 @@
 import { OmoTransportGoneError } from "@/lib/omo/errors";
+import { isTrustedAgentOrigin } from "@/lib/workspaces/agent-origin";
 import { OmoNotFoundError, type SessionSource } from "@/lib/omo/session-source";
 import type {
   OmoSessionOnDiskSummary,
@@ -158,8 +159,9 @@ export class RemoteAgentSessionSource implements SessionSource {
     return value["path"];
   }
 
-  async authorizeSession(_rawId: string): Promise<boolean> {
-    return true;
+  async authorizeSession(rawId: string): Promise<boolean> {
+    const sessions = await this.list();
+    return sessions.some((session) => session.durableId === rawId);
   }
 
   private sessionUrl(rawId: string): string {
@@ -173,6 +175,7 @@ export class RemoteAgentSessionSource implements SessionSource {
     url: string,
     method: "DELETE" | "GET",
   ): Promise<Response> {
+    if (!isTrustedAgentOrigin(url)) throw new OmoTransportGoneError();
     let response: Response;
     try {
       response = await globalThis.fetch(url, {

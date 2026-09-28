@@ -6,6 +6,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend";
 import { superviseSseTarget } from "@/lib/opencode/sse-supervisor";
 import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
+import type { OmoRuntimeWorkspace } from "@/lib/omo/runtime";
 
 export const maxDuration = 300;
 
@@ -100,7 +101,7 @@ const SSE_HEADERS = {
 async function resolveOmoWorkspaces(
   workspaceIds: string[],
   userId: string,
-): Promise<{ id: string; path: string }[]> {
+): Promise<OmoRuntimeWorkspace[]> {
   const rows = await db
     .select()
     .from(workspaces)
@@ -109,7 +110,12 @@ async function resolveOmoWorkspaces(
     );
   return rows.map((row) => {
     const workspace = toWorkspace(row);
-    return { id: workspace.id, path: workspace.path };
+    return {
+      id: workspace.id,
+      path: workspace.path,
+      backend: workspace.backend,
+      agentUrl: workspace.agentUrl,
+    };
   });
 }
 
@@ -193,9 +199,9 @@ async function mixedEngineEvents(
     }
     const { createOmoWorkspaceEventStream } =
       await import("@/lib/omo/event-stream");
-    const { getOmoReadRuntime } = await import("@/lib/omo/facade/read-runtime");
-    const runtime = getOmoReadRuntime();
+    const { createOmoContext } = await import("@/lib/omo/runtime");
     for (const workspace of omoWorkspaces) {
+      const { runtime } = createOmoContext(workspace);
       children.push(
         createOmoWorkspaceEventStream({
           workspace,

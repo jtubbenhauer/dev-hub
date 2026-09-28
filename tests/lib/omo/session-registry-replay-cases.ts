@@ -63,15 +63,19 @@ describe("OmoSessionRegistry buffered replay", () => {
       }),
       entriesFixture([user, assistant], "assistant-mid"),
     ]);
+    const events: OmoRegistryEvent[] = [];
+    fixture.runtime.registry.subscribe("workspace-1", (event) =>
+      events.push(event),
+    );
 
     await fixture.runtime.registry.attach({
       workspace: fixture.workspace,
       durableId: "mid-turn",
     });
 
-    const assistantEvent = rekeyEvents(
-      fixture.runtime.registry.eventsForWorkspace("workspace-1"),
-    ).find((event) => event.properties.toMessageID === "omo_assistant-mid");
+    const assistantEvent = rekeyEvents(events).find(
+      (event) => event.properties.toMessageID === "omo_assistant-mid",
+    );
     expect(assistantEvent?.properties.info).toMatchObject({
       parentID: "omo_user-mid",
     });
@@ -94,15 +98,17 @@ describe("OmoSessionRegistry buffered replay", () => {
       }),
       entriesFixture([user1, assistant1, user2, assistant2], "assistant-2"),
     ]);
+    const rawEvents: OmoRegistryEvent[] = [];
+    fixture.runtime.registry.subscribe("workspace-1", (event) =>
+      rawEvents.push(event),
+    );
 
     await fixture.runtime.registry.attach({
       workspace: fixture.workspace,
       durableId: "chain",
     });
 
-    const events = rekeyEvents(
-      fixture.runtime.registry.eventsForWorkspace("workspace-1"),
-    );
+    const events = rekeyEvents(rawEvents);
     expect(events).toHaveLength(3);
     expect(
       events.find((event) => event.properties.toMessageID === "omo_assistant-1")

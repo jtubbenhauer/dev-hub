@@ -2,7 +2,7 @@
 
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { realpath, rm } from "node:fs/promises";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "@/drizzle/schema";
 import { createRegistryTestDatabase } from "@/tests/lib/omo/session-registry-db-fixture";
 
@@ -73,7 +73,12 @@ async function stubRemoteRegistryClient(
   return openSession;
 }
 
+beforeEach(() => {
+  vi.stubEnv("DEVHUB_AGENT_ALLOWED_ORIGINS", "https://agent.example");
+});
+
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const runtime of globalThis.__devhubOmo?.values() ?? []) {
     runtime.registry.dispose();
     runtime.client.close();
@@ -154,6 +159,118 @@ describe("RemoteAgentSessionSource", () => {
       "Bearer agent-token",
     );
     expect(rm).not.toHaveBeenCalled();
+  });
+
+  it("never sends the agent token to an origin outside the allowlist", async () => {
+    vi.resetModules();
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json([]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { RemoteAgentSessionSource } =
+      await import("@/lib/omo/remote-session-source");
+    const { OmoTransportGoneError } = await import("@/lib/omo/errors");
+    const source = new RemoteAgentSessionSource({
+      sessionsUrl: "https://attacker.example/omo/sessions",
+      token: "agent-token",
+    });
+
+    await expect(source.list()).rejects.toBeInstanceOf(OmoTransportGoneError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("shares one dialog ledger between the remote registry and the facade", async () => {
+    vi.resetModules();
+    const { getOmoRuntimeForWorkspace } = await import("@/lib/omo/runtime");
+    const { getOmoDialogLedger } =
+      await import("@/lib/omo/facade/read-runtime");
+    const { runtime } = getOmoRuntimeForWorkspace(
+      {
+        id: "workspace-1",
+        path: "/informational-only",
+        backend: "remote",
+        agentUrl: "https://agent.example",
+      },
+      "agent-token",
+    );
+
+    expect(getOmoDialogLedger(runtime)).toBe(runtime.registry.dialogLedger);
+  });
+
+  it("refuses to build a remote runtime for an untrusted agentUrl", async () => {
+    vi.resetModules();
+    const { getOmoRuntimeForWorkspace } = await import("@/lib/omo/runtime");
+    const { OmoTransportGoneError } = await import("@/lib/omo/errors");
+
+    expect(() =>
+      getOmoRuntimeForWorkspace(
+        {
+          id: "workspace-1",
+          path: "/informational-only",
+          backend: "remote",
+          agentUrl: "http://10.0.0.1:7500",
+        },
+        "agent-token",
+      ),
+    ).toThrow(OmoTransportGoneError);
+  });
+});
+
+describe("facade context routing by backend", () => {
+  it("routes createOmoReadContext and createOmoWriteContext to the remote source and never touches fs", async () => {
+    vi.resetModules();
+    useTestDatabase(["workspace-1"]);
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json([]));
+    vi.stubGlobal("fetch", fetchMock);
+    const { createOmoReadContext } =
+      await import("@/lib/omo/facade/read-runtime");
+    const { createOmoWriteContext } =
+      await import("@/lib/omo/facade/write-runtime");
+    const { RemoteAgentSessionSource } =
+      await import("@/lib/omo/remote-session-source");
+    const { LocalFsSessionSource } = await import("@/lib/omo/session-source");
+    const workspace = {
+      id: "workspace-1",
+      path: "/informational-only",
+      backend: "remote" as const,
+      agentUrl: "https://agent.example",
+    };
+
+    const readContext = createOmoReadContext(workspace);
+    const writeContext = createOmoWriteContext(workspace);
+    await readContext.source.list();
+
+    expect(readContext.source).toBeInstanceOf(RemoteAgentSessionSource);
+    expect(readContext.source).not.toBeInstanceOf(LocalFsSessionSource);
+    expect(writeContext.source).toBeInstanceOf(RemoteAgentSessionSource);
+    expect(writeContext.source).not.toBeInstanceOf(LocalFsSessionSource);
+    expect(readContext.runtime).toBe(writeContext.runtime);
+    expect(fetchMock).toHaveBeenCalled();
+    expect(realpath).not.toHaveBeenCalled();
+  });
+
+  it("authorizes a remote session only when it appears in the sidecar's scoped listing", async () => {
+    vi.resetModules();
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json([
+        {
+          durableId: "listed",
+          sessionPath: "/agent/sessions/listed.jsonl",
+          forkedFrom: null,
+          title: "Listed",
+          createdMs: 1,
+          updatedMs: 2,
+        },
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { RemoteAgentSessionSource } =
+      await import("@/lib/omo/remote-session-source");
+    const source = new RemoteAgentSessionSource({
+      sessionsUrl: "https://agent.example/omo/sessions",
+      token: "agent-token",
+    });
+
+    await expect(source.authorizeSession("listed")).resolves.toBe(true);
+    await expect(source.authorizeSession("unlisted")).resolves.toBe(false);
   });
 });
 

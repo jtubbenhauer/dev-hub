@@ -11,6 +11,7 @@ import {
 
 const DAEMON_COMMAND_TIMEOUT_MS = 60_000;
 const DAEMON_PING_TIMEOUT_MS = 5_000;
+const DAEMON_ENSURE_RETRY_THROTTLE_MS = 30_000;
 
 export type OmoDaemonInfo = {
   readonly socket: string;
@@ -171,9 +172,14 @@ export function ensureOmoDaemon(
   const nextSharedDaemon = { ensurePromise };
   globalThis.__devhubOmoDaemon = nextSharedDaemon;
   void ensurePromise.catch(() => {
-    if (globalThis.__devhubOmoDaemon === nextSharedDaemon) {
-      globalThis.__devhubOmoDaemon = undefined;
-    }
+    if (globalThis.__devhubOmoDaemon !== nextSharedDaemon) return;
+    // Throttle: keep serving this rejection instead of allowing an immediate re-spawn.
+    const timer = setTimeout(() => {
+      if (globalThis.__devhubOmoDaemon === nextSharedDaemon) {
+        globalThis.__devhubOmoDaemon = undefined;
+      }
+    }, DAEMON_ENSURE_RETRY_THROTTLE_MS);
+    timer.unref?.();
   });
   return ensurePromise;
 }

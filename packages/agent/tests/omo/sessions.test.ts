@@ -104,6 +104,39 @@ describe("listOmoSessionsForWorkspace / readOmoSessionEntries", () => {
     expect(typeof entries[0]?.timestamp).toBe("number");
   });
 
+  it("skips a single record over 16 MiB without buffering it, keeping surrounding valid entries", async () => {
+    const sessionsDir = join(
+      agentDir,
+      "sessions",
+      `--${encodeCwdDir(workspaceA)}--`,
+    );
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = join(sessionsDir, "with-oversized-record.jsonl");
+    const oversizedLine = JSON.stringify({
+      type: "message",
+      id: "entry-oversized",
+      parentId: null,
+      timestamp: "2024-01-01T00:01:00.000Z",
+      message: { role: "user", content: "x".repeat(17 * 1024 * 1024) },
+    });
+    await writeFile(
+      sessionPath,
+      [
+        sessionHeaderLine("session-with-oversized-record", workspaceA),
+        messageEntryLine("entry-before", null),
+        oversizedLine,
+        messageEntryLine("entry-after", "entry-before"),
+      ].join("\n") + "\n",
+    );
+
+    const entries = await readOmoSessionEntries(sessionPath);
+
+    expect(entries.map((entry) => entry.id)).toEqual([
+      "entry-before",
+      "entry-after",
+    ]);
+  });
+
   it("skips malformed and unrecognized lines when reading entries", async () => {
     const sessionsDir = join(
       agentDir,
@@ -153,7 +186,7 @@ describe("deleteOmoSession", () => {
     const sessionPath = join(sessionsDir, "deletable.jsonl");
     await writeFile(sessionPath, sessionHeaderLine("session-x", workspaceA));
 
-    await deleteOmoSession(agentDir, sessionPath);
+    await deleteOmoSession(agentDir, sessionPath, "session-x", workspaceA);
 
     await expect(readFile(sessionPath)).rejects.toThrow();
   });
@@ -163,9 +196,51 @@ describe("deleteOmoSession", () => {
     const outsidePath = join(workspaceA, "not-a-session.jsonl");
     await writeFile(outsidePath, "irrelevant");
 
-    await expect(deleteOmoSession(agentDir, outsidePath)).rejects.toThrow(
-      /outside the sessions directory/,
-    );
+    await expect(
+      deleteOmoSession(agentDir, outsidePath, "session-x", workspaceA),
+    ).rejects.toThrow(/outside the sessions directory/);
     await expect(readFile(outsidePath)).resolves.toBeTruthy();
+  });
+
+  it("refuses to delete when the header id no longer matches (TOCTOU guard)", async () => {
+    const sessionsDir = join(
+      agentDir,
+      "sessions",
+      `--${encodeCwdDir(workspaceA)}--`,
+    );
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = join(sessionsDir, "swapped.jsonl");
+    await writeFile(sessionPath, sessionHeaderLine("session-x", workspaceA));
+
+    await expect(
+      deleteOmoSession(agentDir, sessionPath, "session-expected", workspaceA),
+    ).rejects.toThrow(/no longer matches its expected identity/);
+    await expect(readFile(sessionPath)).resolves.toBeTruthy();
+  });
+
+  it("refuses to delete when the header cwd no longer matches the workspace", async () => {
+    const sessionsDir = join(
+      agentDir,
+      "sessions",
+      `--${encodeCwdDir(workspaceA)}--`,
+    );
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = join(sessionsDir, "wrong-cwd.jsonl");
+    const otherWorkspace = await mkdtemp(
+      join(tmpdir(), "devhub-agent-workspace-other-"),
+    );
+    await writeFile(
+      sessionPath,
+      sessionHeaderLine("session-x", otherWorkspace),
+    );
+
+    try {
+      await expect(
+        deleteOmoSession(agentDir, sessionPath, "session-x", workspaceA),
+      ).rejects.toThrow(/no longer matches its expected identity/);
+      await expect(readFile(sessionPath)).resolves.toBeTruthy();
+    } finally {
+      await rm(otherWorkspace, { recursive: true, force: true });
+    }
   });
 });

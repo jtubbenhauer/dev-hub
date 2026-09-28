@@ -15,9 +15,13 @@ if (!workspacePath) {
 }
 
 const port = parseInt(process.env.AGENT_PORT ?? "7500", 10);
+const MAX_WS_FRAME_BYTES = 16 * 1024 * 1024;
 
 const app = new Hono();
-const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+const { injectWebSocket, upgradeWebSocket, wss } = createNodeWebSocket({
+  app,
+});
+wss.options.maxPayload = MAX_WS_FRAME_BYTES;
 
 app.get("/health", (c) => {
   return c.json({ status: "ok", workspacePath });
@@ -31,8 +35,8 @@ app.route("/omo", omoRpcTunnelRoutes(upgradeWebSocket));
 app.route("/omo", omoSessionRoutes(workspacePath));
 
 app.onError((error, c) => {
-  console.error(`[agent] ${c.req.method} ${c.req.path} error:`, error.message);
-  return c.json({ error: error.message }, 500);
+  console.error(`[agent] ${c.req.method} ${c.req.path} error:`, error);
+  return c.json({ error: "Internal agent error", code: "AGENT_ERROR" }, 500);
 });
 
 const server = serve({ fetch: app.fetch, port }, () => {

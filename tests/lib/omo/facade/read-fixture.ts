@@ -87,6 +87,7 @@ export async function createReadFixture() {
       }),
     ),
     refreshIndexFromHost: vi.fn(async () => undefined),
+    canonicalWorkspacePath: vi.fn(async () => "/workspace"),
     findBinding: vi.fn<
       (
         workspaceId: string,
@@ -95,7 +96,7 @@ export async function createReadFixture() {
       ) => TestBinding | undefined
     >(() => undefined),
     bindingsForLifecycle: vi.fn<() => readonly TestBinding[]>(() => []),
-    eventsForWorkspace: vi.fn(() => []),
+    sessionStatusesForWorkspace: vi.fn(() => ({})),
   };
   const runtime = {
     client,
@@ -104,6 +105,13 @@ export async function createReadFixture() {
     catalog: new Map<string, unknown>(),
   };
   const getCatalog = vi.fn(async () => defaultCatalog);
+  const ensureOmoDaemon = vi.fn(async () => ({
+    socket: "/host.sock",
+    pid: 1,
+    instanceId: "instance",
+    engineVersion: "test",
+    action: "reuse",
+  }));
 
   vi.doMock("@/lib/db", () => ({ db: drizzle(sqlite, { schema }) }));
   vi.doMock("@/lib/omo/session-registry", () => ({
@@ -119,6 +127,10 @@ export async function createReadFixture() {
     resolveOmoSocketPath: () => "/host.sock",
   }));
   vi.doMock("@/lib/omo/adapter/catalog", () => ({ getCatalog }));
+  vi.doMock("@/lib/omo/daemon", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/omo/daemon")>();
+    return { ...actual, ensureOmoDaemon };
+  });
 
   const { handleOmoRead } = await import("@/lib/omo/facade/read");
   const workspace = {
@@ -134,6 +146,7 @@ export async function createReadFixture() {
     registry,
     client,
     getCatalog,
+    ensureOmoDaemon,
     workspace,
     request(
       path: string,
@@ -155,6 +168,7 @@ export async function createReadFixture() {
       vi.doUnmock("@/lib/omo/session-source");
       vi.doUnmock("@/lib/omo/agent-dir");
       vi.doUnmock("@/lib/omo/adapter/catalog");
+      vi.doUnmock("@/lib/omo/daemon");
     },
   };
 }

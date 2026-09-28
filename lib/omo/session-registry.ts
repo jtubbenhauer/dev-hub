@@ -1,3 +1,5 @@
+import { skillPrefixesFromCache } from "@/lib/omo/adapter/catalog-cache";
+import { DialogLedger } from "@/lib/omo/dialog-ledger";
 import { OmoRpcClient, UnixSocketTransport } from "@/lib/omo/rpc-client";
 import { OmoSessionRegistry } from "@/lib/omo/session-registry-core";
 
@@ -14,11 +16,19 @@ export type {
 export type OmoDialogLedger = Map<string, unknown>;
 export type OmoCatalogCache = Map<string, unknown>;
 
+// Same string as lib/omo/facade/read-runtime.ts's private DIALOG_LEDGER_KEY —
+// keep in sync so its magic-key lookup on `dialogs` still finds this ledger.
+const DIALOG_LEDGER_MAGIC_KEY = "\u0000devhub-omo-dialog-ledger";
+
 export type OmoRuntime = {
   readonly client: OmoRpcClient;
   readonly registry: OmoSessionRegistry;
   readonly dialogs: OmoDialogLedger;
   readonly catalog: OmoCatalogCache;
+  // Typed accessor for the same ledger stored under DIALOG_LEDGER_MAGIC_KEY
+  // in `dialogs` above. Optional so callers that build an OmoRuntime without
+  // it (e.g. lib/omo/runtime.ts's remote registry) still type-check.
+  readonly dialogLedger?: DialogLedger;
 };
 
 declare global {
@@ -29,12 +39,16 @@ function createOmoRuntime(hostKey: string): OmoRuntime {
   const client = new OmoRpcClient({
     transport: new UnixSocketTransport({ socketPath: hostKey }),
   });
-  return {
-    client,
-    registry: new OmoSessionRegistry(client),
-    dialogs: new Map(),
-    catalog: new Map(),
-  };
+  const dialogLedger = new DialogLedger();
+  const dialogs = new Map<string, unknown>();
+  dialogs.set(DIALOG_LEDGER_MAGIC_KEY, dialogLedger);
+  const catalog = new Map<string, unknown>();
+  const registry = new OmoSessionRegistry(client, {
+    dialogLedger,
+    getSkillPrefixes: (workspacePath) =>
+      skillPrefixesFromCache(catalog, workspacePath),
+  });
+  return { client, registry, dialogs, catalog, dialogLedger };
 }
 
 export function getOmoRuntime(hostKey: string): OmoRuntime {

@@ -80,6 +80,21 @@ function finishCacheEntry(
   });
 }
 
+// Synchronous best-effort read used to seed live-adapter skill prefixes at
+// binding-creation time; returns [] when nothing is cached yet, which makes
+// the adapter fall back to generic $skill detection.
+export function skillPrefixesFromCache(
+  catalog: ReadonlyMap<string, unknown>,
+  workspacePath: string,
+): readonly string[] {
+  const cachedValue = catalog.get(workspacePath);
+  const cached = isCacheEntry(cachedValue) ? cachedValue : undefined;
+  if (cached?.value === undefined || cached.expiresAt <= Date.now()) return [];
+  return cached.value.agents
+    .filter((agent) => agent.name.startsWith("skill:"))
+    .map((agent) => agent.name.slice("skill:".length));
+}
+
 export function getCachedCatalog(
   runtime: OmoRuntime,
   workspacePath: string,

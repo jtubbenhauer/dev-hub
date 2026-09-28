@@ -11,6 +11,7 @@ import { getAutoColorForNewWorkspace } from "@/lib/workspace-colors";
 import { backfillSshTargets } from "@/lib/workspaces/ssh-target";
 import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
 import { isChatEngine } from "@/lib/engine/types";
+import { isSecureOrLoopbackAgentUrl } from "@/lib/workspaces/agent-origin";
 
 function detectPackageManager(
   dirPath: string,
@@ -185,6 +186,16 @@ async function createRemoteWorkspace(
   if (!agentUrl || typeof agentUrl !== "string") {
     return NextResponse.json(
       { error: "agentUrl is required for remote workspaces" },
+      { status: 400 },
+    );
+  }
+
+  if (!isSecureOrLoopbackAgentUrl(agentUrl)) {
+    return NextResponse.json(
+      {
+        error:
+          "agentUrl must use https/wss unless it targets a loopback address",
+      },
       { status: 400 },
     );
   }

@@ -86,6 +86,23 @@ describe("handleOmoWrite retry and engine errors", () => {
     expect(await writeJson(response)).toEqual({ error: "engine_unavailable" });
   });
 
+  it("returns engine_unavailable for POST /session when the socket is missing", async () => {
+    // Given
+    const fixture = await useWriteFixture();
+    fixture.registry.create.mockRejectedValue(
+      Object.assign(new Error("connect ECONNREFUSED"), {
+        code: "ECONNREFUSED",
+      }),
+    );
+
+    // When
+    const response = await fixture.request("/session", { body: {} });
+
+    // Then
+    expect(response.status).toBe(503);
+    expect(await writeJson(response)).toEqual({ error: "engine_unavailable" });
+  });
+
   it("returns engine_unavailable when the daemon transport is down", async () => {
     // Given
     const fixture = await useWriteFixture();

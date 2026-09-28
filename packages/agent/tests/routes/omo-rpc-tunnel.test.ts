@@ -153,6 +153,21 @@ describe("GET /omo/rpc", () => {
     ]);
   });
 
+  it("closes with 1009 when a single incoming frame exceeds 16 MiB, without writing to the unix socket", async () => {
+    const slowSocket = new SlowRpcSocket();
+    tunnelServer = await startTunnelServer({
+      socketPath,
+      connectSocket: () => slowSocket,
+    });
+    webSocket = await openWebSocket(tunnelServer.url, `Bearer ${TOKEN}`);
+    const closed = nextClose(webSocket);
+
+    webSocket.send(`{"payload":"${"x".repeat(16 * 1024 * 1024 + 1)}"}`);
+
+    await expect(closed).resolves.toMatchObject({ code: 1009 });
+    expect(slowSocket.writes).toEqual([]);
+  });
+
   it("closes with 1013 when the slow-socket buffer exceeds 8 MiB", async () => {
     const slowSocket = new SlowRpcSocket();
     tunnelServer = await startTunnelServer({

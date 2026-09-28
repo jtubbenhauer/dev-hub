@@ -12,6 +12,7 @@ import { eq, and } from "drizzle-orm";
 import { exec } from "node:child_process";
 import { removeWorktree, pruneWorktrees } from "@/lib/git/worktrees";
 import { isChatEngine } from "@/lib/engine/types";
+import { isSecureOrLoopbackAgentUrl } from "@/lib/workspaces/agent-origin";
 import type { LinkedTaskMeta, WorkspaceProvider } from "@/types";
 
 interface RouteParams {
@@ -87,6 +88,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (engine !== undefined && engine !== null && !isChatEngine(engine)) {
     return NextResponse.json(
       { error: 'engine must be "opencode", "omo", or null' },
+      { status: 400 },
+    );
+  }
+
+  if (agentUrl && !isSecureOrLoopbackAgentUrl(agentUrl)) {
+    return NextResponse.json(
+      {
+        error:
+          "agentUrl must use https/wss unless it targets a loopback address",
+      },
       { status: 400 },
     );
   }

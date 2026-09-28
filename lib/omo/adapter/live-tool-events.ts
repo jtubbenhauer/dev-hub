@@ -250,9 +250,9 @@ export function createLiveToolEventHandlers(
   const handleExtension = createLiveTaskEventHandler(
     options,
     () =>
-      [...trackedTools.values()]
-        .reverse()
-        .find((tracked) => tracked.part.tool === "task"),
+      [...trackedTools.values()].filter(
+        (tracked) => tracked.part.tool === "task",
+      ),
     replacePart,
   );
 

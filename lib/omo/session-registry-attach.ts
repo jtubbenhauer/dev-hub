@@ -13,7 +13,10 @@ import {
 import type { OmoSessionRegistry } from "@/lib/omo/session-registry-core";
 import { hydrateOmoBinding } from "@/lib/omo/session-registry-hydration";
 import { parseOpenedState } from "@/lib/omo/session-registry-records";
-import { openOmoSessionWithPathRetry } from "@/lib/omo/session-registry-reopen";
+import {
+  openOmoSessionWithPathRetry,
+  wait,
+} from "@/lib/omo/session-registry-reopen";
 import type {
   OmoAttachAliases,
   OmoAttachRequest,
@@ -177,8 +180,33 @@ async function performAttach(
           canonicalPath,
         });
       });
-    if (sessionPath === null) await open();
-    else await openOmoSessionWithPathRetry(open);
+    if (sessionPath === null) {
+      await open();
+    } else {
+      const resolvedSessionPath = sessionPath;
+      const existing = await openOmoSessionWithPathRetry({
+        open: () => open().then(() => undefined),
+        wait,
+        releaseLock: () => {
+          release?.();
+          release = undefined;
+        },
+        reacquireLock: async () => {
+          release = await registry.openLock.acquire();
+        },
+        findExisting: () =>
+          registry.findBinding(
+            request.workspace.id,
+            rawId,
+            resolvedSessionPath,
+          ),
+      });
+      if (existing !== undefined) {
+        release?.();
+        release = undefined;
+        return await readyBinding(existing);
+      }
+    }
   } finally {
     release?.();
   }

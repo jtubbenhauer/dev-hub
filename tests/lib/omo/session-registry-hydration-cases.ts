@@ -54,6 +54,7 @@ function insertLeafRow(
 
 afterEach(() => {
   vi.doUnmock("@/lib/omo/adapter/live-events");
+  vi.doUnmock("@/lib/omo/session-index");
 });
 
 describe("OmoSessionRegistry hydration", () => {
@@ -226,6 +227,80 @@ describe("OmoSessionRegistry hydration", () => {
       type: "session.resync_required",
       properties: { sessionID: "omo_overflow" },
     });
+  });
+
+  it("rejects a hydrating binding when the transport disconnects mid-hydration, then a retry reopens", async () => {
+    let sawIndexRowCall: (() => void) | undefined;
+    const sawIndexRow = new Promise<void>((resolve) => {
+      sawIndexRowCall = resolve;
+    });
+    // Deliberately never resolves: the gated getOmoIndexRow call must stay
+    // blocked forever so its aborted continuation cannot race the retry
+    // attach below for the same fixtures.
+    const gate = new Promise<void>(() => undefined);
+    let indexRowCallCount = 0;
+    vi.doMock("@/lib/omo/session-index", async (importOriginal) => {
+      const actual =
+        await importOriginal<typeof import("@/lib/omo/session-index")>();
+      return {
+        ...actual,
+        getOmoIndexRow: async (
+          ...args: Parameters<typeof actual.getOmoIndexRow>
+        ) => {
+          indexRowCallCount += 1;
+          // The first two calls are session-registry-attach.ts's
+          // canonicalize() and pre-open row lookups, before any binding is
+          // registered. Gate only the third call (touchOpenedBinding, once
+          // hydration is genuinely in flight) and leave it gated forever —
+          // later calls made by the retry attach below must not block.
+          if (indexRowCallCount === 3) {
+            sawIndexRowCall?.();
+            await gate;
+          }
+          return actual.getOmoIndexRow(...args);
+        },
+      };
+    });
+
+    const context = await createRegistryContext([
+      {
+        type: "open_session",
+        response: openedResponse({
+          durableId: "mid-hang",
+          routingHandle: "route-mid-hang-1",
+          sessionPath: "/sessions/mid-hang.jsonl",
+        }),
+      },
+      {
+        type: "open_session",
+        response: openedResponse({
+          durableId: "mid-hang",
+          routingHandle: "route-mid-hang-2",
+          sessionPath: "/sessions/mid-hang.jsonl",
+        }),
+      },
+      { type: "get_entries", response: entriesResponse() },
+    ]);
+    const attachRequest = {
+      workspace: context.workspace,
+      durableId: "mid-hang",
+      sessionPath: "/sessions/mid-hang.jsonl",
+    };
+
+    const firstAttach = context.runtime.registry.attach(attachRequest);
+    await sawIndexRow;
+    context.host.dropAll();
+    const rejection = await firstAttach.catch((error: unknown) => error);
+
+    expect(rejection).toMatchObject({ name: "OmoHydrationAbortedError" });
+    await vi.waitFor(() => {
+      expect(context.runtime.registry.pendingAttach.size).toBe(0);
+    });
+
+    const retried = await context.runtime.registry.attach(attachRequest);
+
+    expect(retried.state).toBe("live");
+    expect(retried.routingHandle).toBe("route-mid-hang-2");
   });
 
   it("applies leaf effects without subscribers and isolates throwing sinks", async () => {

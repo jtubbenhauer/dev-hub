@@ -82,13 +82,9 @@ describe("handleOmoRead errors and health", () => {
     }
   });
 
-  it("reads remote history through the source without local canonicalization", async () => {
-    // Given
+  it("never falls back to a local session for a remote workspace, even without local mocks matching", async () => {
+    // Given (see remote-source.test.ts for full remote-routing coverage)
     const fixture = await useReadFixture();
-    fixture.source.authorized.add("remote");
-    fixture.source.canonicalWorkspacePath.mockRejectedValue(
-      new Error("must not canonicalize remote paths locally"),
-    );
     const { handleOmoRead } = await import("@/lib/omo/facade/read");
 
     // When
@@ -96,13 +92,15 @@ describe("handleOmoRead errors and health", () => {
       method: "GET",
       path: "/session/omo_remote/message",
       query: new URLSearchParams(),
-      workspace: { ...fixture.workspace, backend: "remote" },
+      workspace: { ...fixture.workspace, backend: "remote", agentUrl: null },
       userId: "user-1",
     });
 
     // Then
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
+    expect(await readJson(response)).toEqual({ error: "engine_unavailable" });
     expect(fixture.source.canonicalWorkspacePath).not.toHaveBeenCalled();
+    expect(fixture.registry.attach).not.toHaveBeenCalled();
   });
 
   it("always returns an empty permission list", async () => {

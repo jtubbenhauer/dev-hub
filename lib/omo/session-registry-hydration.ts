@@ -2,7 +2,10 @@ import { OmoCommandError } from "@/lib/omo/errors";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoRpcClient } from "@/lib/omo/rpc-client";
 import { setOmoLeaf, type OmoSessionIndexRow } from "@/lib/omo/session-index";
-import { OmoHydrationOverflowError } from "@/lib/omo/session-registry-errors";
+import {
+  OmoHydrationAbortedError,
+  OmoHydrationOverflowError,
+} from "@/lib/omo/session-registry-errors";
 import { OmoRegistryRecordBuffer } from "@/lib/omo/session-registry-lock";
 import {
   activeHydrationBranch,
@@ -42,6 +45,10 @@ type RestoredSnapshot = {
   readonly snapshot: OmoEntriesSnapshot;
   readonly leafId: string | null;
 };
+
+function abortHydration(binding: OmoSessionBinding): void {
+  binding.rejectReady(new OmoHydrationAbortedError(binding.durableId));
+}
 
 function getEntries(
   client: OmoRpcClient,
@@ -208,7 +215,10 @@ async function hydrateAfterOverflow(
       throw new TypeError("Missing OmO hydration fence");
     if (binding.buffer.overflowed) continue;
     replayBuffer(controller, binding);
-    if (!controller.isCurrent(binding)) return;
+    if (!controller.isCurrent(binding)) {
+      abortHydration(binding);
+      return;
+    }
     binding.state = "live";
     binding.resolveReady(binding);
     controller.emitEvent(binding.workspaceId, {
@@ -232,7 +242,10 @@ export async function hydrateOmoBinding(
   const firstSnapshot = parseEntriesSnapshot(
     await getEntries(controller.client, binding.routingHandle),
   );
-  if (!controller.isCurrent(binding)) return;
+  if (!controller.isCurrent(binding)) {
+    abortHydration(binding);
+    return;
+  }
   const restored = await restoreLeaf(
     controller,
     binding,
@@ -240,7 +253,10 @@ export async function hydrateOmoBinding(
     row,
     firstSnapshot,
   );
-  if (!controller.isCurrent(binding)) return;
+  if (!controller.isCurrent(binding)) {
+    abortHydration(binding);
+    return;
+  }
   const branch = activeHydrationBranch(
     restored.snapshot.entries,
     restored.leafId,
@@ -253,7 +269,10 @@ export async function hydrateOmoBinding(
     return;
   }
   replayBuffer(controller, binding);
-  if (!controller.isCurrent(binding)) return;
+  if (!controller.isCurrent(binding)) {
+    abortHydration(binding);
+    return;
+  }
   binding.state = "live";
   binding.resolveReady(binding);
 }

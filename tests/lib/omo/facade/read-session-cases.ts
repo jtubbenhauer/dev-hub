@@ -131,6 +131,114 @@ describe("handleOmoRead session routes", () => {
     expect(await readJson(todos)).toEqual([]);
   });
 
+  it("excludes a live session reported under a foreign cwd from listing and the index", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    fixture.client.isConnected = true;
+    fixture.client.request.mockResolvedValue({
+      data: {
+        sessions: [
+          {
+            durableSessionId: "foreign",
+            cwd: "/other-workspace",
+            kind: "interactive",
+          },
+        ],
+      },
+    });
+
+    // When
+    const response = await fixture.request("/session");
+    const identities = await fixture.request("/session/identities");
+
+    // Then
+    const body = await readJson(response);
+    expect(Array.isArray(body) ? body.map((s) => s.id) : body).toEqual([]);
+    const identitiesBody = (await readJson(identities)) as {
+      roots: string[];
+      children: string[];
+    };
+    expect(identitiesBody.roots).not.toContain("omo_foreign");
+    expect(identitiesBody.children).not.toContain("omo_foreign");
+    const row = fixture.sqlite
+      .prepare(
+        "SELECT durable_id FROM omo_session_index WHERE durable_id = 'foreign'",
+      )
+      .get();
+    expect(row).toBeUndefined();
+  });
+
+  it("returns not found for a session index row marked replaced", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    fixture.source.authorized.add("old");
+    fixture.source.summaries.push(summary("old", "Old", 20));
+    insertIndexRow(fixture.sqlite, "old", "interactive");
+    fixture.sqlite
+      .prepare(
+        "UPDATE omo_session_index SET replaced_by_durable_id = 'new' WHERE durable_id = 'old'",
+      )
+      .run();
+
+    // When
+    const response = await fixture.request("/session/omo_old");
+
+    // Then
+    expect(response.status).toBe(404);
+    expect(await readJson(response)).toEqual({ error: "session_not_found" });
+  });
+
+  it("sets parentID from the index row even when the session file is on disk", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    fixture.source.authorized.add("child");
+    fixture.source.summaries.push(summary("child", "Child", 20));
+    insertIndexRow(fixture.sqlite, "child", "worker", "parent-1");
+
+    // When
+    const response = await fixture.request("/session/omo_child");
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toMatchObject({
+      id: "omo_child",
+      parentID: "omo_parent-1",
+    });
+  });
+
+  it("serves a freshly created session from the index before the file exists", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    insertIndexRow(fixture.sqlite, "fresh", "interactive");
+
+    // When
+    const response = await fixture.request("/session/omo_fresh");
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toMatchObject({ id: "omo_fresh" });
+    expect(fixture.source.authorizeSession).not.toHaveBeenCalled();
+  });
+
+  it("lists children and empty todos for a freshly created session before the file exists", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    insertIndexRow(fixture.sqlite, "fresh-parent", "interactive");
+
+    // When
+    const children = await fixture.request(
+      "/session/omo_fresh-parent/children",
+    );
+    const todos = await fixture.request("/session/omo_fresh-parent/todo");
+
+    // Then
+    expect(children.status).toBe(200);
+    expect(await readJson(children)).toEqual([]);
+    expect(todos.status).toBe(200);
+    expect(await readJson(todos)).toEqual([]);
+    expect(fixture.source.authorizeSession).not.toHaveBeenCalled();
+  });
+
   it("merges get_state into detail when the session is attached", async () => {
     // Given
     const fixture = await useReadFixture();

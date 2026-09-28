@@ -1,0 +1,27 @@
+components/chat/running-sub-agents-banner.tsx
+  s_a14af25ea19db4::t_c84883814dbfae 9-12,30-38
+components/chat/session-list.tsx
+  s_a14af25ea19db4::t_21463c48ce547e 24,38-39,507-512,733,777-789,806,827,830,903-919,962-975,1020-1030
+stores/chat-store.ts
+  s_a14af25ea19db4::t_8dedc61b82f32b 247-264,1041-1045,1716-1718,1721-1726,2018-2039,2306-2314,2352-2360
+tests/components/session-list.test.tsx
+  s_a14af25ea19db4::t_48abe15621aefa 426-475
+tests/stores/chat-store.test.ts
+  s_a14af25ea19db4::t_e617e4f603e13f 335-436
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "10116d281197a8a65000d33ffc57f0c725f2299b",
+  "prompts": {},
+  "sessions": {
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

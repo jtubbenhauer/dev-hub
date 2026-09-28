@@ -1,0 +1,57 @@
+lib/omo/session-registry-attach.ts
+  s_46199101c174d2::t_2f5424a249e821 1-240
+lib/omo/session-registry-core.ts
+  s_46199101c174d2::t_5d8ab4e0051f21 1-285
+lib/omo/session-registry-hydration.ts
+  s_46199101c174d2::t_ee00585d3d0af8 1-259
+lib/omo/session-registry-index.ts
+  s_46199101c174d2::t_32d23a9d1f90a1 1-103
+lib/omo/session-registry-lock.ts
+  s_a26ff178f37e76::t_3c4c2c86b01bc5 1-66
+lib/omo/session-registry-records.ts
+  s_46199101c174d2::t_7af6c5667f77dd 1-181
+lib/omo/session-registry-replacement.ts
+  s_46199101c174d2::t_4089cb4da88d4b 1-137
+lib/omo/session-registry.ts
+  s_46199101c174d2::t_794bc6584f8ee2 1-58
+tests/lib/omo/session-registry-db-fixture.ts
+  s_2236f08d0fad46::t_ba1b07e3bcbdd1 1-126
+tests/lib/omo/session-registry-fixture.ts
+  s_46199101c174d2::t_72e7b60c5a6718 1-191
+tests/lib/omo/session-registry-hydration-cases.ts
+  s_46199101c174d2::t_c4d34e7bedc7f9 1-263
+tests/lib/omo/session-registry-replay-cases.ts
+  s_46199101c174d2::t_2ff4f129c3033f 1-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b7c8ae8b084313bc3ba59332660df4cfa9283bcc",
+  "prompts": {},
+  "sessions": {
+    "s_2236f08d0fad46": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a833949ffemixO7Q3RH0FRMq",
+        "model": "claude-haiku-4-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_46199101c174d2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1ab1cffeffeJE8cbhOPwd1QgB",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a26ff178f37e76": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f34617d4affea9EtlbGJ2diXNP",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

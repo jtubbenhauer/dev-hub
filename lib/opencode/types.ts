@@ -16,6 +16,9 @@ import type {
 import type {
   Agent,
   Command,
+  EventQuestionAsked,
+  EventQuestionRejected,
+  EventQuestionReplied,
   PermissionRequest,
   QuestionRequest,
   QuestionInfo,
@@ -60,7 +63,13 @@ export interface MessagePartDeltaEvent {
   };
 }
 
-export type Event = SdkEvent | MessagePartDeltaEvent | MessageRekeyedEvent;
+export type Event =
+  | SdkEvent
+  | EventQuestionAsked
+  | EventQuestionReplied
+  | EventQuestionRejected
+  | MessagePartDeltaEvent
+  | MessageRekeyedEvent;
 export type {
   Command,
   PermissionRequest,

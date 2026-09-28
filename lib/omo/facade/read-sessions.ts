@@ -5,6 +5,7 @@ import {
   getOmoChildren,
   getOmoIndexRow,
   listOmoHiddenIds,
+  listOmoWorkers,
   touchOmoSessionIndexMany,
   type OmoSessionIndexRow,
 } from "@/lib/omo/session-index";
@@ -57,6 +58,8 @@ function titleFromState(
 }
 
 // Cwd rule matches refreshOmoIndexFromHost: never index/list a foreign cwd.
+// Workers are included so the banner can show them under their parent — they
+// are filtered from the root list by listOmoHiddenIds, same as child interactives.
 function liveSessionIds(
   response: Readonly<Record<string, unknown>>,
   workspacePath: string,
@@ -65,7 +68,7 @@ function liveSessionIds(
   const data = response["data"];
   if (!isJsonObject(data) || !Array.isArray(data["sessions"])) return [];
   return data["sessions"].flatMap((value) => {
-    if (!isJsonObject(value) || value["kind"] === "worker") return [];
+    if (!isJsonObject(value)) return [];
     const cwd = value["cwd"];
     if (
       typeof cwd !== "string" ||
@@ -89,7 +92,7 @@ async function liveSummaries(
     );
     const response = await context.runtime.client.request({
       type: "list_sessions",
-      include_workers: false,
+      include_workers: true,
     });
     const summaries: OmoSessionOnDiskSummary[] = [];
     for (const durableId of liveSessionIds(
@@ -118,8 +121,11 @@ async function liveSummaries(
 export async function listOmoSessions(
   context: OmoReadContext,
 ): Promise<Response> {
-  const disk = await context.source.list();
-  const live = await liveSummaries(context);
+  const [disk, live, workers] = await Promise.all([
+    context.source.list(),
+    liveSummaries(context),
+    listOmoWorkers(context.workspace.id),
+  ]);
   const hidden = new Set(await listOmoHiddenIds(context.workspace.id));
   const byId = new Map<string, OmoSessionOnDiskSummary>();
   for (const summary of disk) byId.set(summary.durableId, summary);
@@ -139,9 +145,10 @@ export async function listOmoSessions(
       updatedMs: summary.updatedMs,
     })),
   );
-  return jsonResponse(
-    roots.map((summary) => sessionFromSummary(context, summary)),
-  );
+  return jsonResponse([
+    ...roots.map((summary) => sessionFromSummary(context, summary)),
+    ...workers.map((row) => sessionFromRow(context, row)),
+  ]);
 }
 
 export async function readOmoSession(

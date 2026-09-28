@@ -33,17 +33,16 @@ function insertIndexRow(
 }
 
 describe("handleOmoRead session routes", () => {
-  it("deduplicates disk and live roots and removes hidden worker ids", async () => {
+  it("deduplicates disk and live roots; workers appear with parentID, not in roots", async () => {
     // Given
     const fixture = await useReadFixture();
     fixture.source.summaries.push(
       summary("disk", "Disk", 30),
       summary("shared", "Shared disk", 40),
-      summary("worker", "Worker", 50),
     );
     insertIndexRow(fixture.sqlite, "shared", "interactive");
     insertIndexRow(fixture.sqlite, "live", "interactive");
-    insertIndexRow(fixture.sqlite, "worker", "worker");
+    insertIndexRow(fixture.sqlite, "worker", "worker", "live");
     fixture.client.isConnected = true;
     fixture.client.request.mockResolvedValue({
       data: {
@@ -53,16 +52,8 @@ describe("handleOmoRead session routes", () => {
             cwd: "/workspace",
             kind: "interactive",
           },
-          {
-            durableSessionId: "live",
-            cwd: "/workspace",
-            kind: "interactive",
-          },
-          {
-            durableSessionId: "worker",
-            cwd: "/workspace",
-            kind: "worker",
-          },
+          { durableSessionId: "live", cwd: "/workspace", kind: "interactive" },
+          { durableSessionId: "worker", cwd: "/workspace", kind: "worker" },
         ],
       },
     });
@@ -71,11 +62,46 @@ describe("handleOmoRead session routes", () => {
     const response = await fixture.request("/session");
 
     // Then
-    const body = await readJson(response);
-    expect(
-      Array.isArray(body) ? body.map((session) => session.id).sort() : body,
-    ).toEqual(["omo_disk", "omo_live", "omo_shared"]);
+    const body = (await readJson(response)) as Array<{
+      id: string;
+      parentID?: string;
+    }>;
+    const ids = body.map((session) => session.id).sort();
+    expect(ids).toEqual(["omo_disk", "omo_live", "omo_shared", "omo_worker"]);
+    const worker = body.find((session) => session.id === "omo_worker");
+    expect(worker?.parentID).toBe("omo_live");
+    const rootIds = body
+      .filter((session) => session.parentID === undefined)
+      .map((session) => session.id)
+      .sort();
+    expect(rootIds).toEqual(["omo_disk", "omo_live", "omo_shared"]);
     expect(fixture.registry.refreshIndexFromHost).toHaveBeenCalledOnce();
+  });
+
+  it("includes indexed workers even when the daemon is offline", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    fixture.source.summaries.push(summary("root", "Root", 30));
+    insertIndexRow(fixture.sqlite, "root", "interactive");
+    insertIndexRow(fixture.sqlite, "w1", "worker", "root");
+    insertIndexRow(fixture.sqlite, "w2", "worker", "root");
+
+    // When (client not connected — liveSummaries returns [])
+    const response = await fixture.request("/session");
+
+    // Then
+    const body = (await readJson(response)) as Array<{
+      id: string;
+      parentID?: string;
+    }>;
+    expect(body.map((s) => s.id).sort()).toEqual([
+      "omo_root",
+      "omo_w1",
+      "omo_w2",
+    ]);
+    expect(
+      body.filter((s) => s.parentID !== undefined).map((s) => s.parentID),
+    ).toEqual(["omo_root", "omo_root"]);
   });
 
   it("returns only indexed children even if an unrelated worker is live", async () => {

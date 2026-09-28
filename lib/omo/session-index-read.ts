@@ -56,6 +56,22 @@ export async function findOmoWorkerByTaskId(
   );
 }
 
+export async function listOmoWorkers(
+  workspaceId: string,
+): Promise<OmoSessionIndexRow[]> {
+  return db
+    .select()
+    .from(omoSessionIndex)
+    .where(
+      and(
+        eq(omoSessionIndex.workspaceId, workspaceId),
+        eq(omoSessionIndex.kind, "worker"),
+        isNotNull(omoSessionIndex.parentDurableId),
+        isNull(omoSessionIndex.replacedByDurableId),
+      ),
+    );
+}
+
 export async function listOmoHiddenIds(workspaceId: string): Promise<string[]> {
   const rows = await db
     .select({ durableId: omoSessionIndex.durableId })

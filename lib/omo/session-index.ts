@@ -14,6 +14,7 @@ export {
   getOmoChildren,
   getOmoIndexRow,
   listOmoHiddenIds,
+  listOmoWorkers,
   setOmoLeaf,
   setOmoLeafAndActivity,
   setOmoSessionTitle,

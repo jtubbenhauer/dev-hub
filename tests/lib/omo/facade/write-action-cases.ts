@@ -13,6 +13,12 @@ function lastCommand(
   return fixture.registry.request.mock.calls.at(-1)?.[1];
 }
 
+function lastFireAndForget(
+  fixture: Awaited<ReturnType<typeof useWriteFixture>>,
+): JsonlRecord | undefined {
+  return fixture.client.sendFireAndForget.mock.calls.at(-1)?.[0];
+}
+
 describe("handleOmoWrite action routes", () => {
   it("aborts an interactive session directly", async () => {
     // Given
@@ -140,7 +146,8 @@ describe("handleOmoWrite action routes", () => {
 
     // Then
     expect(response.status).toBe(204);
-    expect(lastCommand(fixture)).toMatchObject({
+    expect(fixture.registry.request).not.toHaveBeenCalled();
+    expect(lastFireAndForget(fixture)).toMatchObject({
       type: "extension_ui_response",
       id: "question-1",
       answers: { choice: { selected: ["A"] } },
@@ -190,7 +197,8 @@ describe("handleOmoWrite action routes", () => {
 
     // Then
     expect(response.status).toBe(204);
-    expect(lastCommand(fixture)).toMatchObject({
+    expect(fixture.registry.request).not.toHaveBeenCalled();
+    expect(lastFireAndForget(fixture)).toMatchObject({
       type: "extension_ui_response",
       id: "question-2",
       sessionId: "route-dialog",

@@ -101,6 +101,66 @@ describe("handleOmoRead message history", () => {
     );
   });
 
+  it("pairs live get_entries tool results with their calls and keeps usage", async () => {
+    const fixture = await useReadFixture();
+    fixture.source.authorized.add("tools");
+    const entries = [
+      messageEntry("user-1", null, "user", "read it", 1),
+      {
+        type: "message",
+        id: "assistant-1",
+        parentId: "user-1",
+        timestamp: 2,
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              id: "call-1",
+              name: "read",
+              arguments: { path: "math.ts" },
+            },
+          ],
+          usage: { input: 11, output: 7 },
+          stopReason: "toolUse",
+          timestamp: 2,
+        },
+      },
+      {
+        type: "message",
+        id: "result-1",
+        parentId: "assistant-1",
+        timestamp: 3,
+        message: {
+          role: "toolResult",
+          toolCallId: "call-1",
+          toolName: "read",
+          isError: false,
+          content: [{ type: "text", text: "file contents" }],
+          timestamp: 3,
+        },
+      },
+    ];
+    fixture.registry.attach.mockResolvedValue(createBinding("tools"));
+    fixture.registry.request.mockResolvedValue({
+      data: { entries, leafId: "result-1" },
+    });
+
+    const response = await fixture.request("/session/omo_tools/message", {});
+    const messages = (await readJson(response)) as Array<{
+      info: { role: string; tokens?: { input: number; output: number } };
+      parts: Array<{ type: string; state?: { status: string } }>;
+    }>;
+    const assistant = messages.find(
+      (message) => message.info.role === "assistant",
+    );
+
+    expect(
+      assistant?.parts.find((part) => part.type === "tool")?.state?.status,
+    ).toBe("completed");
+    expect(assistant?.info.tokens).toMatchObject({ input: 11, output: 7 });
+  });
+
   it("replays pending questions into the workspace dialog ledger", async () => {
     const fixture = await useReadFixture();
     fixture.source.authorized.add("question-session");

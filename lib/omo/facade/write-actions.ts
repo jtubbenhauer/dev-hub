@@ -117,8 +117,9 @@ export async function answerOmoQuestion(
           cancelled: true,
         };
   if (command === null) return invalidRequestResponse();
-  const binding = await attachOmoWriteSession(context, entry.durableId);
-  await context.runtime.registry.request(binding, command);
+  await attachOmoWriteSession(context, entry.durableId);
+  // The host never acknowledges extension_ui_response, so awaiting a reply hangs.
+  context.runtime.client.sendFireAndForget(command);
   context.dialogs.resolve(input.publicId);
   return noContentResponse();
 }

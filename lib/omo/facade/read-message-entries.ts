@@ -44,6 +44,7 @@ export function parseRpcSessionEntry(value: unknown): SessionEntry | null {
         ...base,
         type: "message",
         message: {
+          ...message,
           role: message["role"],
           content: message["content"],
           ...(typeof messageTimestamp === "string" ||

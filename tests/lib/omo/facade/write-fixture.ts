@@ -126,6 +126,7 @@ export async function createWriteFixture() {
     isConnected: true,
     connect: vi.fn(async () => ({ protocolVersion: 1 })),
     request: vi.fn(async (): Promise<JsonlRecord> => ({ data: {} })),
+    sendFireAndForget: vi.fn((_record: JsonlRecord): void => undefined),
   };
   const registry = {
     create: vi.fn(async () => binding),

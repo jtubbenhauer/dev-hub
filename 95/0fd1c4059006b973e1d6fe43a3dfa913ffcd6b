@@ -1,0 +1,23 @@
+.env.example
+  s_ed4cd87e9986d5::t_00c4f56a5f7501 20-29
+AGENTS.md
+  s_ed4cd87e9986d5::t_d772a5d970fff7 225-232
+README.md
+  s_ed4cd87e9986d5::t_93b228c129cdf0 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "950fd1c4059006b973e1d6fe43a3dfa913ffcd6b",
+  "prompts": {},
+  "sessions": {
+    "s_ed4cd87e9986d5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f19bbd5ecffelScPhvll6a5e2S",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

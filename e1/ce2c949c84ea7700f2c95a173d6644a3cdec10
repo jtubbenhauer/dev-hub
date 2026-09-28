@@ -1,0 +1,43 @@
+components/chat/message-tool-use.tsx
+  s_a14af25ea19db4::t_6a4696d3b153c2 20-23,180-185,236-247,258-261,298-319,322,324
+lib/chat/agent-task-summary.ts
+  s_a14af25ea19db4::t_7e7b157c9b9895 1-57
+lib/omo/adapter/live-adapter-types.ts
+  s_a14af25ea19db4::t_d1422ab9a20296 56
+lib/omo/adapter/live-events.ts
+  s_a14af25ea19db4::t_0d6ef7f34dfdfe 179-186,202,211
+lib/omo/adapter/live-task-events.ts
+  s_a14af25ea19db4::t_a997c974935a0b 31-47,50-53,56,70,72,75,79,82-109
+lib/omo/adapter/live-tool-events.ts
+  s_a14af25ea19db4::t_8cf0b781607539 8-12,15,28-33,63-65,229-233,267-270,273,276-277,279-311
+lib/omo/facade/read-messages.ts
+  s_a14af25ea19db4::t_f60d57db579483 8,48,52-62,64,76-88
+lib/omo/session-registry-dispatch.ts
+  s_a14af25ea19db4::t_ab36c274acbdc7 207-210
+tests/lib/chat/agent-task-summary.test.ts
+  s_a14af25ea19db4::t_fd0223e1ae097d 1-51
+tests/lib/omo/adapter/live-task-events.test.ts
+  s_a14af25ea19db4::t_910b3028bb6402 163-282
+tests/lib/omo/facade/read-message-cases.ts
+  s_a14af25ea19db4::t_f818a7b92dceb0 237-309
+tests/lib/omo/session-registry-dispatch.test.ts
+  s_a14af25ea19db4::t_781a7b5f2bf3bc 60
+tests/lib/omo/session-registry-hydration-cases.ts
+  s_a14af25ea19db4::t_e9303a835f203b 65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e1ce2c949c84ea7700f2c95a173d6644a3cdec10",
+  "prompts": {},
+  "sessions": {
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

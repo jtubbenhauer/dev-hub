@@ -185,6 +185,9 @@ export function appendMessageEntry(
       );
       return;
     case "custom":
+      if ("display" in entry.message && entry.message.display === false) {
+        return;
+      }
       appendSyntheticMessage(
         {
           entry,

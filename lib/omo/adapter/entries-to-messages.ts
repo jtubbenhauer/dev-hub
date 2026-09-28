@@ -56,12 +56,9 @@ export function entriesToMessages(
         );
         break;
       case "custom":
-        appendSyntheticMessage(
-          { entry, text: displayText(entry.data), source: entry.type },
-          context,
-        );
         break;
       case "custom_message":
+        if (!entry.display) break;
         appendSyntheticMessage(
           { entry, text: displayText(entry.content), source: entry.type },
           context,

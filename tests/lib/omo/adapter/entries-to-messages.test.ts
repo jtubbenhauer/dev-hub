@@ -125,7 +125,7 @@ describe("entriesToMessages", () => {
   it("maps content, metadata entries, skill prefixes, and folded tool results", () => {
     const messages = entriesToMessages(scenarioEntries(), OPTIONS);
 
-    expect(messages).toHaveLength(7);
+    expect(messages).toHaveLength(6);
     expect(messages.every(isMessageWithParts)).toBe(true);
     expect(messages[0]).toMatchObject({
       info: { agent: "skill:frontend", metadata: { omoSkill: "frontend" } },
@@ -156,9 +156,58 @@ describe("entriesToMessages", () => {
     });
     expect(messages.slice(3).map((message) => message.parts[0])).toMatchObject([
       { metadata: { omoSource: "branch_summary" } },
-      { metadata: { omoSource: "custom" } },
       { metadata: { omoSource: "custom_message" } },
       { metadata: { omoSource: "bashExecution" } },
+    ]);
+  });
+
+  it("hides extension state entries and non-display custom messages", () => {
+    const hiddenCustomRoleMessage = {
+      role: "custom",
+      content: "internal",
+      display: false,
+      timestamp: 3,
+    };
+    const messages = entriesToMessages(
+      [
+        {
+          type: "custom",
+          id: "state",
+          parentId: null,
+          timestamp: 1,
+          customType: "senpi.hooks.stop-state",
+          data: { count: 0 },
+        },
+        {
+          type: "custom_message",
+          id: "hidden",
+          parentId: "state",
+          timestamp: 2,
+          customType: "environment-context",
+          content: "cwd details",
+          display: false,
+        },
+        messageEntry({
+          id: "hidden-role",
+          parentId: "hidden",
+          timestamp: 3,
+          message: hiddenCustomRoleMessage,
+        }),
+        {
+          type: "custom_message",
+          id: "shown",
+          parentId: "hidden-role",
+          timestamp: 4,
+          customType: "omo-model-profile:applied",
+          content: "profile applied",
+          display: true,
+        },
+      ],
+      OPTIONS,
+    );
+
+    expect(messages.map((message) => message.parts[0])).toMatchObject([
+      { text: "profile applied" },
     ]);
   });
 

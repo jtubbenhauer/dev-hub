@@ -1,0 +1,39 @@
+packages/agent/tests/omo/daemon.test.ts
+  s_9b616f005b7655::t_95d4dd79466750 78-84
+  s_9b616f005b7655::t_64434ca0c77e86 1,74-77,85-89
+  s_a14af25ea19db4::t_316b9026daba44 90-91
+tests/lib/omo/session-registry-attach-cases.ts
+  s_9b616f005b7655::t_52217fe7976083 88-91
+lib/omo/session-registry-attach.ts
+  s_9b616f005b7655::t_79c918ddd49b22 88-89,91-92
+lib/omo/daemon.ts
+  s_9b616f005b7655::t_79c918ddd49b22 2,75-76
+tests/lib/omo/daemon.test.ts
+  s_9b616f005b7655::t_f995a9975a616f 1,20,87,182
+packages/agent/src/omo/daemon.ts
+  s_9b616f005b7655::t_79c918ddd49b22 83-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f0247d8084fe1df48cbb957df8cb0ee0827712ea",
+  "prompts": {},
+  "sessions": {
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

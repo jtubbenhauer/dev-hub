@@ -1,0 +1,29 @@
+lib/opencode/retention-maintenance.ts
+  s_c8ed98784e996a::t_abfd23e434e533 1-258
+lib/opencode/retention.ts
+  s_c8ed98784e996a::t_e43f37e6490cd7 1-120
+scripts/opencode-retention-cleanup.ts
+  s_c8ed98784e996a::t_d9e881dba5f8fa 1-200
+tests/lib/opencode/retention-maintenance.test.ts
+  s_c8ed98784e996a::t_82ddf9750e3eae 1-189
+tests/lib/opencode/retention.test.ts
+  s_c8ed98784e996a::t_9d9856ec89f990 1-104
+tests/scripts/opencode-retention-cleanup.test.ts
+  s_c8ed98784e996a::t_27e017ce4d936f 1-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7fca89e24973179b76e584ae6b22d845ccddaddc",
+  "prompts": {},
+  "sessions": {
+    "s_c8ed98784e996a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1aef3eaeffeJSYp9Etob33iYb",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

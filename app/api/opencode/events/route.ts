@@ -193,6 +193,7 @@ async function mixedEngineEvents(
     for (const child of children) child.dispose();
   }
 
+  let lastSetupError: unknown;
   try {
     if (targets.length > 0) {
       children.push(createOpenCodeEventStream(targets, abortController.signal));
@@ -201,21 +202,34 @@ async function mixedEngineEvents(
       await import("@/lib/omo/event-stream");
     const { createOmoContext } = await import("@/lib/omo/runtime");
     for (const workspace of omoWorkspaces) {
-      const { runtime } = createOmoContext(workspace);
-      children.push(
-        createOmoWorkspaceEventStream({
-          workspace,
-          runtime,
-          signal: abortController.signal,
-        }),
-      );
+      // One unreachable or untrusted workspace must not take down the
+      // shared stream for every other workspace.
+      try {
+        const { runtime } = createOmoContext(workspace);
+        children.push(
+          createOmoWorkspaceEventStream({
+            workspace,
+            runtime,
+            signal: abortController.signal,
+          }),
+        );
+      } catch (error) {
+        lastSetupError = error;
+        console.warn("[events] skipping OmO workspace", workspace.id, error);
+      }
     }
   } catch (error) {
+    lastSetupError = error;
+  }
+  if (children.length === 0) {
     settle();
     return NextResponse.json(
       {
         error: "Event stream unavailable",
-        detail: error instanceof Error ? error.message : "Unknown error",
+        detail:
+          lastSetupError instanceof Error
+            ? lastSetupError.message
+            : "Unknown error",
       },
       { status: 503 },
     );

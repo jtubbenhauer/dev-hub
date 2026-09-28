@@ -378,6 +378,50 @@ describe("events dispatch", () => {
   });
 });
 
+describe("events dispatch with an unusable omo workspace", () => {
+  const UNTRUSTED_WS = "ws-omo-untrusted";
+
+  beforeEach(() => {
+    sqlite
+      .prepare(
+        `INSERT INTO workspaces (id, user_id, name, path, type, backend, agent_url)
+         VALUES (?, ?, ?, '/tmp/remote', 'repo', 'remote', 'http://10.255.255.1:7599')`,
+      )
+      .run(UNTRUSTED_WS, USER, UNTRUSTED_WS);
+    state.engines.set(UNTRUSTED_WS, "omo");
+  });
+
+  it("keeps streaming the healthy workspaces when one cannot be set up", async () => {
+    const { GET } = await import("@/app/api/opencode/events/route");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const response = await GET(
+      request(
+        `/api/opencode/events?workspaceIds=${OMO_WS},${UNTRUSTED_WS}&engineRev=1`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(warn).toHaveBeenCalledWith(
+      "[events] skipping OmO workspace",
+      UNTRUSTED_WS,
+      expect.any(Error),
+    );
+    await response.body?.cancel();
+  });
+
+  it("still returns 503 when no requested workspace can stream", async () => {
+    const { GET } = await import("@/app/api/opencode/events/route");
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const response = await GET(
+      request(`/api/opencode/events?workspaceIds=${UNTRUSTED_WS}&engineRev=1`),
+    );
+
+    expect(response.status).toBe(503);
+  });
+});
+
 describe("restart dispatch", () => {
   it("re-ensures and reconnects omo without stopping the daemon", async () => {
     const { getOmoReadRuntime } = await import("@/lib/omo/facade/read-runtime");

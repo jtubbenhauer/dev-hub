@@ -1,4 +1,3 @@
-import type { Message, Part, UserMessage } from "@opencode-ai/sdk";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { Event } from "@/lib/opencode/types";
 import type {
@@ -12,11 +11,10 @@ import {
 } from "@/lib/omo/adapter/shapes";
 import { buildUserContent } from "@/lib/omo/adapter/entry-content";
 import {
-  messageError,
   messageString,
   messageTimestamp,
-  messageUsage,
 } from "@/lib/omo/adapter/entry-message-fields";
+import { completeAssistantMessage } from "@/lib/omo/adapter/live-message-completion";
 import {
   buildDurableLiveMessage,
   parseAgentMessage,
@@ -29,6 +27,11 @@ import {
   handleAssistantMessageUpdate,
   type ActiveAssistantMessage,
 } from "@/lib/omo/adapter/live-message-updates";
+import {
+  type ActiveMessage,
+  messageUpdated,
+} from "@/lib/omo/adapter/live-message-state";
+import { createLiveStatusEventHandlers } from "@/lib/omo/adapter/live-status-events";
 import { createLiveToolEventHandlers } from "@/lib/omo/adapter/live-tool-events";
 
 export type {
@@ -38,20 +41,6 @@ export type {
   LiveAdapterResult,
   LiveAdapterSeed,
 } from "@/lib/omo/adapter/live-adapter-types";
-
-interface ActiveUserMessage {
-  readonly role: "user";
-  readonly provisionalId: string;
-  readonly created: number;
-  readonly parts: Map<number, Part>;
-  info: UserMessage;
-}
-
-type ActiveMessage = ActiveUserMessage | ActiveAssistantMessage;
-
-function messageUpdated(info: Message): Event {
-  return { type: "message.updated", properties: { info } };
-}
 
 export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
   const pendingByRole: Record<LiveMessageRole, ActiveMessage[]> = {
@@ -70,6 +59,13 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
   };
 
   const toolHandlers = createLiveToolEventHandlers(options, activeAssistant);
+  const statusHandlers = createLiveStatusEventHandlers(
+    options,
+    (modelID, providerID) => {
+      lastKnownModel = modelID;
+      lastKnownProvider = providerID;
+    },
+  );
 
   const handleMessageStart = (record: JsonlRecord): LiveAdapterResult => {
     const source = parseAgentMessage(record.message);
@@ -77,10 +73,7 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
     const role = parseLiveRole(source.role);
     if (!role) return { events: [], effects: [] };
     const provisionalId = `omo_live_${crypto.randomUUID()}`;
-    const created = messageTimestamp(
-      source,
-      recordTimestamp(record.timestamp),
-    );
+    const created = messageTimestamp(source, recordTimestamp(record.timestamp));
 
     if (role === "user") {
       const content = buildUserContent(source, {
@@ -147,34 +140,19 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
 
   const handleMessageEnd = (record: JsonlRecord): LiveAdapterResult => {
     const active = activeAssistant();
-    const source = parseAgentMessage(record.message);
-    if (!active || !source || source.role !== "assistant") {
-      return { events: [], effects: [] };
-    }
-    const modelID = messageString(source, "model") ?? lastKnownModel;
-    const providerID = messageString(source, "provider") ?? lastKnownProvider;
-    lastKnownModel = modelID;
-    lastKnownProvider = providerID;
-    const completed = messageTimestamp(
-      source,
-      recordTimestamp(record.timestamp, active.created),
-    );
-    active.info = buildOmoAssistantMessage({
-      id: active.provisionalId,
+    if (!active) return { events: [], effects: [] };
+    const info = completeAssistantMessage(record, active, {
       sessionID: options.sessionId,
+      workspacePath: options.workspacePath,
       parentMessageID: lastUserMessageID ?? options.sessionId,
-      created: active.created,
-      completed:
-        messageString(source, "stopReason") === "pending"
-          ? undefined
-          : completed,
-      modelID,
-      providerID,
-      cwd: options.workspacePath,
-      usage: messageUsage(source),
-      error: messageError(source),
+      lastKnownModel,
+      lastKnownProvider,
     });
-    return { events: [messageUpdated(active.info)], effects: [] };
+    if (!info) return { events: [], effects: [] };
+    active.info = info;
+    lastKnownModel = info.modelID;
+    lastKnownProvider = info.providerID;
+    return { events: [messageUpdated(info)], effects: [] };
   };
 
   const handleEntryAppended = (record: JsonlRecord): LiveAdapterResult => {
@@ -228,6 +206,9 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
       lastKnownProvider = state.lastKnownProvider ?? "";
     },
     handle(record): LiveAdapterResult {
+      if (record.type === "response" && record.command === "set_session_name") {
+        return statusHandlers.handleSetSessionNameResponse(record);
+      }
       switch (record.type) {
         case "message_start":
           return handleMessageStart(record);
@@ -252,6 +233,21 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
           return toolHandlers.handleEnd(record);
         case "extension_event":
           return toolHandlers.handleExtension(record);
+        case "agent_start":
+          return statusHandlers.handleAgentStart();
+        case "agent_settled":
+          return statusHandlers.handleAgentSettled();
+        case "auto_retry_start":
+          return statusHandlers.handleRetryStart(record);
+        case "auto_retry_end":
+          return statusHandlers.handleRetryEnd(record);
+        case "compaction_end":
+          return statusHandlers.handleCompactionEnd();
+        case "model_changed":
+          return statusHandlers.handleModelChanged(record);
+        case "session_replaced":
+        case "queue_update":
+          return { events: [], effects: [] };
         default:
           return { events: [], effects: [] };
       }

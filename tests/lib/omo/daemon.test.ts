@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 // @vitest-environment node
 
 import { execFile, type ExecFileException } from "node:child_process";
@@ -16,6 +17,7 @@ const { mockExecFile } = vi.hoisted(() => ({
       args: string[],
       options: {
         env: NodeJS.ProcessEnv;
+        cwd: string;
         timeout: number;
       },
       callback: ExecFileCallback,
@@ -82,6 +84,7 @@ describe("ensureOmoDaemon", () => {
       ["daemon", "run", "--json"],
       {
         env: expect.objectContaining({ OMO_CODING_AGENT_DIR: "/state/omo" }),
+        cwd: homedir(),
         timeout: 60_000,
       },
       expect.any(Function),
@@ -176,6 +179,7 @@ describe("getOmoDaemonStatus", () => {
       ["daemon", "status", "--json"],
       {
         env: expect.objectContaining({ OMO_CODING_AGENT_DIR: "/state/omo" }),
+        cwd: homedir(),
         timeout: 60_000,
       },
       expect.any(Function),

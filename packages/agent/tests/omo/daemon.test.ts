@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const execFileMock = vi.fn();
@@ -68,6 +69,24 @@ describe("ensureOmoDaemon / getOmoDaemonStatus", () => {
       engineVersion: "1.2.3",
       action: "started",
     });
+  });
+
+  it("starts the shared daemon from the home directory, not the caller's cwd", async () => {
+    const { ensureOmoDaemon } = await import("../../src/omo/daemon.js");
+    respondWith(
+      0,
+      `${JSON.stringify({
+        socket: "/tmp/rpc.sock",
+        pid: 1,
+        instanceId: "instance-1",
+        engineVersion: "1.2.3",
+        action: "running",
+      })}\n`,
+    );
+
+    await ensureOmoDaemon();
+
+    expect(execFileMock.mock.calls[0]?.[2]).toMatchObject({ cwd: homedir() });
   });
 
   it("maps exit code 2 to a usage error", async () => {

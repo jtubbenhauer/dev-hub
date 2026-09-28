@@ -85,6 +85,10 @@ describe("OmoSessionRegistry attach coordination", () => {
     expect(repeated).toBe(byId);
     expect(again).toBe(byId);
     expect(recordsOfType(fixture, "open_session")).toHaveLength(1);
+    expect(recordsOfType(fixture, "open_session")[0]).toMatchObject({
+      sessionPath: "/sessions/known.jsonl",
+      cwd: fixture.workspace.path,
+    });
     expect(fixture.runtime.registry.pendingAttach.size).toBe(0);
   });
 

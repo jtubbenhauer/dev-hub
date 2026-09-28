@@ -85,8 +85,11 @@ function openParams(
       throw new OmoCorruptIndexRowError(request.workspace.id, row.durableId);
     }
   }
+  // omo falls back to the daemon's own directory when cwd is omitted, so a
+  // reopen by sessionPath must name the workspace or its tools run elsewhere.
   return {
-    ...(sessionPath ? { sessionPath } : { cwd: request.workspace.path }),
+    ...(sessionPath ? { sessionPath } : {}),
+    cwd: request.workspace.path,
     retain_on_disconnect: true,
     kind: row?.kind ?? "interactive",
     ...(context ? { context } : {}),

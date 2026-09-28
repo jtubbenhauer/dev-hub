@@ -80,6 +80,8 @@ function runOmoDaemonCommand(
       [...args],
       {
         env: { ...process.env, OMO_CODING_AGENT_DIR: agentDir },
+        // The shared daemon inherits this cwd; never tie it to a checkout.
+        cwd: homedir(),
         timeout: DAEMON_COMMAND_TIMEOUT_MS,
       },
       (error, stdout, stderr) => {

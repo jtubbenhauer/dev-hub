@@ -86,6 +86,10 @@ export class OmoRpcClient {
     }
   }
 
+  reconnect(): Promise<OmoProtocolInfo> {
+    return this.connect();
+  }
+
   async request(
     record: JsonlRecord,
     options?: OmoRequestOptions,

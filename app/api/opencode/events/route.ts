@@ -5,6 +5,7 @@ import { workspaces } from "@/drizzle/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend";
 import { superviseSseTarget } from "@/lib/opencode/sse-supervisor";
+import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
 
 export const maxDuration = 300;
 
@@ -84,6 +85,170 @@ function enqueueUpstreamData(
   }
 }
 
+interface EngineEventStream {
+  readonly stream: ReadableStream<Uint8Array>;
+  readonly dispose: () => void;
+}
+
+const SSE_HEADERS = {
+  "content-type": "text/event-stream",
+  "cache-control": "no-cache",
+  connection: "keep-alive",
+  "x-accel-buffering": "no",
+};
+
+async function resolveOmoWorkspaces(
+  workspaceIds: string[],
+  userId: string,
+): Promise<{ id: string; path: string }[]> {
+  const rows = await db
+    .select()
+    .from(workspaces)
+    .where(
+      and(inArray(workspaces.id, workspaceIds), eq(workspaces.userId, userId)),
+    );
+  return rows.map((row) => {
+    const workspace = toWorkspace(row);
+    return { id: workspace.id, path: workspace.path };
+  });
+}
+
+function createOpenCodeEventStream(
+  targets: UpstreamTarget[],
+  signal: AbortSignal,
+): EngineEventStream {
+  const encoder = new TextEncoder();
+  const cancelled = { current: false };
+  let streamController: ReadableStreamDefaultController<Uint8Array> | null =
+    null;
+  let isDisposed = false;
+
+  function dispose(): void {
+    if (isDisposed) return;
+    isDisposed = true;
+    cancelled.current = true;
+    try {
+      streamController?.close();
+    } catch {
+      // Stream already closed by cancel()
+    }
+  }
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      streamController = controller;
+      const upstreamPromises = targets.map((target) =>
+        superviseSseTarget({
+          signal,
+          connect: target.connect,
+          onData: (data) =>
+            enqueueUpstreamData(target, controller, encoder, cancelled, data),
+          onState: (state) =>
+            enqueueEvent(target, controller, encoder, cancelled, {
+              type: "workspace.connection",
+              properties: state,
+            }),
+        }),
+      );
+      void Promise.allSettled(upstreamPromises).then(dispose);
+    },
+    cancel() {
+      dispose();
+    },
+  });
+  return { stream, dispose };
+}
+
+async function mixedEngineEvents(
+  request: NextRequest,
+  userId: string,
+  openCodeWorkspaceIds: string[],
+  omoWorkspaceIds: string[],
+): Promise<Response> {
+  const [targets, omoWorkspaces] = await Promise.all([
+    resolveTargets(openCodeWorkspaceIds, userId),
+    resolveOmoWorkspaces(omoWorkspaceIds, userId),
+  ]);
+
+  const abortController = new AbortController();
+  const children: EngineEventStream[] = [];
+  let isSettled = false;
+  let isCancelled = false;
+  const abortFromRequest = () => abortController.abort();
+  request.signal.addEventListener("abort", abortFromRequest, { once: true });
+
+  // Every exit path (outer cancel, child failure, normal settlement) funnels
+  // here so each child is disposed exactly once.
+  function settle(): void {
+    if (isSettled) return;
+    isSettled = true;
+    request.signal.removeEventListener("abort", abortFromRequest);
+    abortController.abort();
+    for (const child of children) child.dispose();
+  }
+
+  try {
+    if (targets.length > 0) {
+      children.push(createOpenCodeEventStream(targets, abortController.signal));
+    }
+    const { createOmoWorkspaceEventStream } =
+      await import("@/lib/omo/event-stream");
+    const { getOmoReadRuntime } = await import("@/lib/omo/facade/read-runtime");
+    const runtime = getOmoReadRuntime();
+    for (const workspace of omoWorkspaces) {
+      children.push(
+        createOmoWorkspaceEventStream({
+          workspace,
+          runtime,
+          signal: abortController.signal,
+        }),
+      );
+    }
+  } catch (error) {
+    settle();
+    return NextResponse.json(
+      {
+        error: "Event stream unavailable",
+        detail: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 503 },
+    );
+  }
+
+  const readers = children.map((child) => child.stream.getReader());
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const pumps = readers.map(async (reader) => {
+        while (!isSettled) {
+          const { done, value } = await reader.read();
+          if (done || isSettled) return;
+          try {
+            controller.enqueue(value);
+          } catch {
+            settle();
+          }
+        }
+      });
+      for (const pump of pumps) void pump.catch(settle);
+      void Promise.allSettled(pumps).then(() => {
+        settle();
+        if (isCancelled) return;
+        try {
+          controller.close();
+        } catch {
+          // Stream already closed by cancel()
+        }
+      });
+    },
+    cancel() {
+      isCancelled = true;
+      settle();
+    },
+  });
+
+  return new Response(stream, { headers: SSE_HEADERS });
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -100,6 +265,26 @@ export async function GET(request: NextRequest) {
   }
 
   const workspaceIds = workspaceIdsParam.split(",").filter(Boolean);
+  const userId = session.user.id;
+  const engines = await Promise.all(
+    workspaceIds.map((workspaceId) =>
+      resolveWorkspaceEngine(userId, workspaceId),
+    ),
+  );
+  const omoWorkspaceIds = workspaceIds.filter(
+    (_, index) => engines[index] === "omo",
+  );
+  if (omoWorkspaceIds.length > 0) {
+    const openCodeWorkspaceIds = workspaceIds.filter(
+      (_, index) => engines[index] !== "omo",
+    );
+    return mixedEngineEvents(
+      request,
+      userId,
+      openCodeWorkspaceIds,
+      omoWorkspaceIds,
+    );
+  }
   const targets = await resolveTargets(workspaceIds, session.user.id);
 
   const abortController = new AbortController();

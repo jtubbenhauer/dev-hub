@@ -82,6 +82,20 @@ export async function resolveOpenCodeTarget(
   }
 }
 
+export async function resolveOmoWorkspace(
+  userId: string,
+  workspaceId: string,
+): Promise<Workspace> {
+  const [row] = await db
+    .select()
+    .from(workspaces)
+    .where(and(eq(workspaces.id, workspaceId), eq(workspaces.userId, userId)));
+  if (!row) {
+    throw new OpenCodeTargetError(404, "Workspace not found");
+  }
+  return toWorkspace(row);
+}
+
 export async function authorizeOpenCodeSession(
   target: OpenCodeTarget,
   sessionId: string,

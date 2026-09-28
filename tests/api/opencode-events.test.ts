@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockAuth = vi.fn();
 vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
+vi.mock("@/lib/engine/resolve-engine", () => ({
+  resolveWorkspaceEngine: vi.fn(async () => "opencode"),
+}));
 
 const mockWhere = vi.fn();
 const mockFrom = vi.fn(() => ({ where: mockWhere }));

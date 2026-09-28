@@ -9,6 +9,8 @@ import {
   OpenCodeTargetError,
 } from "@/lib/opencode/proxy-target";
 import { fetchWithHeaderTimeout } from "@/lib/opencode/fetch-timeout";
+import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
+import { proxyOmoRequest } from "@/lib/omo/route-dispatch";
 import type { Workspace, WorkspaceProvider } from "@/types";
 
 interface RouteParams {
@@ -35,6 +37,22 @@ async function proxyToOpenCode(
       { error: "workspaceId is required" },
       { status: 400 },
     );
+  }
+
+  const engine = await resolveWorkspaceEngine(session.user.id, workspaceId);
+  if (engine === "omo") {
+    return proxyOmoRequest({
+      request,
+      userId: session.user.id,
+      workspaceId,
+      pathSegments: pathSegments.path,
+    });
+  }
+  if (
+    pathSegments.path[0] === "session" &&
+    requestedSessionId?.startsWith("omo_")
+  ) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
   let serverUrl: string;

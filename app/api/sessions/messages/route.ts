@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import {
   resolveOpenCodeTarget,
+  resolveOmoWorkspace,
   authorizeOpenCodeSession,
   OpenCodeTargetError,
 } from "@/lib/opencode/proxy-target";
+import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
+import { getOmoSessionMessages } from "@/lib/omo/session-messages-route";
 import { fetchWithHeaderTimeout } from "@/lib/opencode/fetch-timeout";
 import { truncateMessagesForTransport } from "@/lib/opencode/truncate-messages";
 import {
@@ -87,6 +90,21 @@ export async function GET(request: NextRequest) {
       { error: "sessionId and workspaceId are required" },
       { status: 400 },
     );
+  }
+  const engine = await resolveWorkspaceEngine(userId, workspaceId);
+  if (engine === "omo") {
+    return getOmoSessionMessages({
+      userId,
+      workspaceId,
+      sessionId,
+      before,
+      limit,
+      isFresh: forceFresh,
+      isReplace: url.searchParams.get("replace") === "1",
+    });
+  }
+  if (sessionId.startsWith("omo_")) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
   let target: Awaited<ReturnType<typeof resolveOpenCodeTarget>> | null = null;
   let targetResolutionError: OpenCodeTargetError | null = null;
@@ -349,8 +367,13 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
+  const engine = await resolveWorkspaceEngine(session.user.id, workspaceId);
   try {
-    await resolveOpenCodeTarget(session.user.id, workspaceId);
+    if (engine === "omo") {
+      await resolveOmoWorkspace(session.user.id, workspaceId);
+    } else {
+      await resolveOpenCodeTarget(session.user.id, workspaceId);
+    }
   } catch (error) {
     if (error instanceof OpenCodeTargetError) {
       return NextResponse.json(
@@ -359,6 +382,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
     throw error;
+  }
+  if (engine === "omo" && sessionId.startsWith("ses_")) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+  if (engine === "omo" && exactMessageId?.startsWith("omo_live_")) {
+    return NextResponse.json({ purged: 0 });
   }
 
   return withSessionMessageLock(

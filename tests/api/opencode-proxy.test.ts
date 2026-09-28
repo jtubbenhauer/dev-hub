@@ -4,6 +4,9 @@ import type { Workspace } from "@/types";
 
 const mockAuth = vi.fn();
 vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
+vi.mock("@/lib/engine/resolve-engine", () => ({
+  resolveWorkspaceEngine: vi.fn(async () => "opencode"),
+}));
 
 const mockWhere = vi.fn();
 const mockFrom = vi.fn();

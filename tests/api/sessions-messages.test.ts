@@ -3,6 +3,9 @@ import { NextRequest } from "next/server";
 
 const mockAuth = vi.fn();
 vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
+vi.mock("@/lib/engine/resolve-engine", () => ({
+  resolveWorkspaceEngine: vi.fn(async () => "opencode"),
+}));
 
 const mockResolve = vi.fn();
 const mockAuthorize = vi.fn();

@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { workspaces } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { toWorkspace } from "@/lib/workspaces/backend";
+import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
+import { restartOmoEngine } from "@/lib/omo/route-dispatch";
 
 const RESTART_COMMAND = "pkill -TERM -f '[o]pencode serve' || true";
 
@@ -57,6 +59,11 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const url = new URL(request.url);
   const workspaceId = url.searchParams.get("workspaceId");
+
+  const engine = await resolveWorkspaceEngine(session.user.id, workspaceId);
+  if (engine === "omo") {
+    return restartOmoEngine(session.user.id, workspaceId);
+  }
 
   if (!workspaceId) {
     const { stopServer } = await import("@/lib/opencode/server-pool");

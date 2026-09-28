@@ -9,8 +9,10 @@ import {
 import { eq, and } from "drizzle-orm";
 import {
   OpenCodeTargetError,
+  resolveOmoWorkspace,
   resolveOpenCodeTarget,
 } from "@/lib/opencode/proxy-target";
+import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -101,8 +103,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const engine = await resolveWorkspaceEngine(
+    session.user.id,
+    body.workspaceId,
+  );
   try {
-    await resolveOpenCodeTarget(session.user.id, body.workspaceId);
+    if (engine === "omo") {
+      await resolveOmoWorkspace(session.user.id, body.workspaceId);
+    } else {
+      await resolveOpenCodeTarget(session.user.id, body.workspaceId);
+    }
   } catch (error) {
     if (error instanceof OpenCodeTargetError) {
       return NextResponse.json(
@@ -203,8 +213,13 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
+  const engine = await resolveWorkspaceEngine(session.user.id, workspaceId);
   try {
-    await resolveOpenCodeTarget(session.user.id, workspaceId);
+    if (engine === "omo") {
+      await resolveOmoWorkspace(session.user.id, workspaceId);
+    } else {
+      await resolveOpenCodeTarget(session.user.id, workspaceId);
+    }
   } catch (error) {
     if (error instanceof OpenCodeTargetError) {
       return NextResponse.json(

@@ -3,6 +3,9 @@ import { NextRequest } from "next/server";
 
 const mockAuth = vi.fn();
 vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
+vi.mock("@/lib/engine/resolve-engine", () => ({
+  resolveWorkspaceEngine: vi.fn(async () => "opencode"),
+}));
 vi.mock("@/lib/opencode/proxy-target", () => ({
   resolveOpenCodeTarget: vi.fn().mockResolvedValue({}),
   OpenCodeTargetError: class OpenCodeTargetError extends Error {},

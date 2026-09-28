@@ -1,0 +1,197 @@
+.env.example
+  s_44c2a40dcf7088::t_8367e0d249abd4 30-31
+AGENTS.md
+  s_44c2a40dcf7088::t_48086ed700ce36 230-232
+app/api/opencode/events/route.ts
+  s_44c2a40dcf7088::t_6d457c553d095b 9,104,113-118,202,204
+app/api/workspaces/[id]/route.ts
+  s_44c2a40dcf7088::t_49cca8b6a655b3 15,95-104
+app/api/workspaces/route.ts
+  s_44c2a40dcf7088::t_231b2b123790d5 14,193-202
+lib/omo/adapter/catalog-cache.ts
+  s_44c2a40dcf7088::t_8eddfe9acd763d 83-97
+lib/omo/adapter/entry-content.ts
+  s_44c2a40dcf7088::t_d1cb3031519894 24-25,30-38
+lib/omo/adapter/live-events.ts
+  s_a16d1e799e3e3d::t_d5844b6224a065 245
+lib/omo/adapter/live-status-events.ts
+  s_44c2a40dcf7088::t_4911d7d502b5a9 16,110-115,121
+lib/omo/adapter/live-task-events.ts
+  s_d8d55cef2d893e::t_74c84eabfec2af 39-60,63,106-108
+lib/omo/adapter/live-tool-events.ts
+  s_44c2a40dcf7088::t_1ac630871ea248 253-255
+lib/omo/errors.ts
+  s_44c2a40dcf7088::t_0a11b67ddb6db6 89-104
+lib/omo/facade/read-errors.ts
+  s_44c2a40dcf7088::t_176545b7503127 1-5,48-49
+lib/omo/facade/read-messages.ts
+  s_a16d1e799e3e3d::t_016e651de73507 98-99
+lib/omo/facade/read-runtime.ts
+  s_44c2a40dcf7088::t_d54aa294ec0c0b 3,23-25,34-35,39
+lib/omo/facade/read-sessions.ts
+  s_44c2a40dcf7088::t_9ae690bfcaa781 59-64,69-75,87-89,95-99,155,160-162,186-187,201-203,216-225
+lib/omo/facade/read.ts
+  s_44c2a40dcf7088::t_2273c0c38019b2 22,25-26,51,53,63-71,73,75,84,88,102-104,111,117,120,123,125
+lib/omo/facade/write-errors.ts
+  s_44c2a40dcf7088::t_19de6be0a99a6f 2,114-115
+lib/omo/facade/write-runtime.ts
+  s_44c2a40dcf7088::t_6bc7c75c39bf4a 4,9,12
+lib/omo/facade/write-session.ts
+  s_44c2a40dcf7088::t_674b19d56b3db0 2-5,22,108-113,125
+lib/omo/facade/write.ts
+  s_44c2a40dcf7088::t_fc4d24a7d03fc0 16,165
+lib/omo/remote-daemon.ts
+  s_44c2a40dcf7088::t_bff9de32fadde4 3,28-30
+lib/omo/remote-session-source.ts
+  s_44c2a40dcf7088::t_dda55f407340cd 2,162-164,178
+lib/omo/rpc-client.ts
+  s_9be96702534b93::t_c0cb60725075c0 10,106-113
+lib/omo/rpc-connection.ts
+  s_44c2a40dcf7088::t_90a615f2a980ff 93-102
+lib/omo/rpc-ws-transport.ts
+  s_44c2a40dcf7088::t_1061d962ba5d50 5-7,126-128,132
+lib/omo/runtime.ts
+  s_44c2a40dcf7088::t_3050ab5160d427 2,13,53,56,59,80-83,95-108
+lib/omo/session-registry-attach.ts
+  s_d8d55cef2d893e::t_24c3cc5850ffeb 16-19,183-209
+lib/omo/session-registry-binding.ts
+  s_d8d55cef2d893e::t_f0e80773fd359f 1-4,6,8,33-35,43-45,52,54,58-78,98-105,133-140
+lib/omo/session-registry-core.ts
+  s_44c2a40dcf7088::t_d34fb16ee2ea67 1-2,14-17,43,53-55,61,69,140-142,184-186,228-231,237-253,269-270,273-275,296-299,325-328
+lib/omo/session-registry-dispatch.ts
+  s_44c2a40dcf7088::t_0a0790dcd32aee 1,35-40,52-53,56-57,80-84,87-88,120,135-142,149,155-168,187-193,204,206-207,209-214
+lib/omo/session-registry-errors.ts
+  s_44c2a40dcf7088::t_b45176ebaeb427 44-51
+lib/omo/session-registry-hydration.ts
+  s_44c2a40dcf7088::t_2b856388ae0b59 5-8,49-52,218-221,245-248,256-259,272-275
+lib/omo/session-registry-reopen.ts
+  s_44c2a40dcf7088::t_4d5ffbce7aa2a2 2,14-15,59,116-118,122-135,138-139,148-152
+lib/omo/session-registry-types.ts
+  s_44c2a40dcf7088::t_c9c9a8603252e2 2,55
+lib/omo/session-registry.ts
+  s_44c2a40dcf7088::t_c9cb6d7576e9ba 1-2,19-22,28-31,42-51
+lib/workspaces/agent-origin.ts
+  s_44c2a40dcf7088::t_d56f888c500f49 1-63
+packages/agent/src/index.ts
+  s_44c2a40dcf7088::t_a980e3261b3257 18,21-24,38-39
+packages/agent/src/omo/sessions.ts
+  s_44c2a40dcf7088::t_a146ca6a31f22b 4,175-177,181,185-192,194,196,200-212,292,295,297,303,307,309-316,318,326-327,339-358
+packages/agent/src/routes/omo-rpc-tunnel.ts
+  s_44c2a40dcf7088::t_a8a9bccd4c4a17 13,121-124
+packages/agent/src/routes/omo-sessions.ts
+  s_9be96702534b93::t_5b9d10bab26d9a 42-57,69,84,128-133
+packages/agent/tests/omo/sessions.test.ts
+  s_a16d1e799e3e3d::t_897807a7c8e645 107-139,189,199-201,204-245
+packages/agent/tests/routes/omo-rpc-tunnel.test.ts
+  s_a16d1e799e3e3d::t_e106b859d07594 156-170
+stores/chat-store.ts
+  s_a16d1e799e3e3d::t_8ec22450530ca2 43-47,199-218,289-476,505,516-529,990-993,1037,1106,1410-1445,1593-1616,1625,1979,2010,2331,2334-2337,2341-2342,2351,2394-2399,2405-2418,2524-2526,2528-2529,2984-2992,3401-3408,3492,3573-3575,3935,3960,4005-4006,4022-4026,4036,4041-4046,4054-4076
+tests/api/omo-remote-restart.test.ts
+  s_a14af25ea19db4::t_f0565080ca79b2 67,103,139,222
+tests/api/workspaces-agent-url.test.ts
+  s_44c2a40dcf7088::t_0b31fe42ccf266 1-156
+tests/lib/omo/adapter/live-status.test.ts
+  s_44c2a40dcf7088::t_c3e62aa4716c40 136-159
+tests/lib/omo/adapter/live-task-events.test.ts
+  s_d8d55cef2d893e::t_077133ae30f6bb 1-127
+tests/lib/omo/adapter/skill-prefix-fallback.test.ts
+  s_44c2a40dcf7088::t_705798a6805907 1-66
+tests/lib/omo/daemon.test.ts
+  s_44c2a40dcf7088::t_d4d88db8c7c7dc 114-148
+tests/lib/omo/facade/read-catalog-cases.ts
+  s_44c2a40dcf7088::t_5fa80c4871fbda 45-61
+tests/lib/omo/facade/read-ensure-daemon.test.ts
+  s_a14af25ea19db4::t_73025a51876a15 1-167
+tests/lib/omo/facade/read-error-cases.ts
+  s_44c2a40dcf7088::t_3601a31dfdb1f0 85-86,95,100-101,103
+tests/lib/omo/facade/read-fixture.ts
+  s_44c2a40dcf7088::t_c6c2ac33eeaa17 90,99,108-114,130-133,149,171
+tests/lib/omo/facade/read-message-cases.ts
+  s_44c2a40dcf7088::t_e384d422a6d96a 151-172
+tests/lib/omo/facade/read-session-cases.ts
+  s_44c2a40dcf7088::t_c897cfe1c4435c 134-241
+tests/lib/omo/facade/remote-source.test.ts
+  s_44c2a40dcf7088::t_c7c3a938afa27b 5,76-79,81,163-274
+tests/lib/omo/facade/write-error-cases.ts
+  s_44c2a40dcf7088::t_ce5d82aa658256 89-105
+tests/lib/omo/facade/write-session-cases.ts
+  s_44c2a40dcf7088::t_64cd5e1c81b059 129-166
+tests/lib/omo/rpc-client-fire-and-forget.test.ts
+  s_44c2a40dcf7088::t_b3c2e4839a3bff 1-44
+tests/lib/omo/session-registry-dialogs.test.ts
+  s_d8d55cef2d893e::t_5d0a0550539253 1-108
+tests/lib/omo/session-registry-dispatch.test.ts
+  s_44c2a40dcf7088::t_3be85283c2eb1e 1-196
+tests/lib/omo/session-registry-replacement-cases.ts
+  s_44c2a40dcf7088::t_78f944db96414d 1,77-93,105,108-111
+tests/lib/omo/session-registry-replay-cases.ts
+  s_44c2a40dcf7088::t_26bb1200e4b9fe 66-69,76-78,101-104,111
+tests/lib/omo/session-registry-skill-prefixes.test.ts
+  s_295b37d70ca29f::t_0f72a402cb2e62 1-86
+tests/lib/omo/ws-transport.test.ts
+  s_44c2a40dcf7088::t_3b8c4e970aa558 7,9,149-181
+tests/lib/workspaces/agent-origin.test.ts
+  s_9be96702534b93::t_d5dd14e2449175 1-72
+tests/stores/chat-store-omo-replacement.test.ts
+  s_a14af25ea19db4::t_5e8b1c7c143596 1-327
+tests/stores/chat-store-resync.test.ts
+  s_a16d1e799e3e3d::t_afb081c5e8dfa5 1-391
+tests/stores/chat-store-sse-reconcile.test.ts
+  s_a16d1e799e3e3d::t_5555d66e5dd29e 1-377
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5197d52db157b706129589ce7847ceeab5be0bd5",
+  "prompts": {},
+  "sessions": {
+    "s_295b37d70ca29f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1919eb31ffeTugXOXraYdkVQE",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_44c2a40dcf7088": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3282de71ffeBoESmAAfqSTM65",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_9be96702534b93": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f19196814ffe3DHr76DsvWP8q1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a16d1e799e3e3d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1919ad60ffeY6Whu6LwC1jPzL",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_d8d55cef2d893e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f191a3ad0ffeN2100StruDojfu",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

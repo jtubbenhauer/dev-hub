@@ -77,9 +77,7 @@ function session(): Session {
   };
 }
 
-export function workspace(
-  messages: MessageWithParts[] = [],
-): WorkspaceState {
+export function workspace(messages: MessageWithParts[] = []): WorkspaceState {
   return {
     sessions: { [SESSION_ID]: session() },
     sessionsLoaded: true,
@@ -135,10 +133,7 @@ export function userEchoRecords(): JsonlRecord[] {
   ];
 }
 
-export function assistantMessage(
-  id: string,
-  text: string,
-): MessageWithParts {
+export function assistantMessage(id: string, text: string): MessageWithParts {
   const info = buildOmoAssistantMessage({
     id,
     sessionID: SESSION_ID,

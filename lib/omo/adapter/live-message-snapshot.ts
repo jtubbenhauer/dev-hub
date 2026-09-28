@@ -49,7 +49,9 @@ export function recordTimestamp(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function parseAgentMessage(value: unknown): AgentMessageLike | undefined {
+export function parseAgentMessage(
+  value: unknown,
+): AgentMessageLike | undefined {
   if (
     !isRecord(value) ||
     typeof value.role !== "string" ||
@@ -81,7 +83,9 @@ export function parseAppendedLiveMessage(
       type: "message",
       id: record.entry.id,
       parentId:
-        typeof record.entry.parentId === "string" ? record.entry.parentId : null,
+        typeof record.entry.parentId === "string"
+          ? record.entry.parentId
+          : null,
       timestamp,
       message,
     },

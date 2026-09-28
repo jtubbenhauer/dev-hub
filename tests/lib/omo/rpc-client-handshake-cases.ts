@@ -96,9 +96,7 @@ describe("OmoRpcClient handshake and correlation", () => {
     await firstOpen;
     const connection = await host.waitForConnection();
     expect(
-      connection.records.filter(
-        (record) => record["type"] === "open_session",
-      ),
+      connection.records.filter((record) => record["type"] === "open_session"),
     ).toHaveLength(1);
   });
 });

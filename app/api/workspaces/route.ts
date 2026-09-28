@@ -189,10 +189,7 @@ async function createRemoteWorkspace(
     );
   }
 
-  if (
-    resolvedEngine === "opencode" &&
-    normalizedOpencodeUrl === null
-  ) {
+  if (resolvedEngine === "opencode" && normalizedOpencodeUrl === null) {
     return NextResponse.json(
       { error: "opencodeUrl is required for remote workspaces" },
       { status: 400 },

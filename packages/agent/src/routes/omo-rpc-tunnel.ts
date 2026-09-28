@@ -86,10 +86,7 @@ export class OmoRpcTunnel {
   private isClosed = false;
   private backpressureTimer: ReturnType<typeof setInterval> | undefined;
 
-  constructor(
-    webSocket: TunnelWebSocket,
-    options: OmoRpcTunnelOptions,
-  ) {
+  constructor(webSocket: TunnelWebSocket, options: OmoRpcTunnelOptions) {
     this.webSocket = webSocket;
     this.options = options;
   }

@@ -1,9 +1,6 @@
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import { describe, expect, it } from "vitest";
-import {
-  createClient,
-  createHost,
-} from "@/tests/lib/omo/rpc-client-fixture";
+import { createClient, createHost } from "@/tests/lib/omo/rpc-client-fixture";
 
 describe("OmoRpcClient session routing", () => {
   it("hands pre-response records to onBound without generic dispatch", async () => {
@@ -16,11 +13,14 @@ describe("OmoRpcClient session routing", () => {
     let bufferedRecords: readonly JsonlRecord[] = [];
     let overflowed = true;
 
-    const opened = await client.openSession({}, (session, records, didOverflow) => {
-      bufferedRecords = records;
-      overflowed = didOverflow;
-      client.onSession(session.sessionId, () => undefined);
-    });
+    const opened = await client.openSession(
+      {},
+      (session, records, didOverflow) => {
+        bufferedRecords = records;
+        overflowed = didOverflow;
+        client.onSession(session.sessionId, () => undefined);
+      },
+    );
 
     expect(opened.sessionId).toBe("fake-session-1");
     expect(bufferedRecords).toHaveLength(3);

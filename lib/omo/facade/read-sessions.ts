@@ -47,7 +47,9 @@ function sessionFromRow(
   });
 }
 
-function titleFromState(response: Readonly<Record<string, unknown>>): string | undefined {
+function titleFromState(
+  response: Readonly<Record<string, unknown>>,
+): string | undefined {
   const data = response["data"];
   return isJsonObject(data) && typeof data["sessionName"] === "string"
     ? data["sessionName"]
@@ -118,7 +120,9 @@ export async function listOmoSessions(
       updatedMs: summary.updatedMs,
     })),
   );
-  return jsonResponse(roots.map((summary) => sessionFromSummary(context, summary)));
+  return jsonResponse(
+    roots.map((summary) => sessionFromSummary(context, summary)),
+  );
 }
 
 export async function readOmoSession(
@@ -179,13 +183,19 @@ function statusFromEvent(value: unknown): {
 } | null {
   if (!isJsonObject(value) || value["type"] !== "session.status") return null;
   const properties = value["properties"];
-  if (!isJsonObject(properties) || typeof properties["sessionID"] !== "string") {
+  if (
+    !isJsonObject(properties) ||
+    typeof properties["sessionID"] !== "string"
+  ) {
     return null;
   }
   const status = properties["status"];
   if (!isJsonObject(status)) return null;
   if (status["type"] === "busy" || status["type"] === "idle") {
-    return { sessionID: properties["sessionID"], status: { type: status["type"] } };
+    return {
+      sessionID: properties["sessionID"],
+      status: { type: status["type"] },
+    };
   }
   if (
     status["type"] === "retry" &&

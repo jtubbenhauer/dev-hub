@@ -10,18 +10,17 @@ type ExecFileCallback = (
 ) => void;
 
 const { mockExecFile } = vi.hoisted(() => ({
-  mockExecFile:
-    vi.fn<
-      (
-        bin: string,
-        args: string[],
-        options: {
-          env: NodeJS.ProcessEnv;
-          timeout: number;
-        },
-        callback: ExecFileCallback,
-      ) => void
-    >(),
+  mockExecFile: vi.fn<
+    (
+      bin: string,
+      args: string[],
+      options: {
+        env: NodeJS.ProcessEnv;
+        timeout: number;
+      },
+      callback: ExecFileCallback,
+    ) => void
+  >(),
 }));
 
 vi.mock("node:child_process", async (importOriginal) => ({
@@ -106,7 +105,9 @@ describe("ensureOmoDaemon", () => {
 
     await expect(result).rejects.toBeInstanceOf(ErrorClass);
     if (code === 5) {
-      await expect(result).rejects.toMatchObject({ stderr: "engine diagnostic" });
+      await expect(result).rejects.toMatchObject({
+        stderr: "engine diagnostic",
+      });
     }
   });
 

@@ -3,9 +3,7 @@ export {
   readStoredContext,
   type OmoSessionContext,
 } from "@/lib/omo/session-context";
-export {
-  OmoSessionIdentityConflictError,
-} from "@/lib/omo/session-index-errors";
+export { OmoSessionIdentityConflictError } from "@/lib/omo/session-index-errors";
 export {
   mergeOmoSessionIndexFromTaskEvent,
   upsertOmoSessionIndexAuthoritative,

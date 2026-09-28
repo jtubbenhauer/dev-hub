@@ -14,10 +14,7 @@ import {
 } from "@/lib/leader-key-utils";
 import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds";
 import { CHAT_SUGGESTIONS_ENABLED_SETTING_KEY } from "@/lib/chat-suggest/constants";
-import {
-  CHAT_ENGINE_SETTING_KEY,
-  type ChatEngine,
-} from "@/lib/engine/types";
+import { CHAT_ENGINE_SETTING_KEY, type ChatEngine } from "@/lib/engine/types";
 import {
   DEFAULT_EDITOR_FLAVOR,
   EDITOR_FLAVOR_OPTIONS,

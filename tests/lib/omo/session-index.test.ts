@@ -190,24 +190,23 @@ describe("OMO session index", () => {
     ]);
 
     await expect(
-      index.touchOmoSessionIndex(
-        "workspace-1",
-        "b",
-        "/sessions/shared.jsonl",
-        { ...touchRow, title: "B" },
-      ),
+      index.touchOmoSessionIndex("workspace-1", "b", "/sessions/shared.jsonl", {
+        ...touchRow,
+        title: "B",
+      }),
     ).rejects.toBeInstanceOf(index.OmoSessionIdentityConflictError);
     expect(readRow("workspace-1", "b")).toMatchObject({ session_path: null });
   });
 
   it("validates context shape, names, counts, and UTF-8 byte caps", async () => {
-    const { parseOmoSessionContext } =
-      await import("@/lib/omo/session-index");
+    const { parseOmoSessionContext } = await import("@/lib/omo/session-index");
     expect(parseOmoSessionContext({ a: 1 })).toBeNull();
     expect(parseOmoSessionContext([])).toBeNull();
     expect(
       parseOmoSessionContext(
-        Object.fromEntries(Array.from({ length: 33 }, (_, i) => [`k${i}`, "v"])),
+        Object.fromEntries(
+          Array.from({ length: 33 }, (_, i) => [`k${i}`, "v"]),
+        ),
       ),
     ).toBeNull();
     expect(parseOmoSessionContext({ "Bad-Key": "v" })).toBeNull();

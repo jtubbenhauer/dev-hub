@@ -4,10 +4,7 @@ import {
   windowMessages,
 } from "@/lib/omo/adapter/entries-to-messages";
 import { getOmoIndexRow } from "@/lib/omo/session-index";
-import {
-  activeBranch,
-  type SessionEntry,
-} from "@/lib/omo/sessions-on-disk";
+import { activeBranch, type SessionEntry } from "@/lib/omo/sessions-on-disk";
 import {
   isHistoryFallbackError,
   replacementId,
@@ -88,7 +85,9 @@ function ingestPendingQuestions(
     workspaceId: context.workspace.id,
     sendResponse: async () => undefined,
   });
-  dialogs.ingestPendingQuestions(binding.openedState.record["pendingQuestions"]);
+  dialogs.ingestPendingQuestions(
+    binding.openedState.record["pendingQuestions"],
+  );
 }
 
 export async function readOmoMessages(

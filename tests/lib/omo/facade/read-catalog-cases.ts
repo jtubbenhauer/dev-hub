@@ -18,9 +18,7 @@ describe("handleOmoRead catalog routes", () => {
         ],
         default: { provider: "model" },
       },
-      agents: [
-        { name: "skill:plan", description: "Plan", mode: "primary" },
-      ],
+      agents: [{ name: "skill:plan", description: "Plan", mode: "primary" }],
       commands: [{ name: "review", description: "Review" }],
       mcp: { browser: { status: "connected" } },
     });

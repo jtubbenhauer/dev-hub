@@ -43,9 +43,7 @@ describe("handleOmoRead message fallback", () => {
       fixture.source.entries.set("fallback", [diskEntry("disk-leaf")]);
       fixture.registry.attach.mockRejectedValue(namedError(errorName));
 
-      const response = await fixture.request(
-        "/session/omo_fallback/message",
-      );
+      const response = await fixture.request("/session/omo_fallback/message");
 
       expect(response.status).toBe(200);
       expect(responseIds(await readJson(response))).toEqual(["omo_disk-leaf"]);

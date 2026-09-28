@@ -56,11 +56,7 @@ export async function recordOmoSessionReplacement(
         pathOwner.durableId !== oldId &&
         pathOwner.durableId !== newId
       ) {
-        throw new OmoSessionIdentityConflictError(
-          workspaceId,
-          newId,
-          newPath,
-        );
+        throw new OmoSessionIdentityConflictError(workspaceId, newId, newPath);
       }
 
       const updatedAt = Date.now();
@@ -107,7 +103,8 @@ export async function recordOmoSessionReplacement(
         transaction
           .update(omoSessionIndex)
           .set({
-            sessionPath: oldRow.sessionPath === newPath ? null : oldRow.sessionPath,
+            sessionPath:
+              oldRow.sessionPath === newPath ? null : oldRow.sessionPath,
             replacedByDurableId: newId,
             updatedAt,
           })
@@ -201,11 +198,6 @@ export async function recordOmoSessionReplacement(
         .run();
     });
   } catch (error) {
-    translateOmoSessionIndexError(
-      error,
-      workspaceId,
-      newId,
-      newPath,
-    );
+    translateOmoSessionIndexError(error, workspaceId, newId, newPath);
   }
 }

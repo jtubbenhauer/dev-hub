@@ -44,9 +44,9 @@ describe("resolveWorkspaceEngine", () => {
     const { resolveWorkspaceEngine } =
       await import("@/lib/engine/resolve-engine");
 
-    await expect(
-      resolveWorkspaceEngine("user-1", "workspace-1"),
-    ).resolves.toBe("omo");
+    await expect(resolveWorkspaceEngine("user-1", "workspace-1")).resolves.toBe(
+      "omo",
+    );
   });
 
   it("uses the global setting when the workspace has no override", async () => {
@@ -59,9 +59,9 @@ describe("resolveWorkspaceEngine", () => {
     const { resolveWorkspaceEngine } =
       await import("@/lib/engine/resolve-engine");
 
-    await expect(
-      resolveWorkspaceEngine("user-1", "workspace-1"),
-    ).resolves.toBe("omo");
+    await expect(resolveWorkspaceEngine("user-1", "workspace-1")).resolves.toBe(
+      "omo",
+    );
   });
 
   it("uses opencode when no override or global setting exists", async () => {
@@ -72,9 +72,9 @@ describe("resolveWorkspaceEngine", () => {
     const { resolveWorkspaceEngine } =
       await import("@/lib/engine/resolve-engine");
 
-    await expect(
-      resolveWorkspaceEngine("user-1", "workspace-1"),
-    ).resolves.toBe("opencode");
+    await expect(resolveWorkspaceEngine("user-1", "workspace-1")).resolves.toBe(
+      "opencode",
+    );
   });
 
   it("falls back to opencode for an invalid selected value", async () => {
@@ -87,8 +87,8 @@ describe("resolveWorkspaceEngine", () => {
     const { resolveWorkspaceEngine } =
       await import("@/lib/engine/resolve-engine");
 
-    await expect(
-      resolveWorkspaceEngine("user-1", "workspace-1"),
-    ).resolves.toBe("opencode");
+    await expect(resolveWorkspaceEngine("user-1", "workspace-1")).resolves.toBe(
+      "opencode",
+    );
   });
 });

@@ -151,10 +151,10 @@ export function buildAssistantContent(
   },
 ): BuiltContent {
   if (!Array.isArray(message.content)) return { parts: [], toolParts: [] };
-   const parts = message.content.flatMap((block: unknown, index: number) => {
-     const part = buildContentPart(block, index, options);
-     return part ? [part] : [];
-   });
+  const parts = message.content.flatMap((block: unknown, index: number) => {
+    const part = buildContentPart(block, index, options);
+    return part ? [part] : [];
+  });
   return {
     parts,
     toolParts: parts.filter(

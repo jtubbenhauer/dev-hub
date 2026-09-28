@@ -9,11 +9,13 @@ export async function getOmoIndexRow(
   durableId: string,
 ): Promise<OmoSessionIndexRow | null> {
   return (
-    (await db
-      .select()
-      .from(omoSessionIndex)
-      .where(sessionIndexScope(workspaceId, durableId))
-      .limit(1))[0] ?? null
+    (
+      await db
+        .select()
+        .from(omoSessionIndex)
+        .where(sessionIndexScope(workspaceId, durableId))
+        .limit(1)
+    )[0] ?? null
   );
 }
 
@@ -33,9 +35,7 @@ export async function getOmoChildren(
     );
 }
 
-export async function listOmoHiddenIds(
-  workspaceId: string,
-): Promise<string[]> {
+export async function listOmoHiddenIds(workspaceId: string): Promise<string[]> {
   const rows = await db
     .select({ durableId: omoSessionIndex.durableId })
     .from(omoSessionIndex)

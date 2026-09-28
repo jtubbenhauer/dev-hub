@@ -22,10 +22,7 @@ export type OmoReadContext = {
   readonly workspace: OmoReadWorkspace;
 };
 
-export function jsonResponse(
-  value: unknown,
-  init?: ResponseInit,
-): Response {
+export function jsonResponse(value: unknown, init?: ResponseInit): Response {
   return Response.json(value, init);
 }
 

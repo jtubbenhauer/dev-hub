@@ -3407,8 +3407,7 @@ export const useChatStore = create<ChatState>()(
               const wsId =
                 findWorkspaceForSession(state.workspaceStates, sessionID) ??
                 sourceWorkspaceId;
-              const ws =
-                state.workspaceStates[wsId] ?? emptyWorkspaceState();
+              const ws = state.workspaceStates[wsId] ?? emptyWorkspaceState();
               const optimisticId =
                 info.role === "user"
                   ? ws.optimisticMessageIds[sessionID]

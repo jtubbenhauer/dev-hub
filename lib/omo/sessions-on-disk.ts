@@ -161,8 +161,7 @@ function isSessionEntry(value: unknown): value is SessionEntry {
     KNOWN_ENTRY_TYPES.has(value.type) &&
     typeof value.id === "string" &&
     (typeof value.parentId === "string" || value.parentId === null) &&
-    (typeof value.timestamp === "string" ||
-      typeof value.timestamp === "number")
+    (typeof value.timestamp === "string" || typeof value.timestamp === "number")
   );
 }
 

@@ -1,9 +1,6 @@
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import { afterEach } from "vitest";
-import {
-  OmoRpcClient,
-  UnixSocketTransport,
-} from "@/lib/omo/rpc-client";
+import { OmoRpcClient, UnixSocketTransport } from "@/lib/omo/rpc-client";
 import {
   startFakeOmoHost,
   type FakeOmoFixture,

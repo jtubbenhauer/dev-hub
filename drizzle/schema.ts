@@ -86,9 +86,7 @@ export const omoSessionIndex = sqliteTable(
     agent: text("agent"),
     category: text("category"),
     context: text("context"),
-    contextAuthoritative: integer("context_authoritative")
-      .notNull()
-      .default(0),
+    contextAuthoritative: integer("context_authoritative").notNull().default(0),
     replacedByDurableId: text("replaced_by_durable_id"),
     title: text("title").notNull(),
     createdMs: integer("created_ms").notNull(),

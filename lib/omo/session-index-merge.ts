@@ -106,7 +106,10 @@ export async function mergeOmoSessionIndexFromTaskEvent(
       const now = Date.now();
       const title = row.title ?? row.agent ?? row.category ?? "task";
       const createdMs = row.createdMs ?? now;
-      const updatedMs = Math.max(existing?.updatedMs ?? 0, row.updatedMs ?? now);
+      const updatedMs = Math.max(
+        existing?.updatedMs ?? 0,
+        row.updatedMs ?? now,
+      );
       transaction
         .insert(omoSessionIndex)
         .values({

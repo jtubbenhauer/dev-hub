@@ -1,7 +1,4 @@
-import {
-  OmoCommandError,
-  OmoIncompatibleHostError,
-} from "@/lib/omo/errors";
+import { OmoCommandError, OmoIncompatibleHostError } from "@/lib/omo/errors";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 
 export const OMO_CLIENT_CAPABILITIES = [

@@ -26,10 +26,7 @@ describe("chat store message.rekeyed", () => {
   beforeEach(() => {
     animationFrames = createAnimationFrameQueue();
     resetRekeyStore();
-    vi.stubGlobal(
-      "requestAnimationFrame",
-      animationFrames.request,
-    );
+    vi.stubGlobal("requestAnimationFrame", animationFrames.request);
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
     vi.stubGlobal(
       "fetch",
@@ -146,7 +143,9 @@ describe("chat store message.rekeyed", () => {
     });
 
     const messages =
-      useChatStore.getState().workspaceStates[WORKSPACE_ID].messages[SESSION_ID];
+      useChatStore.getState().workspaceStates[WORKSPACE_ID].messages[
+        SESSION_ID
+      ];
     expect(messages).toHaveLength(1);
     expect(messages[0]).toEqual(replacement);
   });
@@ -172,11 +171,16 @@ describe("chat store message.rekeyed", () => {
         parts: replacement.parts,
       },
     });
-    dispatchEvent({ type: "message.updated", properties: { info: removed.info } });
+    dispatchEvent({
+      type: "message.updated",
+      properties: { info: removed.info },
+    });
 
     animationFrames.flush();
     const messages =
-      useChatStore.getState().workspaceStates[WORKSPACE_ID].messages[SESSION_ID];
+      useChatStore.getState().workspaceStates[WORKSPACE_ID].messages[
+        SESSION_ID
+      ];
     expect(messages.map((message) => message.info.id)).toEqual([
       "omo_assistant-entry",
     ]);

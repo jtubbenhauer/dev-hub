@@ -1,4 +1,7 @@
-import { readOmoCatalog, type OmoCatalogRoute } from "@/lib/omo/facade/read-catalog";
+import {
+  readOmoCatalog,
+  type OmoCatalogRoute,
+} from "@/lib/omo/facade/read-catalog";
 import { responseForOmoReadError } from "@/lib/omo/facade/read-errors";
 import { readOmoSessionIdentities } from "@/lib/omo/facade/read-identities";
 import { readOmoMessages } from "@/lib/omo/facade/read-messages";
@@ -20,7 +23,10 @@ import {
   type OmoReadRequest,
 } from "@/lib/omo/facade/read-types";
 
-export type { OmoReadRequest, OmoReadWorkspace } from "@/lib/omo/facade/read-types";
+export type {
+  OmoReadRequest,
+  OmoReadWorkspace,
+} from "@/lib/omo/facade/read-types";
 
 const CATALOG_ROUTES = new Set<OmoCatalogRoute>([
   "/command",

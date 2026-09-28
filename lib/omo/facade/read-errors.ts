@@ -68,7 +68,9 @@ function commandErrorResponse(error: OmoCommandError): Response | null {
       { error: "engine_pressure" },
       {
         status: 503,
-        headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1_000))) },
+        headers: {
+          "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1_000))),
+        },
       },
     );
   }

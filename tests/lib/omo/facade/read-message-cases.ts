@@ -64,12 +64,7 @@ function insertLeaf(
         updated_ms, leaf_known, leaf_entry_id, updated_at)
        VALUES ('workspace-1', ?, ?, 'interactive', ?, 1, 1, 1, ?, 1)`,
     )
-    .run(
-      durableId,
-      `/sessions/${durableId}.jsonl`,
-      durableId,
-      leafEntryId,
-    );
+    .run(durableId, `/sessions/${durableId}.jsonl`, durableId, leafEntryId);
 }
 
 describe("handleOmoRead message history", () => {
@@ -165,7 +160,9 @@ describe("handleOmoRead message history", () => {
     );
     expect(
       fixture.source.authorizeSession.mock.invocationCallOrder[0],
-    ).toBeLessThan(fixture.registry.attach.mock.invocationCallOrder[0] ?? Infinity);
+    ).toBeLessThan(
+      fixture.registry.attach.mock.invocationCallOrder[0] ?? Infinity,
+    );
   });
 
   it.each(["OmoTransportGoneError", "OmoCorruptIndexRowError"])(
@@ -182,9 +179,7 @@ describe("handleOmoRead message history", () => {
       insertLeaf(fixture.sqlite, "fallback", "main");
       fixture.registry.attach.mockRejectedValue(namedError(errorName));
 
-      const response = await fixture.request(
-        "/session/omo_fallback/message",
-      );
+      const response = await fixture.request("/session/omo_fallback/message");
 
       expect(response.status).toBe(200);
       expect(messageIds(await readJson(response))).toEqual([

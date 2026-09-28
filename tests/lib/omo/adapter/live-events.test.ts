@@ -6,10 +6,7 @@ import { describe, expect, it } from "vitest";
 import { createLiveAdapter } from "@/lib/omo/adapter/live-events";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import { isMessageWithParts } from "@/lib/opencode/message-validation";
-import type {
-  Event,
-  MessageRekeyedEvent,
-} from "@/lib/opencode/types";
+import type { Event, MessageRekeyedEvent } from "@/lib/opencode/types";
 
 const OPTIONS = {
   sessionId: "omo_durable-text-1",
@@ -31,7 +28,8 @@ function readFixture(name: string): JsonlRecord[] {
     .split("\n")
     .map((line) => {
       const parsed: unknown = JSON.parse(line);
-      if (!isRecord(parsed)) throw new TypeError("fixture line is not a record");
+      if (!isRecord(parsed))
+        throw new TypeError("fixture line is not a record");
       return parsed;
     });
 }

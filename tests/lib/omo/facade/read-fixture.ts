@@ -73,15 +73,19 @@ export async function createReadFixture() {
       capabilities: [],
       serverVersion: "test-host",
     })),
-    request: vi.fn(async (): Promise<JsonlRecord> => ({
-      data: { sessions: [] },
-    })),
+    request: vi.fn(
+      async (): Promise<JsonlRecord> => ({
+        data: { sessions: [] },
+      }),
+    ),
   };
   const registry = {
     attach: vi.fn(async () => binding),
-    request: vi.fn(async (): Promise<JsonlRecord> => ({
-      data: { entries: [], leafId: null },
-    })),
+    request: vi.fn(
+      async (): Promise<JsonlRecord> => ({
+        data: { entries: [], leafId: null },
+      }),
+    ),
     refreshIndexFromHost: vi.fn(async () => undefined),
     findBinding: vi.fn<
       (

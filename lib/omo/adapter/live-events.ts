@@ -29,6 +29,7 @@ import {
   handleAssistantMessageUpdate,
   type ActiveAssistantMessage,
 } from "@/lib/omo/adapter/live-message-updates";
+import { createLiveToolEventHandlers } from "@/lib/omo/adapter/live-tool-events";
 
 export type {
   Effect,
@@ -67,6 +68,8 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
     const active = pendingByRole.assistant.at(-1);
     return active?.role === "assistant" ? active : undefined;
   };
+
+  const toolHandlers = createLiveToolEventHandlers(options, activeAssistant);
 
   const handleMessageStart = (record: JsonlRecord): LiveAdapterResult => {
     const source = parseAgentMessage(record.message);
@@ -241,6 +244,14 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
           return handleMessageEnd(record);
         case "entry_appended":
           return handleEntryAppended(record);
+        case "tool_execution_start":
+          return toolHandlers.handleStart(record);
+        case "tool_execution_update":
+          return toolHandlers.handleUpdate(record);
+        case "tool_execution_end":
+          return toolHandlers.handleEnd(record);
+        case "extension_event":
+          return toolHandlers.handleExtension(record);
         default:
           return { events: [], effects: [] };
       }

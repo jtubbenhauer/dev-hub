@@ -13,6 +13,7 @@ import type {
 
 const OPTIONS = {
   sessionId: "omo_durable-text-1",
+  workspaceId: "workspace-1",
   workspacePath: "/workspace",
   skillPrefixes: ["frontend", "debugging"],
 } as const;
@@ -114,7 +115,7 @@ describe("createLiveAdapter", () => {
         event.properties.part.type === "tool",
     );
 
-    expect(toolUpdates).toHaveLength(2);
+    expect(toolUpdates).toHaveLength(4);
     expect(toolUpdates[0]).toMatchObject({
       properties: {
         part: {

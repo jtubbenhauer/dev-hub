@@ -67,6 +67,7 @@ describe("chat store message.rekeyed", () => {
       );
     const adapter = createLiveAdapter({
       sessionId: SESSION_ID,
+      workspaceId: "workspace-1",
       workspacePath: "/workspace",
       skillPrefixes: ["frontend"],
     });

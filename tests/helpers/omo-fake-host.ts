@@ -75,7 +75,9 @@ export class FakeOmoConnection {
 
   waitForRecordCount(count: number): Promise<void> {
     if (this.receivedRecords.length >= count) return Promise.resolve();
-    return new Promise((resolve) => this.recordWaiters.push({ count, resolve }));
+    return new Promise((resolve) =>
+      this.recordWaiters.push({ count, resolve }),
+    );
   }
 
   setCapabilities(capabilities: readonly string[]): void {
@@ -105,10 +107,17 @@ function stringField(record: JsonlRecord, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function responseFor(
-  request: JsonlRecord,
-  response: JsonlRecord,
-): JsonlRecord {
+function recordField(
+  record: JsonlRecord,
+  key: string,
+): JsonlRecord | undefined {
+  const value = record[key];
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as JsonlRecord)
+    : undefined;
+}
+
+function responseFor(request: JsonlRecord, response: JsonlRecord): JsonlRecord {
   return {
     id: request["id"],
     type: "response",
@@ -154,12 +163,15 @@ export async function startFakeOmoHost(
     connection.captureRecord(request);
     const type = stringField(request, "type");
     const fixture = takeFixture(request);
+    let eventSessionId = stringField(request, "sessionId");
 
     if (type === "set_client_info") {
       const capabilities = request["capabilities"];
       connection.setCapabilities(
         Array.isArray(capabilities)
-          ? capabilities.filter((value): value is string => typeof value === "string")
+          ? capabilities.filter(
+              (value): value is string => typeof value === "string",
+            )
           : [],
       );
       send(connection, responseFor(request, fixture?.response ?? {}));
@@ -176,7 +188,13 @@ export async function startFakeOmoHost(
       );
     } else if (type === "open_session") {
       sessionCounter += 1;
-      const sessionId = `fake-session-${sessionCounter}`;
+      const fixtureData = fixture
+        ? recordField(fixture.response, "data")
+        : undefined;
+      const sessionId =
+        (fixtureData ? stringField(fixtureData, "sessionId") : undefined) ??
+        `fake-session-${sessionCounter}`;
+      eventSessionId = sessionId;
       sessions.set(sessionId, { sessionId, status: "idle" });
       const eventCount = preResponseEventCounts.shift() ?? 0;
       for (let index = 0; index < eventCount; index += 1) {
@@ -214,7 +232,12 @@ export async function startFakeOmoHost(
       );
     }
 
-    for (const event of fixture?.events ?? []) send(connection, event);
+    for (const event of fixture?.events ?? []) {
+      send(connection, {
+        ...(eventSessionId ? { sessionId: eventSessionId } : {}),
+        ...event,
+      });
+    }
   };
 
   const server = createServer((socket) => {

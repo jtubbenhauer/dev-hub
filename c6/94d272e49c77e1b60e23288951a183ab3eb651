@@ -1,0 +1,43 @@
+components/chat/context-usage-indicator.tsx
+  s_a14af25ea19db4::t_f10df3705860e4 1-81
+components/chat/prompt-input.tsx
+  s_a14af25ea19db4::t_114916723c8fc3 31,1214-1217
+hooks/use-omo-session-stats.ts
+  s_a14af25ea19db4::t_36bc35190e7b3b 1-49
+lib/chat/omo-session-stats.ts
+  s_a14af25ea19db4::t_437d547d7b30c4 1-42
+lib/omo/facade/read-sessions.ts
+  s_a14af25ea19db4::t_5f1061c58d414e 231-320
+lib/omo/facade/read.ts
+  s_a14af25ea19db4::t_1e9537b962ff80 16,78-80,90-91
+tests/components/chat/context-usage-indicator.test.tsx
+  s_a14af25ea19db4::t_68974f8e2d9ce8 1-51
+tests/components/chat/prompt-input-comments.test.tsx
+  s_a14af25ea19db4::t_195c1748d7afdc 47-49
+tests/components/chat/prompt-input-mobile-enter.test.tsx
+  s_a14af25ea19db4::t_ff9d7c07ca5b3d 52-54
+tests/components/chat/prompt-input-pr.test.tsx
+  s_a14af25ea19db4::t_1e8f34a80d1423 47-49
+tests/components/chat/prompt-input-suggestion.test.tsx
+  s_a14af25ea19db4::t_7ccbe525d724ea 54-56
+tests/lib/chat/omo-session-stats.test.ts
+  s_a14af25ea19db4::t_36787c615ea284 1-34
+tests/lib/omo/facade/read-session-cases.ts
+  s_a14af25ea19db4::t_9b4501524a7b45 265-334
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c694d272e49c77e1b60e23288951a183ab3eb651",
+  "prompts": {},
+  "sessions": {
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

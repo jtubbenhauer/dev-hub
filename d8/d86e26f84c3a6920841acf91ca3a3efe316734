@@ -1,0 +1,41 @@
+lib/omo/session-registry-binding.ts
+  s_2f3e69fa0f4dc0::t_9ee3719035eed7 3,12-19
+lib/omo/session-registry-reopen.ts
+  s_399cf2fb24652e::t_83fddedc8ffa7c 1-202
+tests/helpers/omo-fake-host-protocol.ts
+  s_a26ff178f37e76::t_4f5314edec602e 1-45
+tests/helpers/omo-fake-host.ts
+  s_a26ff178f37e76::t_9006879c5ddead 3,11-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d8d86e26f84c3a6920841acf91ca3a3efe316734",
+  "prompts": {},
+  "sessions": {
+    "s_2f3e69fa0f4dc0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1b33c9dcffeRPKX4FN8d5HzWN",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_399cf2fb24652e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a770829ffeL2H4pUWMEreA6Y",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a26ff178f37e76": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f34617d4affea9EtlbGJ2diXNP",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

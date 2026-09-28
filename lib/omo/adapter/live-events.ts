@@ -176,6 +176,14 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
       fallbackAssistant:
         pending?.role === "assistant" ? pending.info : undefined,
     });
+    const liveToolParts = toolHandlers.rekeyMessage(
+      fromMessageID,
+      durableId,
+      durable.parts,
+    );
+    const parts = durable.parts.map(
+      (part) => (part.type === "tool" && liveToolParts.get(part.id)) || part,
+    );
     if (durable.info.role === "user") {
       lastUserMessageID = durableId;
     } else {
@@ -191,7 +199,7 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
             fromMessageID,
             toMessageID: durableId,
             info: durable.info,
-            parts: durable.parts,
+            parts,
           },
         },
       ],
@@ -200,6 +208,7 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
   };
 
   return {
+    linkTaskChild: toolHandlers.linkTaskChild,
     seed(state): void {
       lastUserMessageID = state.lastUserMessageID;
       lastKnownModel = state.lastKnownModel ?? "";

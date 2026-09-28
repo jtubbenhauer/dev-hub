@@ -62,6 +62,7 @@ describe("OmoSessionRegistry hydration", () => {
     vi.doMock("@/lib/omo/adapter/live-events", () => ({
       createLiveAdapter: () => ({
         seed: () => undefined,
+        linkTaskChild: () => [],
         handle: (record: JsonlRecord) => ({
           events: [
             {

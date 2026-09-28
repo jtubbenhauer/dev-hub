@@ -57,6 +57,7 @@ function createTestBinding(
     generation: 1,
     adapter: {
       seed: () => undefined,
+      linkTaskChild: () => [],
       handle: (record) => currentHandle(record),
     },
     dialogs,

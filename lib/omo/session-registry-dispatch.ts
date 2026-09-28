@@ -204,6 +204,10 @@ export class OmoRegistryDispatcher {
             }),
           },
         },
+        ...binding.adapter.linkTaskChild(
+          link.taskId,
+          `omo_${worker.durableId}`,
+        ),
       ]);
     });
   }

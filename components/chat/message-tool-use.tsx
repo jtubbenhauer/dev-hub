@@ -17,6 +17,10 @@ import { SubAgentDialog } from "@/components/chat/sub-agent-dialog";
 import { SessionTaskProgressIndicator } from "@/components/chat/session-task-progress";
 import type { Todo, ToolPart } from "@/lib/opencode/types";
 import { getPartTruncation } from "@/lib/opencode/truncate-messages";
+import {
+  agentTaskDescription,
+  childSessionIdsForAgentPart,
+} from "@/lib/chat/agent-task-summary";
 
 const MAX_OUTPUT_LINES = 10;
 const AGENT_TOOL_NAMES = new Set(["agent", "task"]);
@@ -173,20 +177,12 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
       ? formatDuration(state.time.end - state.time.start)
       : null;
 
-  const childSessionId = useMemo(() => {
-    if ("metadata" in part.state) {
-      const sid = (part.state.metadata as Record<string, unknown>)
-        ?.sessionId as string | undefined;
-      if (sid) return sid;
-    }
-    if (part.metadata) {
-      const sid = (part.metadata as Record<string, unknown>)?.sessionId as
-        | string
-        | undefined;
-      if (sid) return sid;
-    }
-    return null;
-  }, [part.state, part.metadata]);
+  const childSessionIds = useMemo(
+    () => childSessionIdsForAgentPart(part),
+    [part],
+  );
+  const childSessionId = childSessionIds[0] ?? null;
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId);
 
   const storeSessionId = useChatStore((s) => {
@@ -237,9 +233,18 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
   }, [todoUpdatedAt, todos]);
 
   const description =
-    typeof state.input?.description === "string"
-      ? state.input.description
-      : formatParamsSummary(part.tool, state.input);
+    agentTaskDescription(state.input) ??
+    formatParamsSummary(part.tool, state.input);
+  const workspaceSessions = useChatStore((s) =>
+    activeWorkspaceId
+      ? s.workspaceStates[activeWorkspaceId]?.sessions
+      : undefined,
+  );
+  const dialogSessionId = selectedChildId ?? resolvedSessionId;
+  const dialogDescription =
+    selectedChildId !== null
+      ? (workspaceSessions?.[selectedChildId]?.title ?? description)
+      : description;
 
   return (
     <div
@@ -250,7 +255,10 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
     >
       <button
         type="button"
-        onClick={() => setDialogOpen(true)}
+        onClick={() => {
+          setSelectedChildId(null);
+          setDialogOpen(true);
+        }}
         className={cn(
           "hover:bg-muted/30 flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs transition-colors",
           nested ? "inline-flex" : "w-full",
@@ -287,13 +295,33 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
         )}
       </button>
 
+      {childSessionIds.length > 1 && (
+        <div className="mt-0.5 flex flex-col gap-0.5 pl-5">
+          {childSessionIds.map((sessionId, index) => (
+            <button
+              key={sessionId}
+              type="button"
+              onClick={() => {
+                setSelectedChildId(sessionId);
+                setDialogOpen(true);
+              }}
+              className="hover:bg-muted/30 text-muted-foreground flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs transition-colors"
+            >
+              <ExternalLink className="text-muted-foreground/60 size-3 shrink-0" />
+              <span className="truncate">
+                {workspaceSessions?.[sessionId]?.title ??
+                  `Subagent ${index + 1}`}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {activeWorkspaceId && (
         <SubAgentDialog
-          childSessionId={resolvedSessionId}
+          childSessionId={dialogSessionId}
           workspaceId={activeWorkspaceId}
-          description={
-            typeof description === "string" ? description : "Sub-agent"
-          }
+          description={dialogDescription || "Sub-agent"}
           isActive={isActiveStatus}
           open={dialogOpen}
           onOpenChange={setDialogOpen}

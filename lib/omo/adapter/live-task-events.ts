@@ -28,11 +28,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+export function childSessionIdsFromState(state: ToolState): string[] {
+  const metadata =
+    "metadata" in state && isRecord(state.metadata) ? state.metadata : {};
+  const ids = Array.isArray(metadata.sessionIds)
+    ? metadata.sessionIds.filter((id): id is string => typeof id === "string")
+    : [];
+  if (
+    typeof metadata.sessionId === "string" &&
+    !ids.includes(metadata.sessionId)
+  ) {
+    ids.unshift(metadata.sessionId);
+  }
+  return ids;
+}
+
+// A single task call can fan out to several subagents, so every linked child
+// is kept in sessionIds while sessionId stays the first for older readers.
 function withSessionMetadata(state: ToolState, sessionId: string): ToolState {
   if (state.status === "pending") return state;
+  const existing = childSessionIdsFromState(state);
+  const sessionIds = existing.includes(sessionId)
+    ? existing
+    : [...existing, sessionId];
   return {
     ...state,
-    metadata: { ...state.metadata, sessionId },
+    metadata: { ...state.metadata, sessionId: sessionIds[0], sessionIds },
   };
 }
 
@@ -46,21 +67,46 @@ function toolPartMatchesTask(part: ToolPart, taskId: string): boolean {
   return typeof output === "string" && output.includes(taskId);
 }
 
-const TASK_ID_IN_OUTPUT = /\[task_id: ([^\s\]]+)/;
+const TASK_ID_IN_OUTPUT = /\[task_id: ([^\s\]]+)/g;
 
-export function taskIdFromToolPart(part: ToolPart): string | undefined {
+export function taskIdsFromToolPart(part: ToolPart): string[] {
   const state = part.state;
   if (isRecord(state.input) && typeof state.input.task_id === "string") {
-    return state.input.task_id;
+    return [state.input.task_id];
   }
   const metadata = "metadata" in state ? state.metadata : undefined;
   if (isRecord(metadata) && typeof metadata.task_id === "string") {
-    return metadata.task_id;
+    return [metadata.task_id];
   }
   const output = "output" in state ? state.output : undefined;
-  return typeof output === "string"
-    ? TASK_ID_IN_OUTPUT.exec(output)?.[1]
-    : undefined;
+  if (typeof output !== "string") return [];
+  return [
+    ...new Set(
+      [...output.matchAll(TASK_ID_IN_OUTPUT)].map((match) => match[1]),
+    ),
+  ].filter((id): id is string => id !== undefined);
+}
+
+export function linkTaskChildToPart(
+  candidates: readonly TrackedToolPart[],
+  taskId: string,
+  sessionId: string,
+  replacePart: (tracked: TrackedToolPart, part: ToolPart) => Event,
+): Event[] {
+  const active = candidates.filter(
+    (tracked) => tracked.part.state.status === "running",
+  );
+  const tracked =
+    candidates.find((candidate) =>
+      toolPartMatchesTask(candidate.part, taskId),
+    ) ?? (active.length === 1 ? active[0] : undefined);
+  if (
+    tracked === undefined ||
+    childSessionIdsFromState(tracked.part.state).includes(sessionId)
+  ) {
+    return [];
+  }
+  return [replacePart(tracked, withChildSessionId(tracked.part, sessionId))];
 }
 
 export function withChildSessionId(

@@ -53,4 +53,5 @@ export interface LiveAdapterResult {
 export interface LiveAdapter {
   readonly seed: (state: LiveAdapterSeed) => void;
   readonly handle: (record: JsonlRecord) => LiveAdapterResult;
+  readonly linkTaskChild: (taskId: string, childSessionId: string) => Event[];
 }

@@ -5,10 +5,14 @@ import type {
 } from "@/lib/omo/adapter/live-adapter-types";
 import type { ActiveAssistantMessage } from "@/lib/omo/adapter/live-message-updates";
 import { recordTimestamp } from "@/lib/omo/adapter/live-message-snapshot";
-import { createLiveTaskEventHandler } from "@/lib/omo/adapter/live-task-events";
+import {
+  childSessionIdsFromState,
+  createLiveTaskEventHandler,
+  linkTaskChildToPart,
+} from "@/lib/omo/adapter/live-task-events";
 import { buildOmoToolPart } from "@/lib/omo/adapter/shapes";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
-import type { Event } from "@/lib/opencode/types";
+import type { Event, Part } from "@/lib/opencode/types";
 
 export interface TrackedToolPart {
   part: ToolPart;
@@ -21,6 +25,12 @@ export interface LiveToolEventHandlers {
   readonly handleUpdate: (record: JsonlRecord) => LiveAdapterResult;
   readonly handleEnd: (record: JsonlRecord) => LiveAdapterResult;
   readonly handleExtension: (record: JsonlRecord) => LiveAdapterResult;
+  readonly linkTaskChild: (taskId: string, childSessionId: string) => Event[];
+  readonly rekeyMessage: (
+    fromMessageID: string,
+    toMessageID: string,
+    durableParts: readonly Part[],
+  ) => ReadonlyMap<string, ToolPart>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -50,7 +60,9 @@ function resultFields(record: JsonlRecord): {
   if (!isRecord(record.result)) return { output: "", metadata: {} };
   return {
     output: textJoin(record.result.content),
-    metadata: isRecord(record.result.details) ? record.result.details : {},
+    metadata: isRecord(record.result.details)
+      ? { ...record.result.details }
+      : {},
   };
 }
 
@@ -214,6 +226,11 @@ export function createLiveToolEventHandlers(
     const previous = tracked.part.state;
     const start = previous.status === "pending" ? ended : previous.time.start;
     const result = resultFields(record);
+    const linkedChildIds = childSessionIdsFromState(previous);
+    if (linkedChildIds.length > 0) {
+      result.metadata.sessionId ??= linkedChildIds[0];
+      result.metadata.sessionIds ??= linkedChildIds;
+    }
     const errorState = {
       status: "error" as const,
       input: previous.input,
@@ -247,14 +264,49 @@ export function createLiveToolEventHandlers(
     return { events, effects: [] };
   };
 
+  const taskToolParts = () =>
+    [...trackedTools.values()].filter(
+      (tracked) => tracked.part.tool === "task",
+    );
   const handleExtension = createLiveTaskEventHandler(
     options,
-    () =>
-      [...trackedTools.values()].filter(
-        (tracked) => tracked.part.tool === "task",
-      ),
+    taskToolParts,
     replacePart,
   );
+  const linkTaskChild = (taskId: string, childSessionId: string): Event[] =>
+    linkTaskChildToPart(taskToolParts(), taskId, childSessionId, replacePart);
 
-  return { handleStart, handleUpdate, handleEnd, handleExtension };
+  // Once the assistant entry is persisted its message id changes; later tool
+  // updates must target the durable id or the client drops them.
+  const rekeyMessage = (
+    fromMessageID: string,
+    toMessageID: string,
+    durableParts: readonly Part[],
+  ): ReadonlyMap<string, ToolPart> => {
+    const rekeyed = new Map<string, ToolPart>();
+    for (const [callID, tracked] of trackedTools) {
+      if (tracked.part.messageID !== fromMessageID) continue;
+      const part = buildOmoToolPart({
+        ...tracked.part,
+        messageID: toMessageID,
+      });
+      trackedTools.set(callID, { part });
+      rekeyed.set(part.id, part);
+    }
+    for (const part of durableParts) {
+      if (part.type === "tool" && !trackedTools.has(part.callID)) {
+        trackedTools.set(part.callID, { part });
+      }
+    }
+    return rekeyed;
+  };
+
+  return {
+    handleStart,
+    handleUpdate,
+    handleEnd,
+    handleExtension,
+    linkTaskChild,
+    rekeyMessage,
+  };
 }

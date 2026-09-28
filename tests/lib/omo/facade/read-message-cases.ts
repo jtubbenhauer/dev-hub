@@ -234,6 +234,79 @@ describe("handleOmoRead message history", () => {
     ).toEqual({ parent_durable_id: "parent" });
   });
 
+  it("links every child of a batched task call from its output", async () => {
+    const fixture = await useReadFixture();
+    fixture.source.authorized.add("parent");
+    for (const [durableId, taskId] of [
+      ["worker-a", "st_a"],
+      ["worker-b", "st_b"],
+    ]) {
+      fixture.sqlite
+        .prepare(
+          `INSERT INTO omo_session_index
+            (workspace_id, durable_id, session_path, kind, context,
+             context_authoritative, title, created_ms, updated_ms, updated_at)
+           VALUES ('workspace-1', ?, NULL, 'worker', ?, 1, 'Untitled', 1, 1, 1)`,
+        )
+        .run(durableId, JSON.stringify({ role: "child", task_id: taskId }));
+    }
+    const entries = [
+      messageEntry("user-1", null, "user", "fan out", 1),
+      {
+        type: "message",
+        id: "assistant-1",
+        parentId: "user-1",
+        timestamp: 2,
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "call-1", name: "task", arguments: {} },
+          ],
+          timestamp: 2,
+        },
+      },
+      {
+        type: "message",
+        id: "result-1",
+        parentId: "assistant-1",
+        timestamp: 3,
+        message: {
+          role: "toolResult",
+          toolCallId: "call-1",
+          toolName: "task",
+          isError: false,
+          content: [
+            {
+              type: "text",
+              text: "a\n[task_id: st_a - x]\nb\n[task_id: st_b - y]",
+            },
+          ],
+          timestamp: 3,
+        },
+      },
+    ];
+    fixture.registry.attach.mockResolvedValue(createBinding("parent"));
+    fixture.registry.request.mockResolvedValue({
+      data: { entries, leafId: "result-1" },
+    });
+
+    const response = await fixture.request("/session/omo_parent/message", {});
+    const messages = (await readJson(response)) as Array<{
+      parts: Array<{
+        type: string;
+        state?: { metadata?: Record<string, unknown> };
+      }>;
+    }>;
+    const taskPart = messages
+      .flatMap((message) => message.parts)
+      .find((part) => part.type === "tool");
+
+    expect(taskPart?.state?.metadata).toMatchObject({
+      sessionId: "omo_worker-a",
+      sessionIds: ["omo_worker-a", "omo_worker-b"],
+    });
+  });
+
   it("replays pending questions into the workspace dialog ledger", async () => {
     const fixture = await useReadFixture();
     fixture.source.authorized.add("question-session");

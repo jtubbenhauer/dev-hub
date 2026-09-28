@@ -160,3 +160,123 @@ describe("createLiveTaskEventHandler when omo omits child_session_id", () => {
     ]);
   });
 });
+
+describe("live adapter linkTaskChild for a batched parallel task call", () => {
+  it("links every child to the running part and keeps them after the call ends", () => {
+    const adapter = createLiveAdapter(OPTIONS);
+    adapter.handle({
+      type: "tool_execution_start",
+      toolCallId: "call-batch",
+      toolName: "task",
+      args: { tasks: [{ description: "first" }, { description: "second" }] },
+      timestamp: 1_000,
+    });
+
+    const first = adapter.linkTaskChild("st_a", "omo_child-a");
+    const second = adapter.linkTaskChild("st_b", "omo_child-b");
+    const repeated = adapter.linkTaskChild("st_b", "omo_child-b");
+    const ended = adapter.handle({
+      type: "tool_execution_end",
+      toolCallId: "call-batch",
+      toolName: "task",
+      result: { content: [{ type: "text", text: "done" }], details: {} },
+      isError: false,
+      timestamp: 2_000,
+    });
+
+    expect(first).toHaveLength(1);
+    expect(repeated).toEqual([]);
+    const linked = updatedToolParts([{ events: second, effects: [] }])[0];
+    const final = updatedToolParts([ended])[0];
+    for (const part of [linked, final]) {
+      expect(
+        part && "metadata" in part.state && part.state.metadata,
+      ).toMatchObject({
+        sessionId: "omo_child-a",
+        sessionIds: ["omo_child-a", "omo_child-b"],
+      });
+    }
+  });
+});
+
+describe("live adapter after the assistant entry is persisted", () => {
+  it("keeps later task updates and linked children on the durable message id", () => {
+    const adapter = createLiveAdapter(OPTIONS);
+    adapter.handle({
+      type: "message_start",
+      message: { role: "assistant", content: [], timestamp: 1_000 },
+    });
+    adapter.handle({
+      type: "tool_execution_start",
+      toolCallId: "call-task",
+      toolName: "task",
+      args: { task_summary: "Explain add" },
+      timestamp: 1_100,
+    });
+    const rekey = adapter.handle({
+      type: "entry_appended",
+      timestamp: "1970-01-01T00:00:02.000Z",
+      entry: {
+        id: "assistant-1",
+        parentId: null,
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "call-task", name: "task", arguments: {} },
+          ],
+          timestamp: 2_000,
+        },
+      },
+    });
+    const linked = adapter.linkTaskChild("st_x", "omo_child-x");
+
+    const rekeyEvent = rekey.events[0];
+    const rekeyedTool =
+      rekeyEvent?.type === "message.rekeyed"
+        ? rekeyEvent.properties.parts.find((part) => part.type === "tool")
+        : undefined;
+    expect(rekeyedTool).toMatchObject({
+      messageID: "omo_assistant-1",
+      state: { status: "running" },
+    });
+    expect(
+      updatedToolParts([{ events: linked, effects: [] }])[0],
+    ).toMatchObject({
+      messageID: "omo_assistant-1",
+      state: { metadata: { sessionId: "omo_child-x" } },
+    });
+  });
+
+  it("targets the durable message when the tool starts after persistence", () => {
+    const adapter = createLiveAdapter(OPTIONS);
+    adapter.handle({
+      type: "message_start",
+      message: { role: "assistant", content: [], timestamp: 1_000 },
+    });
+    adapter.handle({
+      type: "entry_appended",
+      timestamp: "1970-01-01T00:00:02.000Z",
+      entry: {
+        id: "assistant-2",
+        parentId: null,
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "call-late", name: "task", arguments: {} },
+          ],
+          timestamp: 2_000,
+        },
+      },
+    });
+
+    const started = adapter.handle({
+      type: "tool_execution_start",
+      toolCallId: "call-late",
+      toolName: "task",
+      args: {},
+      timestamp: 2_100,
+    });
+
+    expect(updatedToolParts([started])[0]?.messageID).toBe("omo_assistant-2");
+  });
+});

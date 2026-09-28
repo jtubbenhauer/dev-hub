@@ -5,7 +5,7 @@ import {
 } from "@/lib/omo/adapter/entries-to-messages";
 import type { ToolPart } from "@opencode-ai/sdk";
 import {
-  taskIdFromToolPart,
+  taskIdsFromToolPart,
   withChildSessionId,
 } from "@/lib/omo/adapter/live-task-events";
 import type { MessageWithParts } from "@/lib/opencode/types";
@@ -45,26 +45,23 @@ function branchForLeaf(
   return activeBranch(entries, leafId);
 }
 
-function hasChildSessionId(part: ToolPart): boolean {
-  const metadata = "metadata" in part.state ? part.state.metadata : undefined;
-  return typeof metadata?.["sessionId"] === "string";
-}
-
-async function childSessionIdForTaskPart(
+async function childSessionIdsForTaskPart(
   context: OmoReadContext,
   parentRawId: string,
   part: ToolPart,
-): Promise<string | null> {
-  const taskId = taskIdFromToolPart(part);
-  if (taskId === undefined) return null;
-  const worker = await findOmoWorkerByTaskId(context.workspace.id, taskId);
-  if (worker === null) return null;
-  if (worker.parentDurableId === null) {
-    await mergeOmoSessionIndexFromTaskEvent(context.workspace.id, [
-      { durableId: worker.durableId, parentDurableId: parentRawId },
-    ]);
+): Promise<string[]> {
+  const childSessionIds: string[] = [];
+  for (const taskId of taskIdsFromToolPart(part)) {
+    const worker = await findOmoWorkerByTaskId(context.workspace.id, taskId);
+    if (worker === null) continue;
+    if (worker.parentDurableId === null) {
+      await mergeOmoSessionIndexFromTaskEvent(context.workspace.id, [
+        { durableId: worker.durableId, parentDurableId: parentRawId },
+      ]);
+    }
+    childSessionIds.push(`omo_${worker.durableId}`);
   }
-  return `omo_${worker.durableId}`;
+  return childSessionIds;
 }
 
 async function linkTaskChildren(
@@ -76,15 +73,19 @@ async function linkTaskChildren(
   for (const message of messages) {
     const parts: MessageWithParts["parts"] = [];
     for (const part of message.parts) {
-      const childSessionId =
-        part.type === "tool" && part.tool === "task" && !hasChildSessionId(part)
-          ? await childSessionIdForTaskPart(context, parentRawId, part)
-          : null;
-      parts.push(
-        childSessionId !== null && part.type === "tool"
-          ? withChildSessionId(part, childSessionId)
-          : part,
-      );
+      if (part.type !== "tool" || part.tool !== "task") {
+        parts.push(part);
+        continue;
+      }
+      let linkedPart = part;
+      for (const childSessionId of await childSessionIdsForTaskPart(
+        context,
+        parentRawId,
+        part,
+      )) {
+        linkedPart = withChildSessionId(linkedPart, childSessionId);
+      }
+      parts.push(linkedPart);
     }
     linked.push({ ...message, parts });
   }

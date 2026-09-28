@@ -1,0 +1,35 @@
+app/api/opencode/[...path]/route.ts
+  s_1dffb63abe48cf::t_99ebf8688e93d7 10-19,49-79,170,172-177
+app/api/opencode/restart/route.ts
+  s_44c2a40dcf7088::t_300d0f9db286e8 9-11,57-95,106,132-138
+lib/omo/remote-daemon.ts
+  s_1dffb63abe48cf::t_568ac65d178e59 1-49
+lib/workspaces/auto-suspend-retry.ts
+  s_1dffb63abe48cf::t_8413501b6e7f1a 1-64
+tests/api/omo-remote-restart.test.ts
+  s_1dffb63abe48cf::t_2bc367b9c2f6a7 1-229
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "89a08456403fcb3eca03fb304d7bbf3cb2c2b970",
+  "prompts": {},
+  "sessions": {
+    "s_1dffb63abe48cf": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f19d33358ffekXkOdahfUj0DjF",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_44c2a40dcf7088": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3282de71ffeBoESmAAfqSTM65",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

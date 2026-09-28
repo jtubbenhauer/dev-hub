@@ -197,4 +197,58 @@ describe("ModelSelector", () => {
     expect(onModelChange).not.toHaveBeenCalled();
     expect(screen.getByText("Loading models...")).toBeInTheDocument();
   });
+
+  it("ignores an allowlist that names none of the workspace's models", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          providerResponse(
+            "anthropic-subscription",
+            "Anthropic",
+            "claude-opus-5-5",
+            "Claude Opus 5.5",
+          ),
+        ),
+      ),
+    );
+    const onModelChange = vi.fn();
+
+    render(
+      <ModelSelector
+        workspaceId="omo-workspace"
+        selectedModel={null}
+        onModelChange={onModelChange}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(onModelChange).toHaveBeenCalledWith({
+        providerID: "anthropic-subscription",
+        modelID: "claude-opus-5-5",
+      }),
+    );
+    await act(async () => {
+      screen.getByRole("combobox").click();
+    });
+    expect(
+      await screen.findByRole("option", { name: /Claude Opus 5.5/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("still filters to allowlisted models when any are present", async () => {
+    const onModelChange = vi.fn();
+
+    render(
+      <ModelSelector
+        workspaceId="workspace-1"
+        selectedModel={{ providerID: "opencode", modelID: "big-pickle" }}
+        onModelChange={onModelChange}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(onModelChange).toHaveBeenCalledWith(AVAILABLE_MODEL),
+    );
+  });
 });

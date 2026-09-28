@@ -189,21 +189,24 @@ export function ModelSelector({
     variantsForSelectedModel,
   ]);
 
-  const modelOptions = useMemo(
-    () =>
-      providers.flatMap((p) =>
-        p.models
-          .map((m) => ({
-            value: `${p.provider.id}::${m.id}`,
-            label: m.name || m.id,
-            providerName: p.provider.name || p.provider.id,
-            providerID: p.provider.id,
-            modelID: m.id,
-          }))
-          .filter((option) => !allowlistSet || allowlistSet.has(option.value)),
-      ),
-    [allowlistSet, providers],
-  );
+  const modelOptions = useMemo(() => {
+    const allOptions = providers.flatMap((p) =>
+      p.models.map((m) => ({
+        value: `${p.provider.id}::${m.id}`,
+        label: m.name || m.id,
+        providerName: p.provider.name || p.provider.id,
+        providerID: p.provider.id,
+        modelID: m.id,
+      })),
+    );
+    if (!allowlistSet) return allOptions;
+    const allowedOptions = allOptions.filter((option) =>
+      allowlistSet.has(option.value),
+    );
+    // The allowlist is one global list; when it names none of this
+    // workspace's models (e.g. an OmO workspace) it does not apply here.
+    return allowedOptions.length > 0 ? allowedOptions : allOptions;
+  }, [allowlistSet, providers]);
 
   const currentValue = selectedModel
     ? `${selectedModel.providerID}::${selectedModel.modelID}`
@@ -268,28 +271,25 @@ export function ModelSelector({
           <CommandList>
             <CommandEmpty>No models found.</CommandEmpty>
             {providers.map((p) => {
-              const filteredModels = allowlistSet
-                ? p.models.filter((m) =>
-                    allowlistSet.has(`${p.provider.id}::${m.id}`),
-                  )
-                : p.models;
-              if (filteredModels.length === 0) return null;
+              const providerOptions = modelOptions.filter(
+                (option) => option.providerID === p.provider.id,
+              );
+              if (providerOptions.length === 0) return null;
               return (
                 <CommandGroup
                   key={p.provider.id}
                   heading={p.provider.name || p.provider.id}
                 >
-                  {filteredModels.map((m) => {
-                    const optionValue = `${p.provider.id}::${m.id}`;
-                    const isSelected = currentValue === optionValue;
+                  {providerOptions.map((option) => {
+                    const isSelected = currentValue === option.value;
                     return (
                       <CommandItem
-                        key={optionValue}
-                        value={`${p.provider.name || p.provider.id} ${m.name || m.id}`}
+                        key={option.value}
+                        value={`${option.providerName} ${option.label}`}
                         onSelect={() => {
                           const next = {
-                            providerID: p.provider.id,
-                            modelID: m.id,
+                            providerID: option.providerID,
+                            modelID: option.modelID,
                           };
                           onModelChange(next);
                           persistModel(next);
@@ -302,7 +302,7 @@ export function ModelSelector({
                             isSelected ? "opacity-100" : "opacity-0",
                           )}
                         />
-                        <span className="truncate">{m.name || m.id}</span>
+                        <span className="truncate">{option.label}</span>
                       </CommandItem>
                     );
                   })}

@@ -1,0 +1,27 @@
+lib/omo/adapter/live-task-events.ts
+  s_a14af25ea19db4::t_4254b73a8d930d 49-79,112-130,132
+lib/omo/facade/read-messages.ts
+  s_a14af25ea19db4::t_e5c5beb075a794 6-16,48-94,99,105-109,123,167
+lib/omo/session-registry-dispatch.ts
+  s_a14af25ea19db4::t_575fefb9e95f1c 5,7,32-37,43,157-160,170-217,233-234,238-248
+tests/lib/omo/adapter/live-task-events.test.ts
+  s_a14af25ea19db4::t_70264ebf1ff0ab 128-162
+tests/lib/omo/session-registry-dispatch.test.ts
+  s_a14af25ea19db4::t_9a6aff4e9815a3 196-250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bd5b44afa63fe8d021688990f9db9400be9212c5",
+  "prompts": {},
+  "sessions": {
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

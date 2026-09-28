@@ -1,0 +1,47 @@
+lib/omo/adapter/dialog-mapping.ts
+  s_3bd2b03116e929::t_f29ab56fd1e6f7 1-147
+lib/omo/adapter/dialog-records.ts
+  s_6b0e1cf6bc7bda::t_9243acff3151c5 1-210
+lib/omo/adapter/dialog-responses.ts
+  s_36cbcc6328633c::t_9f77f65e8c6108 1-64
+lib/omo/adapter/dialogs.ts
+  s_6b0e1cf6bc7bda::t_46c44295be8715 1-176
+tests/lib/omo/adapter/dialogs-fixture.ts
+  s_6b0e1cf6bc7bda::t_33ad6c17faae93 1-63
+tests/lib/omo/adapter/dialogs-lifecycle-cases.ts
+  s_6b0e1cf6bc7bda::t_06e4d49245889d 1-149
+tests/lib/omo/adapter/dialogs.test.ts
+  s_6b0e1cf6bc7bda::t_d53b1e004f83c3 1-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "39e5063d0c776f70a75bf548d2f046b1d2e71b79",
+  "prompts": {},
+  "sessions": {
+    "s_36cbcc6328633c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a714cfbffe5JXCstdxOPuc9M",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_3bd2b03116e929": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a70f9e6ffeAyO0Vq2NyAsnfa",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_6b0e1cf6bc7bda": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a7689d7ffeBkthLJQXWfXqKs",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

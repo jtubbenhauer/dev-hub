@@ -660,6 +660,16 @@ export class RemoteBackend implements WorkspaceBackend {
   async getOpenCodeUrl() {
     return this.opencodeUrl;
   }
+
+  getOmoRpcUrl(): string {
+    const url = new URL("/omo/rpc", this.agentUrl);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return url.toString();
+  }
+
+  getOmoSessionsUrl(): string {
+    return new URL("/omo/sessions", this.agentUrl).toString();
+  }
 }
 
 function isQuickCommand(value: unknown): value is QuickCommand {

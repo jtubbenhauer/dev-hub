@@ -26,6 +26,7 @@ export type { OmoRpcClientState } from "@/lib/omo/rpc-lifecycle";
 export type { OmoRpcListener } from "@/lib/omo/rpc-listeners";
 export type * from "@/lib/omo/rpc-protocol";
 export { UnixSocketTransport } from "@/lib/omo/rpc-transport";
+export { WebSocketTransport } from "@/lib/omo/rpc-ws-transport";
 export type { Transport } from "@/lib/omo/rpc-transport";
 
 export class OmoRpcClient {

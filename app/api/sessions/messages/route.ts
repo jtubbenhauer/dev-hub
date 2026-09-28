@@ -386,7 +386,11 @@ export async function DELETE(request: NextRequest) {
   if (engine === "omo" && sessionId.startsWith("ses_")) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
-  if (engine === "omo" && exactMessageId?.startsWith("omo_live_")) {
+  if (
+    engine === "omo" &&
+    exactMessageId?.startsWith("omo_") &&
+    exactMessageId.slice("omo_".length).startsWith("live_")
+  ) {
     return NextResponse.json({ purged: 0 });
   }
 

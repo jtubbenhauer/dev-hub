@@ -1188,6 +1188,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
 
             {/* Selectors */}
             <AgentSelector
+              workspaceId={workspaceId}
               agents={agents}
               selectedAgent={selectedAgent}
               onAgentChange={onAgentChange}

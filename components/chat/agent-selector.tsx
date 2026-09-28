@@ -15,6 +15,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { ModeSelector } from "@/components/chat/mode-selector";
+import { useWorkspaceEngine } from "@/hooks/use-workspace-engine";
 import { cn } from "@/lib/utils";
 import type { Agent } from "@/lib/opencode/types";
 
@@ -81,6 +83,7 @@ export function useAgents(workspaceId: string | null): UseAgentsResult {
 }
 
 interface AgentSelectorProps {
+  workspaceId?: string | null;
   agents: Agent[];
   selectedAgent: string | null;
   onAgentChange: (agent: string) => void;
@@ -89,6 +92,7 @@ interface AgentSelectorProps {
 }
 
 export function AgentSelector({
+  workspaceId = null,
   agents,
   selectedAgent,
   onAgentChange,
@@ -96,6 +100,20 @@ export function AgentSelector({
   onOpenChange: controlledOnOpenChange,
 }: AgentSelectorProps) {
   const [internalOpen, setInternalOpen] = useState(false);
+  const { engine } = useWorkspaceEngine(workspaceId);
+
+  if (engine === "omo") {
+    return (
+      <ModeSelector
+        modes={agents}
+        selectedMode={selectedAgent}
+        onModeChange={onAgentChange}
+        open={controlledOpen}
+        onOpenChange={controlledOnOpenChange}
+      />
+    );
+  }
+
   const activeAgent = agents.find((a) => a.name === selectedAgent);
 
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;

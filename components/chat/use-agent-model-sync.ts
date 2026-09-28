@@ -1,5 +1,6 @@
 import { useAgents } from "@/components/chat/agent-selector";
 import { useModelAgentBindings } from "@/hooks/use-settings";
+import { isOmoSkillAgentName } from "@/lib/engine/omo-mode";
 import type { Agent } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
 import type { Dispatch, SetStateAction } from "react";
@@ -8,6 +9,23 @@ import { useEffect, useMemo, useRef } from "react";
 interface SelectedModel {
   providerID: string;
   modelID: string;
+}
+
+// OmO skill modes are prompt prefixes, never model configurations.
+function findAgentModelBinding(
+  agentModelBindings: Record<string, SelectedModel>,
+  agentName: string,
+): SelectedModel | undefined {
+  if (isOmoSkillAgentName(agentName)) return undefined;
+  return agentModelBindings[agentName];
+}
+
+// Skill modes are opt-in, so an omo workspace defaults to "no mode".
+function findDefaultAgent(primaryAgents: Agent[]): Agent | undefined {
+  return (
+    primaryAgents.find((agent) => agent.name === "code") ??
+    primaryAgents.find((agent) => !isOmoSkillAgentName(agent.name))
+  );
 }
 
 interface AvailableVariants {
@@ -84,7 +102,7 @@ export function useAgentModelSync({
       if (agent?.model) {
         setSelectedModel(agent.model);
       } else {
-        const bound = agentModelBindings[selectedAgent];
+        const bound = findAgentModelBinding(agentModelBindings, selectedAgent);
         if (bound) setSelectedModel(bound);
       }
     }
@@ -157,9 +175,8 @@ export function useAgentModelSync({
     const storedAgent = activeSessionId
       ? getSessionAgent(activeSessionId)
       : null;
-    const defaultAgent =
-      primaryAgents.find((agent) => agent.name === "code") ?? primaryAgents[0];
-    const restoredAgentName = storedAgent ?? defaultAgent.name;
+    const restoredAgentName =
+      storedAgent ?? findDefaultAgent(primaryAgents)?.name ?? null;
     const restoredAgent = primaryAgents.find(
       (agent) => agent.name === restoredAgentName,
     );
@@ -171,12 +188,11 @@ export function useAgentModelSync({
     const storedModel = activeSessionId
       ? getSessionModel(activeSessionId)
       : null;
-    setSelectedModel(
-      storedModel ??
-        restoredAgent?.model ??
-        agentModelBindings[restoredAgentName] ??
-        null,
-    );
+    const boundModel =
+      restoredAgentName === null
+        ? undefined
+        : findAgentModelBinding(agentModelBindings, restoredAgentName);
+    setSelectedModel(storedModel ?? restoredAgent?.model ?? boundModel ?? null);
 
     const storedVariant = activeSessionId
       ? getSessionVariant(activeSessionId)

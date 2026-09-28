@@ -29,6 +29,7 @@ import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { RunningSubAgentsBanner } from "@/components/chat/running-sub-agents-banner";
 import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
+import { WorkspaceEngineBadge } from "@/components/chat/workspace-engine-badge";
 import { SidePanel } from "@/components/chat/side-panel";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { Button } from "@/components/ui/button";
@@ -1365,6 +1366,7 @@ export function ChatInterface() {
 
             {/* Session info */}
             <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+              <WorkspaceEngineBadge workspaceId={activeWorkspaceId} />
               {activeSessionTitle ? (
                 <span
                   className="text-foreground truncate text-sm font-medium"

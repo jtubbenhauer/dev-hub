@@ -1,0 +1,34 @@
+components/chat/model-selector.tsx
+  s_9b616f005b7655::t_3b8598b0215415 37-39,82-86,88,98,241,247,305
+tests/components/chat/model-selector.test.tsx
+  s_9b616f005b7655::t_3b8598b0215415 290-314,318-357
+  s_9b616f005b7655::t_eb6320c1e466d6 315-317
+components/chat/chat-interface.tsx
+  s_a14af25ea19db4::t_d426ba87329a05 1824
+components/chat/prompt-input.tsx
+  s_a14af25ea19db4::t_40e625ed655668 155,185,1205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "20cd3f6de2bc5ecad0880af3d6f7b083de96405b",
+  "prompts": {},
+  "sessions": {
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

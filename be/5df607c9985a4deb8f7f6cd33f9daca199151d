@@ -1,0 +1,29 @@
+app/api/opencode/events/route.ts
+  s_a14af25ea19db4::t_a6ad1c16fcfd47 196,205-219,222-224,229-232
+tests/api/omo-dispatch.test.ts
+  s_d551a29796567b::t_56c189f31b199f 381-424
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "be5df607c9985a4deb8f7f6cd33f9daca199151d",
+  "prompts": {},
+  "sessions": {
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_d551a29796567b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1894bd29ffenWCyNb4VxHOzGs",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

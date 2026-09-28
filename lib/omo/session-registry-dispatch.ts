@@ -85,17 +85,28 @@ export class OmoRegistryDispatcher {
       workspaceSinks = new Set();
       this.sinks.set(workspaceId, workspaceSinks);
     }
+    if (workspaceSinks.has(sink)) return () => undefined;
     workspaceSinks.add(sink);
     this.client.addSubscriber();
-    return () => {
-      workspaceSinks.delete(sink);
-      if (workspaceSinks.size === 0) this.sinks.delete(workspaceId);
-      this.client.removeSubscriber();
-    };
+    return () => this.unsubscribe(workspaceId, sink);
+  }
+
+  private unsubscribe(workspaceId: string, sink: OmoRegistryEventSink): void {
+    const workspaceSinks = this.sinks.get(workspaceId);
+    if (workspaceSinks === undefined || !workspaceSinks.delete(sink)) return;
+    if (workspaceSinks.size === 0) this.sinks.delete(workspaceId);
+    this.client.removeSubscriber();
+  }
+
+  subscriberCount(workspaceId: string): number {
+    return this.sinks.get(workspaceId)?.size ?? 0;
   }
 
   clear(): void {
     this.leafQueue.clear();
+    for (const workspaceSinks of this.sinks.values()) {
+      for (const _sink of workspaceSinks) this.client.removeSubscriber();
+    }
     this.sinks.clear();
     this.events.clear();
     this.records.clear();

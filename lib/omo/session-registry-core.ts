@@ -49,11 +49,13 @@ export class OmoSessionRegistry {
     readonly client: OmoRpcClient,
     options: OmoSessionRegistryOptions = {},
   ) {
-    this.getSubscriberCount = options.getSubscriberCount ?? (() => 0);
     this.dispatcher = new OmoRegistryDispatcher({
       client,
       refreshIndex: (workspace) => this.refreshIndexFromHost(workspace),
     });
+    this.getSubscriberCount =
+      options.getSubscriberCount ??
+      ((workspaceId) => this.dispatcher.subscriberCount(workspaceId));
     this.stopGlobalListener = client.on(this.routeBoundRecord.bind(this));
   }
 
@@ -262,6 +264,10 @@ export class OmoSessionRegistry {
 
   subscribe(workspaceId: string, sink: OmoRegistryEventSink): () => void {
     return this.dispatcher.subscribe(workspaceId, sink);
+  }
+
+  subscriberCount(workspaceId: string): number {
+    return this.dispatcher.subscriberCount(workspaceId);
   }
 
   cleanupBinding(binding: OmoSessionBinding): void {

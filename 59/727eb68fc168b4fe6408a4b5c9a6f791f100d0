@@ -1,0 +1,25 @@
+lib/omo/adapter/catalog.ts
+  s_a14af25ea19db4::t_dbe4c15e7fed2d 14,31,34-45,63,151
+tests/components/chat/omo-mode-selector.test.tsx
+  s_a14af25ea19db4::t_815d73e7d0be58 54
+tests/lib/omo/adapter/catalog-fixture.ts
+  s_a14af25ea19db4::t_0d054d2dbbdfe1 15,27-31,77
+tests/lib/omo/adapter/catalog-shape-cases.ts
+  s_a14af25ea19db4::t_5009ba3c088775 70,90-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "59727eb68fc168b4fe6408a4b5c9a6f791f100d0",
+  "prompts": {},
+  "sessions": {
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

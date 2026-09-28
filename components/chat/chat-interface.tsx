@@ -1821,6 +1821,7 @@ export function ChatInterface() {
             onAgentSelectorOpenChange={setIsAgentSelectorOpen}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
+            onFallbackModel={setSelectedModel}
             onVariantsChange={handleVariantsChange}
             isModelSelectorOpen={isModelSelectorOpen}
             onModelSelectorOpenChange={setIsModelSelectorOpen}

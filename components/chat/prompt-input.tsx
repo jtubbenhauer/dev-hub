@@ -152,6 +152,7 @@ interface PromptInputProps {
 
   selectedModel: SelectedModel | null;
   onModelChange: (model: SelectedModel) => void;
+  onFallbackModel?: (model: SelectedModel) => void;
   onVariantsChange?: (model: SelectedModel | null, variants: string[]) => void;
   isModelSelectorOpen?: boolean;
   onModelSelectorOpenChange?: (open: boolean) => void;
@@ -181,6 +182,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       onAgentSelectorOpenChange,
       selectedModel,
       onModelChange,
+      onFallbackModel,
       onVariantsChange,
       isModelSelectorOpen,
       onModelSelectorOpenChange,
@@ -1200,6 +1202,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
               workspaceId={workspaceId}
               selectedModel={selectedModel}
               onModelChange={onModelChange}
+              onFallbackModel={onFallbackModel}
               onVariantsChange={onVariantsChange}
               open={isModelSelectorOpen}
               onOpenChange={onModelSelectorOpenChange}

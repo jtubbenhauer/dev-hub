@@ -287,4 +287,72 @@ describe("ModelSelector", () => {
       expect(onModelChange).toHaveBeenCalledWith(AVAILABLE_MODEL),
     );
   });
+
+  it("sends an automatic fallback to onFallbackModel without saving it", async () => {
+    localStorage.setItem(
+      "dev-hub:selected-model",
+      JSON.stringify({ providerID: "anthropic", modelID: "claude-opus-4-8" }),
+    );
+    const onModelChange = vi.fn();
+    const onFallbackModel = vi.fn();
+
+    render(
+      <ModelSelector
+        workspaceId="workspace-1"
+        selectedModel={{
+          providerID: "anthropic-subscription",
+          modelID: "claude-opus-5-5",
+        }}
+        onModelChange={onModelChange}
+        onFallbackModel={onFallbackModel}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(onFallbackModel).toHaveBeenCalledWith(AVAILABLE_MODEL),
+    );
+    expect(onModelChange).not.toHaveBeenCalled();
+    expect(
+      JSON.parse(localStorage.getItem("dev-hub:selected-model") ?? "null"),
+    ).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-8",
+    });
+    localStorage.clear();
+  });
+
+  it("remembers a manual pick in an OmO workspace under its own key", async () => {
+    useWorkspaceEngineMock.mockReturnValue({ engine: "omo", isLoading: false });
+    localStorage.setItem(
+      "dev-hub:selected-model",
+      JSON.stringify({ providerID: "anthropic", modelID: "claude-opus-4-8" }),
+    );
+    const onModelChange = vi.fn();
+
+    render(
+      <ModelSelector
+        workspaceId="omo-workspace"
+        selectedModel={{ providerID: "opencode", modelID: "big-pickle" }}
+        onModelChange={onModelChange}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("combobox")).toHaveTextContent("Big Pickle"),
+    );
+    await act(async () => {
+      screen.getByRole("combobox").click();
+    });
+    await act(async () => {
+      (await screen.findByRole("option", { name: /Kimi K3/ })).click();
+    });
+
+    expect(onModelChange).toHaveBeenCalledWith(AVAILABLE_MODEL);
+    expect(
+      JSON.parse(localStorage.getItem("dev-hub:selected-model:omo") ?? "null"),
+    ).toEqual(AVAILABLE_MODEL);
+    expect(
+      JSON.parse(localStorage.getItem("dev-hub:selected-model") ?? "null"),
+    ).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" });
+    localStorage.clear();
+  });
 });

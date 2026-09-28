@@ -34,6 +34,9 @@ interface ModelSelectorProps {
   workspaceId: string | null;
   selectedModel: SelectedModel | null;
   onModelChange: (model: SelectedModel) => void;
+  // Automatic fallbacks only change what is shown; they are never saved to the
+  // session or remembered, so a transient mismatch cannot overwrite a choice.
+  onFallbackModel?: (model: SelectedModel) => void;
   onVariantsChange?: (model: SelectedModel | null, variants: string[]) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -76,9 +79,13 @@ export function loadPersistedModel(): SelectedModel | null {
   return null;
 }
 
-function persistModel(model: SelectedModel) {
+function storageKeyForEngine(engine: string | undefined): string {
+  return engine === "omo" ? `${STORAGE_KEY}:omo` : STORAGE_KEY;
+}
+
+function persistModel(model: SelectedModel, engine: string | undefined) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(model));
+    localStorage.setItem(storageKeyForEngine(engine), JSON.stringify(model));
   } catch {
     // Storage full or unavailable
   }
@@ -88,6 +95,7 @@ export function ModelSelector({
   workspaceId,
   selectedModel,
   onModelChange,
+  onFallbackModel,
   onVariantsChange,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
@@ -230,13 +238,13 @@ export function ModelSelector({
       providerID: fallbackOption.providerID,
       modelID: fallbackOption.modelID,
     };
-    onModelChange(fallback);
-    persistModel(fallback);
+    (onFallbackModel ?? onModelChange)(fallback);
   }, [
     currentOption,
     defaultModels,
     isCurrentWorkspaceLoading,
     modelOptions,
+    onFallbackModel,
     onModelChange,
   ]);
 
@@ -294,7 +302,7 @@ export function ModelSelector({
                             modelID: option.modelID,
                           };
                           onModelChange(next);
-                          persistModel(next);
+                          persistModel(next, engine);
                           setIsOpen(false);
                         }}
                       >

@@ -244,6 +244,24 @@ const sessionDeletionMutations = new Map<string, Promise<void>>();
 const sessionCachePurgeMutations = new Map<string, Promise<void>>();
 const purgedSessionCacheKeys = new Set<string>();
 
+// Switching workspaces can briefly pair the previous active session with the
+// new workspace id; a session already attributed elsewhere would only 404.
+export function isSessionOwnedByOtherWorkspace(
+  workspaceStates: Readonly<Record<string, WorkspaceState>>,
+  sessionId: string,
+  workspaceId: string,
+): boolean {
+  if (workspaceStates[workspaceId]?.sessions[sessionId]) return false;
+  const sourceWorkspaceId = sessionSourceWorkspace.get(sessionId);
+  if (sourceWorkspaceId !== undefined && sourceWorkspaceId !== workspaceId) {
+    return true;
+  }
+  return Object.entries(workspaceStates).some(
+    ([otherId, state]) =>
+      otherId !== workspaceId && sessionId in state.sessions,
+  );
+}
+
 function markSessionDeleted(
   workspaceId: string,
   sessionId: string,
@@ -1020,6 +1038,11 @@ interface ChatState {
     sessionId: string,
     workspaceId: string,
   ) => Promise<SessionDeletionResult>;
+  renameSession: (
+    sessionId: string,
+    workspaceId: string,
+    title: string,
+  ) => Promise<boolean>;
   removeSessionLocal: (
     sessionId: string,
     workspaceId: string,
@@ -1690,8 +1713,17 @@ export const useChatStore = create<ChatState>()(
           if (workspaceId) {
             const targetWs = state.workspaceStates[workspaceId];
             if (targetWs) {
+              const hasLoadedSessions =
+                Object.keys(targetWs.sessions).length > 0;
+              const deletedIds = deletedSessionIdsByWorkspace.get(workspaceId);
               let maxTs = 0;
               for (const [sid, ts] of Object.entries(targetWs.lastViewedAt)) {
+                if (
+                  deletedIds?.has(sid) ||
+                  (hasLoadedSessions && !(sid in targetWs.sessions))
+                ) {
+                  continue;
+                }
                 if (ts > maxTs) {
                   maxTs = ts;
                   nextSessionId = sid;
@@ -1983,6 +2015,28 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
+      renameSession: async (sessionId, workspaceId, title) => {
+        const trimmedTitle = title.trim();
+        if (trimmedTitle.length === 0) return false;
+        const response = await fetch(
+          buildProxyUrl(`session/${sessionId}`, workspaceId),
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: trimmedTitle }),
+          },
+        );
+        if (!response.ok) return false;
+        const updated = (await response.json()) as Session;
+        persistSessionMetadata(workspaceId, [updated]);
+        set((state) =>
+          updateWorkspace(state, workspaceId, (ws) => ({
+            sessions: { ...ws.sessions, [updated.id]: updated },
+          })),
+        );
+        return true;
+      },
+
       deleteSession: async (sessionId, workspaceId) => {
         markSessionDeleted(workspaceId, sessionId);
         let wasDeleted = false;
@@ -2249,6 +2303,15 @@ export const useChatStore = create<ChatState>()(
       fetchMessages: async (sessionId, workspaceId, options) => {
         const force = options?.force === true;
         const state = get();
+        if (
+          isSessionOwnedByOtherWorkspace(
+            state.workspaceStates,
+            sessionId,
+            workspaceId,
+          )
+        ) {
+          return;
+        }
         const hasInMemory =
           (state.workspaceStates[workspaceId]?.messages[sessionId]?.length ??
             0) > 0;
@@ -2286,6 +2349,15 @@ export const useChatStore = create<ChatState>()(
       },
 
       fetchSessionTodos: async (sessionId, workspaceId) => {
+        if (
+          isSessionOwnedByOtherWorkspace(
+            get().workspaceStates,
+            sessionId,
+            workspaceId,
+          )
+        ) {
+          return;
+        }
         const todosBeforeRequest =
           get().workspaceStates[workspaceId]?.todos[sessionId];
         try {

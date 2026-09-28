@@ -423,3 +423,53 @@ describe("SessionList — unified mode workspace picker", () => {
     ).toHaveClass("accent-sky-500");
   });
 });
+
+describe("SessionList — rename", () => {
+  it("renames a session inline through the chat store", async () => {
+    const { useChatStore } = await import("@/stores/chat-store");
+    const renameSession = vi.fn(async () => true);
+    useChatStore.setState({ renameSession });
+    const user = userEvent.setup();
+    render(
+      <SessionList
+        {...baseProps}
+        mode="unified"
+        sessions={[makeUnifiedSession("s1", "ws-1", { title: "Old title" })]}
+        workspaceNames={{}}
+        workspaceBranches={{}}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getAllByTitle("Rename")[0]!);
+    const input = screen.getByLabelText("Session title");
+    await user.clear(input);
+    await user.type(input, "New title{Enter}");
+
+    expect(renameSession).toHaveBeenCalledWith("s1", "ws-1", "New title");
+    expect(screen.queryByLabelText("Session title")).not.toBeInTheDocument();
+  });
+
+  it("cancels the rename on Escape without saving", async () => {
+    const { useChatStore } = await import("@/stores/chat-store");
+    const renameSession = vi.fn(async () => true);
+    useChatStore.setState({ renameSession });
+    const user = userEvent.setup();
+    render(
+      <SessionList
+        {...baseProps}
+        mode="unified"
+        sessions={[makeUnifiedSession("s1", "ws-1", { title: "Keep" })]}
+        workspaceNames={{}}
+        workspaceBranches={{}}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getAllByTitle("Rename")[0]!);
+    await user.type(screen.getByLabelText("Session title"), "x{Escape}");
+
+    expect(renameSession).not.toHaveBeenCalled();
+    expect(screen.getByText("Keep")).toBeInTheDocument();
+  });
+});

@@ -6,7 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import { SessionTaskProgressIndicator } from "@/components/chat/session-task-progress";
 import { SubAgentDialog } from "@/components/chat/sub-agent-dialog";
 import type { Session } from "@/lib/opencode/types";
-import { useChatStore } from "@/stores/chat-store";
+import {
+  isSessionOwnedByOtherWorkspace,
+  useChatStore,
+} from "@/stores/chat-store";
 
 interface RunningSubAgentsBannerProps {
   readonly parentSessionId: string;
@@ -24,6 +27,15 @@ export function RunningSubAgentsBanner({
   >({});
   const [loadedDescendants, setLoadedDescendants] = useState<Session[]>([]);
   useEffect(() => {
+    if (
+      isSessionOwnedByOtherWorkspace(
+        useChatStore.getState().workspaceStates,
+        parentSessionId,
+        workspaceId,
+      )
+    ) {
+      return;
+    }
     const controller = new AbortController();
     void Promise.all([
       fetch(

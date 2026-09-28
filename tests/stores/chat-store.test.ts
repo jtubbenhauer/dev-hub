@@ -332,6 +332,108 @@ describe("workspace switching", () => {
     expect(useChatStore.getState().activeSessionId).toBe("sess-b2");
   });
 
+  it("skips a last-viewed session that is no longer in the loaded list", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-b": {
+          sessions: { "sess-b1": makeSession("sess-b1") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: { "sess-b1": 1000, "sess-gone": 9000 },
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "sess-a",
+    });
+    useChatStore.getState().setActiveWorkspaceId("ws-b");
+    expect(useChatStore.getState().activeSessionId).toBe("sess-b1");
+  });
+
+  it("does not fetch messages or todos for a session owned by another workspace", async () => {
+    const fetchSpy = vi.fn(async () => Response.json([]));
+    vi.stubGlobal("fetch", fetchSpy);
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+    });
+
+    await useChatStore.getState().fetchMessages("sess-a", "ws-b");
+    await useChatStore.getState().fetchSessionTodos("sess-a", "ws-b");
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("renameSession patches the title and updates the stored session", async () => {
+    const renamed = { ...makeSession("sess-r"), title: "Renamed" };
+    const fetchSpy = vi.fn(async () => Response.json(renamed));
+    vi.stubGlobal("fetch", fetchSpy);
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-r": {
+          sessions: { "sess-r": makeSession("sess-r") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+    });
+
+    const ok = await useChatStore
+      .getState()
+      .renameSession("sess-r", "ws-r", "  Renamed  ");
+
+    expect(ok).toBe(true);
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toContain("/api/opencode/session/sess-r?");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(String(init.body))).toEqual({ title: "Renamed" });
+    expect(
+      useChatStore.getState().workspaceStates["ws-r"]?.sessions["sess-r"]
+        ?.title,
+    ).toBe("Renamed");
+    vi.unstubAllGlobals();
+  });
+
   it("hydration path (current null) restores the persisted last-viewed session", () => {
     useChatStore.setState({
       workspaceStates: {

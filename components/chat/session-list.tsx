@@ -21,6 +21,7 @@ import {
   Clock,
   MoreVertical,
   StickyNote,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -34,7 +35,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Session, SessionStatus } from "@/lib/opencode/types";
-import type { SessionWithWorkspace } from "@/stores/chat-store";
+import { useChatStore, type SessionWithWorkspace } from "@/stores/chat-store";
+import { SessionTitleEditor } from "@/components/chat/session-title-editor";
 import type { SessionAgeFilter } from "@/lib/session-filters";
 import {
   SessionTaskProgressIndicator,
@@ -502,6 +504,12 @@ export function SessionList(props: SessionListProps) {
                           : undefined,
                       )
                     }
+                    onRename={renameHandlerFor(
+                      props.mode === "unified"
+                        ? (session as SessionWithWorkspace).workspaceId
+                        : undefined,
+                      session.id,
+                    )}
                     onTogglePin={
                       onPinSession && onUnpinSession
                         ? () => {
@@ -722,6 +730,7 @@ function WorkspaceGroup({
             subAgentCount={subAgentCountBySessionId?.[session.id]}
             onSelect={() => onSelectSession(session)}
             onDelete={() => onDeleteSession(session.id, workspaceId)}
+            onRename={renameHandlerFor(workspaceId, session.id)}
             onTogglePin={
               onPinSession && onUnpinSession
                 ? () => {
@@ -765,6 +774,19 @@ function WorkspaceGroup({
   );
 }
 
+// Without an explicit workspace the list is showing the active workspace.
+function renameHandlerFor(
+  workspaceId: string | undefined,
+  sessionId: string,
+): (title: string) => Promise<boolean> {
+  return async (title) => {
+    const chatState = useChatStore.getState();
+    const targetWorkspaceId = workspaceId ?? chatState.activeWorkspaceId;
+    if (!targetWorkspaceId) return false;
+    return chatState.renameSession(sessionId, targetWorkspaceId, title);
+  };
+}
+
 interface SessionItemProps {
   session: Session;
   isActive: boolean;
@@ -781,6 +803,7 @@ interface SessionItemProps {
   onSelect: () => void;
   onDelete: () => void;
   onTogglePin?: () => void;
+  onRename?: (title: string) => Promise<boolean>;
   onSetNote?: (note: string) => void;
   onClearNote?: () => void;
 }
@@ -801,8 +824,10 @@ function SessionItem({
   onSelect,
   onDelete,
   onTogglePin,
+  onRename,
   onClearNote,
 }: SessionItemProps) {
+  const [isRenaming, setIsRenaming] = useState(false);
   const formattedTime = useMemo(() => {
     return formatRelativeTime(session.time.updated);
   }, [session.time.updated]);
@@ -875,12 +900,23 @@ function SessionItem({
         )}
       </div>
       <div className="w-0 min-w-0 flex-1 overflow-hidden">
-        <p
-          className={cn("truncate", isUnread ? "font-semibold" : "font-medium")}
-          title={session.title || "Untitled"}
-        >
-          {session.title || "Untitled"}
-        </p>
+        {isRenaming && onRename ? (
+          <SessionTitleEditor
+            initialTitle={session.title}
+            onSave={onRename}
+            onDone={() => setIsRenaming(false)}
+          />
+        ) : (
+          <p
+            className={cn(
+              "truncate",
+              isUnread ? "font-semibold" : "font-medium",
+            )}
+            title={session.title || "Untitled"}
+          >
+            {session.title || "Untitled"}
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="text-muted-foreground text-xs">{formattedTime}</p>
           {taskProgress && taskProgress.total > 0 && (
@@ -923,6 +959,20 @@ function SessionItem({
         )}
       </div>
       <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
+        {onRename && (
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsRenaming(true);
+            }}
+            title="Rename"
+          >
+            <Pencil className="text-muted-foreground size-3" />
+          </Button>
+        )}
         {onTogglePin && (
           <Button
             size="icon-xs"
@@ -967,6 +1017,17 @@ function SessionItem({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {onRename && (
+              <DropdownMenuItem
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setIsRenaming(true);
+                }}
+              >
+                <Pencil className="mr-2 size-3.5" />
+                Rename
+              </DropdownMenuItem>
+            )}
             {onTogglePin && (
               <DropdownMenuItem
                 onClick={(event) => {

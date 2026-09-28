@@ -6,6 +6,9 @@ import { eq, and } from "drizzle-orm";
 import { toWorkspace } from "@/lib/workspaces/backend";
 import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
 import { restartOmoEngine } from "@/lib/omo/route-dispatch";
+import { getOmoRuntimeForWorkspace } from "@/lib/omo/runtime";
+import { requestRemoteOmoDaemon } from "@/lib/omo/remote-daemon";
+import type { Workspace } from "@/types";
 
 const RESTART_COMMAND = "pkill -TERM -f '[o]pencode serve' || true";
 
@@ -51,6 +54,45 @@ async function restartViaCommandApi(agentUrl: string): Promise<Response> {
   });
 }
 
+async function restartRemoteOmoEngine(
+  workspace: Workspace,
+  userId: string,
+): Promise<Response> {
+  if (!workspace.agentUrl) {
+    return NextResponse.json(
+      { error: "Remote workspace has no agent URL" },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const ensureResponse = await requestRemoteOmoDaemon({
+      workspace,
+      userId,
+      operation: "ensure",
+    });
+    if (!ensureResponse.ok) {
+      const detail = await ensureResponse.text().catch(() => "");
+      return NextResponse.json(
+        {
+          error: "engine_unavailable",
+          detail: detail || `HTTP ${ensureResponse.status}`,
+        },
+        { status: 503, headers: { "Retry-After": "2" } },
+      );
+    }
+
+    await getOmoRuntimeForWorkspace(workspace).runtime.client.reconnect();
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    return NextResponse.json(
+      { error: "engine_unavailable", detail: error.message },
+      { status: 503, headers: { "Retry-After": "2" } },
+    );
+  }
+  return NextResponse.json({ restarted: true, target: "omo" });
+}
+
 export async function POST(request: NextRequest): Promise<Response> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -61,7 +103,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const workspaceId = url.searchParams.get("workspaceId");
 
   const engine = await resolveWorkspaceEngine(session.user.id, workspaceId);
-  if (engine === "omo") {
+  if (engine === "omo" && !workspaceId) {
     return restartOmoEngine(session.user.id, workspaceId);
   }
 
@@ -86,6 +128,13 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   const workspace = toWorkspace(row);
+
+  if (engine === "omo") {
+    if (workspace.backend === "remote") {
+      return restartRemoteOmoEngine(workspace, session.user.id);
+    }
+    return restartOmoEngine(session.user.id, null);
+  }
 
   if (workspace.backend !== "remote") {
     const { stopServer } = await import("@/lib/opencode/server-pool");

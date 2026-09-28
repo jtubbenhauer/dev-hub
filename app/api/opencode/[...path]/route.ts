@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
-import { db } from "@/lib/db";
-import { settings } from "@/drizzle/schema";
-import { eq, and } from "drizzle-orm";
 import {
   resolveOpenCodeTarget,
   authorizeOpenCodeSession,
@@ -10,8 +7,16 @@ import {
 } from "@/lib/opencode/proxy-target";
 import { fetchWithHeaderTimeout } from "@/lib/opencode/fetch-timeout";
 import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
-import { proxyOmoRequest } from "@/lib/omo/route-dispatch";
-import type { Workspace, WorkspaceProvider } from "@/types";
+import { requestRemoteOmoDaemon } from "@/lib/omo/remote-daemon";
+import {
+  proxyOmoRequest,
+  resolveOmoWorkspaceOrResponse,
+} from "@/lib/omo/route-dispatch";
+import {
+  OPEN_CODE_AUTO_SUSPEND_RETRY_DELAYS_MS,
+  retryAutoSuspendRequest,
+} from "@/lib/workspaces/auto-suspend-retry";
+import type { Workspace } from "@/types";
 
 interface RouteParams {
   params: Promise<{ path: string[] }>;
@@ -41,6 +46,37 @@ async function proxyToOpenCode(
 
   const engine = await resolveWorkspaceEngine(session.user.id, workspaceId);
   if (engine === "omo") {
+    if (opencodePath === "/global/health") {
+      const resolved = await resolveOmoWorkspaceOrResponse(
+        session.user.id,
+        workspaceId,
+      );
+      if (resolved instanceof Response) return resolved;
+      if (resolved.backend === "remote") {
+        try {
+          const statusResponse = await requestRemoteOmoDaemon({
+            workspace: resolved,
+            userId: session.user.id,
+            operation: "status",
+          });
+          if (!statusResponse.ok) {
+            return NextResponse.json({ healthy: false }, { status: 503 });
+          }
+          const status: unknown = await statusResponse.json();
+          const isHealthy =
+            typeof status === "object" &&
+            status !== null &&
+            "reachable" in status &&
+            status.reachable === true;
+          return NextResponse.json(
+            { healthy: isHealthy },
+            { status: isHealthy ? 200 : 503 },
+          );
+        } catch {
+          return NextResponse.json({ healthy: false }, { status: 503 });
+        }
+      }
+    }
     return proxyOmoRequest({
       request,
       userId: session.user.id,
@@ -131,27 +167,14 @@ async function proxyToOpenCode(
       !isSSE &&
       request.method !== "GET"
     ) {
-      const supportsAutoSuspend = await workspaceSupportsAutoSuspend(
+      const retryResponse = await retryAutoSuspendRequest({
         workspace,
-        session.user.id,
-      );
-
-      if (supportsAutoSuspend) {
-        const delays = [2000, 4000, 8000, 8000, 8000];
-        for (const delayMs of delays) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-          try {
-            const retryResponse = await fetchWithHeaderTimeout(
-              targetUrl.toString(),
-              fetchOptions,
-              10_000,
-            );
-            return proxyResponse(retryResponse, false);
-          } catch {
-            continue;
-          }
-        }
-      }
+        userId: session.user.id,
+        delaysMs: OPEN_CODE_AUTO_SUSPEND_RETRY_DELAYS_MS,
+        request: () =>
+          fetchWithHeaderTimeout(targetUrl.toString(), fetchOptions, 10_000),
+      });
+      if (retryResponse) return proxyResponse(retryResponse, false);
     }
 
     const isTimeout =
@@ -204,37 +227,4 @@ async function proxyResponse(upstream: Response, isSSE: boolean) {
     status: upstream.status,
     headers: responseHeaders,
   });
-}
-
-async function workspaceSupportsAutoSuspend(
-  workspace: Workspace,
-  userId: string,
-): Promise<boolean> {
-  const providerMeta = workspace.providerMeta as Record<string, unknown> | null;
-  const providerId =
-    providerMeta && typeof providerMeta.providerId === "string"
-      ? providerMeta.providerId
-      : null;
-  if (!providerId) return false;
-
-  const [settingRow] = await db
-    .select()
-    .from(settings)
-    .where(
-      and(eq(settings.userId, userId), eq(settings.key, "workspace-providers")),
-    );
-  if (!settingRow) return false;
-
-  const providers = Array.isArray(settingRow.value)
-    ? (settingRow.value as unknown[])
-    : [];
-
-  const provider = providers.find(
-    (candidate) =>
-      candidate &&
-      typeof candidate === "object" &&
-      (candidate as Record<string, unknown>).id === providerId,
-  ) as WorkspaceProvider | undefined;
-
-  return provider?.behaviour?.supportsAutoSuspend === true;
 }

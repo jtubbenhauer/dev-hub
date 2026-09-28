@@ -27,6 +27,7 @@ Personal development command center — a self-hosted web app for managing works
 - [pnpm](https://pnpm.io/)
 - [Git](https://git-scm.com/)
 - [OpenCode CLI](https://opencode.ai) — install with `curl -fsSL https://opencode.ai/install | bash`
+- OmO Native (optional): `bun add -g omo-ai`, run `omo setup` once; dev-hub attaches to the shared `omo daemon`
 
 ## Getting Started
 

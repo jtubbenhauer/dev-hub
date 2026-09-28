@@ -222,6 +222,14 @@ This app is self-hosted (localhost). CDN, SEO, image optimisation, and compressi
 - **Lazy loading:** Use `next/dynamic` for heavy components not needed on initial render (modals, drawers, panels behind toggles).
 - **Unbounded collections:** Cap any in-memory collection that grows over time (output buffers, Maps keyed by session/entity ID). Clean up entries when the parent entity is deleted.
 
+## Chat engines
+
+- **OpenCode:** default engine. Dev-hub talks to the OpenCode server via its SDK (`lib/opencode/**`).
+- **omo (OmO Native):** optional engine. Dev-hub attaches over JSON-RPC to the shared `omo daemon` socket. Adapter code lives in `lib/omo/**`; the remote-workspace side lives in `packages/agent/src/omo/**`.
+- **Never stop the omo daemon.** Dev-hub may start it if missing and may close its own idle connections, but it must NEVER stop, kill, or restart the shared daemon. Other clients depend on it.
+- **Tests never use a real omo.** Use the recorded fixtures in `tests/fixtures/omo/**` and the fake host in `tests/helpers/omo-fake-host.ts`.
+- **Re-capture fixtures:** `pnpm tsx scripts/omo-capture-fixtures.ts` (needs omo installed and a configured model provider). See `tests/fixtures/omo/README.md`.
+
 ## Common Gotchas
 
 1. **Edge Runtime:** Any code imported into middleware or instrumentation must not use Node.js-only APIs at the top level. Use dynamic imports inside runtime guards.

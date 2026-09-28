@@ -1,0 +1,63 @@
+app/api/opencode/[...path]/route.ts
+  s_b8ac260a8331c4::t_bcb2bd37b69172 12-13,42-57
+app/api/opencode/events/route.ts
+  s_3d4cdb47243f14::t_f92aa80d32a365 8,88-251,268-287
+app/api/opencode/restart/route.ts
+  s_a26ff178f37e76::t_e2529b891b61de 7-8,63-67
+app/api/sessions/cache/route.ts
+  s_a26ff178f37e76::t_bda44f3d863a13 12,15,106-109,111-115,216,218-222
+app/api/sessions/messages/route.ts
+  s_a26ff178f37e76::t_03bca41910d031 5,9-10,94-108,370,372-376,386-391
+lib/omo/route-dispatch.ts
+  s_a26ff178f37e76::t_6cdf8664812742 1-114
+lib/omo/rpc-client.ts
+  s_3d4cdb47243f14::t_dd9852d0d78821 89-92
+lib/omo/session-messages-route.ts
+  s_a26ff178f37e76::t_027a6964339326 1-247
+lib/opencode/proxy-target.ts
+  s_3d4cdb47243f14::t_4b203f806818c8 85-98
+tests/api/omo-dispatch.test.ts
+  s_3d4cdb47243f14::t_1ea353bd9255bc 1-504
+tests/api/opencode-events.test.ts
+  s_3d4cdb47243f14::t_13e9fff41a5534 6-8
+tests/api/opencode-proxy.test.ts
+  s_3d4cdb47243f14::t_404dc865c0cf5e 7-9
+tests/api/opencode-restart.test.ts
+  s_3d4cdb47243f14::t_1c1cdf74954db3 7-9
+tests/api/session-cache.test.ts
+  s_3d4cdb47243f14::t_3ec3d5afb1d6e7 6-8
+tests/api/sessions-messages.test.ts
+  s_3d4cdb47243f14::t_df3ba5fcc48c2e 6-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b053b1a9ed9aa8987eb512fced3808979a3e2087",
+  "prompts": {},
+  "sessions": {
+    "s_3d4cdb47243f14": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a0b4f29ffev8sfAeZK8qKLHg",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a26ff178f37e76": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f34617d4affea9EtlbGJ2diXNP",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_b8ac260a8331c4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a07005affePHekfs66NO4hnd",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

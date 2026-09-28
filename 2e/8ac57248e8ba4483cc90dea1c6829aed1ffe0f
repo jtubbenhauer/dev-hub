@@ -1,0 +1,57 @@
+lib/omo/facade/read-catalog.ts
+  s_44c2a40dcf7088::t_4700a40fab7c82 1-29
+lib/omo/facade/read-errors.ts
+  s_a26ff178f37e76::t_29e51aee3651b1 1-118
+lib/omo/facade/read-identities.ts
+  s_44c2a40dcf7088::t_e24d317f3b2753 1-58
+lib/omo/facade/read-message-entries.ts
+  s_44c2a40dcf7088::t_91f1e0c333e5e0 1-169
+lib/omo/facade/read-messages.ts
+  s_44c2a40dcf7088::t_2dba8b7e5ec667 1-128
+lib/omo/facade/read-runtime.ts
+  s_44c2a40dcf7088::t_9072abcf549f01 1-56
+lib/omo/facade/read-sessions.ts
+  s_44c2a40dcf7088::t_147ef265dbbc96 1-233
+lib/omo/facade/read-types.ts
+  s_44c2a40dcf7088::t_d0eb8b3c2ce414 1-38
+lib/omo/facade/read.ts
+  s_44c2a40dcf7088::t_ab7ed9e3593cf9 1-122
+tests/lib/omo/facade/read-error-cases.ts
+  s_44c2a40dcf7088::t_c1d539e2306725 1-147
+tests/lib/omo/facade/read-fallback-cases.ts
+  s_a26ff178f37e76::t_1c7911d7abb82d 1-85
+tests/lib/omo/facade/read-fixture.ts
+  s_44c2a40dcf7088::t_b3ab5f90e9f254 1-175
+tests/lib/omo/facade/read-identities-cases.ts
+  s_a26ff178f37e76::t_9eae8c0ebffd82 1-141
+tests/lib/omo/facade/read-message-cases.ts
+  s_a26ff178f37e76::t_dc77af318ba4d9 1-228
+tests/lib/omo/facade/read-session-cases.ts
+  s_44c2a40dcf7088::t_3e32abc2842b65 1-157
+tests/lib/omo/facade/read.test.ts
+  s_a26ff178f37e76::t_d3d9deccf23a79 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2e8ac57248e8ba4483cc90dea1c6829aed1ffe0f",
+  "prompts": {},
+  "sessions": {
+    "s_44c2a40dcf7088": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3282de71ffeBoESmAAfqSTM65",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a26ff178f37e76": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f34617d4affea9EtlbGJ2diXNP",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

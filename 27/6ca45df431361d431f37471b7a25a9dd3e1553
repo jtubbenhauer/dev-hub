@@ -1,0 +1,79 @@
+app/api/workspaces/route.ts
+  s_2f3e69fa0f4dc0::t_ac377c7ec0c45e 192
+drizzle/schema.ts
+  s_2f3e69fa0f4dc0::t_51b97d55bb8c4a 89
+hooks/use-settings.ts
+  s_2f3e69fa0f4dc0::t_91376eed474e03 17
+lib/omo/adapter/entry-content.ts
+  s_2f3e69fa0f4dc0::t_8607bf0fa777f2 154-157
+lib/omo/adapter/live-message-snapshot.ts
+  s_2f3e69fa0f4dc0::t_a2e11c435fa41d 52-54,86-88
+lib/omo/facade/read-errors.ts
+  s_2f3e69fa0f4dc0::t_4bd94f78101beb 71-73
+lib/omo/facade/read-messages.ts
+  s_2f3e69fa0f4dc0::t_3ea538dc8457f8 7,88-90
+lib/omo/facade/read-sessions.ts
+  s_2f3e69fa0f4dc0::t_e90285be102255 50-52,123-125,186-189,195-198
+lib/omo/facade/read-types.ts
+  s_2f3e69fa0f4dc0::t_96e14ee062362e 25
+lib/omo/facade/read.ts
+  s_2f3e69fa0f4dc0::t_a22b87ba6dd940 1-4,26-29
+lib/omo/rpc-protocol.ts
+  s_2f3e69fa0f4dc0::t_e38ee4707a870c 1
+lib/omo/session-index-merge.ts
+  s_2f3e69fa0f4dc0::t_4de641c57cbb7f 109-112
+lib/omo/session-index-read.ts
+  s_2f3e69fa0f4dc0::t_5ed207812749bb 12-18,38
+lib/omo/session-index-replacement.ts
+  s_2f3e69fa0f4dc0::t_07bf8c6080904b 59,106-107,201
+lib/omo/session-index.ts
+  s_2f3e69fa0f4dc0::t_34d39237137a0e 6
+lib/omo/sessions-on-disk.ts
+  s_2f3e69fa0f4dc0::t_519620d9f5eca7 164
+packages/agent/src/routes/omo-rpc-tunnel.ts
+  s_2f3e69fa0f4dc0::t_5a0a330d650a7b 89
+stores/chat-store.ts
+  s_2f3e69fa0f4dc0::t_facedc5eaaf8d5 3410
+tests/lib/engine/resolve-engine.test.ts
+  s_2f3e69fa0f4dc0::t_4b6fe3ff9d9e46 47-49,62-64,75-77,90-92
+tests/lib/omo/adapter/live-events.test.ts
+  s_2f3e69fa0f4dc0::t_d51befc1592aee 9,31-32
+tests/lib/omo/daemon.test.ts
+  s_2f3e69fa0f4dc0::t_ee6d262c637bb5 13-23,108-110
+tests/lib/omo/facade/read-catalog-cases.ts
+  s_2f3e69fa0f4dc0::t_eb9a7ba7b3997c 21
+tests/lib/omo/facade/read-fallback-cases.ts
+  s_2f3e69fa0f4dc0::t_6a26d96c601b32 46
+tests/lib/omo/facade/read-fixture.ts
+  s_2f3e69fa0f4dc0::t_7e708564bb77ba 76-80,84-88
+tests/lib/omo/facade/read-message-cases.ts
+  s_2f3e69fa0f4dc0::t_f98b5529da15b8 67,163-165,182
+tests/lib/omo/rpc-client-buffer-cases.ts
+  s_2f3e69fa0f4dc0::t_21ae5dd6442273 3,16-23
+tests/lib/omo/rpc-client-fixture.ts
+  s_2f3e69fa0f4dc0::t_1cb5822660ce93 3
+tests/lib/omo/rpc-client-handshake-cases.ts
+  s_2f3e69fa0f4dc0::t_dc5c0c6bc34add 99
+tests/lib/omo/session-index.test.ts
+  s_2f3e69fa0f4dc0::t_ab6a5b3341bb2a 193-196,202,207-209
+tests/stores/chat-store-rekey-fixtures.ts
+  s_2f3e69fa0f4dc0::t_9821601816e1ba 80,136
+tests/stores/chat-store-rekey.test.ts
+  s_2f3e69fa0f4dc0::t_2abc7c9a35cda2 29,146-148,174-177,181-183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "276ca45df431361d431f37471b7a25a9dd3e1553",
+  "prompts": {},
+  "sessions": {
+    "s_2f3e69fa0f4dc0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1b33c9dcffeRPKX4FN8d5HzWN",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

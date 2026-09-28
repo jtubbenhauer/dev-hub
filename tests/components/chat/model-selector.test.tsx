@@ -9,8 +9,13 @@ const AVAILABLE_MODEL = {
 
 const useModelAllowlistMock = vi.hoisted(() => vi.fn());
 
+const useWorkspaceEngineMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/hooks/use-settings", () => ({
   useModelAllowlist: useModelAllowlistMock,
+}));
+vi.mock("@/hooks/use-workspace-engine", () => ({
+  useWorkspaceEngine: useWorkspaceEngineMock,
 }));
 
 function deferredResponse() {
@@ -44,6 +49,10 @@ function providerResponse(
 
 describe("ModelSelector", () => {
   beforeEach(() => {
+    useWorkspaceEngineMock.mockReturnValue({
+      engine: "opencode",
+      isLoading: false,
+    });
     useModelAllowlistMock.mockReturnValue({
       allowlist: ["opencode::kimi-k3"],
       isLoading: false,
@@ -198,42 +207,69 @@ describe("ModelSelector", () => {
     expect(screen.getByText("Loading models...")).toBeInTheDocument();
   });
 
-  it("ignores an allowlist that names none of the workspace's models", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          providerResponse(
-            "anthropic-subscription",
-            "Anthropic",
-            "claude-opus-5-5",
-            "Claude Opus 5.5",
-          ),
-        ),
-      ),
-    );
+  it("offers every model in an OmO workspace regardless of the allowlist", async () => {
+    useWorkspaceEngineMock.mockReturnValue({ engine: "omo", isLoading: false });
     const onModelChange = vi.fn();
 
     render(
       <ModelSelector
         workspaceId="omo-workspace"
-        selectedModel={null}
+        selectedModel={{ providerID: "opencode", modelID: "big-pickle" }}
         onModelChange={onModelChange}
       />,
     );
 
     await waitFor(() =>
-      expect(onModelChange).toHaveBeenCalledWith({
-        providerID: "anthropic-subscription",
-        modelID: "claude-opus-5-5",
-      }),
+      expect(screen.getByRole("combobox")).toHaveTextContent("Big Pickle"),
     );
     await act(async () => {
       screen.getByRole("combobox").click();
     });
     expect(
-      await screen.findByRole("option", { name: /Claude Opus 5.5/ }),
+      await screen.findByRole("option", { name: /Big Pickle/ }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Kimi K3/ })).toBeInTheDocument();
+    expect(onModelChange).not.toHaveBeenCalled();
+  });
+
+  it("shows no models in an OpenCode workspace when the allowlist names none", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          providerResponse("other", "Other", "other-model", "Other Model"),
+        ),
+      ),
+    );
+
+    render(
+      <ModelSelector
+        workspaceId="workspace-1"
+        selectedModel={null}
+        onModelChange={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText("No models")).toBeInTheDocument();
+  });
+
+  it("waits for the engine before choosing a fallback model", async () => {
+    useWorkspaceEngineMock.mockReturnValue({
+      engine: "opencode",
+      isLoading: true,
+    });
+    const onModelChange = vi.fn();
+
+    render(
+      <ModelSelector
+        workspaceId="workspace-1"
+        selectedModel={null}
+        onModelChange={onModelChange}
+      />,
+    );
+
+    expect(await screen.findByText("Loading models...")).toBeInTheDocument();
+    expect(onModelChange).not.toHaveBeenCalled();
   });
 
   it("still filters to allowlisted models when any are present", async () => {

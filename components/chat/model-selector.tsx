@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { useModelAllowlist } from "@/hooks/use-settings";
+import { useWorkspaceEngine } from "@/hooks/use-workspace-engine";
 import type { Provider, Model } from "@/lib/opencode/types";
 
 const STORAGE_KEY = "dev-hub:selected-model";
@@ -110,11 +111,17 @@ export function ModelSelector({
   const defaultModels = isProviderStateCurrent
     ? providerState.defaultModels
     : EMPTY_DEFAULT_MODELS;
+  const { engine, isLoading: isEngineLoading } =
+    useWorkspaceEngine(workspaceId);
   const isCurrentWorkspaceLoading =
-    isLoading || (workspaceId !== null && !isProviderStateCurrent);
+    isLoading ||
+    isEngineLoading ||
+    (workspaceId !== null && !isProviderStateCurrent);
+  // The allowlist holds OpenCode model ids; OmO workspaces offer all models.
   const allowlistSet = useMemo(
-    () => (allowlist.length > 0 ? new Set(allowlist) : null),
-    [allowlist],
+    () =>
+      engine !== "omo" && allowlist.length > 0 ? new Set(allowlist) : null,
+    [allowlist, engine],
   );
 
   useEffect(() => {
@@ -200,12 +207,7 @@ export function ModelSelector({
       })),
     );
     if (!allowlistSet) return allOptions;
-    const allowedOptions = allOptions.filter((option) =>
-      allowlistSet.has(option.value),
-    );
-    // The allowlist is one global list; when it names none of this
-    // workspace's models (e.g. an OmO workspace) it does not apply here.
-    return allowedOptions.length > 0 ? allowedOptions : allOptions;
+    return allOptions.filter((option) => allowlistSet.has(option.value));
   }, [allowlistSet, providers]);
 
   const currentValue = selectedModel

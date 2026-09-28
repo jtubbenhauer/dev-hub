@@ -1,0 +1,19 @@
+tests/lib/omo/adapter/entries-to-messages.test.ts
+  s_a14af25ea19db4::t_cdf3b93e066c4f 128,164-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a5fd1c58b2a59abc92ae43dcbf672116866cef61",
+  "prompts": {},
+  "sessions": {
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

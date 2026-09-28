@@ -1,0 +1,45 @@
+lib/omo/event-stream.ts
+  s_d5c6406d235e49::t_d6c4e754e57a06 1-115
+lib/omo/session-registry-core.ts
+  s_23a5ebc82f51c2::t_071a2cc110b919 56-58,269-272
+lib/omo/session-registry-dispatch.ts
+  s_23a5ebc82f51c2::t_4e6ffa81c2be07 88,91-102,107-109
+tests/lib/omo/event-stream-delivery-cases.ts
+  s_44c2a40dcf7088::t_6d27f89e2ee94a 1-187
+tests/lib/omo/event-stream-fixture.ts
+  s_44c2a40dcf7088::t_f24f427eafba69 1-85
+tests/lib/omo/event-stream-lifecycle-cases.ts
+  s_44c2a40dcf7088::t_d35cf9d4bb73b3 1-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c866b8ba28ec3924223e680b7e5068726e418529",
+  "prompts": {},
+  "sessions": {
+    "s_23a5ebc82f51c2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a30d23fffeQ2z1M8WKAVRde8",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_44c2a40dcf7088": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3282de71ffeBoESmAAfqSTM65",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_d5c6406d235e49": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1a2f2cadffebBLQdbBzEHJH6Q",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

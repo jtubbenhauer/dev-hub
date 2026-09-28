@@ -57,7 +57,9 @@ export function getUnifiedFallbackSession<T extends UnifiedFallbackCandidate>(
   isUnifiedMode: boolean,
   activeSessionId: string | null,
   sessions: readonly T[],
+  urlSessionId: string | null,
 ): T | null {
-  if (!isUnifiedMode || activeSessionId || sessions.length === 0) return null;
+  if (!isUnifiedMode || activeSessionId || urlSessionId) return null;
+  if (sessions.length === 0) return null;
   return sessions[0];
 }

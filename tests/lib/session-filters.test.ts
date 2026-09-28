@@ -144,16 +144,24 @@ describe("getUnifiedFallbackSession", () => {
   ];
 
   it("selects the newest loaded session when unified mode has no active chat", () => {
-    expect(getUnifiedFallbackSession(true, null, sessions)).toEqual(
+    expect(getUnifiedFallbackSession(true, null, sessions, null)).toEqual(
       sessions[0],
     );
   });
 
   it("does not replace an existing active chat", () => {
-    expect(getUnifiedFallbackSession(true, "active", sessions)).toBeNull();
+    expect(
+      getUnifiedFallbackSession(true, "active", sessions, null),
+    ).toBeNull();
   });
 
   it("does not cross workspaces outside unified mode", () => {
-    expect(getUnifiedFallbackSession(false, null, sessions)).toBeNull();
+    expect(getUnifiedFallbackSession(false, null, sessions, null)).toBeNull();
+  });
+
+  it("does not override a session requested by the URL while it is still being applied", () => {
+    expect(
+      getUnifiedFallbackSession(true, null, sessions, "url-session"),
+    ).toBeNull();
   });
 });

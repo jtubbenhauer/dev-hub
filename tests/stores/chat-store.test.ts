@@ -4980,6 +4980,102 @@ describe("fetchSessions fallback to cache", () => {
     expect(useChatStore.getState().activeWorkspaceId).toBe("ws-local");
     expect(useChatStore.getState().activeSessionId).toBe(newestRoot.id);
   });
+
+  it("keeps an unlisted root session that the server still returns by ID", async () => {
+    const orphanedSession = makeSession("orphaned-root", { updated: 5000 });
+    const listedRoot = makeSession("listed-root", { updated: 3000 });
+    useChatStore.setState({
+      activeWorkspaceId: "ws-remote",
+      activeSessionId: orphanedSession.id,
+    });
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/sessions/cache?")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [{ ...orphanedSession, fromCache: true }],
+        });
+      }
+      if (url.startsWith(`/api/opencode/session/${orphanedSession.id}?`)) {
+        return Promise.resolve({ ok: true, json: async () => orphanedSession });
+      }
+      if (url.startsWith("/api/opencode/session?")) {
+        return Promise.resolve({ ok: true, json: async () => [listedRoot] });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    await useChatStore.getState().fetchSessions("ws-remote");
+
+    const state = useChatStore.getState();
+    const sessions = state.workspaceStates["ws-remote"].sessions;
+    expect(Object.keys(sessions).sort()).toEqual([
+      "listed-root",
+      "orphaned-root",
+    ]);
+    expect(sessions["orphaned-root"]).not.toHaveProperty("fromCache");
+    expect(state.activeSessionId).toBe(orphanedSession.id);
+  });
+
+  it("verifies an unlisted active session even when it was never cached", async () => {
+    const orphanedSession = makeSession("orphaned-active", { updated: 5000 });
+    useChatStore.setState({
+      activeWorkspaceId: "ws-remote",
+      activeSessionId: orphanedSession.id,
+    });
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.startsWith(`/api/opencode/session/${orphanedSession.id}?`)) {
+        return Promise.resolve({ ok: true, json: async () => orphanedSession });
+      }
+      if (url.startsWith("/api/opencode/session?")) {
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+
+    await useChatStore.getState().fetchSessions("ws-remote");
+
+    const state = useChatStore.getState();
+    expect(
+      state.workspaceStates["ws-remote"].sessions["orphaned-active"],
+    ).toBeDefined();
+    expect(state.activeSessionId).toBe(orphanedSession.id);
+  });
+
+  it("drops an unlisted session that the server no longer returns by ID", async () => {
+    const deletedSession = makeSession("deleted-root", { updated: 5000 });
+    const listedRoot = makeSession("listed-root", { updated: 3000 });
+    useChatStore.setState({
+      activeWorkspaceId: "ws-remote",
+      activeSessionId: deletedSession.id,
+    });
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/sessions/cache?")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [{ ...deletedSession, fromCache: true }],
+        });
+      }
+      if (url.startsWith(`/api/opencode/session/${deletedSession.id}?`)) {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          json: async () => ({ error: "not found" }),
+        });
+      }
+      if (url.startsWith("/api/opencode/session?")) {
+        return Promise.resolve({ ok: true, json: async () => [listedRoot] });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    await useChatStore.getState().fetchSessions("ws-remote");
+
+    const state = useChatStore.getState();
+    expect(
+      state.workspaceStates["ws-remote"].sessions["deleted-root"],
+    ).toBeUndefined();
+    expect(state.activeSessionId).toBe(listedRoot.id);
+  });
 });
 
 describe("session todo hydration", () => {

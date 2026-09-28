@@ -94,6 +94,7 @@ import {
   StickyNote,
   X,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { Virtuoso } from "react-virtuoso";
@@ -626,10 +627,12 @@ export function ChatInterface() {
       filterSessionsByAge(unifiedSessions, sessionAgeFilter, unifiedPinnedIds),
     [unifiedSessions, sessionAgeFilter, unifiedPinnedIds],
   );
+  const urlSessionId = useSearchParams().get("sessionId") || null;
   const unifiedFallbackSession = getUnifiedFallbackSession(
     isUnifiedMode,
     activeSessionId,
     filteredUnifiedSessions,
+    urlSessionId,
   );
   useEffect(() => {
     if (!unifiedFallbackSession) return;

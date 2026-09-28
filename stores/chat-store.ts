@@ -46,6 +46,7 @@ export type StreamingStatus =
 const MAX_CACHED_SESSIONS = 15;
 const ALL_ROOT_SESSION_LIMIT = 5_000;
 const SESSION_FETCH_LIMIT = 500;
+const MAX_UNLISTED_SESSION_CHECKS = 20;
 
 interface LruEntry {
   sessionId: string;
@@ -950,6 +951,36 @@ function buildProxyUrl(
   return `/api/opencode/${path}${query ? `?${query}` : ""}`;
 }
 
+// OpenCode's session list is scoped to the current project (keyed by the git
+// root commit). If a repo is re-cloned or its history rewritten, older sessions
+// drop out of the list but remain fully loadable by ID. Keep any unlisted root
+// session that the server still returns directly.
+async function fetchUnlistedRootSessions(
+  workspaceId: string,
+  sessionIds: readonly string[],
+  signal: AbortSignal,
+): Promise<Session[]> {
+  const results = await Promise.allSettled(
+    sessionIds.map(async (sessionId) => {
+      const response = await fetch(
+        buildProxyUrl(`session/${sessionId}`, workspaceId),
+        { signal },
+      );
+      if (!response.ok) return null;
+      const data: unknown = await response.json();
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        return null;
+      }
+      const session = data as Session;
+      if (session.id !== sessionId || session.parentID) return null;
+      return session;
+    }),
+  );
+  return results.flatMap((result) =>
+    result.status === "fulfilled" && result.value ? [result.value] : [],
+  );
+}
+
 function extractErrorString(error: unknown): string {
   if (typeof error === "string") return error;
   if (error && typeof error === "object") {
@@ -1488,6 +1519,47 @@ export const useChatStore = create<ChatState>()(
           recentSessions = recentSessions.filter(
             (session) => !deletedIds.has(session.id),
           );
+
+          const listedRootIds = new Set(rootSessions.map((s) => s.id));
+          const previousRoots = Object.values(
+            get().workspaceStates[workspaceId]?.sessions ?? {},
+          ).filter((session) => !session.parentID);
+          const unlistedRootIds = previousRoots
+            .filter(
+              (session) =>
+                !listedRootIds.has(session.id) && !deletedIds.has(session.id),
+            )
+            .sort((a, b) => b.time.updated - a.time.updated)
+            .map((session) => session.id);
+          const {
+            activeWorkspaceId: workspaceIdBeforeVerify,
+            activeSessionId: sessionIdBeforeVerify,
+          } = get();
+          if (
+            workspaceIdBeforeVerify === workspaceId &&
+            sessionIdBeforeVerify &&
+            !listedRootIds.has(sessionIdBeforeVerify) &&
+            !recentSessions.some((s) => s.id === sessionIdBeforeVerify) &&
+            !deletedIds.has(sessionIdBeforeVerify) &&
+            !unlistedRootIds.includes(sessionIdBeforeVerify)
+          ) {
+            unlistedRootIds.unshift(sessionIdBeforeVerify);
+          }
+          if (unlistedRootIds.length > 0) {
+            const verifyController = new AbortController();
+            const verifyTimeoutId = setTimeout(
+              () => verifyController.abort(),
+              10_000,
+            );
+            const unlistedRoots = await fetchUnlistedRootSessions(
+              workspaceId,
+              unlistedRootIds.slice(0, MAX_UNLISTED_SESSION_CHECKS),
+              verifyController.signal,
+            );
+            clearTimeout(verifyTimeoutId);
+            rootSessions = [...rootSessions, ...unlistedRoots];
+          }
+
           const sessionsMap: Record<string, Session> = {};
           for (const session of Object.values(
             get().workspaceStates[workspaceId]?.sessions ?? {},

@@ -10,6 +10,7 @@ export {
 } from "@/lib/omo/session-index-merge";
 export {
   deleteOmoIndexRowWithDescendants,
+  findOmoWorkerByTaskId,
   getOmoChildren,
   getOmoIndexRow,
   listOmoHiddenIds,

@@ -193,4 +193,59 @@ describe("OmoRegistryDispatcher", () => {
     expect(row?.leaf_entry_id).toBe("entry-1");
     expect(errorLog).toHaveBeenCalled();
   });
+
+  it("links a task worker to its parent through context.task_id once", async () => {
+    sqlite
+      .prepare(
+        `INSERT INTO omo_session_index
+          (workspace_id, durable_id, session_path, kind, context,
+           context_authoritative, title, created_ms, updated_ms, updated_at)
+         VALUES ('workspace-1', 'worker-1', NULL, 'worker',
+           '{"role":"child","task_id":"st_task-1"}', 1, 'Untitled', 10, 10, 10)`,
+      )
+      .run();
+    const refreshIndex = vi.fn(async () => undefined);
+    const dispatcher = new Dispatcher({
+      client: createUnconnectedClient(),
+      refreshIndex,
+    });
+    const events: unknown[] = [];
+    dispatcher.subscribe(WORKSPACE.id, (event) => events.push(event));
+    const link = {
+      linkTaskChild: {
+        parentDurableId: "parent-1",
+        taskId: "st_task-1",
+        title: "Read math.ts",
+        updatedMs: 20,
+      },
+    };
+    const { binding } = createTestBinding("parent-1", () => ({
+      events: [],
+      effects: [link],
+    }));
+
+    dispatcher.dispatch(binding, { type: "extension_event", name: "x" });
+    await binding.effectTail;
+    dispatcher.dispatch(binding, { type: "extension_event", name: "x" });
+    await binding.effectTail;
+
+    const row = sqlite
+      .prepare(
+        "SELECT parent_durable_id, title FROM omo_session_index WHERE durable_id = 'worker-1'",
+      )
+      .get();
+    expect(row).toEqual({
+      parent_durable_id: "parent-1",
+      title: "Read math.ts",
+    });
+    expect(refreshIndex).toHaveBeenCalledOnce();
+    expect(events).toMatchObject([
+      {
+        type: "session.updated",
+        properties: {
+          info: { id: "omo_worker-1", parentID: "omo_parent-1" },
+        },
+      },
+    ]);
+  });
 });

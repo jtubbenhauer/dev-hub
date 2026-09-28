@@ -2,7 +2,9 @@ import type { SessionStatus } from "@opencode-ai/sdk";
 import type { Effect } from "@/lib/omo/adapter/live-adapter-types";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoRpcClient } from "@/lib/omo/rpc-client";
+import { buildOmoSession } from "@/lib/omo/adapter/shapes";
 import {
+  findOmoWorkerByTaskId,
   mergeOmoSessionIndexFromTaskEvent,
   setOmoLeafAndActivity,
 } from "@/lib/omo/session-index";
@@ -27,11 +29,18 @@ type MergeFromTaskEventEffect = Extract<
   { readonly refreshIndex: true }
 >;
 
+type LinkTaskChildEffect = Extract<Effect, { readonly linkTaskChild: unknown }>;
+
+type TaskChildLink = LinkTaskChildEffect["linkTaskChild"];
+
+const MAX_LINKED_TASKS = 1_000;
+
 export class OmoRegistryDispatcher {
   readonly leafQueue = new Map<string, Promise<void>>();
   private readonly client: OmoRpcClient;
   private readonly refreshIndex: OmoRegistryDispatcherOptions["refreshIndex"];
   private readonly sinks = new Map<string, Set<OmoRegistryEventSink>>();
+  private readonly linkedTasks = new Set<string>();
   // Per-session latest status only (busy/idle/retry) — bounded by session
   // count, unlike the unbounded event log this replaced.
   private readonly sessionStatuses = new Map<
@@ -145,6 +154,10 @@ export class OmoRegistryDispatcher {
   }
 
   private applyEffect(binding: OmoSessionBinding, effect: Effect): void {
+    if (this.isLinkEffect(effect)) {
+      this.linkTaskChild(binding, effect.linkTaskChild);
+      return;
+    }
     if (!this.isMergeEffect(effect)) return;
     binding.effectTail = this.continueEffectTail(binding, async () => {
       await mergeOmoSessionIndexFromTaskEvent(binding.workspaceId, [
@@ -152,6 +165,54 @@ export class OmoRegistryDispatcher {
       ]);
       await this.refreshIndex(binding.workspace);
     });
+  }
+
+  private linkTaskChild(binding: OmoSessionBinding, link: TaskChildLink): void {
+    const key = `${binding.workspaceId}:${link.taskId}`;
+    if (this.linkedTasks.has(key)) return;
+    binding.effectTail = this.continueEffectTail(binding, async () => {
+      if (this.linkedTasks.has(key)) return;
+      await this.refreshIndex(binding.workspace);
+      const worker = await findOmoWorkerByTaskId(
+        binding.workspaceId,
+        link.taskId,
+      );
+      if (worker === null) return;
+      await mergeOmoSessionIndexFromTaskEvent(binding.workspaceId, [
+        {
+          durableId: worker.durableId,
+          parentDurableId: link.parentDurableId,
+          agent: link.agent,
+          category: link.category,
+          title: link.title,
+          updatedMs: link.updatedMs,
+        },
+      ]);
+      this.rememberLinkedTask(key);
+      this.emit(binding.workspaceId, [
+        {
+          type: "session.updated",
+          properties: {
+            info: buildOmoSession({
+              rawId: worker.durableId,
+              workspaceId: binding.workspaceId,
+              directory: binding.workspace.path,
+              title: link.title,
+              created: worker.createdMs,
+              updated: link.updatedMs,
+              parentRawId: link.parentDurableId,
+            }),
+          },
+        },
+      ]);
+    });
+  }
+
+  private rememberLinkedTask(key: string): void {
+    this.linkedTasks.add(key);
+    if (this.linkedTasks.size <= MAX_LINKED_TASKS) return;
+    const oldest = this.linkedTasks.values().next().value;
+    if (oldest !== undefined) this.linkedTasks.delete(oldest);
   }
 
   // Chains onto whatever effectTail already holds instead of replacing it,
@@ -169,11 +230,22 @@ export class OmoRegistryDispatcher {
   }
 
   private isMergeEffect(effect: Effect): effect is MergeFromTaskEventEffect {
-    const row = effect["mergeFromTaskEvent"];
+    const row =
+      "mergeFromTaskEvent" in effect ? effect.mergeFromTaskEvent : undefined;
     return (
       isJsonObject(row) &&
       typeof row["durableId"] === "string" &&
-      effect["refreshIndex"] === true
+      "refreshIndex" in effect &&
+      effect.refreshIndex === true
+    );
+  }
+
+  private isLinkEffect(effect: Effect): effect is LinkTaskChildEffect {
+    const link = "linkTaskChild" in effect ? effect.linkTaskChild : undefined;
+    return (
+      isJsonObject(link) &&
+      typeof link["taskId"] === "string" &&
+      typeof link["parentDurableId"] === "string"
     );
   }
 

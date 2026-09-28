@@ -3,7 +3,17 @@ import {
   entriesToMessages,
   windowMessages,
 } from "@/lib/omo/adapter/entries-to-messages";
-import { getOmoIndexRow } from "@/lib/omo/session-index";
+import type { ToolPart } from "@opencode-ai/sdk";
+import {
+  taskIdFromToolPart,
+  withChildSessionId,
+} from "@/lib/omo/adapter/live-task-events";
+import type { MessageWithParts } from "@/lib/opencode/types";
+import {
+  findOmoWorkerByTaskId,
+  getOmoIndexRow,
+  mergeOmoSessionIndexFromTaskEvent,
+} from "@/lib/omo/session-index";
 import { activeBranch, type SessionEntry } from "@/lib/omo/sessions-on-disk";
 import {
   isHistoryFallbackError,
@@ -35,23 +45,68 @@ function branchForLeaf(
   return activeBranch(entries, leafId);
 }
 
-function responseForMessages(
+function hasChildSessionId(part: ToolPart): boolean {
+  const metadata = "metadata" in part.state ? part.state.metadata : undefined;
+  return typeof metadata?.["sessionId"] === "string";
+}
+
+async function childSessionIdForTaskPart(
+  context: OmoReadContext,
+  parentRawId: string,
+  part: ToolPart,
+): Promise<string | null> {
+  const taskId = taskIdFromToolPart(part);
+  if (taskId === undefined) return null;
+  const worker = await findOmoWorkerByTaskId(context.workspace.id, taskId);
+  if (worker === null) return null;
+  if (worker.parentDurableId === null) {
+    await mergeOmoSessionIndexFromTaskEvent(context.workspace.id, [
+      { durableId: worker.durableId, parentDurableId: parentRawId },
+    ]);
+  }
+  return `omo_${worker.durableId}`;
+}
+
+async function linkTaskChildren(
+  context: OmoReadContext,
+  parentRawId: string,
+  messages: readonly MessageWithParts[],
+): Promise<MessageWithParts[]> {
+  const linked: MessageWithParts[] = [];
+  for (const message of messages) {
+    const parts: MessageWithParts["parts"] = [];
+    for (const part of message.parts) {
+      const childSessionId =
+        part.type === "tool" && part.tool === "task" && !hasChildSessionId(part)
+          ? await childSessionIdForTaskPart(context, parentRawId, part)
+          : null;
+      parts.push(
+        childSessionId !== null && part.type === "tool"
+          ? withChildSessionId(part, childSessionId)
+          : part,
+      );
+    }
+    linked.push({ ...message, parts });
+  }
+  return linked;
+}
+
+async function responseForMessages(
   entries: SessionEntry[],
   rawId: string,
   context: OmoReadContext,
   query: URLSearchParams,
-): Response {
+): Promise<Response> {
   const messages = entriesToMessages(entries, {
     sessionId: `omo_${rawId}`,
     workspacePath: context.workspace.path,
     skillPrefixes: [],
   });
-  return jsonResponse(
-    windowMessages(messages, {
-      limit: messageLimit(query),
-      before: query.get("before"),
-    }),
-  );
+  const window = windowMessages(messages, {
+    limit: messageLimit(query),
+    before: query.get("before"),
+  });
+  return jsonResponse(await linkTaskChildren(context, rawId, window));
 }
 
 async function fileFallback(
@@ -65,7 +120,7 @@ async function fileFallback(
   ]);
   const fallbackLeaf = entries.at(-1)?.id;
   const leafId = row?.leafEntryId ?? fallbackLeaf;
-  return responseForMessages(
+  return await responseForMessages(
     branchForLeaf(entries, leafId),
     rawId,
     context,
@@ -109,7 +164,7 @@ export async function readOmoMessages(
     const snapshot = parseRpcEntriesResponse(
       await context.runtime.registry.request(binding, { type: "get_entries" }),
     );
-    return responseForMessages(
+    return await responseForMessages(
       branchForLeaf(snapshot.entries, snapshot.leafId),
       rawId,
       context,

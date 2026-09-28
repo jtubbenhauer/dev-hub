@@ -35,6 +35,27 @@ export async function getOmoChildren(
     );
 }
 
+export async function findOmoWorkerByTaskId(
+  workspaceId: string,
+  taskId: string,
+): Promise<OmoSessionIndexRow | null> {
+  return (
+    (
+      await db
+        .select()
+        .from(omoSessionIndex)
+        .where(
+          and(
+            eq(omoSessionIndex.workspaceId, workspaceId),
+            eq(omoSessionIndex.kind, "worker"),
+            sql`json_extract(${omoSessionIndex.context}, '$.task_id') = ${taskId}`,
+          ),
+        )
+        .limit(1)
+    )[0] ?? null
+  );
+}
+
 export async function listOmoHiddenIds(workspaceId: string): Promise<string[]> {
   const rows = await db
     .select({ durableId: omoSessionIndex.durableId })

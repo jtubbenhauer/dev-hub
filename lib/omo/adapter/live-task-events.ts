@@ -46,6 +46,37 @@ function toolPartMatchesTask(part: ToolPart, taskId: string): boolean {
   return typeof output === "string" && output.includes(taskId);
 }
 
+const TASK_ID_IN_OUTPUT = /\[task_id: ([^\s\]]+)/;
+
+export function taskIdFromToolPart(part: ToolPart): string | undefined {
+  const state = part.state;
+  if (isRecord(state.input) && typeof state.input.task_id === "string") {
+    return state.input.task_id;
+  }
+  const metadata = "metadata" in state ? state.metadata : undefined;
+  if (isRecord(metadata) && typeof metadata.task_id === "string") {
+    return metadata.task_id;
+  }
+  const output = "output" in state ? state.output : undefined;
+  return typeof output === "string"
+    ? TASK_ID_IN_OUTPUT.exec(output)?.[1]
+    : undefined;
+}
+
+export function withChildSessionId(
+  part: ToolPart,
+  sessionId: string,
+): ToolPart {
+  return buildOmoToolPart({
+    ...part,
+    state: withSessionMetadata(part.state, sessionId),
+  });
+}
+
+function optionalText(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 function toolPartForTask(
   candidates: readonly TrackedToolPart[],
   taskId: string | undefined,
@@ -78,8 +109,27 @@ export function createLiveTaskEventHandler(
     const events: Event[] = [];
     const effects: Effect[] = [];
     for (const task of tasks) {
-      if (!isRecord(task) || typeof task.child_session_id !== "string")
+      if (!isRecord(task)) continue;
+      if (typeof task.child_session_id !== "string") {
+        // omo runs tasks out of process and omits child_session_id; the
+        // worker session is found later through its context.task_id.
+        if (typeof task.task_id === "string") {
+          const agent = optionalText(task.agent_type);
+          const category = optionalText(task.category);
+          effects.push({
+            linkTaskChild: {
+              parentDurableId: parentRawId,
+              taskId: task.task_id,
+              title:
+                optionalText(task.task_summary) ?? agent ?? category ?? "task",
+              ...(agent === undefined ? {} : { agent }),
+              ...(category === undefined ? {} : { category }),
+              updatedMs: now,
+            },
+          });
+        }
         continue;
+      }
       const rawChild = task.child_session_id;
       const agent =
         typeof task.agent_type === "string" ? task.agent_type : undefined;

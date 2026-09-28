@@ -19,6 +19,16 @@ export type Effect =
         readonly updatedMs: number;
       };
       readonly refreshIndex: true;
+    }
+  | {
+      readonly linkTaskChild: {
+        readonly parentDurableId: string;
+        readonly taskId: string;
+        readonly title: string;
+        readonly agent?: string;
+        readonly category?: string;
+        readonly updatedMs: number;
+      };
     };
 
 export interface LiveAdapterSeed {

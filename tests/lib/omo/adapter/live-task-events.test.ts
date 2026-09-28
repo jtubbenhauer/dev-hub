@@ -125,3 +125,38 @@ describe("createLiveTaskEventHandler with two parallel tasks", () => {
     expect(toolPartMetadataSessionId(callBPart)).toBe("omo_child-b");
   });
 });
+
+describe("createLiveTaskEventHandler when omo omits child_session_id", () => {
+  it("asks the registry to link the worker by task_id instead", () => {
+    const adapter = createLiveAdapter(OPTIONS);
+
+    const result = adapter.handle({
+      type: "extension_event",
+      name: "omo.task.updated",
+      data: {
+        parent_session_id: "parallel-parent-1",
+        tasks: [
+          {
+            task_id: "st_task-1",
+            status: "running",
+            task_summary: "Read math.ts",
+            category: "deep-low",
+          },
+        ],
+      },
+      timestamp: 2_000,
+    });
+
+    expect(result.effects).toEqual([
+      {
+        linkTaskChild: {
+          parentDurableId: "parallel-parent-1",
+          taskId: "st_task-1",
+          title: "Read math.ts",
+          category: "deep-low",
+          updatedMs: 2_000,
+        },
+      },
+    ]);
+  });
+});

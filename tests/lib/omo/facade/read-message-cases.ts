@@ -161,6 +161,79 @@ describe("handleOmoRead message history", () => {
     expect(assistant?.info.tokens).toMatchObject({ input: 11, output: 7 });
   });
 
+  it("links history task calls to their worker session by task_id", async () => {
+    const fixture = await useReadFixture();
+    fixture.source.authorized.add("parent");
+    fixture.sqlite
+      .prepare(
+        `INSERT INTO omo_session_index
+          (workspace_id, durable_id, session_path, kind, context,
+           context_authoritative, title, created_ms, updated_ms, updated_at)
+         VALUES ('workspace-1', 'worker-1', NULL, 'worker',
+           '{"role":"child","task_id":"st_task-1"}', 1, 'Untitled', 1, 1, 1)`,
+      )
+      .run();
+    const entries = [
+      messageEntry("user-1", null, "user", "delegate it", 1),
+      {
+        type: "message",
+        id: "assistant-1",
+        parentId: "user-1",
+        timestamp: 2,
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "call-1", name: "task", arguments: {} },
+          ],
+          timestamp: 2,
+        },
+      },
+      {
+        type: "message",
+        id: "result-1",
+        parentId: "assistant-1",
+        timestamp: 3,
+        message: {
+          role: "toolResult",
+          toolCallId: "call-1",
+          toolName: "task",
+          isError: false,
+          content: [
+            {
+              type: "text",
+              text: 'add\n\n[task_id: st_task-1 - continue with task_send(to="st_task-1")]',
+            },
+          ],
+          timestamp: 3,
+        },
+      },
+    ];
+    fixture.registry.attach.mockResolvedValue(createBinding("parent"));
+    fixture.registry.request.mockResolvedValue({
+      data: { entries, leafId: "result-1" },
+    });
+
+    const response = await fixture.request("/session/omo_parent/message", {});
+    const messages = (await readJson(response)) as Array<{
+      parts: Array<{
+        type: string;
+        state?: { metadata?: Record<string, unknown> };
+      }>;
+    }>;
+    const taskPart = messages
+      .flatMap((message) => message.parts)
+      .find((part) => part.type === "tool");
+
+    expect(taskPart?.state?.metadata?.["sessionId"]).toBe("omo_worker-1");
+    expect(
+      fixture.sqlite
+        .prepare(
+          "SELECT parent_durable_id FROM omo_session_index WHERE durable_id = 'worker-1'",
+        )
+        .get(),
+    ).toEqual({ parent_durable_id: "parent" });
+  });
+
   it("replays pending questions into the workspace dialog ledger", async () => {
     const fixture = await useReadFixture();
     fixture.source.authorized.add("question-session");

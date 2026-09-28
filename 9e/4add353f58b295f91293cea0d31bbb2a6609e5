@@ -1,0 +1,21 @@
+components/chat/model-selector.tsx
+  s_a14af25ea19db4::t_f0dd654c7824b9 21,114-115,117-120,122-124,210
+tests/components/chat/model-selector.test.tsx
+  s_a14af25ea19db4::t_cea0c57b20a394 12-13,17-19,52-55,210-211,217,223,229,231-272
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9e4add353f58b295f91293cea0d31bbb2a6609e5",
+  "prompts": {},
+  "sessions": {
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

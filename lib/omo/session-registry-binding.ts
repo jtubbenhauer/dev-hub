@@ -1,5 +1,6 @@
 import { createLiveAdapter } from "@/lib/omo/adapter/live-events";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
+import type { OmoOpenedSession } from "@/lib/omo/rpc-client";
 import { OmoRegistryRecordBuffer } from "@/lib/omo/session-registry-lock";
 import { createOmoBindingReady } from "@/lib/omo/session-registry-ready";
 import type { OmoOpenedState } from "@/lib/omo/session-registry-records";
@@ -7,6 +8,14 @@ import type {
   OmoAttachRequest,
   OmoSessionBinding,
 } from "@/lib/omo/session-registry-types";
+
+export type OmoBindOpenedInput = {
+  readonly opened: OmoOpenedSession;
+  readonly buffered: readonly JsonlRecord[];
+  readonly overflowed: boolean;
+  readonly request: OmoAttachRequest;
+  readonly canonicalPath: string;
+};
 
 type OmoOpenedBindingInput = {
   readonly openedState: OmoOpenedState;

@@ -19,6 +19,7 @@ export type OmoBindingState =
   | "hydrating"
   | "cutover"
   | "live"
+  | "detached"
   | "replaced"
   | "closed";
 

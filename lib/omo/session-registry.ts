@@ -1,6 +1,8 @@
 import { OmoRpcClient, UnixSocketTransport } from "@/lib/omo/rpc-client";
 import { OmoSessionRegistry } from "@/lib/omo/session-registry-core";
 
+export { OmoEngineUnavailableError } from "@/lib/omo/session-registry-errors";
+
 export type {
   OmoAttachRequest,
   OmoRegistryEvent,

@@ -1,11 +1,12 @@
 import type { JsonlRecord } from "@/lib/omo/jsonl";
-import type { OmoOpenedSession, OmoRpcClient } from "@/lib/omo/rpc-client";
+import type { OmoRpcClient } from "@/lib/omo/rpc-client";
 import { getOmoIndexRow } from "@/lib/omo/session-index";
 import { OmoAttachCoordinator } from "@/lib/omo/session-registry-aliases";
 import { attachOmoSession } from "@/lib/omo/session-registry-attach";
 import {
   createOmoOpenedBinding,
   createOmoSuccessorBinding,
+  type OmoBindOpenedInput,
 } from "@/lib/omo/session-registry-binding";
 import { OmoRegistryDispatcher } from "@/lib/omo/session-registry-dispatch";
 import { OmoWorkspacePathConflictError } from "@/lib/omo/session-registry-errors";
@@ -16,6 +17,11 @@ import {
   refreshOmoIndexFromHost,
 } from "@/lib/omo/session-registry-index";
 import { parseOpenedState } from "@/lib/omo/session-registry-records";
+import {
+  handleOmoLifecycleRecord,
+  requestOmoSession,
+  type OmoSessionRegistryOptions,
+} from "@/lib/omo/session-registry-reopen";
 import { receiveOmoBoundRecord } from "@/lib/omo/session-registry-routing";
 import type {
   OmoAttachRequest,
@@ -25,14 +31,6 @@ import type {
   OmoSessionBinding,
   OmoSessionRegistryWorkspace,
 } from "@/lib/omo/session-registry-types";
-
-type BindOpenedInput = {
-  readonly opened: OmoOpenedSession;
-  readonly buffered: readonly JsonlRecord[];
-  readonly overflowed: boolean;
-  readonly request: OmoAttachRequest;
-  readonly canonicalPath: string;
-};
 
 export class OmoSessionRegistry {
   readonly attachCoordinator = new OmoAttachCoordinator();
@@ -45,15 +43,18 @@ export class OmoSessionRegistry {
   private readonly refreshes = new Map<string, Promise<void>>();
   private readonly dispatcher: OmoRegistryDispatcher;
   private readonly stopGlobalListener: () => void;
+  private readonly getSubscriberCount: (workspaceId: string) => number;
 
-  constructor(readonly client: OmoRpcClient) {
+  constructor(
+    readonly client: OmoRpcClient,
+    options: OmoSessionRegistryOptions = {},
+  ) {
+    this.getSubscriberCount = options.getSubscriberCount ?? (() => 0);
     this.dispatcher = new OmoRegistryDispatcher({
       client,
       refreshIndex: (workspace) => this.refreshIndexFromHost(workspace),
     });
-    this.stopGlobalListener = client.on((record) =>
-      this.routeBoundRecord(record),
-    );
+    this.stopGlobalListener = client.on(this.routeBoundRecord.bind(this));
   }
 
   get leafQueue(): ReadonlyMap<string, Promise<void>> {
@@ -62,6 +63,13 @@ export class OmoSessionRegistry {
 
   attach(request: OmoAttachRequest): Promise<OmoSessionBinding> {
     return attachOmoSession(this, request);
+  }
+
+  request(
+    binding: OmoSessionBinding,
+    command: JsonlRecord,
+  ): Promise<JsonlRecord> {
+    return requestOmoSession(this, binding, command);
   }
 
   create({ workspace }: { readonly workspace: OmoSessionRegistryWorkspace }) {
@@ -92,13 +100,14 @@ export class OmoSessionRegistry {
     const byId = durableId
       ? this.byDurableId.get(this.durableKey(workspaceId, durableId))
       : undefined;
-    const byPath = sessionPath
-      ? this.bySessionPath.get(sessionPath)
-      : undefined;
-    return byId ?? (byPath?.workspaceId === workspaceId ? byPath : undefined);
+    const path = sessionPath;
+    const byPath = path ? this.bySessionPath.get(path) : undefined;
+    const binding =
+      byId ?? (byPath?.workspaceId === workspaceId ? byPath : undefined);
+    return binding?.state === "detached" ? undefined : binding;
   }
 
-  bindOpened(input: BindOpenedInput): OmoSessionBinding {
+  bindOpened(input: OmoBindOpenedInput): OmoSessionBinding {
     const openedState = parseOpenedState(input.opened);
     const durableId = openedState.durableId;
     const generationKey = this.durableKey(
@@ -210,9 +219,25 @@ export class OmoSessionRegistry {
     this.dispatcher.emitEvent(workspaceId, event);
   }
 
+  bindingsForLifecycle(): readonly OmoSessionBinding[] {
+    return [...new Set(this.byDurableId.values())];
+  }
+
+  detachBinding(binding: OmoSessionBinding): void {
+    if (binding.state === "closed" || binding.state === "replaced") return;
+    if (this.byRoutingHandle.get(binding.routingHandle) === binding) {
+      this.byRoutingHandle.delete(binding.routingHandle);
+    }
+    binding.unregisterSession();
+    binding.unregisterSession = () => undefined;
+    binding.state = "detached";
+    binding.failure = undefined;
+  }
+
   isCurrent(binding: OmoSessionBinding): boolean {
     const key = this.durableKey(binding.workspaceId, binding.durableId);
     return (
+      binding.state !== "detached" &&
       binding.state !== "replaced" &&
       this.generations.get(key) === binding.generation &&
       this.byDurableId.get(key) === binding
@@ -277,8 +302,20 @@ export class OmoSessionRegistry {
 
   private routeBoundRecord(record: JsonlRecord): void {
     const routingHandle = record["sessionId"];
-    if (typeof routingHandle !== "string") return;
-    const binding = this.byRoutingHandle.get(routingHandle);
+    const binding =
+      typeof routingHandle === "string"
+        ? this.byRoutingHandle.get(routingHandle)
+        : undefined;
+    if (
+      handleOmoLifecycleRecord({
+        registry: this,
+        binding,
+        record,
+        getSubscriberCount: this.getSubscriberCount,
+      })
+    ) {
+      return;
+    }
     if (!binding) return;
     receiveOmoBoundRecord(this, binding, record);
   }

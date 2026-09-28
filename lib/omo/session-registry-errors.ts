@@ -40,3 +40,16 @@ export class OmoHydrationOverflowError extends Error {
     super(`OmO session ${durableId} overflowed all hydration fences`);
   }
 }
+
+export class OmoEngineUnavailableError extends Error {
+  readonly name = "OmoEngineUnavailableError";
+  readonly code = "engine_unavailable";
+  readonly statusCode = 503;
+
+  constructor(
+    readonly command: string,
+    readonly detail: string,
+  ) {
+    super(`OmO engine unavailable while handling ${command}: ${detail}`);
+  }
+}

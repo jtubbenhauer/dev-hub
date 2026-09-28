@@ -13,6 +13,7 @@ import {
 import type { OmoSessionRegistry } from "@/lib/omo/session-registry-core";
 import { hydrateOmoBinding } from "@/lib/omo/session-registry-hydration";
 import { parseOpenedState } from "@/lib/omo/session-registry-records";
+import { openOmoSessionWithPathRetry } from "@/lib/omo/session-registry-reopen";
 import type {
   OmoAttachAliases,
   OmoAttachRequest,
@@ -158,9 +159,8 @@ async function performAttach(
     );
     registry.assertWorkspaceAvailable(canonicalPath, request.workspace.id);
     const params = openParams(request, sessionPath, row);
-    await registry.client.openSession(
-      params,
-      (opened, buffered, overflowed) => {
+    const open = () =>
+      registry.client.openSession(params, (opened, buffered, overflowed) => {
         const openedState = parseOpenedState(opened);
         if (rawId !== undefined && openedState.durableId !== rawId) {
           throw new OmoSessionIdentityConflictError(
@@ -176,8 +176,9 @@ async function performAttach(
           request,
           canonicalPath,
         });
-      },
-    );
+      });
+    if (sessionPath === null) await open();
+    else await openOmoSessionWithPathRetry(open);
   } finally {
     release?.();
   }

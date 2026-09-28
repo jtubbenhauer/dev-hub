@@ -45,6 +45,7 @@ async function completeReplacement(
     target.durableId,
     target.sessionPath,
   );
+  // Re-key unresolved dialogs here once the runtime injects todo 15's ledger.
   const binding = registry.bindSuccessor(
     previous,
     target.durableId,
@@ -91,6 +92,7 @@ async function completeReplacement(
     type: "session.deleted",
     properties: { info: oldInfo },
   });
+  // TODO(todo 15): Re-key unresolved dialogs before metadata_moved is emitted.
   registry.emitEvent(binding.workspaceId, {
     type: "session.metadata_moved",
     properties: {

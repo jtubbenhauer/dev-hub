@@ -262,4 +262,74 @@ describe("handleOmoRead session routes", () => {
       type: "get_state",
     });
   });
+
+  it("returns live session stats for an attached session", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    const binding = createBinding("root");
+    insertIndexRow(fixture.sqlite, "root", "interactive");
+    fixture.registry.findBinding.mockReturnValue(binding);
+    fixture.registry.request.mockResolvedValue({
+      data: {
+        tokens: {
+          input: 100,
+          output: 50,
+          cacheRead: 10,
+          cacheWrite: 5,
+          total: 165,
+        },
+        cost: 0.42,
+        contextUsage: {
+          tokens: 120_000,
+          contextWindow: 1_000_000,
+          percent: 12,
+        },
+      },
+    });
+
+    // When
+    const response = await fixture.request("/session/omo_root/stats");
+
+    // Then
+    expect(await readJson(response)).toEqual({
+      tokens: {
+        input: 100,
+        output: 50,
+        cacheRead: 10,
+        cacheWrite: 5,
+        total: 165,
+      },
+      cost: 0.42,
+      contextUsage: { tokens: 120_000, contextWindow: 1_000_000, percent: 12 },
+    });
+    expect(fixture.registry.request).toHaveBeenCalledWith(binding, {
+      type: "get_session_stats",
+    });
+  });
+
+  it("returns null stats without attaching a session that is not live", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    insertIndexRow(fixture.sqlite, "idle", "interactive");
+
+    // When
+    const response = await fixture.request("/session/omo_idle/stats");
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toBeNull();
+    expect(fixture.registry.request).not.toHaveBeenCalled();
+    expect(fixture.registry.attach).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 stats for an unknown session", async () => {
+    // Given
+    const fixture = await useReadFixture();
+
+    // When
+    const response = await fixture.request("/session/omo_nope/stats");
+
+    // Then
+    expect(response.status).toBe(404);
+  });
 });

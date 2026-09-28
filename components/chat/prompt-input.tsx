@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import type { Agent, Command } from "@/lib/opencode/types";
 import { AgentSelector } from "@/components/chat/agent-selector";
 import { ModelSelector } from "@/components/chat/model-selector";
+import { ContextUsageIndicator } from "@/components/chat/context-usage-indicator";
 import { VariantSelector } from "@/components/chat/variant-selector";
 import type { Attachment } from "@/lib/attachment-utils";
 import {
@@ -1209,6 +1210,10 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
               onVariantChange={onVariantChange}
               open={isVariantSelectorOpen}
               onOpenChange={onVariantSelectorOpenChange}
+            />
+            <ContextUsageIndicator
+              workspaceId={workspaceId}
+              sessionId={sessionId}
             />
 
             {/* Spacer */}

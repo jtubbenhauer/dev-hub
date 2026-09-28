@@ -228,3 +228,93 @@ export function readOmoSessionStatus(context: OmoReadContext): Response {
 export function readOmoTodos(): Response {
   return jsonResponse([]);
 }
+
+export interface OmoSessionStats {
+  readonly tokens: {
+    readonly input: number;
+    readonly output: number;
+    readonly cacheRead: number;
+    readonly cacheWrite: number;
+    readonly total: number;
+  };
+  readonly cost: number;
+  readonly contextUsage: {
+    readonly tokens: number;
+    readonly contextWindow: number;
+    readonly percent: number;
+  } | null;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+export function parseOmoSessionStats(
+  response: unknown,
+): OmoSessionStats | null {
+  const data = isJsonObject(response) ? response["data"] : undefined;
+  if (!isJsonObject(data)) return null;
+  const tokens = data["tokens"];
+  const cost = finiteNumber(data["cost"]);
+  if (!isJsonObject(tokens) || cost === undefined) return null;
+  const input = finiteNumber(tokens["input"]);
+  const output = finiteNumber(tokens["output"]);
+  const cacheRead = finiteNumber(tokens["cacheRead"]);
+  const cacheWrite = finiteNumber(tokens["cacheWrite"]);
+  const total = finiteNumber(tokens["total"]);
+  if (
+    input === undefined ||
+    output === undefined ||
+    cacheRead === undefined ||
+    cacheWrite === undefined ||
+    total === undefined
+  ) {
+    return null;
+  }
+  const usage = data["contextUsage"];
+  const usedTokens = isJsonObject(usage)
+    ? finiteNumber(usage["tokens"])
+    : undefined;
+  const contextWindow = isJsonObject(usage)
+    ? finiteNumber(usage["contextWindow"])
+    : undefined;
+  const percent = isJsonObject(usage)
+    ? finiteNumber(usage["percent"])
+    : undefined;
+  return {
+    tokens: { input, output, cacheRead, cacheWrite, total },
+    cost,
+    contextUsage:
+      usedTokens !== undefined &&
+      contextWindow !== undefined &&
+      contextWindow > 0 &&
+      percent !== undefined
+        ? { tokens: usedTokens, contextWindow, percent }
+        : null,
+  };
+}
+
+// Stats come from the live daemon session only; a session that is not
+// attached returns null rather than being opened just to be measured.
+export async function readOmoSessionStats(
+  context: OmoReadContext,
+  rawId: string,
+): Promise<Response> {
+  const row = await getOmoIndexRow(context.workspace.id, rawId);
+  if (row === null && !(await context.source.authorizeSession(rawId))) {
+    return sessionNotFoundResponse();
+  }
+  const binding = context.runtime.registry.findBinding(
+    context.workspace.id,
+    rawId,
+    row?.sessionPath ?? null,
+  );
+  if (binding === undefined) return jsonResponse(null);
+  await binding.ready;
+  const response = await context.runtime.registry.request(binding, {
+    type: "get_session_stats",
+  });
+  return jsonResponse(parseOmoSessionStats(response));
+}

@@ -51,6 +51,9 @@ vi.mock("@/components/chat/model-selector", () => ({
 vi.mock("@/components/chat/variant-selector", () => ({
   VariantSelector: () => null,
 }));
+vi.mock("@/components/chat/context-usage-indicator", () => ({
+  ContextUsageIndicator: () => null,
+}));
 vi.mock("@/components/chat/pr-picker", () => ({ PrPicker: () => null }));
 vi.mock("@/hooks/use-git", () => ({
   useWorkspaceGitHub: vi.fn().mockReturnValue(null),

@@ -13,6 +13,7 @@ import {
   listOmoSessions,
   readOmoChildren,
   readOmoSession,
+  readOmoSessionStats,
   readOmoSessionStatus,
   readOmoTodos,
 } from "@/lib/omo/facade/read-sessions";
@@ -74,7 +75,9 @@ async function readSessionRoute(
   path: string,
   query: URLSearchParams,
 ): Promise<Response> {
-  const match = /^\/session\/([^/]+)(?:\/(message|children|todo))?$/.exec(path);
+  const match = /^\/session\/([^/]+)(?:\/(message|children|todo|stats))?$/.exec(
+    path,
+  );
   if (match === null) return unsupportedResponse();
   const publicId = match[1];
   const rawId = publicId === undefined ? null : rawOmoId(publicId);
@@ -84,6 +87,8 @@ async function readSessionRoute(
       return readOmoMessages(context, rawId, query);
     case "children":
       return readOmoChildren(context, rawId);
+    case "stats":
+      return readOmoSessionStats(context, rawId);
     case "todo":
       if (!(await isOmoIdKnown(context, rawId))) {
         return jsonResponse({ error: "session_not_found" }, { status: 404 });

@@ -22,6 +22,7 @@ interface EditorState {
   isFileTreeOpen: boolean;
   diffViewMode: DiffViewMode;
   markdownPreviewPath: string | null;
+  csvPreviewPath: string | null;
   workspaceFileStates: Record<string, WorkspaceFileState>;
 
   openFile: (file: OpenFile) => void;
@@ -34,6 +35,7 @@ interface EditorState {
   toggleDiffViewMode: () => void;
   setDiffViewMode: (mode: DiffViewMode) => void;
   setMarkdownPreviewPath: (path: string | null) => void;
+  setCsvPreviewPath: (path: string | null) => void;
   closeAllFiles: () => void;
 
   getExpandedPaths: (workspaceId: string) => Set<string>;
@@ -62,6 +64,7 @@ export const useEditorStore = create<EditorState>()(
       isFileTreeOpen: true,
       diffViewMode: "unified" as DiffViewMode,
       markdownPreviewPath: null,
+      csvPreviewPath: null,
       workspaceFileStates: {},
 
       openFile: (file) => {
@@ -127,6 +130,8 @@ export const useEditorStore = create<EditorState>()(
       setDiffViewMode: (mode) => set({ diffViewMode: mode }),
 
       setMarkdownPreviewPath: (path) => set({ markdownPreviewPath: path }),
+
+      setCsvPreviewPath: (path) => set({ csvPreviewPath: path }),
 
       closeAllFiles: () => set({ openFiles: [], activeFilePath: null }),
 

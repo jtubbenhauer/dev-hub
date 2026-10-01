@@ -4,6 +4,10 @@ export function isPdfPath(filePath: string): boolean {
   return filePath.toLowerCase().endsWith(".pdf");
 }
 
+export function isCsvPath(filePath: string): boolean {
+  return filePath.toLowerCase().endsWith(".csv");
+}
+
 export const MARKDOWN_LANGUAGE = "markdown";
 
 export function isMarkdownLanguage(language: string): boolean {

@@ -1,0 +1,30 @@
+components/chat/split-panel-files.tsx
+  s_a3da6af7197aac::t_7a6d2649c1e066 638-647
+  s_a3da6af7197aac::t_08d46de5dd30da 536
+  s_a3da6af7197aac::t_8fa24237e08262 42-45
+  s_56e5c5722a8a2b::t_364a508f245102 634
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f9e9fef2131ce2a2e9c51dd20868402f573a17ff",
+  "prompts": {},
+  "sessions": {
+    "s_56e5c5722a8a2b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f09e9061bffeddhMtQlydgJHVf",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a3da6af7197aac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f09e9061bffeddhMtQlydgJHVf",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

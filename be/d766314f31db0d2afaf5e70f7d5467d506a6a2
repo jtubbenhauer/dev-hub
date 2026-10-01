@@ -1,0 +1,42 @@
+lib/file-preview.ts
+  s_0e0442bcb43648::t_9843d410c461be 7-12
+  s_0e0442bcb43648::t_24e6e712c5e929 13-18
+tests/components/editor/markdown-preview.test.tsx
+  s_0e0442bcb43648::t_f5fa0237b969d1 4-7,9-15,20-32,36-43,47-51,57-65,71,77-80,84,87-89,94-101
+  s_0e0442bcb43648::t_5cc1fc1f05d7f4 1
+  s_0e0442bcb43648::t_f07c338cb2abba 2-3,8,16-19,33-35,44-46,52-56,66-70,72-76,81-83,85-86,90-93,102-118
+components/editor/markdown-preview.tsx
+  s_0e0442bcb43648::t_021eaa1413dff0 1-2,4,6,8,10,57-63,65-71,75,77-81,85,88,90-93
+  s_0e0442bcb43648::t_7d73fd5179b9e1 5
+  s_0e0442bcb43648::t_8d8baaac29779d 3,7,9,11-56,64,72-74,76,82-84,86-87,89
+stores/editor-store.ts
+  s_0e0442bcb43648::t_cc27cb87968fc2 24
+  s_0e0442bcb43648::t_17a875f4b7c234 36
+  s_0e0442bcb43648::t_6bb97b745188af 64
+  s_0e0442bcb43648::t_b1a12b7095d26e 129
+  s_a3da6af7197aac::t_fcad13558bda5e 130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bed766314f31db0d2afaf5e70f7d5467d506a6a2",
+  "prompts": {},
+  "sessions": {
+    "s_0e0442bcb43648": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f15e9d79cffemjiEVk3EJtNOqL",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a3da6af7197aac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f09e9061bffeddhMtQlydgJHVf",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

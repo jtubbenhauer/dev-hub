@@ -8,6 +8,7 @@ import type { FileTreeEntry } from "@/types";
 import { OpenEditors } from "@/components/editor/open-editors";
 import { FileTabs } from "@/components/editor/file-tabs";
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
+import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import type { EditorHandle } from "@/components/editor/editor-switcher";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -581,6 +582,12 @@ function FilesContent() {
 
             {activeFile && (
               <>
+                <MarkdownPreviewToggle
+                  language={activeFile.language}
+                  filePath={activeFile.path}
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                />
                 <Button
                   variant="ghost"
                   size="sm"

@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useEditorTypeSetting } from "@/hooks/use-settings";
 import type { NeovimEditorHandle } from "@/components/editor/neovim-editor";
 import type { MonacoEditorHandle } from "@/components/editor/monaco-editor";
+import { MarkdownPreviewFrame } from "@/components/editor/markdown-preview";
 
 export type EditorHandle = NeovimEditorHandle | MonacoEditorHandle;
 
@@ -38,10 +39,18 @@ export const EditorSwitcher = forwardRef<EditorHandle, EditorSwitcherProps>(
   function EditorSwitcher(props, ref) {
     const { editorType } = useEditorTypeSetting();
 
-    if (editorType === "neovim") {
-      return <NeovimEditor ref={ref} {...props} />;
-    }
-
-    return <MonacoEditor ref={ref} {...props} />;
+    return (
+      <MarkdownPreviewFrame
+        content={props.content}
+        language={props.language}
+        filePath={props.filePath}
+      >
+        {editorType === "neovim" ? (
+          <NeovimEditor ref={ref} {...props} />
+        ) : (
+          <MonacoEditor ref={ref} {...props} />
+        )}
+      </MarkdownPreviewFrame>
+    );
   },
 );

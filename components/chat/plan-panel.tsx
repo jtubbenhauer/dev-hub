@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Save, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
+import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import {
   Select,
   SelectContent,
@@ -246,6 +247,13 @@ export function PlanPanel({
             <span
               className="size-2 rounded-full bg-amber-500"
               title="Unsaved changes"
+            />
+          )}
+
+          {activePlanPath && (
+            <MarkdownPreviewToggle
+              language="markdown"
+              filePath={activePlanPath}
             />
           )}
 

@@ -15,6 +15,7 @@ import {
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 import { PdfViewer } from "@/components/editor/pdf-viewer";
+import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import { getRawFileUrl, PDF_LANGUAGE } from "@/lib/file-preview";
 import { downloadTextFile } from "@/lib/download-file";
 
@@ -104,6 +105,14 @@ export function ChatFileDialog() {
                 <span className="hidden sm:inline">Full editor</span>
               </Link>
             </Button>
+          )}
+          {file && (
+            <MarkdownPreviewToggle
+              language={file.language}
+              filePath={file.path}
+              size="sm"
+              className="size-8 p-0"
+            />
           )}
           {file?.language !== PDF_LANGUAGE && (
             <Button

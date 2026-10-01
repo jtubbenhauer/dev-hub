@@ -1,0 +1,46 @@
+tests/components/editor/csv-preview.test.tsx
+  s_a3da6af7197aac::t_bc3c3192ca9c95 38,41,53,61,63
+  s_a3da6af7197aac::t_7255f402a3dd2e 1-37,39-40,42-52,54-60,62,64-77,79-82,84-108,110-142,144-151,154-160,164-165,167-169
+  s_a3da6af7197aac::t_5f1d603255c4c8 109
+  s_a3da6af7197aac::t_c1f2a69b6068fe 152-153,161-163,166
+  s_a3da6af7197aac::t_97108b62db4a40 143
+  s_a3da6af7197aac::t_441017d9916456 78,83
+components/editor/csv-preview.tsx
+  s_a3da6af7197aac::t_be85860690b96e 1-102
+lib/file-preview.ts
+  s_a3da6af7197aac::t_5d567f07f4b848 7-10
+stores/editor-store.ts
+  s_a3da6af7197aac::t_d1a6a245311a6c 38
+  s_a3da6af7197aac::t_8a78b5bfe2e5bc 25
+  s_a3da6af7197aac::t_fcad13558bda5e 134
+  s_a3da6af7197aac::t_f9fab6b53d0493 67
+  s_99d1a276cac1e5::t_752f635589b1ad 135
+components/editor/csv-table.tsx
+  s_a3da6af7197aac::t_1ebe32dda251f6 355
+  s_a3da6af7197aac::t_08d46de5dd30da 180,301-303
+  s_a3da6af7197aac::t_b5874a2289241b 1-179,181-300,304-354,356-382
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f58fc48a287361afe69498764b105f33c2b2337",
+  "prompts": {},
+  "sessions": {
+    "s_99d1a276cac1e5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f13f5f8faffeeynzFo1grJNbLE",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a3da6af7197aac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f09e9061bffeddhMtQlydgJHVf",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

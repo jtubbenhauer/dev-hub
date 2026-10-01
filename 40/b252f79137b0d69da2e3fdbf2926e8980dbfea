@@ -1,0 +1,39 @@
+components/chat/split-panel-files.tsx
+  s_0e0442bcb43648::t_ffb688ee25b402 624,628,630-633
+  s_0e0442bcb43648::t_d61d9395cef20b 38-41
+  s_0e0442bcb43648::t_bccdf20b9fdf3d 526-531
+  s_a3da6af7197aac::t_7a6d2649c1e066 629
+  s_56e5c5722a8a2b::t_024522b6d67a91 634-637
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "40b252f79137b0d69da2e3fdbf2926e8980dbfea",
+  "prompts": {},
+  "sessions": {
+    "s_0e0442bcb43648": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f15e9d79cffemjiEVk3EJtNOqL",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_56e5c5722a8a2b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f09e9061bffeddhMtQlydgJHVf",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a3da6af7197aac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f09e9061bffeddhMtQlydgJHVf",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

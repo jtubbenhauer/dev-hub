@@ -39,6 +39,10 @@ import {
   MarkdownPreviewFrame,
   MarkdownPreviewToggle,
 } from "@/components/editor/markdown-preview";
+import {
+  CsvPreviewFrame,
+  CsvPreviewToggle,
+} from "@/components/editor/csv-preview";
 import { isPdfPath, PDF_LANGUAGE } from "@/lib/file-preview";
 
 const MonacoEditor = dynamic(
@@ -529,6 +533,7 @@ export function SplitPanelFiles({
               filePath={currentFilePath}
             />
           )}
+          {!isPdf && !isDiff && <CsvPreviewToggle filePath={currentFilePath} />}
           {!isPdf && (
             <Button
               size="icon-xs"
@@ -626,14 +631,20 @@ export function SplitPanelFiles({
                 language={currentFileLanguage ?? "plaintext"}
                 filePath={currentFilePath}
               >
-                <MonacoEditor
+                <CsvPreviewFrame
                   content={currentFileContent}
-                  language={currentFileLanguage ?? "plaintext"}
-                  onChange={setContent}
-                  onSave={handleSave}
                   filePath={currentFilePath}
                   workspaceId={workspaceId}
-                />
+                >
+                  <MonacoEditor
+                    content={currentFileContent}
+                    language={currentFileLanguage ?? "plaintext"}
+                    onChange={setContent}
+                    onSave={handleSave}
+                    filePath={currentFilePath}
+                    workspaceId={workspaceId}
+                  />
+                </CsvPreviewFrame>
               </MarkdownPreviewFrame>
             </div>
             {isCommentsOpen && comments.length > 0 && (

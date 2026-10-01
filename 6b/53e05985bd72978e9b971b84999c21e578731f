@@ -1,0 +1,19 @@
+app/globals.css
+  s_0e0442bcb43648::t_c7190480b8f4c2 493-494
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6b53e05985bd72978e9b971b84999c21e578731f",
+  "prompts": {},
+  "sessions": {
+    "s_0e0442bcb43648": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f15e9d79cffemjiEVk3EJtNOqL",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

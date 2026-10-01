@@ -1,0 +1,21 @@
+tests/components/chat/command-picker.test.tsx
+  s_917aef1ca1e68d::t_5ffb4eac36f6a0 1-24
+components/chat/command-picker.tsx
+  s_917aef1ca1e68d::t_b5458323192344 32-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3818d5207fb216bc9d4bdfb1861e2dcb2bea3c66",
+  "prompts": {},
+  "sessions": {
+    "s_917aef1ca1e68d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f0af6fd92ffeZB6af9dF1DcIxN",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -29,6 +29,11 @@ const BUILTIN_COMMANDS: SlashCommand[] = [
     description: "Revert last assistant message changes",
     source: "builtin",
   },
+  {
+    name: "export",
+    description: "Export session transcript",
+    source: "builtin",
+  },
 ];
 
 function fuzzyMatch(value: string, query: string): boolean {

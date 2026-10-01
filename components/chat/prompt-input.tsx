@@ -406,6 +406,11 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           description: "Revert last assistant message changes",
           source: "builtin",
         },
+        {
+          name: "export",
+          description: "Export session transcript",
+          source: "builtin",
+        },
       ];
       const serverCommands = commands.map((command) => ({
         name: command.name,

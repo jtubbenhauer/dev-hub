@@ -94,10 +94,17 @@ import {
   StickyNote,
   X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { Virtuoso } from "react-virtuoso";
+
+const ExportSessionDialog = dynamic(() =>
+  import("@/components/chat/export-session-dialog").then(
+    (mod) => mod.ExportSessionDialog,
+  ),
+);
 
 interface SelectedModel {
   providerID: string;
@@ -196,6 +203,7 @@ export function ChatInterface() {
   const sessionNoteInputRef = useRef<HTMLInputElement>(null);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const promptInputRef = useRef<PromptInputHandle>(null);
   const sessionListFocusRef = useRef<HTMLDivElement>(null);
@@ -901,6 +909,16 @@ export function ChatInterface() {
   const handleCommandDispatch = useCallback(
     async (command: SlashCommand, args: string) => {
       if (!activeWorkspaceId) return;
+
+      // Exporting must not create an empty session the way other commands do.
+      if (command.source === "builtin" && command.name === "export") {
+        if (activeSessionId) {
+          setIsExportDialogOpen(true);
+        } else {
+          toast.error("No session to export");
+        }
+        return;
+      }
 
       let sessionId = activeSessionId;
       if (!sessionId) {
@@ -1855,6 +1873,16 @@ export function ChatInterface() {
           messages={activeMessagesRaw}
           workspacePath={activeWorkspacePath}
           onEscape={() => promptInputRef.current?.focus()}
+        />
+      ) : null}
+
+      {isExportDialogOpen && activeWorkspaceId && activeSessionId ? (
+        <ExportSessionDialog
+          workspaceId={activeWorkspaceId}
+          sessionId={activeSessionId}
+          defaultThinking={showThinking}
+          defaultToolDetails={showToolCalls}
+          onClose={() => setIsExportDialogOpen(false)}
         />
       ) : null}
     </div>

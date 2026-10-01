@@ -35,6 +35,10 @@ import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
 import { FileViewToggle } from "@/components/chat/file-view-toggle";
 import { useFileViewMode } from "@/components/chat/use-file-view-mode";
 import { PdfViewer } from "@/components/editor/pdf-viewer";
+import {
+  MarkdownPreviewFrame,
+  MarkdownPreviewToggle,
+} from "@/components/editor/markdown-preview";
 import { isPdfPath, PDF_LANGUAGE } from "@/lib/file-preview";
 
 const MonacoEditor = dynamic(
@@ -519,6 +523,12 @@ export function SplitPanelFiles({
               onChange={setMode}
             />
           )}
+          {!isPdf && !isDiff && (
+            <MarkdownPreviewToggle
+              language={currentFileLanguage ?? "plaintext"}
+              filePath={currentFilePath}
+            />
+          )}
           {!isPdf && (
             <Button
               size="icon-xs"
@@ -611,14 +621,20 @@ export function SplitPanelFiles({
         ) : (
           <div className="flex min-h-0 flex-1">
             <div className="min-w-0 flex-1">
-              <MonacoEditor
+              <MarkdownPreviewFrame
                 content={currentFileContent}
                 language={currentFileLanguage ?? "plaintext"}
-                onChange={setContent}
-                onSave={handleSave}
                 filePath={currentFilePath}
-                workspaceId={workspaceId}
-              />
+              >
+                <MonacoEditor
+                  content={currentFileContent}
+                  language={currentFileLanguage ?? "plaintext"}
+                  onChange={setContent}
+                  onSave={handleSave}
+                  filePath={currentFilePath}
+                  workspaceId={workspaceId}
+                />
+              </MarkdownPreviewFrame>
             </div>
             {isCommentsOpen && comments.length > 0 && (
               <div className="w-64 shrink-0 border-l">

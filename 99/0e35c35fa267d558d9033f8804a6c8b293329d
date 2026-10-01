@@ -1,0 +1,23 @@
+lib/opencode/session-transcript.ts
+  s_917aef1ca1e68d::t_454cee2a83a8d8 104
+  s_917aef1ca1e68d::t_3be3ef38d16aa7 1-103,105-130
+tests/lib/opencode/session-transcript.test.ts
+  s_917aef1ca1e68d::t_110e0cd81f5ea1 1-22,26-127,133-186,188-264
+  s_917aef1ca1e68d::t_454cee2a83a8d8 23-25,128-132,187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "990e35c35fa267d558d9033f8804a6c8b293329d",
+  "prompts": {},
+  "sessions": {
+    "s_917aef1ca1e68d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f0af6fd92ffeZB6af9dF1DcIxN",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

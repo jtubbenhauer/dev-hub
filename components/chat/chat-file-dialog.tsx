@@ -16,6 +16,7 @@ import { EditorSwitcher } from "@/components/editor/editor-switcher";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 import { PdfViewer } from "@/components/editor/pdf-viewer";
 import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
+import { CsvPreviewToggle } from "@/components/editor/csv-preview";
 import { getRawFileUrl, PDF_LANGUAGE } from "@/lib/file-preview";
 import { downloadTextFile } from "@/lib/download-file";
 
@@ -109,6 +110,13 @@ export function ChatFileDialog() {
           {file && (
             <MarkdownPreviewToggle
               language={file.language}
+              filePath={file.path}
+              size="sm"
+              className="size-8 p-0"
+            />
+          )}
+          {file && (
+            <CsvPreviewToggle
               filePath={file.path}
               size="sm"
               className="size-8 p-0"

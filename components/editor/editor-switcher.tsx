@@ -6,6 +6,7 @@ import { useEditorTypeSetting } from "@/hooks/use-settings";
 import type { NeovimEditorHandle } from "@/components/editor/neovim-editor";
 import type { MonacoEditorHandle } from "@/components/editor/monaco-editor";
 import { MarkdownPreviewFrame } from "@/components/editor/markdown-preview";
+import { CsvPreviewFrame } from "@/components/editor/csv-preview";
 
 export type EditorHandle = NeovimEditorHandle | MonacoEditorHandle;
 
@@ -45,11 +46,17 @@ export const EditorSwitcher = forwardRef<EditorHandle, EditorSwitcherProps>(
         language={props.language}
         filePath={props.filePath}
       >
-        {editorType === "neovim" ? (
-          <NeovimEditor ref={ref} {...props} />
-        ) : (
-          <MonacoEditor ref={ref} {...props} />
-        )}
+        <CsvPreviewFrame
+          content={props.content}
+          filePath={props.filePath}
+          workspaceId={props.workspaceId}
+        >
+          {editorType === "neovim" ? (
+            <NeovimEditor ref={ref} {...props} />
+          ) : (
+            <MonacoEditor ref={ref} {...props} />
+          )}
+        </CsvPreviewFrame>
       </MarkdownPreviewFrame>
     );
   },

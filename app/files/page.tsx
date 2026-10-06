@@ -10,6 +10,7 @@ import { FileTabs } from "@/components/editor/file-tabs";
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
 import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import { CsvPreviewToggle } from "@/components/editor/csv-preview";
+import { ImageViewer } from "@/components/editor/image-viewer";
 import type { EditorHandle } from "@/components/editor/editor-switcher";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -17,6 +18,12 @@ import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { downloadTextFile } from "@/lib/download-file";
+import {
+  getRawFileUrl,
+  IMAGE_LANGUAGE,
+  isBinaryPreviewLanguage,
+  isImagePath,
+} from "@/lib/file-preview";
 
 import { useFileTabsSetting } from "@/hooks/use-settings";
 import { Button } from "@/components/ui/button";
@@ -49,6 +56,21 @@ import { ProblemsPanel } from "@/components/editor/problems-panel";
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = () => Math.max(500, window.innerWidth * 0.5);
 const DEFAULT_PANEL_WIDTH = 260;
+
+async function readFileForEditor(
+  workspaceId: string,
+  filePath: string,
+): Promise<{ content: string; language: string } | null> {
+  if (isImagePath(filePath)) {
+    return { content: "", language: IMAGE_LANGUAGE };
+  }
+  const response = await fetch(
+    `/api/files/content?workspaceId=${workspaceId}&path=${encodeURIComponent(filePath)}`,
+  );
+  if (!response.ok) return null;
+  const data: { content: string; language: string } = await response.json();
+  return { content: data.content, language: data.language };
+}
 
 export default function FilesPage() {
   return (
@@ -111,22 +133,18 @@ function FilesContent() {
 
   const handleFileTreeFileClick = useCallback(
     async (entry: FileTreeEntry) => {
-      if (activeWorkspaceId) {
-        expandPathToFile(activeWorkspaceId, entry.path);
-      }
-      const response = await fetch(
-        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(entry.path)}`,
-      );
-      if (!response.ok) return;
-      const data = await response.json();
+      if (!activeWorkspaceId) return;
+      expandPathToFile(activeWorkspaceId, entry.path);
+      const file = await readFileForEditor(activeWorkspaceId, entry.path);
+      if (!file) return;
       if (isFileTabsDisabled) closeAllFiles();
       editorOpenFile({
         path: entry.path,
         name: entry.name,
-        content: data.content,
-        language: data.language,
+        content: file.content,
+        language: file.language,
         isDirty: false,
-        originalContent: data.content,
+        originalContent: file.content,
       });
     },
     [
@@ -141,22 +159,18 @@ function FilesContent() {
   const handleFileTreeSearchResultClick = useCallback(
     async (filePath: string) => {
       const name = filePath.split("/").pop() ?? filePath;
-      if (activeWorkspaceId) {
-        expandPathToFile(activeWorkspaceId, filePath);
-      }
-      const response = await fetch(
-        `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(filePath)}`,
-      );
-      if (!response.ok) return;
-      const data = await response.json();
+      if (!activeWorkspaceId) return;
+      expandPathToFile(activeWorkspaceId, filePath);
+      const file = await readFileForEditor(activeWorkspaceId, filePath);
+      if (!file) return;
       if (isFileTabsDisabled) closeAllFiles();
       editorOpenFile({
         path: filePath,
         name,
-        content: data.content,
-        language: data.language,
+        content: file.content,
+        language: file.language,
         isDirty: false,
-        originalContent: data.content,
+        originalContent: file.content,
       });
     },
     [
@@ -181,6 +195,7 @@ function FilesContent() {
   const [savingPath, setSavingPath] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const restoredForRef = useRef<string | null>(null);
+  const restoreTabsPromiseRef = useRef<Promise<void> | null>(null);
   const openedFromParamRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -198,21 +213,18 @@ function FilesContent() {
 
     const savedActive = getSavedActiveFile(activeWorkspaceId);
 
-    Promise.all(
+    restoreTabsPromiseRef.current = Promise.all(
       savedTabs.map(async (tab) => {
         try {
-          const res = await fetch(
-            `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(tab.path)}`,
-          );
-          if (!res.ok) return null;
-          const data = await res.json();
+          const file = await readFileForEditor(activeWorkspaceId, tab.path);
+          if (!file) return null;
           return {
             path: tab.path,
             name: tab.name,
-            content: data.content as string,
-            language: data.language as string,
+            content: file.content,
+            language: file.language,
             isDirty: false,
-            originalContent: data.content as string,
+            originalContent: file.content,
           };
         } catch {
           return null;
@@ -269,20 +281,20 @@ function FilesContent() {
 
     if (isFileTabsDisabled) closeAllFiles();
 
-    fetch(
-      `/api/files/content?workspaceId=${activeWorkspaceId}&path=${encodeURIComponent(openPath)}`,
-    )
-      .then(async (res) => {
-        if (!res.ok) return;
-        const data = await res.json();
+    // Wait for saved tabs to restore so they cannot steal focus from the
+    // requested file (image previews open without a fetch, so they finish first).
+    (restoreTabsPromiseRef.current ?? Promise.resolve())
+      .then(() => readFileForEditor(activeWorkspaceId, openPath))
+      .then((file) => {
+        if (!file) return;
         const name = openPath.split("/").pop() ?? openPath;
         editorOpenFile({
           path: openPath,
           name,
-          content: data.content,
-          language: data.language,
+          content: file.content,
+          language: file.language,
           isDirty: false,
-          originalContent: data.content,
+          originalContent: file.content,
         });
       })
       .catch(() => {});
@@ -331,6 +343,8 @@ function FilesContent() {
 
   const handleSave = useCallback(async () => {
     if (!activeFile || !activeWorkspaceId) return;
+    // Preview tabs hold no text content, so saving would truncate the file.
+    if (isBinaryPreviewLanguage(activeFile.language)) return;
 
     setSavingPath(activeFile.path);
     try {
@@ -430,6 +444,7 @@ function FilesContent() {
   }
 
   const isSaving = savingPath === activeFile?.path;
+  const isActiveFileImage = activeFile?.language === IMAGE_LANGUAGE;
 
   return (
     <AuthenticatedLayout>
@@ -594,32 +609,52 @@ function FilesContent() {
                   size="sm"
                   className="h-7 w-7 p-0"
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 gap-1.5 px-1.5 text-xs"
-                  onClick={() => void handleSave()}
-                  disabled={isSaving || !activeFile.isDirty}
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Save className="h-3.5 w-3.5" />
-                  )}
-                  <span className="hidden md:inline">Save</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  onClick={() =>
-                    downloadTextFile(activeFile.name, activeFile.content)
-                  }
-                  aria-label="Download file"
-                  title="Download file"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                </Button>
+                {!isActiveFileImage && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1.5 px-1.5 text-xs"
+                    onClick={() => void handleSave()}
+                    disabled={isSaving || !activeFile.isDirty}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="h-3.5 w-3.5" />
+                    )}
+                    <span className="hidden md:inline">Save</span>
+                  </Button>
+                )}
+                {isActiveFileImage ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    asChild
+                  >
+                    <a
+                      href={getRawFileUrl(activeWorkspace.id, activeFile.path)}
+                      download={activeFile.name}
+                      aria-label="Download file"
+                      title="Download file"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() =>
+                      downloadTextFile(activeFile.name, activeFile.content)
+                    }
+                    aria-label="Download file"
+                    title="Download file"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -629,7 +664,12 @@ function FilesContent() {
 
           {/* Editor area */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {activeFile ? (
+            {activeFile && isActiveFileImage ? (
+              <ImageViewer
+                workspaceId={activeWorkspace.id}
+                filePath={activeFile.path}
+              />
+            ) : activeFile ? (
               <>
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <EditorSwitcher

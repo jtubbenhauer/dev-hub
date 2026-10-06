@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RunningSubAgentsBanner } from "@/components/chat/running-sub-agents-banner";
-import { useChatStore } from "@/stores/chat-store";
+import { useChatStore, type WorkspaceState } from "@/stores/chat-store";
 
 vi.mock("@/components/chat/sub-agent-dialog", () => ({
   SubAgentDialog: ({
@@ -19,6 +19,7 @@ afterEach(() => {
   cleanup();
   useChatStore.setState({ workspaceStates: {} });
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("RunningSubAgentsBanner", () => {
@@ -124,7 +125,8 @@ describe("RunningSubAgentsBanner", () => {
     );
   });
 
-  it("loads missing active descendants and compacts overflow into one line", async () => {
+  it("loads missing active descendants and shows every one that fits", async () => {
+    mockAgentListWidth(1200);
     global.fetch = vi
       .fn()
       .mockImplementation((input: string | URL | Request) => {
@@ -172,8 +174,106 @@ describe("RunningSubAgentsBanner", () => {
     );
 
     expect(await screen.findByText("3 running")).toBeInTheDocument();
-    expect(screen.getByText("+1 more")).toBeInTheDocument();
-    expect(screen.queryByText("Third running agent")).not.toBeInTheDocument();
+    for (const title of [
+      "First running agent",
+      "Second running agent",
+      "Third running agent",
+    ]) {
+      expect(screen.getByRole("button", { name: title })).toBeInTheDocument();
+    }
+    expect(
+      screen.queryByRole("button", { name: /more/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("moves agents that do not fit into a picker that opens their detail", async () => {
+    mockAgentListWidth(500);
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => [] });
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-1": makeWorkspaceState(
+          {
+            parent: makeSession("parent", "Parent"),
+            newest: makeSession("newest", "Newest agent", "parent", 4),
+            newer: makeSession("newer", "Newer agent", "parent", 3),
+            older: makeSession("older", "Older agent", "parent", 2),
+            oldest: makeSession("oldest", "Oldest agent", "parent", 1),
+          },
+          {
+            newest: { type: "busy" },
+            newer: { type: "busy" },
+            older: { type: "busy" },
+            oldest: { type: "busy" },
+          },
+        ),
+      },
+    });
+    const user = userEvent.setup();
+
+    render(
+      <RunningSubAgentsBanner parentSessionId="parent" workspaceId="ws-1" />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Newest agent" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Newer agent" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Older agent")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "+2 more" }));
+    expect(
+      screen.getByRole("menuitem", { name: "Older agent" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Oldest agent" }));
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("Oldest agent");
+  });
+
+  it("re-fits the chips when the banner is resized", () => {
+    const notifyResize = installControlledResizeObserver();
+    const agentListWidth = mockAgentListWidth(300);
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => [] });
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-1": makeWorkspaceState(
+          {
+            parent: makeSession("parent", "Parent"),
+            first: makeSession("first", "First running agent", "parent", 3),
+            second: makeSession("second", "Second running agent", "parent", 2),
+            third: makeSession("third", "Third running agent", "parent", 1),
+          },
+          {
+            first: { type: "busy" },
+            second: { type: "busy" },
+            third: { type: "busy" },
+          },
+        ),
+      },
+    });
+
+    render(
+      <RunningSubAgentsBanner parentSessionId="parent" workspaceId="ws-1" />,
+    );
+    expect(
+      screen.getAllByRole("button", { name: /running agent/ }),
+    ).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "+2 more" })).toBeInTheDocument();
+
+    agentListWidth.mockReturnValue(1200);
+    act(() => notifyResize());
+
+    expect(
+      screen.getAllByRole("button", { name: /running agent/ }),
+    ).toHaveLength(3);
+    expect(
+      screen.queryByRole("button", { name: /more/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("reconciles a stale idle store status with the current server status", async () => {
@@ -265,7 +365,12 @@ describe("RunningSubAgentsBanner", () => {
   });
 });
 
-function makeSession(id: string, title: string, parentID?: string) {
+function makeSession(
+  id: string,
+  title: string,
+  parentID?: string,
+  updatedAt = 1,
+) {
   return {
     id,
     title,
@@ -273,6 +378,51 @@ function makeSession(id: string, title: string, parentID?: string) {
     projectID: "project-1",
     directory: "/tmp",
     version: "1",
-    time: { created: 1, updated: 1 },
+    time: { created: 1, updated: updatedAt },
   };
+}
+
+function makeWorkspaceState(
+  sessions: WorkspaceState["sessions"],
+  sessionStatuses: WorkspaceState["sessionStatuses"],
+): WorkspaceState {
+  return {
+    sessionsLoaded: true,
+    sessions,
+    messages: {},
+    optimisticMessageIds: {},
+    sessionStatuses,
+    permissions: [],
+    questions: [],
+    todos: {},
+    todoUpdatedAt: {},
+    sessionAgents: {},
+    sessionModels: {},
+    sessionVariants: {},
+    lastViewedAt: {},
+    pinnedSessionIds: new Set<string>(),
+    sessionNotes: {},
+  };
+}
+
+function mockAgentListWidth(width: number) {
+  return vi
+    .spyOn(Element.prototype, "clientWidth", "get")
+    .mockReturnValue(width);
+}
+
+function installControlledResizeObserver() {
+  const notifyCallbacks: Array<() => void> = [];
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(callback: ResizeObserverCallback) {
+        notifyCallbacks.push(() => callback([], this));
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  return () => notifyCallbacks.forEach((notify) => notify());
 }

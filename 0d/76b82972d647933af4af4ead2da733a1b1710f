@@ -1,0 +1,27 @@
+tests/components/chat/chat-file-dialog.test.tsx
+  s_0cf80bbc7332e5::t_a7403a59c544b0 7
+  s_0cf80bbc7332e5::t_75906be77769be 74-103
+  s_0cf80bbc7332e5::t_5f913dc03e8278 104
+components/chat/chat-file-dialog.tsx
+  s_0cf80bbc7332e5::t_f25730ac560e1f 46-47
+  s_0cf80bbc7332e5::t_5e30651b0b09b5 185-186
+  s_0cf80bbc7332e5::t_74aabef5511856 150
+  s_0cf80bbc7332e5::t_14679c7f7eba5c 133
+  s_0cf80bbc7332e5::t_b736bf687b4b22 18,21-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0d76b82972d647933af4af4ead2da733a1b1710f",
+  "prompts": {},
+  "sessions": {
+    "s_0cf80bbc7332e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ef00c022cffevwTVDCgOtE04ES",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

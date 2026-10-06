@@ -1,0 +1,22 @@
+tests/components/editor/image-viewer.test.tsx
+  s_0cf80bbc7332e5::t_992e3038d33fe1 1-38
+components/editor/image-viewer.tsx
+  s_0cf80bbc7332e5::t_31c0006f38580b 1-33,35-45
+  s_0cf80bbc7332e5::t_af19ee9a015b71 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f1eb7b087258e409f54bb99574b114bd46706be3",
+  "prompts": {},
+  "sessions": {
+    "s_0cf80bbc7332e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ef00c022cffevwTVDCgOtE04ES",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -45,6 +45,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { GitHubMarkdown } from "@/components/git/github-markdown";
 import type { GitHubPrFileContent, GitHubReviewComment } from "@/types";
 import type { ReviewDraft } from "@/stores/review-draft-store";
+import { trackBuiltinTs } from "@/lib/lsp/client/builtin-typescript";
 
 type DraftDisplayComment = GitHubReviewComment & {
   isDraft: true;
@@ -821,6 +822,7 @@ export const MonacoPrDiffEditor = forwardRef<
 
   const handleBeforeMount = useCallback(
     (monacoInstance: typeof import("monaco-editor")) => {
+      trackBuiltinTs(monacoInstance);
       registerMonacoThemes(monacoInstance);
     },
     [],

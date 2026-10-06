@@ -49,6 +49,7 @@ import { CommentInput } from "@/components/editor/comment-input";
 import { attachCommentToChat } from "@/lib/comment-chat-bridge";
 import { useChatStore } from "@/stores/chat-store";
 import type { FileComment, ReviewFile } from "@/types";
+import { trackBuiltinTs } from "@/lib/lsp/client/builtin-typescript";
 
 const DiffEditor = dynamic(
   () => import("@monaco-editor/react").then((mod) => mod.DiffEditor),
@@ -281,6 +282,7 @@ export const MonacoReviewEditor = forwardRef<
 
   const handleBeforeMount = useCallback(
     (monacoInstance: typeof import("monaco-editor")) => {
+      trackBuiltinTs(monacoInstance);
       registerMonacoThemes(monacoInstance);
     },
     [],

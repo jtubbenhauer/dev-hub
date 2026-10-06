@@ -87,7 +87,12 @@ export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
       () => ({
         focus: () => terminalHandle?.focus(),
         blur: () => terminalHandle?.blur(),
-        revealLine: (_line: number) => {},
+        revealLine: (line: number) => {
+          if (!terminalHandle) return;
+          if (!Number.isInteger(line) || line < 1) return;
+          terminalHandle.write("\x1b");
+          setTimeout(() => terminalHandle.write(`:${line}\r`), 50);
+        },
       }),
       [terminalHandle],
     );

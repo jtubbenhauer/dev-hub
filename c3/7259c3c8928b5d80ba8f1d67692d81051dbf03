@@ -1,0 +1,23 @@
+tests/lib/side-panel-open-file.test.ts
+  s_0cf80bbc7332e5::t_f3752319abcaad 4
+  s_0cf80bbc7332e5::t_a4d9f85a742f9c 27-41
+  s_0cf80bbc7332e5::t_58d1e9a484fe5f 42
+lib/side-panel-open-file.ts
+  s_0cf80bbc7332e5::t_76ae982861abea 2,10-11,13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c37259c3c8928b5d80ba8f1d67692d81051dbf03",
+  "prompts": {},
+  "sessions": {
+    "s_0cf80bbc7332e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ef00c022cffevwTVDCgOtE04ES",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

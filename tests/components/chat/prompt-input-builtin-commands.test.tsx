@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, cleanup, fireEvent } from "@testing-library/react";
 import { PromptInput } from "@/components/chat/prompt-input";
 

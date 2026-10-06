@@ -35,6 +35,7 @@ import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
 import { FileViewToggle } from "@/components/chat/file-view-toggle";
 import { useFileViewMode } from "@/components/chat/use-file-view-mode";
 import { PdfViewer } from "@/components/editor/pdf-viewer";
+import { ImageViewer } from "@/components/editor/image-viewer";
 import {
   MarkdownPreviewFrame,
   MarkdownPreviewToggle,
@@ -43,7 +44,11 @@ import {
   CsvPreviewFrame,
   CsvPreviewToggle,
 } from "@/components/editor/csv-preview";
-import { isPdfPath, PDF_LANGUAGE } from "@/lib/file-preview";
+import {
+  getBinaryPreviewLanguage,
+  IMAGE_LANGUAGE,
+  PDF_LANGUAGE,
+} from "@/lib/file-preview";
 
 const MonacoEditor = dynamic(
   () => import("@/components/editor/monaco-editor").then((m) => m.MonacoEditor),
@@ -59,12 +64,7 @@ interface SplitPanelFilesProps {
 }
 
 const BINARY_EXTENSIONS = [
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
   ".svg",
-  ".ico",
   ".wasm",
   ".zip",
   ".tar",
@@ -115,6 +115,8 @@ export function SplitPanelFiles({
   const currentFileLanguage = activeFile?.language ?? null;
   const isDirty = activeFile?.isDirty ?? false;
   const isPdf = currentFileLanguage === PDF_LANGUAGE;
+  const isImage = currentFileLanguage === IMAGE_LANGUAGE;
+  const isBinaryPreview = isPdf || isImage;
 
   const queryClient = useQueryClient();
 
@@ -220,9 +222,10 @@ export function SplitPanelFiles({
   const loadFile = useCallback(
     async (path: string) => {
       abortControllerRef.current?.abort();
-      if (isPdfPath(path)) {
+      const previewLanguage = getBinaryPreviewLanguage(path);
+      if (previewLanguage) {
         clearError();
-        openFileInTab(path, "", PDF_LANGUAGE);
+        openFileInTab(path, "", previewLanguage);
         setIsLoading(false);
         return;
       }
@@ -275,8 +278,9 @@ export function SplitPanelFiles({
       isRestoringRef.current = true;
       const results = await Promise.all(
         files.map(async (f) => {
-          if (isPdfPath(f.path)) {
-            return { path: f.path, content: "", language: PDF_LANGUAGE };
+          const previewLanguage = getBinaryPreviewLanguage(f.path);
+          if (previewLanguage) {
+            return { path: f.path, content: "", language: previewLanguage };
           }
           try {
             const res = await fetch(
@@ -521,20 +525,22 @@ export function SplitPanelFiles({
           {isDirty && (
             <span className="bg-warning size-1.5 shrink-0 rounded-full" />
           )}
-          {canDiff && !isPdf && (
+          {canDiff && !isBinaryPreview && (
             <FileViewToggle
               mode={isDiff ? "diff" : "editor"}
               onChange={setMode}
             />
           )}
-          {!isPdf && !isDiff && (
+          {!isBinaryPreview && !isDiff && (
             <MarkdownPreviewToggle
               language={currentFileLanguage ?? "plaintext"}
               filePath={currentFilePath}
             />
           )}
-          {!isPdf && !isDiff && <CsvPreviewToggle filePath={currentFilePath} />}
-          {!isPdf && (
+          {!isBinaryPreview && !isDiff && (
+            <CsvPreviewToggle filePath={currentFilePath} />
+          )}
+          {!isBinaryPreview && (
             <Button
               size="icon-xs"
               variant="ghost"
@@ -613,6 +619,10 @@ export function SplitPanelFiles({
         (isPdf ? (
           <div className="flex min-h-0 flex-1">
             <PdfViewer workspaceId={workspaceId} filePath={currentFilePath} />
+          </div>
+        ) : isImage ? (
+          <div className="flex min-h-0 flex-1">
+            <ImageViewer workspaceId={workspaceId} filePath={currentFilePath} />
           </div>
         ) : isDiff ? (
           <div className="flex min-h-0 flex-1" data-testid="split-panel-diff">

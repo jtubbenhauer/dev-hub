@@ -1,0 +1,40 @@
+tests/api/files-raw.test.ts
+  s_0cf80bbc7332e5::t_7a75d9ef09345d 169-180
+  s_0cf80bbc7332e5::t_9fec92f5d10c3f 36-38
+  s_0cf80bbc7332e5::t_f5aed4859ed91f 53-59
+  s_0cf80bbc7332e5::t_22aa626e3e4423 39-41
+  s_0cf80bbc7332e5::t_bf4e53e4488f15 219
+  s_0cf80bbc7332e5::t_fc48c17f1fe850 90-107,112-113,115,181
+  s_38bffa3aaaa985::t_8cfad2ffb59041 114,116,182
+app/api/files/raw/route.ts
+  s_0cf80bbc7332e5::t_a059839bf66b06 8,12,15,17,20
+  s_0cf80bbc7332e5::t_97141d8f14aa3b 81,84-86,104-105,107
+  s_0cf80bbc7332e5::t_8533a5eb3f4f8c 66
+  s_0cf80bbc7332e5::t_c3b28175c79860 133
+  s_0cf80bbc7332e5::t_be77feb87aa961 155
+  s_0cf80bbc7332e5::t_d9050bd2875ccc 41,44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e430eb7a2e8ed386377ea2a4766e54812529a87b",
+  "prompts": {},
+  "sessions": {
+    "s_0cf80bbc7332e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ef00c022cffevwTVDCgOtE04ES",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_38bffa3aaaa985": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ef00c022cffevwTVDCgOtE04ES",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

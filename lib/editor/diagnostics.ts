@@ -34,3 +34,46 @@ export function mapToMonacoMarker(diagnostic: Diagnostic): MonacoMarkerData {
     code: diagnostic.code,
   };
 }
+
+export interface MonacoMarkerLike {
+  startLineNumber: number;
+  startColumn: number;
+  endLineNumber: number;
+  endColumn: number;
+  message: string;
+  severity: number;
+  source?: string;
+  code?: string | { value: string };
+}
+
+function monacoSeverityToDiagnosticSeverity(
+  monacoSeverity: number,
+): DiagnosticSeverity {
+  switch (monacoSeverity) {
+    case 8:
+      return DiagnosticSeverity.Error;
+    case 4:
+      return DiagnosticSeverity.Warning;
+    case 2:
+      return DiagnosticSeverity.Information;
+    case 1:
+      return DiagnosticSeverity.Hint;
+    default:
+      return DiagnosticSeverity.Error;
+  }
+}
+
+export function markerToDiagnostic(marker: MonacoMarkerLike): Diagnostic {
+  return {
+    message: marker.message,
+    severity: monacoSeverityToDiagnosticSeverity(marker.severity),
+    source: marker.source ?? "ts",
+    code: typeof marker.code === "object" ? marker.code.value : marker.code,
+    range: {
+      startLine: marker.startLineNumber,
+      startColumn: marker.startColumn,
+      endLine: marker.endLineNumber,
+      endColumn: marker.endColumn,
+    },
+  };
+}

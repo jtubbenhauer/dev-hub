@@ -23,6 +23,7 @@ describe("useDiagnosticsStore", () => {
   beforeEach(() => {
     useDiagnosticsStore.setState({
       diagnosticsByFile: new Map(),
+      diagnosticsBySource: new Map(),
       pendingRequests: new Map(),
     });
   });
@@ -148,5 +149,168 @@ describe("useDiagnosticsStore", () => {
     expect(
       useDiagnosticsStore.getState().getDiagnosticsForFile("ws2", "b.ts"),
     ).toEqual([]);
+  });
+
+  describe("source-scoped diagnostics", () => {
+    const eslintDiagnostic = makeDiagnostic(
+      DiagnosticSeverity.Warning,
+      "eslint warning",
+    );
+    const typescriptDiagnostic = makeDiagnostic(
+      DiagnosticSeverity.Error,
+      "ts error",
+    );
+
+    it("merges sources into diagnosticsByFile with eslint first", () => {
+      const store = useDiagnosticsStore.getState();
+      store.setDiagnosticsForSource("ws1", "a.ts", "typescript", [
+        typescriptDiagnostic,
+      ]);
+      store.setDiagnosticsForSource("ws1", "a.ts", "eslint", [
+        eslintDiagnostic,
+      ]);
+
+      expect(
+        useDiagnosticsStore.getState().getDiagnosticsForFile("ws1", "a.ts"),
+      ).toEqual([eslintDiagnostic, typescriptDiagnostic]);
+    });
+
+    it("clearing one source keeps the other source's diagnostics", () => {
+      const store = useDiagnosticsStore.getState();
+      store.setDiagnosticsForSource("ws1", "a.ts", "eslint", [
+        eslintDiagnostic,
+      ]);
+      store.setDiagnosticsForSource("ws1", "a.ts", "typescript", [
+        typescriptDiagnostic,
+      ]);
+
+      useDiagnosticsStore
+        .getState()
+        .clearDiagnosticsForSource("ws1", "a.ts", "typescript");
+
+      const state = useDiagnosticsStore.getState();
+      expect(state.getDiagnosticsForFile("ws1", "a.ts")).toEqual([
+        eslintDiagnostic,
+      ]);
+      expect(state.diagnosticsBySource.get("ws1:a.ts")?.typescript).toBe(
+        undefined,
+      );
+    });
+
+    it("deletes the key from both maps when every source is empty", () => {
+      const store = useDiagnosticsStore.getState();
+      store.setDiagnosticsForSource("ws1", "a.ts", "typescript", [
+        typescriptDiagnostic,
+      ]);
+
+      useDiagnosticsStore
+        .getState()
+        .clearDiagnosticsForSource("ws1", "a.ts", "typescript");
+
+      const state = useDiagnosticsStore.getState();
+      expect(state.diagnosticsByFile.has("ws1:a.ts")).toBe(false);
+      expect(state.diagnosticsBySource.has("ws1:a.ts")).toBe(false);
+    });
+
+    it("clearSourceForWorkspace leaves other workspaces and sources intact", () => {
+      const store = useDiagnosticsStore.getState();
+      store.setDiagnosticsForSource("ws1", "a.ts", "typescript", [
+        typescriptDiagnostic,
+      ]);
+      store.setDiagnosticsForSource("ws1", "b.ts", "typescript", [
+        typescriptDiagnostic,
+      ]);
+      store.setDiagnosticsForSource("ws1", "b.ts", "eslint", [
+        eslintDiagnostic,
+      ]);
+      store.setDiagnosticsForSource("ws10", "a.ts", "typescript", [
+        typescriptDiagnostic,
+      ]);
+
+      useDiagnosticsStore
+        .getState()
+        .clearSourceForWorkspace("ws1", "typescript");
+
+      const state = useDiagnosticsStore.getState();
+      expect(state.diagnosticsByFile.has("ws1:a.ts")).toBe(false);
+      expect(state.getDiagnosticsForFile("ws1", "b.ts")).toEqual([
+        eslintDiagnostic,
+      ]);
+      expect(state.getDiagnosticsForFile("ws10", "a.ts")).toEqual([
+        typescriptDiagnostic,
+      ]);
+    });
+
+    it("setDiagnostics writes the eslint source and preserves typescript", () => {
+      useDiagnosticsStore
+        .getState()
+        .setDiagnosticsForSource("ws1", "a.ts", "typescript", [
+          typescriptDiagnostic,
+        ]);
+
+      useDiagnosticsStore
+        .getState()
+        .setDiagnostics("ws1", "a.ts", [eslintDiagnostic]);
+
+      const state = useDiagnosticsStore.getState();
+      expect(state.diagnosticsBySource.get("ws1:a.ts")).toEqual({
+        eslint: [eslintDiagnostic],
+        typescript: [typescriptDiagnostic],
+      });
+      expect(state.getDiagnosticsForFile("ws1", "a.ts")).toEqual([
+        eslintDiagnostic,
+        typescriptDiagnostic,
+      ]);
+    });
+
+    it("clearDiagnostics removes both sources for the file", () => {
+      const store = useDiagnosticsStore.getState();
+      store.setDiagnosticsForSource("ws1", "a.ts", "eslint", [
+        eslintDiagnostic,
+      ]);
+      store.setDiagnosticsForSource("ws1", "a.ts", "typescript", [
+        typescriptDiagnostic,
+      ]);
+
+      useDiagnosticsStore.getState().clearDiagnostics("ws1", "a.ts");
+
+      const state = useDiagnosticsStore.getState();
+      expect(state.diagnosticsByFile.has("ws1:a.ts")).toBe(false);
+      expect(state.diagnosticsBySource.has("ws1:a.ts")).toBe(false);
+    });
+
+    it("clearAllDiagnostics resets the source map too", () => {
+      useDiagnosticsStore
+        .getState()
+        .setDiagnosticsForSource("ws1", "a.ts", "typescript", [
+          typescriptDiagnostic,
+        ]);
+
+      useDiagnosticsStore.getState().clearAllDiagnostics();
+
+      expect(useDiagnosticsStore.getState().diagnosticsBySource.size).toBe(0);
+    });
+
+    it("a typescript write keeps the stored eslint array reference", () => {
+      const eslintDiagnostics = [eslintDiagnostic];
+      useDiagnosticsStore
+        .getState()
+        .setDiagnostics("ws1", "a.ts", eslintDiagnostics);
+      const eslintBefore = useDiagnosticsStore
+        .getState()
+        .diagnosticsBySource.get("ws1:a.ts")?.eslint;
+
+      useDiagnosticsStore
+        .getState()
+        .setDiagnosticsForSource("ws1", "a.ts", "typescript", [
+          typescriptDiagnostic,
+        ]);
+
+      const eslintAfter = useDiagnosticsStore
+        .getState()
+        .diagnosticsBySource.get("ws1:a.ts")?.eslint;
+      expect(eslintBefore).toBe(eslintDiagnostics);
+      expect(eslintAfter).toBe(eslintBefore);
+    });
   });
 });

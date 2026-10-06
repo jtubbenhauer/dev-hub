@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import { useSidePanelStore } from "@/stores/side-panel-store";
-import { PDF_LANGUAGE } from "@/lib/file-preview";
+import { IMAGE_LANGUAGE, PDF_LANGUAGE } from "@/lib/file-preview";
 
 describe("openFileInSidePanel", () => {
   beforeEach(() => {
@@ -23,5 +23,21 @@ describe("openFileInSidePanel", () => {
     const tab = state.openFiles.find((f) => f.path === "docs/spec.pdf");
     expect(tab?.language).toBe(PDF_LANGUAGE);
     expect(state.isLoading).toBe(false);
+  });
+
+  it("opens images as a preview tab without fetching text content", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const fallback = vi.fn();
+
+    await openFileInSidePanel("ws-1", "assets/screenshot.jpg", fallback);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fallback).not.toHaveBeenCalled();
+    const state = useSidePanelStore.getState();
+    expect(state.activeFilePath).toBe("assets/screenshot.jpg");
+    const tab = state.openFiles.find((f) => f.path === "assets/screenshot.jpg");
+    expect(tab?.language).toBe(IMAGE_LANGUAGE);
+    expect(state.activePanelTab).toBe("files");
   });
 });

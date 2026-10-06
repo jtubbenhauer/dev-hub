@@ -1,0 +1,23 @@
+tests/lib/file-preview.test.ts
+  s_0cf80bbc7332e5::t_1badeeff0f197c 25-84
+  s_0cf80bbc7332e5::t_ae73f854875ecb 2-11
+lib/file-preview.ts
+  s_0cf80bbc7332e5::t_cdbfc27c58e676 2,8-44
+  s_0cf80bbc7332e5::t_ac6e672ea8bf1d 45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "04ec48ad4152161acc849dbe300512ed64fc6bc2",
+  "prompts": {},
+  "sessions": {
+    "s_0cf80bbc7332e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ef00c022cffevwTVDCgOtE04ES",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

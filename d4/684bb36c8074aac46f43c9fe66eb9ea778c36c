@@ -1,0 +1,47 @@
+tests/components/chat/running-sub-agents-banner.test.tsx
+  s_c8eb2a5ac62387::t_88ed1223e3240c 368-373,381,384-428
+  s_c8eb2a5ac62387::t_ec7c113498cd03 177-276
+  s_c8eb2a5ac62387::t_29e30d74f21435 128-129
+  s_d51563770b3417::t_4643aa7daaf78a 6,22
+components/chat/running-sub-agents-banner.tsx
+  s_c8eb2a5ac62387::t_eb925cbc9181ac 138-150
+  s_c8eb2a5ac62387::t_d7aad5892797ae 3-4,8-13,20-24,26-38,40
+  s_c8eb2a5ac62387::t_c40eb8f4703c5f 39
+  s_c8eb2a5ac62387::t_461b41338f022e 163-168
+  s_c8eb2a5ac62387::t_e899ffc733c033 183-186
+  s_c8eb2a5ac62387::t_b4d3ec46cd1f0c 208-242
+  s_c8eb2a5ac62387::t_8c80c0f948292d 25
+  s_b8cd7eb6101ab9::t_b9f6b3d64bcb07 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d4684bb36c8074aac46f43c9fe66eb9ea778c36c",
+  "prompts": {},
+  "sessions": {
+    "s_b8cd7eb6101ab9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ef05f6cb3ffec0R16XIliuFzhY",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_c8eb2a5ac62387": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ef04d6128ffe1pbjIObADTh9iU",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_d51563770b3417": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ef07d4401ffek8euKtxqK0nh77",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

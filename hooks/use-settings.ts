@@ -70,6 +70,7 @@ export const SETTINGS_KEYS = {
   NOTIFICATIONS_SOUND_ENABLED: "notifications-sound-enabled",
   NOTIFICATIONS_PUSH_ENABLED: "notifications-push-enabled",
   CHAT_SUGGESTIONS_ENABLED: CHAT_SUGGESTIONS_ENABLED_SETTING_KEY,
+  LSP_ENABLED: "lsp-enabled",
 } as const;
 
 export type EditorType = "monaco" | "neovim";
@@ -522,6 +523,15 @@ export function useEditorTypeSetting(): {
     editorType: isValid ? (raw as EditorType) : DEFAULT_EDITOR_TYPE,
     isLoading,
   };
+}
+
+export function useLspEnabledSetting(): {
+  isLspEnabled: boolean;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  const isLspEnabled = data?.[SETTINGS_KEYS.LSP_ENABLED] === true;
+  return { isLspEnabled, isLoading };
 }
 
 export function useExternalEditorSetting(): {

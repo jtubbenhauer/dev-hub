@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { isPdfPath, PDF_LANGUAGE } from "@/lib/file-preview";
+import { getBinaryPreviewLanguage } from "@/lib/file-preview";
 
 interface ChatDialogFile {
   readonly path: string;
@@ -45,11 +45,12 @@ export const useChatFileDialogStore = create<ChatFileDialogState>(
   (set, get) => ({
     ...initialState,
     openFile: async (workspaceId, path, fallback) => {
-      if (isPdfPath(path)) {
+      const previewLanguage = getBinaryPreviewLanguage(path);
+      if (previewLanguage) {
         set({
           isOpen: true,
           isLoading: false,
-          file: { path, content: "", language: PDF_LANGUAGE, workspaceId },
+          file: { path, content: "", language: previewLanguage, workspaceId },
           originalContent: "",
         });
         return;

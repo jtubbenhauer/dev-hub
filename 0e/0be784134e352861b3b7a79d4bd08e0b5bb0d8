@@ -1,0 +1,22 @@
+stores/chat-file-dialog-store.ts
+  s_0cf80bbc7332e5::t_fc261152bfa34d 48-49,53
+  s_0cf80bbc7332e5::t_382c7f01d05d54 2
+tests/stores/chat-file-dialog-store.test.ts
+  s_0cf80bbc7332e5::t_37ff5b47965f2d 61-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0e0be784134e352861b3b7a79d4bd08e0b5bb0d8",
+  "prompts": {},
+  "sessions": {
+    "s_0cf80bbc7332e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ef00c022cffevwTVDCgOtE04ES",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

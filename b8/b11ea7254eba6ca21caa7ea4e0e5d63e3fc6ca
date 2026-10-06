@@ -1,0 +1,28 @@
+components/chat/split-panel-files.tsx
+  s_0cf80bbc7332e5::t_3a82c700ec6f03 118-119
+  s_0cf80bbc7332e5::t_85ede7a6161095 47-51
+  s_0cf80bbc7332e5::t_cad01eb8e3dd4d 281-283
+  s_0cf80bbc7332e5::t_b2cad1cde3375c 623-625
+  s_0cf80bbc7332e5::t_2dc71fd44cf7ff 225-226,228
+  s_0cf80bbc7332e5::t_bf52a95d9ef7e6 528,534,540-543
+  s_0cf80bbc7332e5::t_3404ff4e90a903 38
+  s_0cf80bbc7332e5::t_d85eb43c9e3a7a 626
+tests/components/chat/split-panel-files-image.test.tsx
+  s_0cf80bbc7332e5::t_170be6ed8b805e 1-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b8b11ea7254eba6ca21caa7ea4e0e5d63e3fc6ca",
+  "prompts": {},
+  "sessions": {
+    "s_0cf80bbc7332e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ef00c022cffevwTVDCgOtE04ES",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

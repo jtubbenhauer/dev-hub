@@ -33,6 +33,12 @@ vi.mock("drizzle-orm", () => ({
 import { GET } from "@/app/api/files/raw/route";
 
 const PDF_BYTES = Buffer.from("%PDF-1.4\n\0binary\xff\nend", "latin1");
+const PNG_BYTES = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+]);
+const JPEG_BYTES = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0xff, 0xd9,
+]);
 let workspaceDir: string;
 
 function request(query: string): NextRequest {
@@ -44,6 +50,13 @@ beforeAll(() => {
   fs.mkdirSync(path.join(workspaceDir, "docs"));
   fs.writeFileSync(path.join(workspaceDir, "docs", "Report.PDF"), PDF_BYTES);
   fs.writeFileSync(path.join(workspaceDir, "index.html"), "<script></script>");
+  fs.mkdirSync(path.join(workspaceDir, "assets"));
+  fs.writeFileSync(path.join(workspaceDir, "assets", "logo.png"), PNG_BYTES);
+  fs.writeFileSync(path.join(workspaceDir, "assets", "photo.JPG"), JPEG_BYTES);
+  fs.writeFileSync(
+    path.join(workspaceDir, "assets", "icon.svg"),
+    '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+  );
 });
 
 afterAll(() => {
@@ -74,8 +87,30 @@ describe("GET /api/files/raw", () => {
     expect(body.equals(PDF_BYTES)).toBe(true);
   });
 
-  it("refuses non-PDF files", async () => {
+  it("streams PNG bytes unchanged with an image content type", async () => {
+    const res = await GET(request("workspaceId=ws-1&path=assets/logo.png"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    const body = Buffer.from(await res.arrayBuffer());
+    expect(body.equals(PNG_BYTES)).toBe(true);
+  });
+
+  it("serves uppercase .JPG files as image/jpeg", async () => {
+    const res = await GET(request("workspaceId=ws-1&path=assets/photo.JPG"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    const body = Buffer.from(await res.arrayBuffer());
+    expect(body.equals(JPEG_BYTES)).toBe(true);
+  });
+
+  it("refuses files that are neither PDFs nor raster images", async () => {
     const res = await GET(request("workspaceId=ws-1&path=index.html"));
+    expect(res.status).toBe(415);
+  });
+
+  it("refuses SVG files because they can carry scripts", async () => {
+    const res = await GET(request("workspaceId=ws-1&path=assets/icon.svg"));
     expect(res.status).toBe(415);
   });
 
@@ -131,6 +166,20 @@ describe("GET /api/files/raw for remote workspaces", () => {
     expect(body.equals(PDF_BYTES)).toBe(true);
   });
 
+  it("proxies image bytes from the agent with an image content type", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(PNG_BYTES, { status: 200 })),
+    );
+
+    const res = await GET(request("workspaceId=ws-1&path=assets/logo.png"));
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    const body = Buffer.from(await res.arrayBuffer());
+    expect(body.equals(PNG_BYTES)).toBe(true);
+  });
+
   it("forwards agent JSON errors with their status", async () => {
     vi.stubGlobal(
       "fetch",
@@ -167,7 +216,7 @@ describe("GET /api/files/raw for remote workspaces", () => {
     expect(res.status).toBe(502);
   });
 
-  it("still refuses non-PDF files without contacting the agent", async () => {
+  it("still refuses non-previewable files without contacting the agent", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 

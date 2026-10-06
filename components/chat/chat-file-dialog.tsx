@@ -15,9 +15,15 @@ import {
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 import { PdfViewer } from "@/components/editor/pdf-viewer";
+import { ImageViewer } from "@/components/editor/image-viewer";
 import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import { CsvPreviewToggle } from "@/components/editor/csv-preview";
-import { getRawFileUrl, PDF_LANGUAGE } from "@/lib/file-preview";
+import {
+  getRawFileUrl,
+  IMAGE_LANGUAGE,
+  isBinaryPreviewLanguage,
+  PDF_LANGUAGE,
+} from "@/lib/file-preview";
 import { downloadTextFile } from "@/lib/download-file";
 
 function getFileName(filePath: string): string {
@@ -37,6 +43,8 @@ export function ChatFileDialog() {
   const [isSaving, setIsSaving] = useState(false);
 
   const isDirty = file !== null && file.content !== originalContent;
+  const isBinaryPreview =
+    file !== null && isBinaryPreviewLanguage(file.language);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -122,7 +130,7 @@ export function ChatFileDialog() {
               className="size-8 p-0"
             />
           )}
-          {file?.language !== PDF_LANGUAGE && (
+          {!isBinaryPreview && (
             <Button
               size="sm"
               onClick={handleSave}
@@ -139,7 +147,7 @@ export function ChatFileDialog() {
             </Button>
           )}
           {file &&
-            (file.language === PDF_LANGUAGE ? (
+            (isBinaryPreview ? (
               <Button variant="ghost" size="sm" className="size-8 p-0" asChild>
                 <a
                   href={getRawFileUrl(file.workspaceId, file.path)}
@@ -174,6 +182,8 @@ export function ChatFileDialog() {
             </div>
           ) : file.language === PDF_LANGUAGE ? (
             <PdfViewer workspaceId={file.workspaceId} filePath={file.path} />
+          ) : file.language === IMAGE_LANGUAGE ? (
+            <ImageViewer workspaceId={file.workspaceId} filePath={file.path} />
           ) : (
             <EditorSwitcher
               content={file.content}

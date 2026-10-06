@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 import { ChatFileDialog } from "@/components/chat/chat-file-dialog";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
-import { PDF_LANGUAGE } from "@/lib/file-preview";
+import { IMAGE_LANGUAGE, PDF_LANGUAGE } from "@/lib/file-preview";
 import { downloadTextFile } from "@/lib/download-file";
 
 vi.mock("@/components/editor/editor-switcher", () => ({
@@ -69,6 +69,37 @@ describe("ChatFileDialog download button", () => {
     expect(downloadLink).toHaveAttribute(
       "href",
       "/api/files/raw?workspaceId=ws-1&path=docs%2Freport.pdf",
+    );
+  });
+
+  it("previews images instead of opening the editor", () => {
+    useChatFileDialogStore.setState({
+      isOpen: true,
+      isLoading: false,
+      file: {
+        path: "assets/logo.png",
+        content: "",
+        language: IMAGE_LANGUAGE,
+        workspaceId: "ws-1",
+      },
+      originalContent: "",
+    });
+
+    render(<ChatFileDialog />);
+
+    expect(screen.getByRole("img", { name: "logo.png" })).toHaveAttribute(
+      "src",
+      "/api/files/raw?workspaceId=ws-1&path=assets%2Flogo.png",
+    );
+    expect(screen.queryByTestId("editor-switcher")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Save file" }),
+    ).not.toBeInTheDocument();
+    const downloadLink = screen.getByRole("link", { name: "Download file" });
+    expect(downloadLink).toHaveAttribute("download", "logo.png");
+    expect(downloadLink).toHaveAttribute(
+      "href",
+      "/api/files/raw?workspaceId=ws-1&path=assets%2Flogo.png",
     );
   });
 });

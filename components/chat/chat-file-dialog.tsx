@@ -193,6 +193,7 @@ export function ChatFileDialog() {
               filePath={file.path}
               workspaceId={file.workspaceId}
               autoFocus
+              isLspEligible
             />
           )}
         </div>

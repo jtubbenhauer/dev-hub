@@ -52,6 +52,9 @@ import { useRouter } from "next/navigation";
 import { useGitStatus } from "@/hooks/use-git";
 import { useLintOnSave, useDiagnosticsForFile } from "@/hooks/use-diagnostics";
 import { ProblemsPanel } from "@/components/editor/problems-panel";
+import { LspStatusToggle } from "@/components/editor/lsp-status-toggle";
+import { useLspOpenFileHandler } from "@/hooks/use-lsp-open-file-handler";
+import { openFileInFilesPage } from "@/lib/files/open-in-files-page";
 
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = () => Math.max(500, window.innerWidth * 0.5);
@@ -158,29 +161,40 @@ function FilesContent() {
 
   const handleFileTreeSearchResultClick = useCallback(
     async (filePath: string) => {
-      const name = filePath.split("/").pop() ?? filePath;
-      if (!activeWorkspaceId) return;
-      expandPathToFile(activeWorkspaceId, filePath);
-      const file = await readFileForEditor(activeWorkspaceId, filePath);
-      if (!file) return;
-      if (isFileTabsDisabled) closeAllFiles();
-      editorOpenFile({
-        path: filePath,
-        name,
-        content: file.content,
-        language: file.language,
-        isDirty: false,
-        originalContent: file.content,
-      });
+      if (activeWorkspaceId) {
+        expandPathToFile(activeWorkspaceId, filePath);
+        await openFileInFilesPage({
+          workspaceId: activeWorkspaceId,
+          path: filePath,
+          isFileTabsDisabled,
+          canDiscardDirtyTabs: true,
+        });
+      }
     },
-    [
-      activeWorkspaceId,
-      editorOpenFile,
-      closeAllFiles,
-      isFileTabsDisabled,
-      expandPathToFile,
-    ],
+    [activeWorkspaceId, isFileTabsDisabled, expandPathToFile],
   );
+
+  const handleLspOpenFile = useCallback(
+    async (
+      relativePath: string,
+      shouldCommit: () => boolean,
+    ): Promise<boolean> => {
+      if (!activeWorkspaceId) return false;
+      const opened = await openFileInFilesPage({
+        workspaceId: activeWorkspaceId,
+        path: relativePath,
+        isFileTabsDisabled,
+        shouldCommit,
+        canDiscardDirtyTabs: false,
+      });
+      if (opened) expandPathToFile(activeWorkspaceId, relativePath);
+      return opened;
+    },
+    [activeWorkspaceId, isFileTabsDisabled, expandPathToFile],
+  );
+  useLspOpenFileHandler("files-page", handleLspOpenFile, () => {
+    return useEditorStore.getState().activeFilePath;
+  });
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -571,6 +585,7 @@ function FilesContent() {
                 {warningCount}
               </span>
             )}
+            <LspStatusToggle />
 
             {activeFile && isActiveFileUnstaged && (
               <Button
@@ -671,7 +686,10 @@ function FilesContent() {
               />
             ) : activeFile ? (
               <>
-                <div className="min-h-0 flex-1 overflow-hidden">
+                <div
+                  className="min-h-0 flex-1 overflow-hidden"
+                  data-lsp-surface="files-page"
+                >
                   <EditorSwitcher
                     ref={editorHandleRef}
                     content={activeFile.content}
@@ -680,6 +698,7 @@ function FilesContent() {
                     onSave={() => void handleSaveRef.current()}
                     workspaceId={activeWorkspaceId ?? undefined}
                     filePath={activeFile.path}
+                    isLspEligible
                   />
                 </div>
                 <ProblemsPanel

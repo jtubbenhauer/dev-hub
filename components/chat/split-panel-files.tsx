@@ -49,6 +49,8 @@ import {
   IMAGE_LANGUAGE,
   PDF_LANGUAGE,
 } from "@/lib/file-preview";
+import { useLspOpenFileHandler } from "@/hooks/use-lsp-open-file-handler";
+import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 
 const MonacoEditor = dynamic(
   () => import("@/components/editor/monaco-editor").then((m) => m.MonacoEditor),
@@ -105,6 +107,14 @@ export function SplitPanelFiles({
   const expandedPaths = useSidePanelStore((s) => s.expandedPaths);
   const toggleExpandedPath = useSidePanelStore((s) => s.toggleExpandedPath);
   const expandPathToFile = useSidePanelStore((s) => s.expandPathToFile);
+  // prettier-ignore
+  useLspOpenFileHandler("split-panel", async (relativePath, shouldCommit) => {
+    let opened = true;
+    await openFileInSidePanel(workspaceId, relativePath, () => {
+      opened = false;
+    }, shouldCommit);
+    return opened;
+  }, () => useSidePanelStore.getState().activeFilePath);
 
   const activeFile = useMemo(
     () => openFiles.find((f) => f.path === activeFilePath) ?? null,
@@ -635,7 +645,7 @@ export function SplitPanelFiles({
           </div>
         ) : (
           <div className="flex min-h-0 flex-1">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1" data-lsp-surface="split-panel">
               <MarkdownPreviewFrame
                 content={currentFileContent}
                 language={currentFileLanguage ?? "plaintext"}
@@ -653,6 +663,7 @@ export function SplitPanelFiles({
                     onSave={handleSave}
                     filePath={currentFilePath}
                     workspaceId={workspaceId}
+                    isLspEligible
                   />
                 </CsvPreviewFrame>
               </MarkdownPreviewFrame>

@@ -54,6 +54,10 @@ vi.mock("@/components/editor/editor-switcher", () => ({
   EditorSwitcher: () => <div data-testid="editor-switcher" />,
 }));
 
+vi.mock("@/components/editor/lsp-status-toggle", () => ({
+  LspStatusToggle: () => null,
+}));
+
 vi.mock("@/hooks/use-settings", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/use-settings")>()),
   useFileTabsSetting: () => ({ isFileTabsDisabled: false, isLoading: false }),

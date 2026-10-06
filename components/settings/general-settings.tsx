@@ -36,6 +36,7 @@ import {
   useSettingsMutation,
   useSoundSettings,
   useFileTabsSetting,
+  useLspEnabledSetting,
   useChatFileOpenSetting,
   useChatSidebarTabsOpenSetting,
   useNotificationSettings,
@@ -162,6 +163,7 @@ function EditorSettingsCard() {
   const { nvimAppName, isLoading: isLoadingNvim } = useNvimAppNameSetting();
   const { isFileTabsDisabled, isLoading: isLoadingFileTabs } =
     useFileTabsSetting();
+  const { isLspEnabled } = useLspEnabledSetting();
   const { fileOpenMode, isLoading: isLoadingChatFileOpenMode } =
     useChatFileOpenSetting();
   const { sidebarTabsOpenMode, isLoading: isLoadingSidebarTabsOpenMode } =
@@ -248,6 +250,18 @@ function EditorSettingsCard() {
         onSuccess: () =>
           toast.success(
             `Neovim config set to ${value === "devhub" ? "bundled (devhub)" : value === "personal" ? "personal (~/.config/nvim)" : value}`,
+          ),
+      },
+    );
+  };
+
+  const handleLspToggle = (checked: boolean) => {
+    mutation.mutate(
+      { key: SETTINGS_KEYS.LSP_ENABLED, value: checked },
+      {
+        onSuccess: () =>
+          toast.success(
+            `TypeScript language server ${checked ? "enabled" : "disabled"}`,
           ),
       },
     );
@@ -349,6 +363,25 @@ function EditorSettingsCard() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="lsp-enabled">
+              TypeScript language server (experimental)
+            </Label>
+            <p className="text-muted-foreground text-xs">
+              Real-time TypeScript diagnostics, hover, completions and
+              go-to-definition in the file editors. Runs a local vtsls process
+              while enabled.
+            </p>
+          </div>
+          <Switch
+            id="lsp-enabled"
+            checked={isLspEnabled}
+            onCheckedChange={handleLspToggle}
+            disabled={mutation.isPending}
+          />
         </div>
 
         <div className="flex items-center justify-between">

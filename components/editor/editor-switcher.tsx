@@ -34,11 +34,13 @@ interface EditorSwitcherProps {
   workspaceId?: string;
   filePath?: string;
   autoFocus?: boolean;
+  isLspEligible?: boolean;
 }
 
 export const EditorSwitcher = forwardRef<EditorHandle, EditorSwitcherProps>(
   function EditorSwitcher(props, ref) {
     const { editorType } = useEditorTypeSetting();
+    const { isLspEligible, ...editorProps } = props;
 
     return (
       <MarkdownPreviewFrame
@@ -52,9 +54,13 @@ export const EditorSwitcher = forwardRef<EditorHandle, EditorSwitcherProps>(
           workspaceId={props.workspaceId}
         >
           {editorType === "neovim" ? (
-            <NeovimEditor ref={ref} {...props} />
+            <NeovimEditor ref={ref} {...editorProps} />
           ) : (
-            <MonacoEditor ref={ref} {...props} />
+            <MonacoEditor
+              ref={ref}
+              {...editorProps}
+              isLspEligible={isLspEligible}
+            />
           )}
         </CsvPreviewFrame>
       </MarkdownPreviewFrame>

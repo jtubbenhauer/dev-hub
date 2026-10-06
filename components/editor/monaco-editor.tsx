@@ -37,6 +37,8 @@ import { useChatStore } from "@/stores/chat-store";
 import type { FileComment } from "@/types";
 import { MessageCircle } from "lucide-react";
 import { useMonacoDiagnosticMarkers } from "@/hooks/use-monaco-diagnostic-markers";
+import { useLspEditorAttachment } from "@/hooks/use-lsp-editor-attachment";
+import { trackBuiltinTs } from "@/lib/lsp/client/builtin-typescript";
 
 const Editor = dynamic(
   () => import("@monaco-editor/react").then((mod) => mod.default),
@@ -95,11 +97,13 @@ interface MonacoEditorProps {
   onSave?: () => void;
   workspaceId?: string;
   filePath?: string;
+  isLspEligible?: boolean;
 }
 
 export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
   function MonacoEditor(
-    { content, language, onChange, onSave, workspaceId, filePath },
+    // prettier-ignore
+    { content, language, onChange, onSave, workspaceId, filePath, isLspEligible },
     ref,
   ) {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -216,9 +220,19 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       filePath,
       isEditorReady,
     );
+    const lspModelPath = useLspEditorAttachment({
+      editorRef,
+      monacoRef,
+      isEditorReady,
+      workspaceId,
+      filePath,
+      isLspEligible,
+      content,
+    });
 
     const handleBeforeMount = useCallback(
       (monacoInstance: typeof import("monaco-editor")) => {
+        trackBuiltinTs(monacoInstance);
         registerMonacoThemes(monacoInstance);
       },
       [],
@@ -420,6 +434,7 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       <div className="flex h-full w-full overflow-hidden">
         <div className="relative flex-1 overflow-hidden">
           <Editor
+            path={lspModelPath}
             height="100%"
             language={getMonacoLanguage(language)}
             theme={getMonacoThemeName(theme, resolvedMode)}

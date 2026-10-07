@@ -1,0 +1,27 @@
+lib/opencode/fetch-timeout.ts
+  s_4a6eabe9854eed::t_ba97b300360a6d 4-12,26
+  s_4a6eabe9854eed::t_4cf1563968785b 1-3
+tests/api/opencode-proxy.test.ts
+  s_4a6eabe9854eed::t_ae0264d85de886 58,60-71,73-79
+  s_4a6eabe9854eed::t_51aeae3496fd34 264-265,267-273,275-290,292-323
+  s_4a6eabe9854eed::t_a35947b08d4995 291
+  s_4a6eabe9854eed::t_a0df2bd6710147 59,72
+  s_4a6eabe9854eed::t_86f758c4ec1041 266
+  s_4a6eabe9854eed::t_cf93a37fc37e1a 274
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "971f576b1d6f16c36ae0e512b7d9bbdbb8251138",
+  "prompts": {},
+  "sessions": {
+    "s_4a6eabe9854eed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_eeca727fbffe6xRWWvxyEHfBnm",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

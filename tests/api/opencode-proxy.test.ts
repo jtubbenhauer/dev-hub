@@ -55,6 +55,28 @@ function makeRemoteWorkspaceRow() {
   };
 }
 
+function makeLargePromptRequest(): NextRequest {
+  const base64Of10MbPdf = "A".repeat(14 * 1024 * 1024);
+  return new NextRequest(
+    "http://localhost:3000/api/opencode/session/s1/prompt_async?workspaceId=ws-1",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        parts: [
+          { type: "text", text: "Summarise this model" },
+          {
+            type: "file",
+            mime: "application/pdf",
+            filename: "model.pdf",
+            url: `data:application/pdf;base64,${base64Of10MbPdf}`,
+          },
+        ],
+      }),
+    },
+  );
+}
+
 function makeRemoteWorkspace(): Workspace {
   return {
     id: "ws-1",
@@ -234,6 +256,66 @@ describe("OpenCode proxy route retry", () => {
     );
 
     await vi.advanceTimersByTimeAsync(15_000);
+    const response = await promise;
+
+    expect(response.status).toBe(504);
+  });
+
+  it("does not time out a large prompt while its body is still uploading", async () => {
+    vi.useFakeTimers();
+    const uploadSlowerThanHeaderTimeoutMs = 20_000;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, opts?: RequestInit) =>
+          new Promise<Response>((resolve, reject) => {
+            const uploadTimer = setTimeout(
+              () => resolve(new Response(null, { status: 204 })),
+              uploadSlowerThanHeaderTimeoutMs,
+            );
+            opts?.signal?.addEventListener("abort", () => {
+              clearTimeout(uploadTimer);
+              reject((opts.signal as AbortSignal).reason);
+            });
+          }),
+      ),
+    );
+
+    mockWhere.mockResolvedValueOnce([makeRemoteWorkspaceRow()]);
+
+    const mod = await import("@/app/api/opencode/[...path]/route");
+    const promise = mod.POST(makeLargePromptRequest(), {
+      params: Promise.resolve({ path: ["session", "s1", "prompt_async"] }),
+    });
+
+    await vi.advanceTimersByTimeAsync(uploadSlowerThanHeaderTimeoutMs);
+    const response = await promise;
+
+    expect(response.status).toBe(204);
+  });
+
+  it("still returns 504 when the upstream never answers a large prompt", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, opts?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            opts?.signal?.addEventListener("abort", () => {
+              reject((opts.signal as AbortSignal).reason);
+            });
+          }),
+      ),
+    );
+
+    mockWhere.mockResolvedValueOnce([makeRemoteWorkspaceRow()]);
+
+    const mod = await import("@/app/api/opencode/[...path]/route");
+    const promise = mod.POST(makeLargePromptRequest(), {
+      params: Promise.resolve({ path: ["session", "s1", "prompt_async"] }),
+    });
+
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
     const response = await promise;
 
     expect(response.status).toBe(504);

@@ -53,6 +53,7 @@ const remoteWorkspace = { ...localWorkspace, backend: "remote" };
 const stoppedStatus = {
   workspaceId: "ws-1",
   serverEpoch: null,
+  pid: null,
   state: "stopped",
   wsUrl: null,
   error: null,
@@ -229,6 +230,7 @@ describe("POST start", () => {
     expect(await response.json()).toEqual({
       workspaceId: "ws-1",
       serverEpoch: 3,
+      pid: null,
       state: "running",
       wsUrl: "ws://127.0.0.1:7601/?workspaceId=ws-1&epoch=3",
       error: null,

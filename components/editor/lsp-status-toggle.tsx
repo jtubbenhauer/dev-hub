@@ -20,6 +20,7 @@ const STATUS_DOT_CLASSES: Record<LspClientStatus, string> = {
   disabled: "bg-muted-foreground/40",
   unavailable: "bg-muted-foreground/40",
   "waiting-for-editor": "bg-yellow-500",
+  idle: "bg-muted-foreground/40",
   starting: "bg-yellow-500",
   connecting: "bg-yellow-500",
   connected: "bg-green-500",
@@ -31,6 +32,7 @@ const STATUS_TOOLTIPS: Record<Exclude<LspClientStatus, "error">, string> = {
   disabled: "Off — click to enable",
   unavailable: "Needs a local workspace",
   "waiting-for-editor": "Waiting for an editor",
+  idle: "Idle — starts when you open a TypeScript file",
   starting: "Starting…",
   connecting: "Connecting…",
   connected: "Connected",
@@ -51,6 +53,7 @@ export function LspStatusToggle() {
   const { isLspEnabled } = useLspEnabledSetting();
   const mutation = useSettingsMutation();
   const tooltipText = statusTooltip(status, errorMessage);
+  const canRetry = status === "busy" || status === "error";
 
   return (
     <div className="flex items-center">
@@ -83,7 +86,7 @@ export function LspStatusToggle() {
         </TooltipTrigger>
         <TooltipContent>{tooltipText}</TooltipContent>
       </Tooltip>
-      {status === "error" && (
+      {canRetry && (
         <Button
           variant="ghost"
           size="icon"

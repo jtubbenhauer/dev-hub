@@ -2,11 +2,12 @@
 // allow: SIZE_OK — Task 7 requires the complete lifecycle contract in this single test file.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ChildProcess, spawn, type SpawnOptions } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
+import { isProcessLive } from "@/tests/helpers/process-liveness";
 import {
   LspServerManager,
   LspBusyError,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/lsp/types";
 
 const fixturePath = path.resolve("tests/fixtures/fake-lsp-server.mjs");
+const supervisorPath = path.resolve("lib/lsp/lsp-supervisor.mjs");
 const resolveServerCommand = () => ({
   command: process.execPath,
   args: [fixturePath],
@@ -29,11 +31,17 @@ let workspace: { workspaceId: string; workspacePath: string };
 let children: ChildProcess[];
 let originalExitListeners = process.listeners("exit");
 let recordFile: string;
+let realGroups: number[];
+const fakeChildByPid = new Map<number, ChildProcess>();
+const killProcessGroupImpl = vi.fn((pgid: number, signal: NodeJS.Signals) => {
+  fakeChildByPid.get(pgid)?.kill(signal);
+});
 
 const spawnReal = vi.fn(
   (command: string, args: string[], options: SpawnOptions) => {
     const child = spawn(command, args, options);
     children.push(child);
+    if (options.detached && child.pid !== undefined) realGroups.push(child.pid);
     return child;
   },
 );
@@ -92,7 +100,9 @@ async function hover(id: number | string = 0) {
   return response;
 }
 
-function controlledSpawn() {
+function controlledSpawn(
+  options: NonNullable<ConstructorParameters<typeof LspServerManager>[0]> = {},
+) {
   vi.useFakeTimers();
   const spawnImpl = vi.fn(() => {
     const child = new ChildProcess();
@@ -102,10 +112,17 @@ function controlledSpawn() {
     Object.defineProperty(child, "pid", { value: 900_000 + children.length });
     vi.spyOn(child, "kill").mockReturnValue(true);
     children.push(child);
+    fakeChildByPid.set(childPid(), child);
     queueMicrotask(() => child.emit("spawn"));
     return child;
   });
-  manager = new LspServerManager({ resolveServerCommand, spawnImpl });
+  manager = new LspServerManager({
+    resolveServerCommand,
+    spawnImpl,
+    platform: "darwin",
+    killProcessGroupImpl,
+    ...options,
+  });
   return spawnImpl;
 }
 
@@ -117,6 +134,12 @@ function frame(message: JsonRpcMessage) {
 beforeEach(() => {
   originalExitListeners = process.listeners("exit");
   children = [];
+  realGroups = [];
+  fakeChildByPid.clear();
+  killProcessGroupImpl.mockReset();
+  killProcessGroupImpl.mockImplementation((pgid, signal) => {
+    fakeChildByPid.get(pgid)?.kill(signal);
+  });
   spawnReal.mockClear();
   workspace = {
     workspaceId: "workspace A",
@@ -127,6 +150,9 @@ beforeEach(() => {
     "FAKE_LSP_EXIT_ON_HOVER",
     "FAKE_LSP_IGNORE_SHUTDOWN",
     "FAKE_LSP_ASK_CONFIG",
+    "FAKE_LSP_PID_FILE",
+    "FAKE_LSP_SPAWN_GRANDCHILD",
+    "FAKE_LSP_GRANDCHILD_PID_FILE",
     "VTSLS_BIN_PATH",
   ])
     vi.stubEnv(key, undefined);
@@ -141,7 +167,29 @@ afterEach(async () => {
   if (vi.isFakeTimers()) {
     for (const child of children) child.emit("exit", 0, null);
   }
-  await manager.stop();
+  try {
+    await manager.stop();
+  } finally {
+    for (const pgid of realGroups) {
+      const memberPids = [pgid];
+      const grandchildPidFile = path.join(
+        workspace.workspacePath,
+        "grandchild.pid",
+      );
+      if (pgid === children.at(-1)?.pid && existsSync(grandchildPidFile)) {
+        memberPids.push(Number(readFileSync(grandchildPidFile, "utf8")));
+      }
+      if (!memberPids.some(isProcessLive)) continue;
+      try {
+        process.kill(-pgid, "SIGKILL");
+      } catch (error) {
+        if (
+          !(error instanceof Error && "code" in error && error.code === "ESRCH")
+        )
+          throw error;
+      }
+    }
+  }
   for (const listener of process.listeners("exit")) {
     if (!originalExitListeners.includes(listener))
       process.removeListener("exit", listener);
@@ -173,6 +221,7 @@ describe("real stdio lifecycle", () => {
     expect(manager.getStatus(workspace.workspaceId, 7601)).toEqual({
       workspaceId: workspace.workspaceId,
       serverEpoch: 1,
+      pid: childPid(),
       state: "running",
       wsUrl: "ws://127.0.0.1:7601/?workspaceId=workspace%20A&epoch=1",
       error: null,
@@ -180,6 +229,7 @@ describe("real stdio lifecycle", () => {
     expect(manager.getStatus("other", 7601)).toEqual({
       workspaceId: "other",
       serverEpoch: null,
+      pid: null,
       state: "stopped",
       wsUrl: null,
       error: null,
@@ -192,11 +242,25 @@ describe("real stdio lifecycle", () => {
     expect(spawnReal).toHaveBeenCalledTimes(1);
     expect(manager.epoch).toBe(1);
     expect(process.kill(childPid(), 0)).toBe(true);
-    expect(spawnReal).toHaveBeenCalledWith(process.execPath, [fixturePath], {
-      cwd: workspace.workspacePath,
-      stdio: "pipe",
-      env: process.env,
-    });
+    expect(spawnReal).toHaveBeenCalledWith(
+      process.execPath,
+      process.platform === "win32"
+        ? [fixturePath, `--clientProcessId=${process.pid}`]
+        : [
+            supervisorPath,
+            `--parent-pid=${process.pid}`,
+            "--",
+            process.execPath,
+            fixturePath,
+            `--clientProcessId=${process.pid}`,
+          ],
+      {
+        cwd: workspace.workspacePath,
+        stdio: "pipe",
+        env: process.env,
+        detached: process.platform !== "win32",
+      },
+    );
   });
 
   it("replaces the old child when another workspace has no connection", async () => {
@@ -362,7 +426,11 @@ describe("real stdio lifecycle", () => {
     });
     await exited;
     expect(manager.state).toBe("error");
-    expect(manager.error).toBe("vtsls exited (code 3, signal null)");
+    expect(manager.error).toBe(
+      process.platform === "win32"
+        ? "vtsls exited (code 3, signal null)"
+        : "vtsls exited (code null, signal SIGKILL)",
+    );
     expect(manager.hasConnection).toBe(false);
     expect(removed).not.toHaveBeenCalled();
     vi.stubEnv("FAKE_LSP_EXIT_ON_HOVER", undefined);
@@ -410,8 +478,16 @@ describe("shutdown escalation", () => {
     );
     await vi.advanceTimersByTimeAsync(12_000);
     await firstFailure;
-    expect(child.kill).toHaveBeenNthCalledWith(1, "SIGTERM");
-    expect(child.kill).toHaveBeenNthCalledWith(2, "SIGKILL");
+    expect(killProcessGroupImpl).toHaveBeenNthCalledWith(
+      1,
+      child.pid,
+      "SIGTERM",
+    );
+    expect(killProcessGroupImpl).toHaveBeenNthCalledWith(
+      2,
+      child.pid,
+      "SIGKILL",
+    );
     expect(manager.state).toBe("error");
     expect(manager.error).toContain("did not exit");
     const second = manager.stop();
@@ -421,7 +497,11 @@ describe("shutdown escalation", () => {
     );
     await vi.advanceTimersByTimeAsync(5_000);
     await secondFailure;
-    expect(child.kill).toHaveBeenNthCalledWith(3, "SIGKILL");
+    expect(killProcessGroupImpl).toHaveBeenNthCalledWith(
+      3,
+      child.pid,
+      "SIGKILL",
+    );
     const restartFailure = expect(manager.start(workspace)).rejects.toThrow(
       "previous vtsls process",
     );
@@ -561,18 +641,25 @@ describe("shutdown escalation", () => {
     child.stdin = new PassThrough();
     child.stdout = new PassThrough();
     child.stderr = new PassThrough();
-    const kill = vi.spyOn(child, "kill").mockReturnValue(true);
+    Object.defineProperty(child, "pid", { value: 900_000 });
+    vi.spyOn(child, "kill").mockReturnValue(true);
+    fakeChildByPid.set(900_000, child);
     children.push(child);
     manager = new LspServerManager({
       resolveServerCommand,
       spawnImpl: () => child,
+      platform: "darwin",
+      killProcessGroupImpl,
     });
     const started = manager.start(workspace);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(manager.getStatus(workspace.workspaceId, 7601).pid).toBe(900_000);
     await vi.advanceTimersByTimeAsync(10_000);
     await started;
     expect(manager.state).toBe("error");
     expect(manager.error).toBe("vtsls did not start within 10s");
-    expect(kill).toHaveBeenCalled();
+    expect(killProcessGroupImpl).toHaveBeenCalledWith(900_000, "SIGKILL");
+    expect(manager.getStatus(workspace.workspaceId, 7601).pid).toBeNull();
     child.emit("spawn");
     expect(manager.state).toBe("error");
   });
@@ -601,14 +688,30 @@ describe("missing binary", () => {
     await manager.start(workspace);
     expect(spawnReal).toHaveBeenCalledWith(
       process.execPath,
-      [fixturePath, "--stdio"],
-      { cwd: workspace.workspacePath, stdio: "pipe", env: process.env },
+      process.platform === "win32"
+        ? [fixturePath, "--stdio", `--clientProcessId=${process.pid}`]
+        : [
+            supervisorPath,
+            `--parent-pid=${process.pid}`,
+            "--",
+            process.execPath,
+            fixturePath,
+            "--stdio",
+            `--clientProcessId=${process.pid}`,
+          ],
+      {
+        cwd: workspace.workspacePath,
+        stdio: "pipe",
+        env: process.env,
+        detached: process.platform !== "win32",
+      },
     );
     expect(manager.state).toBe("running");
   });
 
   it("reports a spawn error without poisoning a subsequent stop", async () => {
     manager = new LspServerManager({
+      platform: "win32",
       resolveServerCommand: () => ({
         command: "/missing-devhub-executable",
         args: [],
@@ -635,4 +738,201 @@ describe("missing binary", () => {
       globalThis.__devhubLspServerManager = prior;
     }
   });
+});
+
+describe("process-tree ownership", () => {
+  it.each(["darwin", "win32"] as const)(
+    "uses the %s spawn contract",
+    async (platform) => {
+      // Given
+      const customSupervisor = path.join(
+        workspace.workspacePath,
+        "supervisor.mjs",
+      );
+      const spawnImpl = controlledSpawn({
+        platform,
+        parentPid: 4242,
+        supervisorPath: customSupervisor,
+        resolveServerCommand: () => ({
+          command: "custom-vtsls",
+          args: ["--stdio"],
+        }),
+      });
+      // When
+      await manager.start(workspace);
+      // Then
+      expect(spawnImpl).toHaveBeenCalledWith(
+        platform === "win32" ? "custom-vtsls" : process.execPath,
+        platform === "win32"
+          ? ["--stdio", "--clientProcessId=4242"]
+          : [
+              customSupervisor,
+              "--parent-pid=4242",
+              "--",
+              "custom-vtsls",
+              "--stdio",
+              "--clientProcessId=4242",
+            ],
+        {
+          cwd: workspace.workspacePath,
+          stdio: "pipe",
+          env: process.env,
+          detached: platform !== "win32",
+        },
+      );
+    },
+  );
+
+  it("uses direct child signaling when win32 stop escalates", async () => {
+    // Given
+    controlledSpawn({ platform: "win32" });
+    await manager.start(workspace);
+    const child = currentChild();
+    // When
+    const stopped = manager.stop();
+    await vi.advanceTimersByTimeAsync(7_000);
+    child.emit("exit", null, "SIGKILL");
+    await stopped;
+    // Then
+    expect(child.kill).toHaveBeenNthCalledWith(1, "SIGTERM");
+    expect(child.kill).toHaveBeenNthCalledWith(2, "SIGKILL");
+    expect(killProcessGroupImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "destroys stdin when the child exits (stopping=%s)",
+    async (isStopping) => {
+      // Given
+      controlledSpawn();
+      await manager.start(workspace);
+      const child = currentChild();
+      const stopped = isStopping ? manager.stop() : Promise.resolve();
+      await vi.advanceTimersByTimeAsync(0);
+      // When
+      child.emit("exit", 0, null);
+      await stopped;
+      // Then
+      expect(child.stdin?.destroyed).toBe(true);
+      expect(manager.getStatus(workspace.workspaceId, 7601).pid).toBeNull();
+    },
+  );
+
+  it("signals the held group synchronously when a child is running", async () => {
+    // Given
+    controlledSpawn();
+    await manager.start(workspace);
+    // When
+    manager.killProcessTreeSync();
+    // Then
+    expect(killProcessGroupImpl).toHaveBeenCalledExactlyOnceWith(
+      childPid(),
+      "SIGKILL",
+    );
+  });
+
+  it.each([false, true])(
+    "never signals a group when no child is held (previous child=%s)",
+    async (hasPreviousChild) => {
+      // Given
+      controlledSpawn();
+      if (hasPreviousChild) {
+        await manager.start(workspace);
+        currentChild().emit("exit", 0, null);
+      }
+      // When
+      manager.killProcessTreeSync();
+      // Then
+      expect(killProcessGroupImpl).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["ESRCH", "EPERM"])(
+    "handles %s when group signaling fails",
+    async (code) => {
+      // Given
+      controlledSpawn();
+      await manager.start(workspace);
+      const error = Object.assign(new Error("signal failed"), { code });
+      killProcessGroupImpl.mockImplementation(() => {
+        throw error;
+      });
+      const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+      // When
+      manager.killProcessTreeSync();
+      // Then
+      expect(warning.mock.calls).toEqual(
+        code === "ESRCH" ? [] : [["[lsp] process-group signal failed", error]],
+      );
+    },
+  );
+
+  it("kills the tree synchronously when the manager's process exit hook runs", async () => {
+    // Given
+    controlledSpawn();
+    await manager.start(workspace);
+    const kill = vi.spyOn(manager, "killProcessTreeSync");
+    const exitHook = process.listeners("exit").at(-1);
+    if (!exitHook) throw new Error("Expected manager exit hook");
+    // When
+    exitHook(0);
+    // Then
+    expect(kill).toHaveBeenCalledOnce();
+    expect(killProcessGroupImpl).toHaveBeenCalledExactlyOnceWith(
+      childPid(),
+      "SIGKILL",
+    );
+  });
+});
+
+describe.skipIf(process.platform === "win32")("real grandchild cleanup", () => {
+  it.each([
+    { name: "graceful stop", flag: undefined, run: () => manager.stop() },
+    {
+      name: "ignored shutdown",
+      flag: "FAKE_LSP_IGNORE_SHUTDOWN",
+      run: () => manager.stop(),
+    },
+    {
+      name: "hover crash",
+      flag: "FAKE_LSP_EXIT_ON_HOVER",
+      run: () =>
+        new Promise<void>((resolve) => {
+          manager.onServerExited(resolve);
+          manager.sendToServer({
+            jsonrpc: "2.0",
+            id: 0,
+            method: "textDocument/hover",
+          });
+        }),
+    },
+    {
+      name: "synchronous tree kill",
+      flag: undefined,
+      run: () => manager.killProcessTreeSync(),
+    },
+  ])(
+    "removes the live grandchild after $name",
+    async ({ flag, run }) => {
+      // Given
+      const pidFile = path.join(workspace.workspacePath, "grandchild.pid");
+      vi.stubEnv("FAKE_LSP_SPAWN_GRANDCHILD", "1");
+      vi.stubEnv("FAKE_LSP_GRANDCHILD_PID_FILE", pidFile);
+      if (flag) vi.stubEnv(flag, "1");
+      await manager.start(workspace);
+      await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true), {
+        interval: 50,
+        timeout: 2_000,
+      });
+      const grandchildPid = Number(readFileSync(pidFile, "utf8"));
+      expect(isProcessLive(grandchildPid)).toBe(true);
+      // When
+      await run();
+      // Then
+      await vi.waitFor(() => expect(isProcessLive(grandchildPid)).toBe(false), {
+        interval: 50,
+        timeout: 3_000,
+      });
+    },
+    10_000,
+  );
 });

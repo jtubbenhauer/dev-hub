@@ -211,6 +211,7 @@ describe("built-in TypeScript registrations", () => {
       controller.update({
         isLspEnabled: true,
         isMonacoRegistered: true,
+        hasAttachedEditor: true,
         workspace: { id: "ws", path: "/Workspace", backend: "local" },
         retryNonce: 0,
       });

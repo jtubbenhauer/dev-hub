@@ -4,6 +4,7 @@ import type {
 } from "@/lib/lsp/client/lsp-session";
 import {
   LSP_CLOSE_CODES,
+  LSP_EDITORLESS_RELEASE_MS,
   type LspClientStatus,
   type LspStatusResponse,
 } from "@/lib/lsp/types";
@@ -26,6 +27,7 @@ export interface LspSessionInputs {
   readonly isLspEnabled: boolean;
   readonly workspace: LspSessionWorkspace | null;
   readonly isMonacoRegistered: boolean;
+  readonly hasAttachedEditor: boolean;
   readonly retryNonce: number;
 }
 
@@ -101,6 +103,9 @@ export function createLspSessionController(
   let failureCount = 0;
   let retryTimer: TimerHandle | null = null;
   let stableTimer: TimerHandle | null = null;
+  let releaseTimer: TimerHandle | null = null;
+  let activeFlowAttempt: number | null = null;
+  let latestInputs: LspSessionInputs | null = null;
   let lastRetryNonce: number | null = null;
   let pendingStop: Promise<void> = Promise.resolve();
   // Settles once every POST start sent so far has settled and any superseded server it started is stopped.
@@ -119,6 +124,15 @@ export function createLspSessionController(
     if (stableTimer !== null) clearTimer(stableTimer);
     retryTimer = null;
     stableTimer = null;
+  }
+
+  function clearReleaseTimer(): void {
+    if (releaseTimer !== null) clearTimer(releaseTimer);
+    releaseTimer = null;
+  }
+
+  function hasLiveOrPendingSession(): boolean {
+    return handle !== null || activeFlowAttempt === attemptId;
   }
 
   function disposeHandle(): void {
@@ -140,6 +154,7 @@ export function createLspSessionController(
   function teardown(shouldRestore: boolean): void {
     attemptId += 1;
     clearTimers();
+    clearReleaseTimer();
     disposeHandle();
     const stopRequest =
       targetWorkspace !== null && hasStartedServer
@@ -248,6 +263,7 @@ export function createLspSessionController(
   async function runConnectFlow(workspace: LspSessionWorkspace): Promise<void> {
     attemptId += 1;
     const attempt = attemptId;
+    activeFlowAttempt = attempt;
     clearTimers();
     setStatus("starting");
     try {
@@ -288,6 +304,8 @@ export function createLspSessionController(
     } catch (error) {
       if (attempt !== attemptId) return;
       finishWithoutSession("error", describeError(error));
+    } finally {
+      if (activeFlowAttempt === attempt) activeFlowAttempt = null;
     }
   }
 
@@ -321,8 +339,38 @@ export function createLspSessionController(
     }, LSP_STABLE_CONNECTION_MS);
   }
 
+  function releaseIfStillEditorless(): void {
+    releaseTimer = null;
+    if (latestInputs === null || latestInputs.hasAttachedEditor) return;
+    teardown(true);
+    setStatus("idle");
+  }
+
+  function handleEditorlessUpdate(isRetryRequested: boolean): void {
+    if (hasLiveOrPendingSession()) {
+      if (releaseTimer === null) {
+        releaseTimer = setTimer(
+          releaseIfStillEditorless,
+          LSP_EDITORLESS_RELEASE_MS,
+        );
+      }
+      return;
+    }
+    // Nothing is live: cancel a pending backoff retry without touching the server.
+    attemptId += 1;
+    clearTimers();
+    clearReleaseTimer();
+    targetWorkspace = null;
+    hasStartedServer = false;
+    if (isRetryRequested) failureCount = 0;
+    useLspStore.getState().setSession(null, null);
+    restoreBuiltin();
+    setStatus("idle");
+  }
+
   function update(inputs: LspSessionInputs): void {
     if (isDisposed) return;
+    latestInputs = inputs;
     const isRetryRequested =
       lastRetryNonce !== null && lastRetryNonce !== inputs.retryNonce;
     lastRetryNonce = inputs.retryNonce;
@@ -346,6 +394,11 @@ export function createLspSessionController(
     if (targetWorkspace !== null && targetWorkspace.id !== workspace.id) {
       teardown(false);
     }
+    if (!inputs.hasAttachedEditor) {
+      handleEditorlessUpdate(isRetryRequested);
+      return;
+    }
+    clearReleaseTimer();
     if (targetWorkspace !== null && !isRetryRequested) return;
     if (isRetryRequested) {
       clearTimers();
@@ -361,6 +414,7 @@ export function createLspSessionController(
     isDisposed = true;
     attemptId += 1;
     clearTimers();
+    clearReleaseTimer();
     disposeHandle();
     restoreBuiltin();
   }

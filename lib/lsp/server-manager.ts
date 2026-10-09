@@ -29,6 +29,13 @@ type Workspace = {
   readonly workspacePath: string;
 };
 type ManagerOptions = {
+  readonly platform?: NodeJS.Platform;
+  readonly parentPid?: number;
+  readonly supervisorPath?: string;
+  readonly killProcessGroupImpl?: (
+    pgid: number,
+    signal: NodeJS.Signals,
+  ) => void;
   readonly resolveServerCommand?: () => ServerCommand;
   readonly noConnectionIdleMs?: number;
   readonly spawnImpl?: (
@@ -97,12 +104,26 @@ export class LspServerManager {
   private readonly stoppingListeners = new Set<() => void>();
   private readonly spawnImpl;
   private readonly noConnectionIdleMs;
+  private readonly platform;
+  private readonly parentPid;
+  private readonly supervisorPath;
+  private readonly killProcessGroupImpl;
 
   constructor(private readonly options: ManagerOptions = {}) {
     this.spawnImpl = options.spawnImpl ?? spawn;
     this.noConnectionIdleMs =
       options.noConnectionIdleMs ?? LSP_NO_CONNECTION_IDLE_MS;
-    process.once("exit", () => this.child?.kill("SIGKILL"));
+    this.platform = options.platform ?? process.platform;
+    this.parentPid = options.parentPid ?? process.pid;
+    this.supervisorPath =
+      options.supervisorPath ??
+      path.join(process.cwd(), "lib", "lsp", "lsp-supervisor.mjs");
+    this.killProcessGroupImpl =
+      options.killProcessGroupImpl ??
+      ((pgid: number, signal: NodeJS.Signals) => {
+        process.kill(-pgid, signal);
+      });
+    process.once("exit", () => this.killProcessTreeSync());
   }
 
   get isShuttingDown(): boolean {
@@ -115,6 +136,7 @@ export class LspServerManager {
       return {
         workspaceId,
         serverEpoch: null,
+        pid: null,
         state: "stopped",
         wsUrl: null,
         error: null,
@@ -123,6 +145,10 @@ export class LspServerManager {
     return {
       workspaceId,
       serverEpoch: this.epoch,
+      pid:
+        this.state === "starting" || this.state === "running"
+          ? (this.child?.pid ?? null)
+          : null,
       state: this.state,
       wsUrl:
         this.state === "running" && !this.isShuttingDown
@@ -178,11 +204,26 @@ export class LspServerManager {
       }
       let ownChild: ChildProcess;
       try {
-        ownChild = this.spawnImpl(command.command, command.args, {
-          cwd: workspace.workspacePath,
-          stdio: "pipe",
-          env: process.env,
-        });
+        const isPosix = this.platform !== "win32";
+        const args = [...command.args, `--clientProcessId=${this.parentPid}`];
+        ownChild = this.spawnImpl(
+          isPosix ? process.execPath : command.command,
+          isPosix
+            ? [
+                this.supervisorPath,
+                `--parent-pid=${this.parentPid}`,
+                "--",
+                command.command,
+                ...args,
+              ]
+            : args,
+          {
+            cwd: workspace.workspacePath,
+            stdio: "pipe",
+            env: process.env,
+            detached: isPosix,
+          },
+        );
       } catch (error) {
         if (!(error instanceof Error)) throw error;
         this.state = "error";
@@ -211,7 +252,7 @@ export class LspServerManager {
         this.state = "error";
         this.error = "vtsls did not start within 10s";
         this.isStopping = true;
-        ownChild.kill("SIGKILL");
+        this.signalTree("SIGKILL");
         finishStart();
       }, 10_000);
       ownChild.on("spawn", () => {
@@ -322,12 +363,12 @@ export class LspServerManager {
           await waitFor(exited, 2_000);
         }
         if (this.child === ownChild) {
-          ownChild.kill("SIGTERM");
+          this.signalTree("SIGTERM");
           await waitFor(exited, 3_000);
         }
       }
       if (this.child === ownChild) {
-        ownChild.kill("SIGKILL");
+        this.signalTree("SIGKILL");
         await waitFor(exited, 5_000);
       }
       if (this.child === ownChild) {
@@ -411,7 +452,29 @@ export class LspServerManager {
     this.idleTimer = undefined;
   }
 
+  killProcessTreeSync(): void {
+    this.signalTree("SIGKILL");
+  }
+
+  private signalTree(signal: NodeJS.Signals): void {
+    const child = this.child;
+    if (!child) return;
+    if (this.platform === "win32") {
+      child.kill(signal);
+      return;
+    }
+    if (child.pid === undefined) return;
+    try {
+      this.killProcessGroupImpl(child.pid, signal);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ESRCH")
+        return;
+      console.warn("[lsp] process-group signal failed", error);
+    }
+  }
+
   private releaseChild(): void {
+    this.child?.stdin?.destroy();
     this.child = null;
     this.readerSubscription?.dispose();
     this.readerSubscription = null;

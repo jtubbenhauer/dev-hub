@@ -15,6 +15,10 @@ export const LSP_DIAGNOSTIC_MARKER_OWNER = "lsp";
 
 export const LSP_NO_CONNECTION_IDLE_MS = 60_000;
 
+export const LSP_EDITORLESS_RELEASE_MS = 300_000;
+
+export const LSP_HEARTBEAT_INTERVAL_MS = 30_000;
+
 export const LSP_CLOSE_CODES = {
   BUSY: 4001,
   STALE_EPOCH: 4002,
@@ -90,6 +94,7 @@ export type LspServerState = "stopped" | "starting" | "running" | "error";
 export interface LspStatusResponse {
   workspaceId: string;
   serverEpoch: number | null;
+  readonly pid: number | null;
   state: LspServerState;
   wsUrl: string | null;
   error: string | null;
@@ -112,6 +117,7 @@ export type LspClientStatus =
   | "disabled"
   | "unavailable"
   | "waiting-for-editor"
+  | "idle"
   | "starting"
   | "connecting"
   | "connected"

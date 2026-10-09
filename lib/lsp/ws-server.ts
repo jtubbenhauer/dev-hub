@@ -15,6 +15,7 @@ import {
   isJsonRpcResponse,
   LSP_CLOSE_CODES,
   LSP_DEFAULT_PORT,
+  LSP_HEARTBEAT_INTERVAL_MS,
   LSP_PHASE1_CLIENT_NOTIFICATIONS,
   LSP_PHASE1_CLIENT_REQUESTS,
   LSP_PHASE1_DYNAMIC_METHODS,
@@ -24,7 +25,6 @@ import {
 } from "@/lib/lsp/types";
 import { VTSLS_SETTINGS } from "@/lib/lsp/vtsls-settings";
 
-const HEARTBEAT_INTERVAL_MS = 30_000;
 const TRACE_PENDING_LIMIT = 10_000;
 
 type LspWsServer = {
@@ -34,6 +34,13 @@ type LspWsServer = {
   readonly wss: WebSocketServer;
   readonly heartbeat: ReturnType<typeof setInterval>;
 };
+
+export type LspWsServerOptions = {
+  readonly heartbeatIntervalMs?: number;
+};
+
+// Only accepted connections are tracked; false means the last ping is unanswered.
+const isAlive = new WeakMap<WebSocket, boolean>();
 
 type TraceDirection = "c2s" | "s2c";
 
@@ -161,6 +168,8 @@ function handleLspConnection(
     socket.close(LSP_CLOSE_CODES.BUSY, "lsp-busy");
     return;
   }
+  isAlive.set(socket, true);
+  socket.on("pong", () => isAlive.set(socket, true));
 
   const bridge = createLspBridgeSession({
     workspaceRoot: workspacePath,
@@ -251,7 +260,10 @@ async function failInitialisation(server: LspWsServer, message: string) {
   }
 }
 
-function startLspWsServer(manager: LspServerManager): LspWsServer {
+function startLspWsServer(
+  manager: LspServerManager,
+  heartbeatIntervalMs: number,
+): LspWsServer {
   const configuredPort =
     process.env.LSP_SERVER_PORT ?? String(LSP_DEFAULT_PORT);
   const requestedPort = Number(configuredPort);
@@ -267,9 +279,15 @@ function startLspWsServer(manager: LspServerManager): LspWsServer {
   wss.on("error", (error) => console.debug("[lsp] websocket server", error));
   const heartbeat = setInterval(() => {
     for (const client of wss.clients) {
-      if (client.readyState === WebSocket.OPEN) client.ping();
+      if (!isAlive.has(client)) continue;
+      if (isAlive.get(client) === false) {
+        client.terminate();
+        continue;
+      }
+      isAlive.set(client, false);
+      client.ping();
     }
-  }, HEARTBEAT_INTERVAL_MS);
+  }, heartbeatIntervalMs);
 
   let resolveReady: (value: { port: number }) => void = () => {};
   let rejectReady: (error: Error) => void = () => {};
@@ -313,9 +331,14 @@ function startLspWsServer(manager: LspServerManager): LspWsServer {
 
 export function ensureLspWsServer(
   manager: LspServerManager,
+  options: LspWsServerOptions = {},
 ): Promise<{ port: number }> {
   const existing = globalThis.__devhubLspWsServer;
-  if (existing === undefined) return startLspWsServer(manager).ready;
+  if (existing === undefined) {
+    const heartbeatIntervalMs =
+      options.heartbeatIntervalMs ?? LSP_HEARTBEAT_INTERVAL_MS;
+    return startLspWsServer(manager, heartbeatIntervalMs).ready;
+  }
   if (existing.manager !== manager) {
     return Promise.reject(
       new Error(

@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createServer, type Server } from "node:net";
+import { setTimeout as delay } from "node:timers/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
@@ -67,8 +68,8 @@ function inScopeUri() {
   return workspaceRelativePathToFileUri(workspacePath, "src/a.ts");
 }
 
-function connect(url: string): TestClient {
-  const socket = new WebSocket(url);
+function connect(url: string, options?: WebSocket.ClientOptions): TestClient {
+  const socket = new WebSocket(url, options);
   const messages: unknown[] = [];
   socket.on("message", (data) => messages.push(JSON.parse(data.toString())));
   const opened = new Promise<void>((resolve, reject) => {
@@ -477,6 +478,47 @@ describe("server lifecycle", () => {
     await expect(ensureLspWsServer(manager)).resolves.toEqual({
       port: expect.any(Number),
     });
+  });
+});
+
+describe("heartbeat", () => {
+  const HEARTBEAT_TEST_INTERVAL_MS = 100;
+
+  it("terminates a client that stops answering pings and stops the manager", async () => {
+    const { port } = await ensureLspWsServer(manager, {
+      heartbeatIntervalMs: HEARTBEAT_TEST_INTERVAL_MS,
+    });
+    await manager.start({ workspaceId: WORKSPACE_ID, workspacePath });
+    const silentClient = connect(
+      buildLspWsUrl(port, WORKSPACE_ID, manager.epoch),
+      { autoPong: false },
+    );
+    await silentClient.opened;
+
+    const outcome = await Promise.race([
+      silentClient.closed,
+      delay(500).then(() => "still open after 500 ms"),
+    ]);
+
+    expect(outcome).toEqual({ code: 1006, reason: "" });
+    await vi.waitFor(() => expect(manager.state).toBe("stopped"), {
+      timeout: 5_000,
+      interval: 20,
+    });
+  });
+
+  it("keeps a client that answers pings connected", async () => {
+    await ensureLspWsServer(manager, {
+      heartbeatIntervalMs: HEARTBEAT_TEST_INTERVAL_MS,
+    });
+    const { client } = await startAndConnect();
+
+    await delay(1_000);
+
+    expect({
+      readyState: client.socket.readyState,
+      state: manager.state,
+    }).toEqual({ readyState: WebSocket.OPEN, state: "running" });
   });
 });
 

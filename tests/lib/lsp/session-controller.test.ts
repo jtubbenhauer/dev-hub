@@ -47,6 +47,7 @@ function statusBody(
   return {
     workspaceId,
     serverEpoch: 7,
+    pid: 4242,
     state: "running",
     wsUrl: `ws://127.0.0.1:7601/?workspaceId=${workspaceId}&epoch=7`,
     error: null,
@@ -116,6 +117,7 @@ function inputs(overrides: Partial<LspSessionInputs> = {}): LspSessionInputs {
     isLspEnabled: true,
     workspace: workspaceA,
     isMonacoRegistered: true,
+    hasAttachedEditor: true,
     retryNonce: 0,
     ...overrides,
   };
@@ -123,6 +125,16 @@ function inputs(overrides: Partial<LspSessionInputs> = {}): LspSessionInputs {
 
 function lastClose(code: number): void {
   connectOptionsLog.at(-1)?.onUnexpectedClose(code, "closed");
+}
+
+async function expectNextConnectAfter(
+  delayMs: number,
+  expectedCalls: number,
+): Promise<void> {
+  await vi.advanceTimersByTimeAsync(delayMs - 1);
+  expect(connectMock).toHaveBeenCalledTimes(expectedCalls - 1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(connectMock).toHaveBeenCalledTimes(expectedCalls);
 }
 
 function deferStartFor(deferredWorkspaceId: string): {
@@ -392,16 +404,6 @@ describe("createLspSessionController lifecycle", () => {
 });
 
 describe("retry limits", () => {
-  async function expectNextConnectAfter(
-    delayMs: number,
-    expectedCalls: number,
-  ): Promise<void> {
-    await vi.advanceTimersByTimeAsync(delayMs - 1);
-    expect(connectMock).toHaveBeenCalledTimes(expectedCalls - 1);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(connectMock).toHaveBeenCalledTimes(expectedCalls);
-  }
-
   it("retries a rejecting connect 5 times with backoff, then errors", async () => {
     connectImpl = () => Promise.reject(new Error("socket refused"));
 
@@ -583,4 +585,165 @@ describe("superseded in-flight start", () => {
       expect(connectMock).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("editor-less release", () => {
+  const startA = { action: "start", workspaceId: "ws-a" };
+  const stopA = { action: "stop", workspaceId: "ws-a" };
+  const rejectingConnect = () => Promise.reject(new Error("socket refused"));
+
+  async function connectThenLoseEditor(): Promise<void> {
+    controller.update(inputs());
+    await flushMicrotasks();
+    expect(useLspStore.getState().status).toBe("connected");
+    controller.update(inputs({ hasAttachedEditor: false }));
+    await flushMicrotasks();
+  }
+
+  it("stays idle without fetching when no editor is attached", async () => {
+    controller.update(inputs({ hasAttachedEditor: false }));
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(useLspStore.getState().status).toBe("idle");
+    expect(restoreBuiltin).toHaveBeenCalled();
+  });
+
+  it("only resets the failure count on retry while idle", async () => {
+    controller.update(inputs({ hasAttachedEditor: false }));
+    controller.update(inputs({ hasAttachedEditor: false, retryNonce: 1 }));
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(useLspStore.getState().status).toBe("idle");
+  });
+
+  it("connects once an editor attaches", async () => {
+    controller.update(inputs({ hasAttachedEditor: false }));
+    await flushMicrotasks();
+
+    controller.update(inputs());
+    await flushMicrotasks();
+
+    expect(postedActions()).toEqual([startA]);
+    expect(connectMock).toHaveBeenCalledTimes(1);
+    expect(useLspStore.getState()).toMatchObject({
+      status: "connected",
+      sessionWorkspaceId: "ws-a",
+    });
+  });
+
+  it("releases exactly 300,000 ms after the last editor detached", async () => {
+    await connectThenLoseEditor();
+
+    await vi.advanceTimersByTimeAsync(299_999);
+    expect(handles[0]?.dispose).not.toHaveBeenCalled();
+    expect(postedActions()).toEqual([startA]);
+    expect(restoreBuiltin).not.toHaveBeenCalled();
+    expect(useLspStore.getState().status).toBe("connected");
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(handles[0]?.dispose).toHaveBeenCalledTimes(1);
+    expect(postedActions()).toEqual([startA, stopA]);
+    expect(restoreBuiltin).toHaveBeenCalledTimes(1);
+    expect(useLspStore.getState()).toMatchObject({
+      status: "idle",
+      sessionWorkspaceId: null,
+    });
+  });
+
+  it("keeps the session when an editor returns before the deadline", async () => {
+    await connectThenLoseEditor();
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    controller.update(inputs());
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    expect(handles[0]?.dispose).not.toHaveBeenCalled();
+    expect(postedActions()).toEqual([startA]);
+    expect(connectMock).toHaveBeenCalledTimes(1);
+    expect(useLspStore.getState().status).toBe("connected");
+  });
+
+  it("keeps the status while a connect flow is in flight, then releases", async () => {
+    const { resolveStart } = deferStartFor("ws-a");
+    controller.update(inputs());
+    await flushMicrotasks();
+    controller.update(inputs({ hasAttachedEditor: false }));
+    await flushMicrotasks();
+    expect(useLspStore.getState().status).toBe("starting");
+
+    resolveStart(startingResponse("ws-a"));
+    await flushMicrotasks();
+    expect(useLspStore.getState().status).toBe("connected");
+
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(handles[0]?.dispose).toHaveBeenCalledTimes(1);
+    expect(postedActions()).toEqual([startA, stopA]);
+    expect(useLspStore.getState().status).toBe("idle");
+  });
+
+  it("reconnects from idle with the failure count reset", async () => {
+    connectImpl = rejectingConnect;
+    controller.update(inputs());
+    await flushMicrotasks();
+    await expectNextConnectAfter(1000, 2);
+    await expectNextConnectAfter(2000, 3);
+
+    controller.update(inputs({ hasAttachedEditor: false }));
+    await flushMicrotasks();
+    expect(useLspStore.getState().status).toBe("idle");
+
+    controller.update(inputs());
+    await flushMicrotasks();
+    expect(postedActions()).toEqual([startA, startA, startA, startA]);
+    expect(connectMock).toHaveBeenCalledTimes(4);
+    await expectNextConnectAfter(1000, 5);
+  });
+
+  it("cancels a pending backoff retry when the editors vanish", async () => {
+    connectImpl = rejectingConnect;
+    controller.update(inputs());
+    await flushMicrotasks();
+    expect(connectMock).toHaveBeenCalledTimes(1);
+
+    controller.update(inputs({ hasAttachedEditor: false }));
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    expect(connectMock).toHaveBeenCalledTimes(1);
+    expect(useLspStore.getState().status).toBe("idle");
+    expect(restoreBuiltin).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes the disabled path while the release timer is pending", async () => {
+    await connectThenLoseEditor();
+    await vi.advanceTimersByTimeAsync(100_000);
+
+    controller.update(
+      inputs({ isLspEnabled: false, hasAttachedEditor: false }),
+    );
+    await flushMicrotasks();
+    expect(postedActions()).toEqual([startA, stopA]);
+    expect(useLspStore.getState().status).toBe("disabled");
+
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(postedActions()).toEqual([startA, stopA]);
+    expect(useLspStore.getState().status).toBe("disabled");
+    expect(restoreBuiltin).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops the old workspace at once when switching without an editor", async () => {
+    controller.update(inputs());
+    await flushMicrotasks();
+
+    controller.update(
+      inputs({ workspace: workspaceB, hasAttachedEditor: false }),
+    );
+    await flushMicrotasks();
+
+    expect(handles[0]?.dispose).toHaveBeenCalledTimes(1);
+    expect(postedActions()).toEqual([startA, stopA]);
+    expect(connectMock).toHaveBeenCalledTimes(1);
+    expect(useLspStore.getState().status).toBe("idle");
+  });
 });

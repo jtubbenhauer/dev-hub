@@ -48,6 +48,11 @@ describe("LspStatusToggle", () => {
     ["disabled", "bg-muted-foreground/40", "Off — click to enable"],
     ["unavailable", "bg-muted-foreground/40", "Needs a local workspace"],
     ["waiting-for-editor", "bg-yellow-500", "Waiting for an editor"],
+    [
+      "idle",
+      "bg-muted-foreground/40",
+      "Idle — starts when you open a TypeScript file",
+    ],
     ["starting", "bg-yellow-500", "Starting…"],
     ["connecting", "bg-yellow-500", "Connecting…"],
     ["connected", "bg-green-500", "Connected"],
@@ -110,10 +115,10 @@ describe("LspStatusToggle", () => {
     "disabled",
     "unavailable",
     "waiting-for-editor",
+    "idle",
     "starting",
     "connecting",
     "connected",
-    "busy",
   ])("hides the retry button in the %s status", (status) => {
     renderToggle();
     setStatus(status);
@@ -121,15 +126,20 @@ describe("LspStatusToggle", () => {
     expect(screen.queryByTestId("lsp-retry")).not.toBeInTheDocument();
   });
 
-  it("requests a retry from the error state", async () => {
-    renderToggle();
-    setStatus("error", "spawn failed");
+  it.each<LspClientStatus>(["busy", "error"])(
+    "requests a retry from the %s state",
+    async (status) => {
+      renderToggle();
+      setStatus(status, status === "error" ? "spawn failed" : undefined);
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Retry TypeScript language server" }),
-    );
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Retry TypeScript language server",
+        }),
+      );
 
-    expect(useLspStore.getState().retryNonce).toBe(1);
-    expect(mutateMock).not.toHaveBeenCalled();
-  });
+      expect(useLspStore.getState().retryNonce).toBe(1);
+      expect(mutateMock).not.toHaveBeenCalled();
+    },
+  );
 });

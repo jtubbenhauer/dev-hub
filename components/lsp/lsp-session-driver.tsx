@@ -34,6 +34,9 @@ export function LspSessionDriver() {
   );
   const isMonacoRegistered = useLspStore((s) => s.isMonacoRegistered);
   const retryNonce = useLspStore((s) => s.retryNonce);
+  const hasAttachedEditor = useLspStore(
+    (s) => Object.keys(s.documentOwners).length > 0,
+  );
   const controllerRef = useRef<LspSessionController | null>(null);
 
   useEffect(() => {
@@ -59,6 +62,7 @@ export function LspSessionDriver() {
       isLspEnabled,
       workspace,
       isMonacoRegistered,
+      hasAttachedEditor,
       retryNonce,
     });
   }, [
@@ -67,6 +71,7 @@ export function LspSessionDriver() {
     workspacePath,
     workspaceBackend,
     isMonacoRegistered,
+    hasAttachedEditor,
     retryNonce,
   ]);
 

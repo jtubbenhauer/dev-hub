@@ -1,4 +1,22 @@
-import { appendFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { appendFileSync, writeFileSync } from "node:fs";
+
+if (process.env.FAKE_LSP_PID_FILE) {
+  writeFileSync(process.env.FAKE_LSP_PID_FILE, String(process.pid));
+}
+if (process.env.FAKE_LSP_SPAWN_GRANDCHILD === "1") {
+  const grandchild = spawn(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1000)", "fake-tsserver"],
+    { stdio: "ignore" },
+  );
+  if (process.env.FAKE_LSP_GRANDCHILD_PID_FILE) {
+    writeFileSync(
+      process.env.FAKE_LSP_GRANDCHILD_PID_FILE,
+      String(grandchild.pid),
+    );
+  }
+}
 
 const isIgnoringShutdown = process.env.FAKE_LSP_IGNORE_SHUTDOWN === "1";
 if (isIgnoringShutdown) process.on("SIGTERM", () => {});

@@ -26,6 +26,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Local, gitignored artifact directories that are not part of this project.
     ".opencode/**",
+    ".omo/**",
   ]),
 ]);
 

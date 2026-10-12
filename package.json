@@ -25,6 +25,22 @@
     "agent:typecheck": "pnpm --filter @devhub/agent typecheck"
   },
   "dependencies": {
+    "@codingame/monaco-vscode-api": "25.1.2",
+    "@codingame/monaco-vscode-configuration-service-override": "25.1.2",
+    "@codingame/monaco-vscode-editor-api": "25.1.2",
+    "@codingame/monaco-vscode-editor-service-override": "25.1.2",
+    "@codingame/monaco-vscode-extension-api": "25.1.2",
+    "@codingame/monaco-vscode-extensions-service-override": "25.1.2",
+    "@codingame/monaco-vscode-files-service-override": "25.1.2",
+    "@codingame/monaco-vscode-languages-service-override": "25.1.2",
+    "@codingame/monaco-vscode-localization-service-override": "25.1.2",
+    "@codingame/monaco-vscode-log-service-override": "25.1.2",
+    "@codingame/monaco-vscode-model-service-override": "25.1.2",
+    "@codingame/monaco-vscode-standalone-css-language-features": "25.1.2",
+    "@codingame/monaco-vscode-standalone-html-language-features": "25.1.2",
+    "@codingame/monaco-vscode-standalone-json-language-features": "25.1.2",
+    "@codingame/monaco-vscode-standalone-languages": "25.1.2",
+    "@codingame/monaco-vscode-standalone-typescript-language-features": "25.1.2",
     "@devhub/shared": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@opencode-ai/sdk": "^1.2.27",
@@ -49,6 +65,7 @@
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.575.0",
     "monaco-editor": "0.55.1",
+    "monaco-languageclient": "10.7.0",
     "next": "16.1.6",
     "next-auth": "5.0.0-beta.30",
     "node-pty": "^1.1.0",
@@ -68,7 +85,10 @@
     "sonner": "^2.0.7",
     "systeminformation": "^5.31.5",
     "tailwind-merge": "^3.5.0",
+    "vscode": "npm:@codingame/monaco-vscode-extension-api@25.1.2",
     "vscode-jsonrpc": "8.2.1",
+    "vscode-languageclient": "9.0.1",
+    "vscode-ws-jsonrpc": "3.5.0",
     "ws": "^8.19.0",
     "zustand": "^5.0.12"
   },
@@ -104,7 +124,10 @@
       "node-pty"
     ],
     "overrides": {
-      "@monaco-editor/loader": "1.7.0"
+      "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@25.1.2"
+    },
+    "patchedDependencies": {
+      "vscode-languageclient@9.0.1": "patches/vscode-languageclient@9.0.1.patch"
     }
   }
 }

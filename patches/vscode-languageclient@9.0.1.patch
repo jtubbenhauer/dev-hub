@@ -1,0 +1,58 @@
+diff --git a/lib/common/notebook.js b/lib/common/notebook.js
+index 63edaeeadbedf98ed410811ac5b8b7861fb46500..e3fc3417d81eb7007ae9b1b5755fd3c0547fa71b 100644
+--- a/lib/common/notebook.js
++++ b/lib/common/notebook.js
+@@ -714,6 +714,10 @@ class NotebookDocumentSyncFeature {
+         this.client = client;
+         this.registrations = new Map();
+         this.registrationType = proto.NotebookDocumentSyncRegistrationType.type;
++        this.textDocumentListeners = [];
++    }
++    ensureTextDocumentListeners() {
++        if (this.textDocumentListeners.length > 0) return;
+         // We don't receive an event for cells where the document changes its language mode
+         // Since we allow servers to filter on the language mode we fire such an event ourselves.
+         vscode.workspace.onDidOpenTextDocument((textDocument) => {
+@@ -729,7 +733,7 @@ class NotebookDocumentSyncFeature {
+                     provider.didOpenNotebookCellTextDocument(notebookDocument, notebookCell);
+                 }
+             }
+-        });
++        }, undefined, this.textDocumentListeners);
+         vscode.workspace.onDidChangeTextDocument((event) => {
+             if (event.contentChanges.length === 0) {
+                 return;
+@@ -747,7 +751,7 @@ class NotebookDocumentSyncFeature {
+                     provider.didChangeNotebookCellTextDocument(notebookDocument, event);
+                 }
+             }
+-        });
++        }, undefined, this.textDocumentListeners);
+         vscode.workspace.onDidCloseTextDocument((textDocument) => {
+             if (textDocument.uri.scheme !== NotebookDocumentSyncFeature.CellScheme) {
+                 return;
+@@ -765,7 +769,7 @@ class NotebookDocumentSyncFeature {
+                     provider.didCloseNotebookCellTextDocument(notebookDocument, notebookCell);
+                 }
+             }
+-        });
++        }, undefined, this.textDocumentListeners);
+     }
+     getState() {
+         if (this.registrations.size === 0) {
+@@ -800,6 +804,7 @@ class NotebookDocumentSyncFeature {
+         this.register({ id, registerOptions: options });
+     }
+     register(data) {
++        this.ensureTextDocumentListeners();
+         const provider = new NotebookDocumentSyncFeatureProvider(this.client, data.registerOptions);
+         this.registrations.set(data.id, provider);
+     }
+@@ -812,6 +817,7 @@ class NotebookDocumentSyncFeature {
+             provider.dispose();
+         }
+         this.registrations.clear();
++        for (const listener of this.textDocumentListeners.splice(0)) listener.dispose();
+     }
+     handles(textDocument) {
+         if (textDocument.uri.scheme !== NotebookDocumentSyncFeature.CellScheme) {

@@ -53,7 +53,7 @@ async function gitPost<T>(
 
 export function useGitStatus(
   workspaceId: string | null,
-  refetchIntervalMs: number = 10_000,
+  refetchIntervalMs: number = 30_000,
 ) {
   return useQuery<GitStatusResult>({
     queryKey: ["git-status", workspaceId],

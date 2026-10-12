@@ -143,6 +143,7 @@ function _emitEvent(
 // a beforeEach after calling vi.resetModules().
 
 import { useChatStore, _resetModuleCaches } from "../../stores/chat-store";
+import { subscribeToGitStatusRefresh } from "@/lib/git/git-status-refresh";
 
 async function flushMicrotasks(ticks = 8) {
   for (let i = 0; i < ticks; i++) await Promise.resolve();
@@ -1326,6 +1327,43 @@ describe("cross-workspace SSE routing", () => {
     expect(
       useChatStore.getState().workspaceStates["ws-a"].sessionStatuses["sess-a"],
     ).toEqual({ type: "idle" });
+  });
+
+  it("session.idle requests a git status refresh for the session's workspace", () => {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": {
+          sessions: { "sess-a": makeSession("sess-a") },
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: { "sess-a": { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+          sessionsLoaded: true,
+        },
+      },
+      activeWorkspaceId: "ws-b",
+      activeSessionId: null,
+    });
+    const gitStatusRefreshListener = vi.fn();
+    const unsubscribe = subscribeToGitStatusRefresh(gitStatusRefreshListener);
+
+    useChatStore
+      .getState()
+      .handleEvent(
+        { type: "session.idle", properties: { sessionID: "sess-a" } },
+        "ws-b",
+      );
+    unsubscribe();
+
+    expect(gitStatusRefreshListener).toHaveBeenCalledExactlyOnceWith("ws-a");
   });
 
   it("session.status (idle) from a background workspace updates sessionStatuses in that workspace", () => {

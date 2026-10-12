@@ -44,6 +44,7 @@ import {
   type SessionDeletionResult,
 } from "@/lib/chat/session-deletion";
 import { engineForSessionId, type ChatEngine } from "@/lib/engine/types";
+import { requestGitStatusRefresh } from "@/lib/git/git-status-refresh";
 
 export type StreamingStatus =
   | "idle"
@@ -4219,6 +4220,8 @@ export const useChatStore = create<ChatState>()(
             if (sessionID === activeSessionId && wsId === activeWorkspaceId) {
               get().clearStreamingPoll();
             }
+            // OpenCode emits no per-file edit events; a finished turn is when its writes land.
+            requestGitStatusRefresh(wsId);
             playSoundForEvent("agent");
             sendBrowserNotification("Agent completed", {
               body: "The agent has finished processing.",

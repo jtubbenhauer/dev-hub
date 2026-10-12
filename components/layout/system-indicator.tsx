@@ -1,6 +1,6 @@
 "use client";
 
-import { useSystemStatsSnapshot } from "@/hooks/use-system-stats";
+import { useSystemSummary } from "@/hooks/use-system-stats";
 import {
   Popover,
   PopoverContent,
@@ -36,7 +36,7 @@ function formatUptime(seconds: number): string {
 }
 
 export function SystemIndicator() {
-  const { data: stats } = useSystemStatsSnapshot({ interval: 30_000 });
+  const { data: stats } = useSystemSummary({ interval: 30_000 });
 
   if (!stats) return null;
 

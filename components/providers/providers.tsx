@@ -6,6 +6,7 @@ import { useState } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { LspSessionDriver } from "@/components/lsp/lsp-session-driver";
+import { GitStatusRefreshSubscriber } from "@/components/providers/git-status-refresh-subscriber";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { CommandPaletteProvider } from "@/components/providers/command-palette-provider";
 import { CommandPalette } from "@/components/command-palette/command-palette";
@@ -76,6 +77,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
+        <GitStatusRefreshSubscriber />
         <ThemeProvider>
           <TooltipProvider>
             <CommandPaletteProvider>

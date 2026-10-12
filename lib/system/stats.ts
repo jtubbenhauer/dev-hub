@@ -1,5 +1,8 @@
+import os from "node:os";
 import si from "systeminformation";
+import type { Systeminformation } from "systeminformation";
 import type {
+  SystemSummary,
   SystemStats,
   SystemStatsWithHistory,
   CpuStats,
@@ -11,61 +14,85 @@ import type {
 } from "@/types";
 
 const RING_BUFFER_SIZE = 60; // 5 minutes at 5s intervals
-const CACHE_TTL_MS = 2_000;
 const COLLECTION_INTERVAL_MS = 5_000;
+const STATS_FRESH_MS = COLLECTION_INTERVAL_MS + 1_000;
+const FULL_ACTIVE_WINDOW_MS = 15_000; // loop collects full stats while full requests keep arriving
 const IDLE_STOP_MS = 5 * 60 * 1_000; // stop background collection after 5min of no requests
+
+type InFlightCollection =
+  | { kind: "summary"; promise: Promise<SystemSummary> }
+  | { kind: "full"; promise: Promise<SystemStats> };
+
+interface CpuStaticInfo {
+  cores: number;
+  model: string;
+  speed: number;
+}
 
 // Ring buffer — only scalar series for sparklines
 const history: SystemStatsHistory = {
   timestamps: [],
   cpu: [],
   memory: [],
+  networkTimestamps: [],
   networkRx: [],
   networkTx: [],
 };
 
-let cachedStats: SystemStats | null = null;
-let cacheTimestamp = 0;
+let cpuStaticInfoPromise: Promise<CpuStaticInfo> | null = null;
+let inFlightCollection: InFlightCollection | null = null;
+let latestResult: SystemSummary | null = null;
+let latestResultAt = 0;
+let latestFullResult: SystemStats | null = null;
+let latestFullResultAt = 0;
 let collectionTimer: ReturnType<typeof setInterval> | null = null;
-let lastRequestTime = 0;
+let lastRequestAt = 0;
+let lastFullRequestAt = 0;
 
-function pushToRingBuffer(stats: SystemStats) {
-  const totalRx = stats.network.reduce((sum, n) => sum + n.rxSec, 0);
-  const totalTx = stats.network.reduce((sum, n) => sum + n.txSec, 0);
-
-  history.timestamps.push(stats.timestamp);
-  history.cpu.push(stats.cpu.usage);
-  history.memory.push(stats.memory.usagePercent);
-  history.networkRx.push(totalRx);
-  history.networkTx.push(totalTx);
-
-  if (history.timestamps.length > RING_BUFFER_SIZE) {
-    history.timestamps.shift();
-    history.cpu.shift();
-    history.memory.shift();
-    history.networkRx.shift();
-    history.networkTx.shift();
-  }
+function pushCapped(series: number[], value: number) {
+  series.push(value);
+  if (series.length > RING_BUFFER_SIZE) series.shift();
 }
 
-async function collectStats(): Promise<SystemStats> {
-  const [cpuLoad, cpuData, mem, disksRaw, networkRaw, processes, uptime, temp] =
-    await Promise.all([
-      si.currentLoad(),
-      si.cpu(),
-      si.mem(),
-      si.fsSize(),
-      si.networkStats(),
-      si.processes(),
-      si.time(),
-      si.cpuTemperature().catch(() => null),
-    ]);
+function pushToRingBuffer(result: SystemSummary | SystemStats) {
+  pushCapped(history.timestamps, result.timestamp);
+  pushCapped(history.cpu, result.cpu.usage);
+  pushCapped(history.memory, result.memory.usagePercent);
 
-  const cpu: CpuStats = {
-    usage: Math.round(cpuLoad.currentLoad * 10) / 10,
+  if (!("network" in result)) return;
+  const totalRx = result.network.reduce((sum, n) => sum + n.rxSec, 0);
+  const totalTx = result.network.reduce((sum, n) => sum + n.txSec, 0);
+  pushCapped(history.networkTimestamps, result.timestamp);
+  pushCapped(history.networkRx, totalRx);
+  pushCapped(history.networkTx, totalTx);
+}
+
+function getCpuStaticInfo(): Promise<CpuStaticInfo> {
+  if (cpuStaticInfoPromise) return cpuStaticInfoPromise;
+  const promise = si.cpu().then((cpuData) => ({
     cores: cpuData.cores,
     model: `${cpuData.manufacturer} ${cpuData.brand}`.trim(),
     speed: cpuData.speed,
+  }));
+  cpuStaticInfoPromise = promise;
+  // A failed lookup must not stay memoized, so the next collection retries.
+  promise.catch(() => {
+    if (cpuStaticInfoPromise === promise) cpuStaticInfoPromise = null;
+  });
+  return promise;
+}
+
+function buildSummary(
+  cpuLoad: Systeminformation.CurrentLoadData,
+  mem: Systeminformation.MemData,
+  temp: Systeminformation.CpuTemperatureData | null,
+  cpuInfo: CpuStaticInfo,
+): SystemSummary {
+  const cpu: CpuStats = {
+    usage: Math.round(cpuLoad.currentLoad * 10) / 10,
+    cores: cpuInfo.cores,
+    model: cpuInfo.model,
+    speed: cpuInfo.speed,
     temperature: temp?.main && temp.main > 0 ? temp.main : undefined,
   };
 
@@ -81,6 +108,36 @@ async function collectStats(): Promise<SystemStats> {
         ? Math.round((mem.swapused / mem.swaptotal) * 1000) / 10
         : 0,
   };
+
+  return {
+    cpu,
+    memory,
+    uptime: Math.floor(os.uptime()),
+    timestamp: Date.now(),
+  };
+}
+
+async function collectSummary(): Promise<SystemSummary> {
+  const [cpuLoad, mem, temp, cpuInfo] = await Promise.all([
+    si.currentLoad(),
+    si.mem(),
+    si.cpuTemperature().catch(() => null),
+    getCpuStaticInfo(),
+  ]);
+  return buildSummary(cpuLoad, mem, temp, cpuInfo);
+}
+
+async function collectFull(): Promise<SystemStats> {
+  const [cpuLoad, mem, temp, cpuInfo, disksRaw, networkRaw, processes] =
+    await Promise.all([
+      si.currentLoad(),
+      si.mem(),
+      si.cpuTemperature().catch(() => null),
+      getCpuStaticInfo(),
+      si.fsSize(),
+      si.networkStats(),
+      si.processes(),
+    ]);
 
   // Filter out /mnt/* mounts (Windows drives in WSL) and tiny pseudo-filesystems
   const disks: DiskStats[] = disksRaw
@@ -117,33 +174,103 @@ async function collectStats(): Promise<SystemStats> {
       command: p.command,
     }));
 
+  const summary = buildSummary(cpuLoad, mem, temp, cpuInfo);
   return {
-    cpu,
-    memory,
+    cpu: summary.cpu,
+    memory: summary.memory,
     disks,
     network,
     processes: topProcesses,
-    uptime: Math.floor(uptime.uptime),
-    timestamp: Date.now(),
+    uptime: summary.uptime,
+    timestamp: summary.timestamp,
   };
+}
+
+function recordCollection(result: SystemSummary | SystemStats) {
+  const now = Date.now();
+  latestResult = result;
+  latestResultAt = now;
+  if ("network" in result) {
+    latestFullResult = result;
+    latestFullResultAt = now;
+  }
+  pushToRingBuffer(result);
+}
+
+// si.currentLoad() and si.networkStats() measure since their previous call,
+// so callers must never start a collection while another one is in flight.
+function startSummaryCollection(): Promise<SystemSummary> {
+  const promise = collectSummary().then((result) => {
+    recordCollection(result);
+    return result;
+  });
+  trackInFlight({ kind: "summary", promise });
+  return promise;
+}
+
+function startFullCollection(): Promise<SystemStats> {
+  const promise = collectFull().then((result) => {
+    recordCollection(result);
+    return result;
+  });
+  trackInFlight({ kind: "full", promise });
+  return promise;
+}
+
+function trackInFlight(collection: InFlightCollection) {
+  inFlightCollection = collection;
+  const clearWhenSettled = () => {
+    if (inFlightCollection === collection) inFlightCollection = null;
+  };
+  collection.promise.then(clearWhenSettled, clearWhenSettled);
+}
+
+function obtainSummary(): Promise<SystemSummary> {
+  if (inFlightCollection) return inFlightCollection.promise;
+  return startSummaryCollection();
+}
+
+async function obtainFull(): Promise<SystemStats> {
+  const current = inFlightCollection;
+  if (!current) return startFullCollection();
+  if (current.kind === "full") return current.promise;
+  await current.promise.catch(() => undefined);
+  // Another caller may have started a full collection while this one waited.
+  return obtainFull();
+}
+
+function isFresh(collectedAt: number, now: number): boolean {
+  return now - collectedAt < STATS_FRESH_MS;
+}
+
+function toSummary(result: SystemSummary): SystemSummary {
+  return {
+    cpu: result.cpu,
+    memory: result.memory,
+    uptime: result.uptime,
+    timestamp: result.timestamp,
+  };
+}
+
+async function runCollectionTick() {
+  const now = Date.now();
+  if (now - lastRequestAt > IDLE_STOP_MS) {
+    stopCollection();
+    return;
+  }
+  const shouldCollectFull = now - lastFullRequestAt < FULL_ACTIVE_WINDOW_MS;
+  try {
+    if (shouldCollectFull) await obtainFull();
+    else await obtainSummary();
+  } catch {
+    // silently swallow — transient collection errors shouldn't crash the server
+  }
 }
 
 function startCollection() {
   if (collectionTimer) return;
-  collectionTimer = setInterval(async () => {
-    // Auto-stop after idle period
-    if (Date.now() - lastRequestTime > IDLE_STOP_MS) {
-      stopCollection();
-      return;
-    }
-    try {
-      const stats = await collectStats();
-      cachedStats = stats;
-      cacheTimestamp = Date.now();
-      pushToRingBuffer(stats);
-    } catch {
-      // silently swallow — transient collection errors shouldn't crash the server
-    }
+  collectionTimer = setInterval(() => {
+    void runCollectionTick();
   }, COLLECTION_INTERVAL_MS);
 }
 
@@ -154,22 +281,40 @@ function stopCollection() {
   }
 }
 
-export async function getSystemStats(): Promise<SystemStats> {
-  lastRequestTime = Date.now();
+export async function getSystemSummary(): Promise<SystemSummary> {
+  const now = Date.now();
+  lastRequestAt = now;
   startCollection();
 
-  if (cachedStats && Date.now() - cacheTimestamp < CACHE_TTL_MS) {
-    return cachedStats;
+  if (latestResult && isFresh(latestResultAt, now)) {
+    return toSummary(latestResult);
   }
+  return toSummary(await obtainSummary());
+}
 
-  const stats = await collectStats();
-  cachedStats = stats;
-  cacheTimestamp = Date.now();
-  pushToRingBuffer(stats);
-  return stats;
+export async function getSystemStats(): Promise<SystemStats> {
+  const now = Date.now();
+  lastRequestAt = now;
+  lastFullRequestAt = now;
+  startCollection();
+
+  if (latestFullResult && isFresh(latestFullResultAt, now)) {
+    return latestFullResult;
+  }
+  return obtainFull();
 }
 
 export async function getSystemStatsWithHistory(): Promise<SystemStatsWithHistory> {
   const current = await getSystemStats();
-  return { current, history: { ...history } };
+  return {
+    current,
+    history: {
+      timestamps: [...history.timestamps],
+      cpu: [...history.cpu],
+      memory: [...history.memory],
+      networkTimestamps: [...history.networkTimestamps],
+      networkRx: [...history.networkRx],
+      networkTx: [...history.networkTx],
+    },
+  };
 }

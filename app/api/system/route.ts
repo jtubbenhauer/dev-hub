@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
-import { getSystemStats, getSystemStatsWithHistory } from "@/lib/system/stats";
+import {
+  getSystemStats,
+  getSystemStatsWithHistory,
+  getSystemSummary,
+} from "@/lib/system/stats";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -10,10 +14,16 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = request.nextUrl;
   const includeHistory = searchParams.get("history") === "true";
+  const isSummaryOnly = searchParams.get("detail") === "summary";
 
   try {
     if (includeHistory) {
       const data = await getSystemStatsWithHistory();
+      return NextResponse.json(data);
+    }
+
+    if (isSummaryOnly) {
+      const data = await getSystemSummary();
       return NextResponse.json(data);
     }
 

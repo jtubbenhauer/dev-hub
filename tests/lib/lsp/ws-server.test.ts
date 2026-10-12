@@ -243,7 +243,7 @@ describe("connection checks", () => {
 });
 
 describe("bridged traffic", () => {
-  it("returns initialize capabilities without referencesProvider", async () => {
+  it("returns initialize capabilities with referencesProvider", async () => {
     const { client } = await startAndConnect();
     send(client, {
       id: 0,
@@ -257,6 +257,7 @@ describe("bridged traffic", () => {
       capabilities: {
         textDocumentSync: 2,
         hoverProvider: true,
+        referencesProvider: true,
         completionProvider: { resolveProvider: true },
       },
     });
@@ -277,7 +278,7 @@ describe("bridged traffic", () => {
     expect(hoverUris[0]).not.toContain("inmemory");
   });
 
-  it("rejects textDocument/references with -32601 without reaching the server", async () => {
+  it("forwards textDocument/references to the server", async () => {
     const { client } = await startAndConnect();
     send(client, {
       id: 3,
@@ -288,12 +289,26 @@ describe("bridged traffic", () => {
         context: { includeDeclaration: true },
       },
     });
+    hover(client, 4, inScopeUri());
+    await waitForResponse(client, 4);
+
+    expect(recordedMethods()).toContain("textDocument/references");
+    expect(recordedMethods()).toContain("textDocument/hover");
+  });
+
+  it("rejects workspace/symbol with -32601 without reaching the server", async () => {
+    const { client } = await startAndConnect();
+    send(client, {
+      id: 3,
+      method: "workspace/symbol",
+      params: { query: "helper" },
+    });
     const response = await waitForResponse(client, 3);
     hover(client, 4, inScopeUri());
     await waitForResponse(client, 4);
 
     expect(response.error?.code).toBe(-32601);
-    expect(recordedMethods()).not.toContain("textDocument/references");
+    expect(recordedMethods()).not.toContain("workspace/symbol");
     expect(recordedMethods()).toContain("textDocument/hover");
   });
 
@@ -544,8 +559,8 @@ describe("trace file", () => {
     await waitForResponse(client, 2);
     send(client, {
       id: 3,
-      method: "textDocument/references",
-      params: { textDocument: { uri: inScopeUri() } },
+      method: "workspace/symbol",
+      params: { query: "helper" },
     });
     await waitForResponse(client, 3);
     const lines = readJsonLines(traceFile);
@@ -603,7 +618,7 @@ describe("trace file", () => {
       {
         dir: "s2c",
         kind: "response",
-        method: "textDocument/references",
+        method: "workspace/symbol",
         id: 3,
         resultNonEmpty: false,
       },

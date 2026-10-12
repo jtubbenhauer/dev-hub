@@ -13,7 +13,7 @@ describe("getSettingsSection", () => {
     ).toBe("literals");
     expect(
       getSettingsSection("vtsls.experimental.completion.entriesLimit"),
-    ).toBe(200);
+    ).toBe(50);
     expect(getSettingsSection("typescript.format")).toEqual({ enable: true });
   });
 
@@ -28,5 +28,16 @@ describe("getSettingsSection", () => {
     expect(getSettingsSection("javascript.inlayHints")).toEqual(
       getSettingsSection("typescript.inlayHints"),
     );
+  });
+
+  it("caps vtsls completion lists at 50 entries with server-side fuzzy match", () => {
+    expect(VTSLS_SETTINGS.vtsls.experimental.completion).toEqual({
+      enableServerSideFuzzyMatch: true,
+      entriesLimit: 50,
+    });
+    expect(getSettingsSection("vtsls.experimental.completion")).toEqual({
+      enableServerSideFuzzyMatch: true,
+      entriesLimit: 50,
+    });
   });
 });

@@ -6,71 +6,50 @@ import {
 import {
   isJsonRpcRequest,
   isJsonRpcResponse,
+  isLspRecord as isRecord,
+  LSP_PHASE2_CLIENT_REQUESTS,
+  LSP_PHASE2_CLIENT_NOTIFICATIONS,
+  LSP_PHASE2_DYNAMIC_METHODS,
   type JsonRpcId,
   type JsonRpcMessage,
+  type JsonRpcNotification,
+  type JsonRpcRequest,
 } from "@/lib/lsp/types";
 import {
   getSettingsSection,
   type VTSLS_SETTINGS,
 } from "@/lib/lsp/vtsls-settings";
-
-export type BridgeOutput = {
-  toServer: JsonRpcMessage[];
-  toClient: JsonRpcMessage[];
-};
+import {
+  record,
+  toClient,
+  toServer,
+  response,
+  type BridgeOutput,
+} from "@/lib/lsp/bridge-protocol";
+import { rewriteServerResult } from "@/lib/lsp/bridge-server-results";
+import {
+  createBridgeWorkspaceEdits,
+  type ApplyWorkspaceEdit,
+} from "@/lib/lsp/bridge-workspace-edits";
+export type { BridgeOutput } from "@/lib/lsp/bridge-protocol";
 
 type BridgeOptions = {
   readonly workspaceRoot: string;
   readonly resolveRealCaseUri: (uri: string) => string | null;
   readonly settings: typeof VTSLS_SETTINGS;
-  readonly allowedServerCapabilities: readonly string[];
-  readonly allowedDynamicMethods: readonly string[];
-  readonly allowedClientRequests: readonly string[];
-  readonly allowedClientNotifications: readonly string[];
+  readonly applyWorkspaceEdit: ApplyWorkspaceEdit;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function record(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? value : {};
-}
-
-function toClient(...messages: JsonRpcMessage[]): BridgeOutput {
-  return { toServer: [], toClient: messages };
-}
-
-function toServer(...messages: JsonRpcMessage[]): BridgeOutput {
-  return { toServer: messages, toClient: [] };
-}
-
-function response(id: JsonRpcId, result: unknown): JsonRpcMessage {
-  return { jsonrpc: "2.0", id, result };
-}
-
-const SERVER_INTERNAL_COMMAND_PREFIXES = ["_typescript.", "_vtsls."];
-
-function stripCompletionCommand(item: unknown): unknown {
-  if (!isRecord(item)) return item;
-  const command = record(item.command).command;
-  if (
-    typeof command !== "string" ||
-    !SERVER_INTERNAL_COMMAND_PREFIXES.some((prefix) =>
-      command.startsWith(prefix),
-    )
-  )
-    return item;
-  const cleaned = { ...item };
-  delete cleaned.command;
-  return cleaned;
-}
 
 export function createLspBridgeSession(options: BridgeOptions) {
   const { workspaceRoot, resolveRealCaseUri } = options;
   const rootUri = workspaceRootToFileUri(workspaceRoot);
   const name = workspaceRoot.split("/").at(-1) ?? workspaceRoot;
   const pendingClientRequests = new Map<JsonRpcId, string>();
+  const phase2 = createBridgeWorkspaceEdits(options);
+  const allowedClientRequests: readonly string[] = LSP_PHASE2_CLIENT_REQUESTS;
+  const allowedClientNotifications: readonly string[] =
+    LSP_PHASE2_CLIENT_NOTIFICATIONS;
+  const allowedDynamicMethods: readonly string[] = LSP_PHASE2_DYNAMIC_METHODS;
 
   function forwardClient(message: JsonRpcMessage): BridgeOutput {
     if (isJsonRpcRequest(message)) {
@@ -80,12 +59,42 @@ export function createLspBridgeSession(options: BridgeOptions) {
     return toServer(message);
   }
 
-  function fromClient(input: JsonRpcMessage): BridgeOutput {
-    const message = structuredClone(input);
+  function withRealCaseDocument(
+    message: JsonRpcRequest | JsonRpcNotification,
+    params: Record<string, unknown>,
+  ): JsonRpcMessage | null {
+    const textDocument = record(params.textDocument);
+    if (typeof textDocument.uri !== "string") return message;
+    const real = resolveRealCaseUri(textDocument.uri);
+    if (
+      real === null ||
+      !isLspDocumentUriInWorkspace(real, workspaceRoot, {
+        isCaseInsensitive: false,
+      })
+    )
+      return null;
+    return {
+      ...message,
+      params: {
+        ...params,
+        textDocument: {
+          ...textDocument,
+          uri: real,
+          ...(message.method === "textDocument/didOpen"
+            ? { languageId: lspLanguageIdForPath(real) }
+            : {}),
+        },
+      },
+    };
+  }
+
+  function fromClient(message: JsonRpcMessage): BridgeOutput {
     if (isJsonRpcResponse(message)) return toServer(message);
     if (!("method" in message)) return toClient();
+    const local = phase2.fromClient(message);
+    if (local) return local;
     const isRequest = isJsonRpcRequest(message);
-    if (isRequest && !options.allowedClientRequests.includes(message.method)) {
+    if (isRequest && !allowedClientRequests.includes(message.method)) {
       return toClient({
         jsonrpc: "2.0",
         id: message.id,
@@ -95,32 +104,31 @@ export function createLspBridgeSession(options: BridgeOptions) {
         },
       });
     }
-    if (
-      !isRequest &&
-      !options.allowedClientNotifications.includes(message.method)
-    )
+    if (!isRequest && !allowedClientNotifications.includes(message.method))
       return toClient();
     const params = record(message.params);
     switch (message.method) {
       case "initialize":
         if (isRequest) {
           const capabilities = record(params.capabilities);
-          message.params = {
-            ...params,
-            rootUri,
-            rootPath: workspaceRoot,
-            workspaceFolders: [{ uri: rootUri, name }],
-            capabilities: {
-              ...capabilities,
-              workspace: {
-                ...record(capabilities.workspace),
-                configuration: true,
-                workspaceFolders: true,
-                didChangeConfiguration: { dynamicRegistration: false },
+          return forwardClient({
+            ...message,
+            params: {
+              ...params,
+              rootUri,
+              rootPath: workspaceRoot,
+              workspaceFolders: [{ uri: rootUri, name }],
+              capabilities: {
+                ...capabilities,
+                workspace: {
+                  ...record(capabilities.workspace),
+                  configuration: true,
+                  workspaceFolders: true,
+                  didChangeConfiguration: { dynamicRegistration: false },
+                },
               },
             },
-          };
-          return forwardClient(message);
+          });
         }
         break;
       case "initialized":
@@ -138,61 +146,25 @@ export function createLspBridgeSession(options: BridgeOptions) {
         if (!isRequest) return toClient();
         break;
     }
-    const textDocument = record(params.textDocument);
-    if (typeof textDocument.uri === "string") {
-      const real = resolveRealCaseUri(textDocument.uri);
-      if (
-        real === null ||
-        !isLspDocumentUriInWorkspace(real, workspaceRoot, {
-          isCaseInsensitive: false,
-        })
-      ) {
-        return isRequest ? toClient(response(message.id, null)) : toClient();
-      }
-      message.params = {
-        ...params,
-        textDocument: {
-          ...textDocument,
-          uri: real,
-          ...(message.method === "textDocument/didOpen"
-            ? { languageId: lspLanguageIdForPath(real) }
-            : {}),
-        },
-      };
-    }
-    return forwardClient(message);
+    const forwarded = withRealCaseDocument(message, params);
+    if (forwarded === null)
+      return isRequest ? toClient(response(message.id, null)) : toClient();
+    phase2.track(forwarded);
+    return forwardClient(forwarded);
   }
 
-  function fromServer(input: JsonRpcMessage): BridgeOutput {
-    const message = structuredClone(input);
+  function fromServer(message: JsonRpcMessage): BridgeOutput {
     if (isJsonRpcResponse(message)) {
       const method =
         message.id === null ? undefined : pendingClientRequests.get(message.id);
       if (message.id !== null) pendingClientRequests.delete(message.id);
-      const result = message.result;
-      switch (method) {
-        case "initialize":
-          if (isRecord(result)) {
-            result.capabilities = Object.fromEntries(
-              Object.entries(record(result.capabilities)).filter(([key]) =>
-                options.allowedServerCapabilities.includes(key),
-              ),
-            );
-          }
-          break;
-        case "textDocument/completion":
-          if (Array.isArray(result))
-            message.result = result.map(stripCompletionCommand);
-          else if (isRecord(result) && Array.isArray(result.items))
-            result.items = result.items.map(stripCompletionCommand);
-          break;
-        case "completionItem/resolve":
-          message.result = stripCompletionCommand(result);
-          break;
-      }
-      return toClient(message);
+      const local = phase2.fromResponse(message, method);
+      if (local) return local;
+      return toClient(rewriteServerResult(message, method));
     }
     if (isJsonRpcRequest(message)) {
+      const local = phase2.fromServerRequest(message);
+      if (local) return local;
       const params = record(message.params);
       switch (message.method) {
         case "client/registerCapability":
@@ -207,12 +179,14 @@ export function createLspBridgeSession(options: BridgeOptions) {
                 (entry: unknown) =>
                   isRecord(entry) &&
                   typeof entry.method === "string" &&
-                  options.allowedDynamicMethods.includes(entry.method),
+                  allowedDynamicMethods.includes(entry.method),
               )
             : [];
           if (allowed.length === 0) return toServer(response(message.id, null));
-          message.params = { ...params, [key]: allowed };
-          return toClient(message);
+          return toClient({
+            ...message,
+            params: { ...params, [key]: allowed },
+          });
         }
         case "workspace/configuration": {
           const items = Array.isArray(params.items) ? params.items : [];
@@ -226,13 +200,6 @@ export function createLspBridgeSession(options: BridgeOptions) {
         }
         case "workspace/workspaceFolders":
           return toServer(response(message.id, [{ uri: rootUri, name }]));
-        case "workspace/applyEdit":
-          return toServer(
-            response(message.id, {
-              applied: false,
-              failureReason: "Workspace edits are not supported in Phase 1",
-            }),
-          );
         default:
           return toServer(response(message.id, null));
       }

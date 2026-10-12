@@ -1,3 +1,84 @@
+export * from "@/lib/lsp/workspace-edit-guards";
+export * from "@/lib/lsp/phase2-profile";
+
+export type LspPosition = { readonly line: number; readonly character: number };
+export type LspRange = {
+  readonly start: LspPosition;
+  readonly end: LspPosition;
+};
+export type LspTextEdit = {
+  readonly range: LspRange;
+  readonly newText: string;
+  readonly annotationId?: string;
+};
+export type LspCommand = {
+  readonly title: string;
+  readonly command: string;
+  readonly arguments?: unknown[];
+};
+export type LspTextDocumentEdit = {
+  readonly textDocument: {
+    readonly uri: string;
+    readonly version: number | null;
+  };
+  readonly edits: LspTextEdit[];
+};
+export type LspCreateFile = {
+  readonly kind: "create";
+  readonly uri: string;
+  readonly options?: {
+    readonly overwrite?: boolean;
+    readonly ignoreIfExists?: boolean;
+  };
+  readonly annotationId?: string;
+};
+export type LspRenameFile = {
+  readonly kind: "rename";
+  readonly oldUri: string;
+  readonly newUri: string;
+  readonly options?: {
+    readonly overwrite?: boolean;
+    readonly ignoreIfExists?: boolean;
+  };
+  readonly annotationId?: string;
+};
+export type LspDeleteFile = {
+  readonly kind: "delete";
+  readonly uri: string;
+  readonly options?: {
+    readonly recursive?: boolean;
+    readonly ignoreIfNotExists?: boolean;
+  };
+  readonly annotationId?: string;
+};
+export type LspWorkspaceEdit = {
+  readonly changes?: Record<string, LspTextEdit[]>;
+  readonly documentChanges?: (
+    | LspTextDocumentEdit
+    | LspCreateFile
+    | LspRenameFile
+    | LspDeleteFile
+  )[];
+  readonly changeAnnotations?: Record<
+    string,
+    {
+      readonly label: string;
+      readonly needsConfirmation?: boolean;
+      readonly description?: string;
+    }
+  >;
+};
+export type LspWorkspaceEditResult = {
+  readonly applied: boolean;
+  readonly reason: string | null;
+  readonly changedUris: string[];
+  readonly createdUris: string[];
+};
+export type LspSyncedDocument = {
+  readonly version: number;
+  readonly text: string;
+};
+
 export const LSP_DEFAULT_PORT = 7601;
 
 export const LSP_DOCUMENT_EXTENSIONS = [
@@ -11,7 +92,7 @@ export const LSP_DOCUMENT_EXTENSIONS = [
   ".cjs",
 ] as const;
 
-export const LSP_DIAGNOSTIC_MARKER_OWNER = "lsp";
+export const LSP_DIAGNOSTIC_MARKER_OWNER = "devhub-lsp";
 
 export const LSP_NO_CONNECTION_IDLE_MS = 60_000;
 
@@ -26,68 +107,6 @@ export const LSP_CLOSE_CODES = {
   SERVER_EXITED: 4004,
   WORKSPACE_MISMATCH: 4005,
 } as const;
-
-export const LSP_PHASE1_SERVER_CAPABILITIES = [
-  "textDocumentSync",
-  "hoverProvider",
-  "signatureHelpProvider",
-  "completionProvider",
-  "definitionProvider",
-  "typeDefinitionProvider",
-  "implementationProvider",
-  "documentFormattingProvider",
-  "documentRangeFormattingProvider",
-  "inlayHintProvider",
-  "semanticTokensProvider",
-] as const;
-
-export const LSP_PHASE1_DYNAMIC_METHODS = [
-  "textDocument/hover",
-  "textDocument/signatureHelp",
-  "textDocument/completion",
-  "textDocument/definition",
-  "textDocument/typeDefinition",
-  "textDocument/implementation",
-  "textDocument/formatting",
-  "textDocument/rangeFormatting",
-  "textDocument/inlayHint",
-  "textDocument/semanticTokens",
-] as const;
-
-export const LSP_DEFINITION_METHODS = [
-  "textDocument/definition",
-  "textDocument/typeDefinition",
-  "textDocument/implementation",
-] as const;
-
-export const LSP_PHASE1_CLIENT_REQUESTS = [
-  "initialize",
-  "shutdown",
-  "textDocument/hover",
-  "textDocument/signatureHelp",
-  "textDocument/completion",
-  "completionItem/resolve",
-  "textDocument/definition",
-  "textDocument/typeDefinition",
-  "textDocument/implementation",
-  "textDocument/formatting",
-  "textDocument/rangeFormatting",
-  "textDocument/inlayHint",
-  "inlayHint/resolve",
-  "textDocument/semanticTokens/full",
-  "textDocument/semanticTokens/full/delta",
-  "textDocument/semanticTokens/range",
-] as const;
-
-export const LSP_PHASE1_CLIENT_NOTIFICATIONS = [
-  "initialized",
-  "exit",
-  "textDocument/didOpen",
-  "textDocument/didChange",
-  "textDocument/didClose",
-  "textDocument/didSave",
-  "$/cancelRequest",
-] as const;
 
 export type LspServerState = "stopped" | "starting" | "running" | "error";
 
@@ -175,7 +194,7 @@ function hasJsonRpcVersion(message: Record<string, unknown>): boolean {
   return message.jsonrpc === "2.0";
 }
 
-// id 0 is a valid request id (the native Monaco client starts at 0): never test id by truthiness
+// id 0 is a valid request id: never test id by truthiness.
 function hasJsonRpcId(message: Record<string, unknown>): boolean {
   return typeof message.id === "number" || typeof message.id === "string";
 }

@@ -12,20 +12,24 @@ const INLAY_HINTS = {
 
 export const VTSLS_SETTINGS = {
   typescript: {
+    referencesCodeLens: { enabled: true },
+    implementationsCodeLens: { enabled: true },
     inlayHints: INLAY_HINTS,
     format: { enable: true },
     tsserver: { maxTsServerMemory: 3072 },
     preferences: { importModuleSpecifier: "shortest" },
   },
   javascript: {
+    referencesCodeLens: { enabled: true },
     inlayHints: INLAY_HINTS,
     format: { enable: true },
     preferences: { importModuleSpecifier: "shortest" },
   },
   vtsls: {
+    enableMoveToFileCodeAction: true,
     autoUseWorkspaceTsdk: true,
     experimental: {
-      completion: { enableServerSideFuzzyMatch: true, entriesLimit: 200 },
+      completion: { enableServerSideFuzzyMatch: true, entriesLimit: 50 },
     },
   },
 } as const;

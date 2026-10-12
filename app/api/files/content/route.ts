@@ -3,7 +3,10 @@ import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db";
 import { workspaces } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { getLanguageFromFilename } from "@/lib/files/operations";
+import {
+  getLanguageFromFilename,
+  writeFileContentIfUnchanged,
+} from "@/lib/files/operations";
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend";
 
 // GET: read file content
@@ -64,12 +67,29 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { workspaceId, path: filePath, content } = body;
-
-  if (!workspaceId || !filePath || content === undefined) {
+  const body: unknown = await request.json();
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("workspaceId" in body) ||
+    typeof body.workspaceId !== "string" ||
+    !body.workspaceId ||
+    !("path" in body) ||
+    typeof body.path !== "string" ||
+    !body.path ||
+    !("content" in body) ||
+    typeof body.content !== "string"
+  ) {
     return NextResponse.json(
       { error: "workspaceId, path, and content are required" },
+      { status: 400 },
+    );
+  }
+  const { workspaceId, path: filePath, content } = body;
+  const baseContent = "baseContent" in body ? body.baseContent : undefined;
+  if (baseContent !== undefined && typeof baseContent !== "string") {
+    return NextResponse.json(
+      { error: "baseContent must be a string" },
       { status: 400 },
     );
   }
@@ -89,8 +109,29 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const backend = getBackend(toWorkspace(row));
-    await backend.writeFile(filePath, content);
+    const workspace = toWorkspace(row);
+    if (baseContent !== undefined && workspace.backend !== "remote") {
+      if (
+        writeFileContentIfUnchanged(
+          workspace.path,
+          filePath,
+          content,
+          baseContent,
+        ) === "stale"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "This file changed on disk since you opened it (for example by a rename). Your text is kept — copy it, then reopen the file.",
+            code: "STALE_BASE",
+          },
+          { status: 409 },
+        );
+      }
+    } else {
+      const backend = getBackend(workspace);
+      await backend.writeFile(filePath, content);
+    }
     return NextResponse.json({ success: true, path: filePath });
   } catch (error) {
     const message =

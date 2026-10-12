@@ -5,7 +5,6 @@ import {
   isLspDocumentPath,
   isLspDocumentUriInWorkspace,
   lspLanguageIdForPath,
-  monacoLanguageForPath,
   toLowerCaseUriKey,
   workspaceRelativePathToFileUri,
   workspaceRootToFileUri,
@@ -147,24 +146,10 @@ describe("extensions", () => {
     ".cjs": "javascript",
     ".jsx": "javascriptreact",
   };
-  const monacoLanguageByExtension: Record<string, string> = {
-    ".ts": "typescript",
-    ".mts": "typescript",
-    ".cts": "typescript",
-    ".tsx": "typescript",
-    ".js": "javascript",
-    ".mjs": "javascript",
-    ".cjs": "javascript",
-    ".jsx": "javascript",
-  };
-
   it.each(LSP_DOCUMENT_EXTENSIONS)("maps %s to language ids", (extension) => {
     const path = `src/file${extension}`;
     expect(isLspDocumentPath(path)).toBe(true);
     expect(lspLanguageIdForPath(path)).toBe(languageIdByExtension[extension]);
-    expect(monacoLanguageForPath(path)).toBe(
-      monacoLanguageByExtension[extension],
-    );
   });
 
   it("is case-insensitive on the extension and rejects other files", () => {
@@ -174,7 +159,6 @@ describe("extensions", () => {
     expect(isLspDocumentPath("Makefile")).toBe(false);
     expect(isLspDocumentPath("dir.ts/readme")).toBe(false);
     expect(lspLanguageIdForPath("a.py")).toBeNull();
-    expect(monacoLanguageForPath("a.py")).toBeNull();
   });
 });
 

@@ -28,6 +28,39 @@ function send(message) {
   );
 }
 
+function replaceHelper(line, character) {
+  return {
+    range: {
+      start: { line, character },
+      end: { line, character: character + "helper".length },
+    },
+    newText: "renamed",
+  };
+}
+
+function renameEdit(renameUri) {
+  const sourceDirectory = renameUri.slice(0, renameUri.lastIndexOf("/"));
+  const changes = {
+    [`${sourceDirectory}/a.ts`]: [replaceHelper(0, 9), replaceHelper(1, 21)],
+    [`${sourceDirectory}/b.ts`]: [replaceHelper(1, 16)],
+    [`${sourceDirectory}/refs.ts`]: [
+      replaceHelper(0, 9),
+      replaceHelper(1, 19),
+      replaceHelper(2, 19),
+    ],
+  };
+  if (process.env.FAKE_LSP_RENAME_EDIT !== "delete") return { changes };
+  return {
+    documentChanges: [
+      {
+        textDocument: { uri: `${sourceDirectory}/b.ts`, version: null },
+        edits: changes[`${sourceDirectory}/b.ts`],
+      },
+      { kind: "delete", uri: `${sourceDirectory}/refs.ts` },
+    ],
+  };
+}
+
 function receive(message) {
   if (process.env.FAKE_LSP_RECORD_FILE) {
     appendFileSync(
@@ -52,6 +85,14 @@ function receive(message) {
     case "textDocument/hover":
       if (process.env.FAKE_LSP_EXIT_ON_HOVER === "1") process.exit(3);
       send({ id: message.id, result: { contents: "fake-hover" } });
+      break;
+    case "textDocument/rename":
+      if (process.env.FAKE_LSP_RENAME_EDIT) {
+        send({
+          id: message.id,
+          result: renameEdit(message.params.textDocument.uri),
+        });
+      }
       break;
     case "shutdown":
       if (!isIgnoringShutdown) send({ id: message.id, result: null });

@@ -2,11 +2,15 @@
 // allow: SIZE_OK — Task 6 requires the complete bridge rule table in this one test file.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createLspBridgeSession } from "@/lib/lsp/message-bridge";
+import type { ApplyWorkspaceEdit } from "@/lib/lsp/bridge-workspace-edits";
 import {
-  LSP_PHASE1_CLIENT_NOTIFICATIONS,
-  LSP_PHASE1_CLIENT_REQUESTS,
-  LSP_PHASE1_DYNAMIC_METHODS,
-  LSP_PHASE1_SERVER_CAPABILITIES,
+  LSP_PHASE2_SERVER_CAPABILITIES,
+  LSP_APPLY_EDIT_COMMAND,
+  LSP_EDIT_RESULT_NOTIFICATION,
+  LSP_DIRTY_DOCUMENTS_NOTIFICATION,
+  type LspWorkspaceEditResult,
+  type LspWorkspaceEdit,
+  type LspSyncedDocument,
   type JsonRpcMessage,
   type JsonRpcId,
 } from "@/lib/lsp/types";
@@ -45,15 +49,332 @@ const options = {
   workspaceRoot: root,
   resolveRealCaseUri,
   settings: VTSLS_SETTINGS,
-  allowedServerCapabilities: LSP_PHASE1_SERVER_CAPABILITIES,
-  allowedDynamicMethods: LSP_PHASE1_DYNAMIC_METHODS,
-  allowedClientRequests: LSP_PHASE1_CLIENT_REQUESTS,
-  allowedClientNotifications: LSP_PHASE1_CLIENT_NOTIFICATIONS,
+  applyWorkspaceEdit: vi.fn<ApplyWorkspaceEdit>(),
 };
 let bridge: ReturnType<typeof createLspBridgeSession>;
 beforeEach(() => {
   resolveRealCaseUri.mockClear();
   bridge = createLspBridgeSession(options);
+});
+
+describe("phase2", () => {
+  const edit: LspWorkspaceEdit = { changes: { [uri]: [] } };
+  const applied: LspWorkspaceEditResult = {
+    applied: true,
+    reason: null,
+    changedUris: [uri, `${rootUri}/new.ts`],
+    createdUris: [`${rootUri}/new.ts`],
+  };
+  const writer =
+    vi.fn<
+      (
+        edit: LspWorkspaceEdit,
+        synced: ReadonlyMap<string, LspSyncedDocument>,
+        dirty: ReadonlySet<string>,
+      ) => LspWorkspaceEditResult
+    >();
+  const watched = notification("workspace/didChangeWatchedFiles", {
+    changes: [
+      { uri: `${rootUri}/new.ts`, type: 1 },
+      { uri, type: 2 },
+    ],
+  });
+  const execute = (editId = "edit-1") =>
+    request("workspace/executeCommand", {
+      command: LSP_APPLY_EDIT_COMMAND,
+      arguments: [editId],
+    });
+  beforeEach(() => {
+    writer.mockReset().mockReturnValue(applied);
+    bridge = createLspBridgeSession({
+      ...options,
+      applyWorkspaceEdit: writer,
+    });
+  });
+  it("returns an empty edit and notifies when rename is applied", () => {
+    bridge.fromClient(
+      request("textDocument/rename", { textDocument: { uri } }),
+    );
+    const result = bridge.fromServer(response(edit));
+    expect(result).toEqual({
+      toClient: [
+        response({ changes: {} }),
+        notification(LSP_EDIT_RESULT_NOTIFICATION, applied),
+      ],
+      toServer: [watched],
+    });
+    expect(writer).toHaveBeenCalledWith(edit, new Map(), new Set());
+  });
+  it("returns RequestFailed and notifies when rename is refused", () => {
+    const refused = {
+      ...applied,
+      applied: false,
+      reason: "a.ts has unsaved changes — save it first",
+      changedUris: [],
+      createdUris: [],
+    };
+    writer.mockReturnValue(refused);
+    bridge.fromClient(request("textDocument/rename"));
+    const result = bridge.fromServer(response(edit));
+    expect(result).toEqual(
+      toClient(
+        {
+          jsonrpc: "2.0",
+          id: 0,
+          error: { code: -32803, message: refused.reason },
+        },
+        notification(LSP_EDIT_RESULT_NOTIFICATION, refused),
+      ),
+    );
+  });
+  it("keeps null results unchanged when rename has no edit", () => {
+    bridge.fromClient(request("textDocument/rename"));
+    const result = bridge.fromServer(response(null));
+    expect(result).toEqual(toClient(response(null)));
+    expect(writer).not.toHaveBeenCalled();
+  });
+  it("wraps code action edits without writing when listing actions", () => {
+    const followUp = { title: "Next", command: "server.next" };
+    const lazy = { title: "Lazy", data: 4 };
+    bridge.fromClient(request("textDocument/codeAction"));
+    const result = bridge.fromServer(
+      response([{ title: "Fix", edit, command: followUp }, lazy]),
+    );
+    expect(result).toEqual(
+      toClient(
+        response([
+          {
+            title: "Fix",
+            command: {
+              title: "Fix",
+              command: LSP_APPLY_EDIT_COMMAND,
+              arguments: ["edit-1", followUp],
+            },
+          },
+          lazy,
+        ]),
+      ),
+    );
+    expect(writer).not.toHaveBeenCalled();
+  });
+  it.each([LSP_APPLY_EDIT_COMMAND, "devhub.lsp.applyEdit"])(
+    "unwraps %s when a resolved action contains a fresh edit",
+    (command) => {
+      const followUp = {
+        title: "Next",
+        command: "server.next",
+        arguments: [1],
+      };
+      bridge.fromClient(request("codeAction/resolve"));
+      const result = bridge.fromServer(
+        response({
+          title: "Fix",
+          edit,
+          command: { title: "Fix", command, arguments: ["old", followUp] },
+        }),
+      );
+      expect(result).toEqual(
+        toClient(
+          response({
+            title: "Fix",
+            command: {
+              title: "Fix",
+              command: LSP_APPLY_EDIT_COMMAND,
+              arguments: ["edit-1", followUp],
+            },
+          }),
+        ),
+      );
+      expect(writer).not.toHaveBeenCalled();
+    },
+  );
+  it("writes once without forwarding when a wrapped action is selected", () => {
+    bridge.fromClient(request("textDocument/codeAction"));
+    bridge.fromServer(response([{ title: "Fix", edit }]));
+    const result = bridge.fromClient(execute());
+    expect(result).toEqual({
+      toClient: [response(applied)],
+      toServer: [watched],
+    });
+    expect(writer).toHaveBeenCalledExactlyOnceWith(edit, new Map(), new Set());
+  });
+  it("expires consumed actions when selected twice", () => {
+    bridge.fromClient(request("textDocument/codeAction"));
+    bridge.fromServer(response([{ title: "Fix", edit }]));
+    bridge.fromClient(execute());
+    writer.mockClear();
+    const result = bridge.fromClient(execute());
+    expect(result).toEqual(
+      toClient(
+        response({
+          applied: false,
+          reason: "edit expired — run the action again",
+          changedUris: [],
+          createdUris: [],
+        }),
+      ),
+    );
+    expect(writer).not.toHaveBeenCalled();
+  });
+  it("returns expired when the edit id is unknown", () => {
+    const result = bridge.fromClient(execute("unknown"));
+    expect(result).toEqual(
+      toClient(
+        response({
+          applied: false,
+          reason: "edit expired — run the action again",
+          changedUris: [],
+          createdUris: [],
+        }),
+      ),
+    );
+    expect(writer).not.toHaveBeenCalled();
+  });
+  it("evicts the oldest action when the pending edit cap is exceeded", () => {
+    bridge.fromClient(request("textDocument/codeAction"));
+    bridge.fromServer(
+      response(Array.from({ length: 201 }, () => ({ title: "Fix", edit }))),
+    );
+    const result = bridge.fromClient(execute("edit-1"));
+    expect(result.toClient).toEqual([
+      response({
+        applied: false,
+        reason: "edit expired — run the action again",
+        changedUris: [],
+        createdUris: [],
+      }),
+    ]);
+    expect(writer).not.toHaveBeenCalled();
+  });
+  it("answers the server without exposing an edit when applyEdit arrives", () => {
+    const result = bridge.fromServer(request("workspace/applyEdit", { edit }));
+    expect(result).toEqual({
+      toServer: [
+        response({ applied: true, failureReason: undefined }),
+        watched,
+      ],
+      toClient: [notification(LSP_EDIT_RESULT_NOTIFICATION, applied)],
+    });
+    expect(writer).toHaveBeenCalledExactlyOnceWith(edit, new Map(), new Set());
+  });
+  it("refuses malformed server edits before calling the writer", () => {
+    const result = bridge.fromServer(
+      request("workspace/applyEdit", { edit: { changes: { [uri]: [{}] } } }),
+    );
+    expect(result.toServer).toEqual([
+      response({ applied: false, failureReason: "malformed edit" }),
+    ]);
+    expect(writer).not.toHaveBeenCalled();
+  });
+  it("tracks text in step when didChange contains sequential incremental changes", () => {
+    bridge.fromClient(
+      notification("textDocument/didOpen", {
+        textDocument: { uri: uri.toLowerCase(), text: "abc", version: 1 },
+      }),
+    );
+    bridge.fromClient(
+      notification("textDocument/didChange", {
+        textDocument: { uri, version: 2 },
+        contentChanges: [
+          {
+            range: {
+              start: { line: 0, character: 1 },
+              end: { line: 0, character: 2 },
+            },
+            text: "XY",
+          },
+        ],
+      }),
+    );
+    bridge.fromServer(request("workspace/applyEdit", { edit }));
+    expect(writer).toHaveBeenCalledWith(
+      edit,
+      new Map([[uri, { version: 2, text: "aXYc" }]]),
+      new Set(),
+    );
+  });
+  it("replaces the real-case dirty set before the allowlist gate", () => {
+    const result = bridge.fromClient(
+      notification(LSP_DIRTY_DOCUMENTS_NOTIFICATION, {
+        uris: [uri.toLowerCase(), "inmemory://model/1"],
+      }),
+    );
+    bridge.fromServer(request("workspace/applyEdit", { edit }));
+    expect(result).toEqual(toClient());
+    expect(writer).toHaveBeenCalledWith(edit, new Map(), new Set([uri]));
+    bridge.fromClient(
+      notification(LSP_DIRTY_DOCUMENTS_NOTIFICATION, { uris: [] }),
+    );
+    bridge.fromServer(request("workspace/applyEdit", { edit }));
+    expect(writer).toHaveBeenLastCalledWith(edit, new Map(), new Set());
+  });
+  it("retains dirty tabs when didClose removes the synced document", () => {
+    bridge.fromClient(
+      notification("textDocument/didOpen", {
+        textDocument: { uri, version: 1, text: "abc" },
+      }),
+    );
+    bridge.fromClient(
+      notification("textDocument/didChange", {
+        textDocument: { uri, version: 2 },
+        contentChanges: [{ text: "dirty" }],
+      }),
+    );
+    bridge.fromClient(
+      notification(LSP_DIRTY_DOCUMENTS_NOTIFICATION, { uris: [uri] }),
+    );
+    bridge.fromClient(
+      notification("textDocument/didClose", { textDocument: { uri } }),
+    );
+    bridge.fromClient(request("textDocument/rename"));
+    bridge.fromServer(response(edit));
+    expect(writer).toHaveBeenCalledWith(edit, new Map(), new Set([uri]));
+  });
+  it("passes dirty tabs to the writer when selecting a wrapped action", () => {
+    bridge.fromClient(
+      notification(LSP_DIRTY_DOCUMENTS_NOTIFICATION, { uris: [uri] }),
+    );
+    bridge.fromClient(request("textDocument/codeAction"));
+    bridge.fromServer(response([{ title: "Fix", edit }]));
+    bridge.fromClient(execute());
+    expect(writer).toHaveBeenCalledWith(edit, new Map(), new Set([uri]));
+  });
+  it("strips the client-owned move command when initialize completes", () => {
+    bridge.fromClient(request("initialize"));
+    const result = bridge.fromServer(
+      response({
+        capabilities: {
+          renameProvider: true,
+          executeCommandProvider: {
+            commands: ["_typescript.moveToFileRefactoring", "keep"],
+          },
+          diagnosticProvider: true,
+        },
+      }),
+    );
+    expect(result).toEqual(
+      toClient(
+        response({
+          capabilities: {
+            renameProvider: true,
+            executeCommandProvider: { commands: ["keep"] },
+          },
+        }),
+      ),
+    );
+  });
+  it("allows references when the Phase 2 profile is selected", () => {
+    const message = request("textDocument/references", {
+      textDocument: { uri },
+    });
+    expect(bridge.fromClient(message)).toEqual(toServer(message));
+  });
+  it("allows dynamic rename registration when the Phase 2 profile is selected", () => {
+    const message = request("client/registerCapability", {
+      registrations: [{ id: "rename", method: "textDocument/rename" }],
+    });
+    expect(bridge.fromServer(message)).toEqual(toClient(message));
+  });
 });
 
 describe("fromClient", () => {
@@ -67,26 +388,25 @@ describe("fromClient", () => {
   ])("C1 forwards responses before the method gate: %j", (message) => {
     expect(bridge.fromClient(message)).toEqual(toServer(message));
   });
-  it.each([
-    "textDocument/references",
-    "workspace/executeCommand",
-    "unknown/request",
-  ])("C1b rejects %s with id 0 before URI resolution", (method) => {
-    const result = bridge.fromClient(
-      request(method, { textDocument: { uri } }),
-    );
-    expect(result).toEqual(
-      toClient({
-        jsonrpc: "2.0",
-        id: 0,
-        error: {
-          code: -32601,
-          message: `Method not allowed by the dev-hub LSP bridge: ${method}`,
-        },
-      }),
-    );
-    expect(resolveRealCaseUri).not.toHaveBeenCalled();
-  });
+  it.each(["unknown/request"])(
+    "C1b rejects %s with id 0 before URI resolution",
+    (method) => {
+      const result = bridge.fromClient(
+        request(method, { textDocument: { uri } }),
+      );
+      expect(result).toEqual(
+        toClient({
+          jsonrpc: "2.0",
+          id: 0,
+          error: {
+            code: -32601,
+            message: `Method not allowed by the dev-hub LSP bridge: ${method}`,
+          },
+        }),
+      );
+      expect(resolveRealCaseUri).not.toHaveBeenCalled();
+    },
+  );
   it.each([
     "workspace/didChangeWorkspaceFolders",
     "workspace/didChangeConfiguration",
@@ -257,20 +577,13 @@ describe("fromServer", () => {
   it("S1 trims initialize capabilities using the pending id 0 then deletes it", () => {
     bridge.fromClient(request("initialize"));
     const allowed = Object.fromEntries(
-      LSP_PHASE1_SERVER_CAPABILITIES.map((key) => [key, { enabled: true }]),
+      LSP_PHASE2_SERVER_CAPABILITIES.map((key) => [key, { enabled: true }]),
     );
     const excluded = Object.fromEntries(
-      [
-        "referencesProvider",
-        "renameProvider",
-        "codeActionProvider",
-        "documentSymbolProvider",
-        "documentHighlightProvider",
-        "foldingRangeProvider",
-        "codeLensProvider",
-        "diagnosticProvider",
-        "executeCommandProvider",
-      ].map((key) => [key, true]),
+      ["diagnosticProvider", "workspaceSymbolProvider"].map((key) => [
+        key,
+        true,
+      ]),
     );
     const message = response({
       capabilities: { ...allowed, ...excluded },
@@ -386,7 +699,7 @@ describe("fromServer", () => {
   it("S1 clears pending requests after exceeding 10,000", () => {
     for (let id = 0; id <= 10000; id += 1)
       bridge.fromClient(request("initialize", undefined, id));
-    const message = response({ capabilities: { renameProvider: true } });
+    const message = response({ capabilities: { diagnosticProvider: true } });
     expect(bridge.fromServer(message)).toEqual(toClient(message));
   });
   it.each(["client/registerCapability", "client/unregisterCapability"])(
@@ -402,7 +715,7 @@ describe("fromServer", () => {
         registerOptions: { documentSelector: [] },
       };
       const message = request(method, {
-        [key]: [allowed, { id: "drop", method: "textDocument/rename" }],
+        [key]: [allowed, { id: "drop", method: "workspace/symbol" }],
       });
       const original = structuredClone(message);
       expect(bridge.fromServer(message)).toEqual(
@@ -421,7 +734,7 @@ describe("fromServer", () => {
       expect(
         bridge.fromServer(
           request(method, {
-            [key]: [{ id: "drop", method: "textDocument/rename" }],
+            [key]: [{ id: "drop", method: "workspace/symbol" }],
           }),
         ),
       ).toEqual(toServer(response(null)));
@@ -440,23 +753,34 @@ describe("fromServer", () => {
       toServer(response([VTSLS_SETTINGS, VTSLS_SETTINGS, "literals", null])),
     );
   });
+  it("S3b delivers the 50-entry completion cap to vtsls on both paths", () => {
+    const expectedCompletion = {
+      enableServerSideFuzzyMatch: true,
+      entriesLimit: 50,
+    };
+    const message = request("workspace/configuration", {
+      items: [{ section: "vtsls.experimental.completion" }],
+    });
+    expect(bridge.fromServer(message)).toEqual(
+      toServer(response([expectedCompletion])),
+    );
+    const initialized = notification("initialized");
+    expect(bridge.fromClient(initialized)).toEqual(
+      toServer(
+        initialized,
+        notification("workspace/didChangeConfiguration", {
+          settings: expect.objectContaining({
+            vtsls: expect.objectContaining({
+              experimental: { completion: expectedCompletion },
+            }),
+          }),
+        }),
+      ),
+    );
+  });
   it("S4 supplies workspace folders", () => {
     expect(bridge.fromServer(request("workspace/workspaceFolders"))).toEqual(
       toServer(response([folder])),
-    );
-  });
-  it("S5 refuses workspace edits", () => {
-    expect(
-      bridge.fromServer(
-        request("workspace/applyEdit", { edit: { changes: { [uri]: [] } } }),
-      ),
-    ).toEqual(
-      toServer(
-        response({
-          applied: false,
-          failureReason: "Workspace edits are not supported in Phase 1",
-        }),
-      ),
     );
   });
   it("S6 answers other server requests null", () => {

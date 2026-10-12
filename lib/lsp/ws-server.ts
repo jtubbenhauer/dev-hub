@@ -16,14 +16,11 @@ import {
   LSP_CLOSE_CODES,
   LSP_DEFAULT_PORT,
   LSP_HEARTBEAT_INTERVAL_MS,
-  LSP_PHASE1_CLIENT_NOTIFICATIONS,
-  LSP_PHASE1_CLIENT_REQUESTS,
-  LSP_PHASE1_DYNAMIC_METHODS,
-  LSP_PHASE1_SERVER_CAPABILITIES,
   type JsonRpcId,
   type JsonRpcMessage,
 } from "@/lib/lsp/types";
 import { VTSLS_SETTINGS } from "@/lib/lsp/vtsls-settings";
+import { applyWorkspaceEditToDisk } from "@/lib/lsp/workspace-edit-writer";
 
 const TRACE_PENDING_LIMIT = 10_000;
 
@@ -175,10 +172,13 @@ function handleLspConnection(
     workspaceRoot: workspacePath,
     resolveRealCaseUri: createCaseResolver(workspacePath).resolveRealCaseUri,
     settings: VTSLS_SETTINGS,
-    allowedServerCapabilities: LSP_PHASE1_SERVER_CAPABILITIES,
-    allowedDynamicMethods: LSP_PHASE1_DYNAMIC_METHODS,
-    allowedClientRequests: LSP_PHASE1_CLIENT_REQUESTS,
-    allowedClientNotifications: LSP_PHASE1_CLIENT_NOTIFICATIONS,
+    applyWorkspaceEdit: (edit, synced, dirty) =>
+      applyWorkspaceEditToDisk({
+        workspaceRoot: workspacePath,
+        edit,
+        syncedDocuments: synced,
+        dirtyUris: dirty,
+      }),
   });
   const traceFile = process.env.LSP_TRACE_FILE;
   const tracer = traceFile ? createLspTracer(traceFile, workspacePath) : null;

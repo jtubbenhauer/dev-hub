@@ -99,23 +99,6 @@ export function lspLanguageIdForPath(path: string): string | null {
   }
 }
 
-export function monacoLanguageForPath(path: string): string | null {
-  switch (getLowercaseExtension(path)) {
-    case ".ts":
-    case ".mts":
-    case ".cts":
-    case ".tsx":
-      return "typescript";
-    case ".js":
-    case ".mjs":
-    case ".cjs":
-    case ".jsx":
-      return "javascript";
-    default:
-      return null;
-  }
-}
-
 export function toLowerCaseUriKey(uri: string): string {
   return uri.toLowerCase();
 }

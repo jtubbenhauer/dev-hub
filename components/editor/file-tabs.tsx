@@ -1,13 +1,17 @@
 "use client";
+import { memo } from "react";
+import { useEditorTabMetadataSelector } from "@/hooks/use-editor-tab-metadata";
 
 import { useEditorStore } from "@/stores/editor-store";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
-export function FileTabs() {
-  const { openFiles, activeFilePath, setActiveFile, closeFile } =
-    useEditorStore();
+export const FileTabs = memo(function FileTabs() {
+  const openFiles = useEditorStore(useEditorTabMetadataSelector());
+  const activeFilePath = useEditorStore((s) => s.activeFilePath);
+  const setActiveFile = useEditorStore((s) => s.setActiveFile);
+  const closeFile = useEditorStore((s) => s.closeFile);
 
   if (openFiles.length === 0) return null;
 
@@ -60,4 +64,4 @@ export function FileTabs() {
       <ScrollBar orientation="horizontal" />
     </ScrollArea>
   );
-}
+});

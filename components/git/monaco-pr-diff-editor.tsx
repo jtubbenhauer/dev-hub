@@ -1,4 +1,6 @@
 "use client";
+import { registerConfiguredEditorCleanup } from "@/components/editor/configured-editor-lifecycle";
+import { useMonacoDiffOptions } from "@/hooks/use-monaco-diff-options";
 
 import {
   useEffect,
@@ -33,7 +35,6 @@ import { useTheme } from "@/components/providers/theme-provider";
 import {
   registerMonacoThemes,
   getMonacoThemeName,
-  MONACO_FONT_FAMILY,
 } from "@/lib/editor/monaco-themes";
 import { WRAPPED_DIFF_EDITOR_OPTIONS } from "@/lib/editor/monaco-diff-options";
 import {
@@ -46,6 +47,7 @@ import { GitHubMarkdown } from "@/components/git/github-markdown";
 import type { GitHubPrFileContent, GitHubReviewComment } from "@/types";
 import type { ReviewDraft } from "@/stores/review-draft-store";
 import { trackBuiltinTs } from "@/lib/lsp/client/builtin-typescript";
+import { loadMonacoReact } from "@/lib/editor/monaco-bootstrap";
 
 type DraftDisplayComment = GitHubReviewComment & {
   isDraft: true;
@@ -118,7 +120,7 @@ function buildDraftDisplayComment(draft: ReviewDraft): DraftDisplayComment {
 }
 
 const DiffEditor = dynamic(
-  () => import("@monaco-editor/react").then((mod) => mod.DiffEditor),
+  () => loadMonacoReact().then((mod) => mod.DiffEditor),
   {
     ssr: false,
     loading: () => <div className="bg-muted h-full w-full animate-pulse" />,
@@ -837,6 +839,8 @@ export const MonacoPrDiffEditor = forwardRef<
 
       const originalEditor = diffEditor.getOriginalEditor();
       const modifiedEditor = diffEditor.getModifiedEditor();
+      registerConfiguredEditorCleanup(originalEditor);
+      registerConfiguredEditorCleanup(modifiedEditor);
       decorationsRef.current.LEFT = originalEditor.createDecorationsCollection(
         [],
       );
@@ -1104,6 +1108,13 @@ export const MonacoPrDiffEditor = forwardRef<
     };
   }, []);
 
+  const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
+  const options = useMonacoDiffOptions({
+    fontSize: effectiveFontSize,
+    renderSideBySide: diffViewMode === "side-by-side",
+    readOnly: true,
+    isReview: false,
+  });
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -1114,7 +1125,6 @@ export const MonacoPrDiffEditor = forwardRef<
 
   const fileName = fileContent.path;
   const commentCount = comments.length + drafts.length;
-  const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
 
   const portalEntries: React.ReactNode[] = [];
   for (const [lineKey, domNode] of portalTargets) {
@@ -1238,27 +1248,7 @@ export const MonacoPrDiffEditor = forwardRef<
             theme={getMonacoThemeName(theme, resolvedMode)}
             beforeMount={handleBeforeMount}
             onMount={handleMount}
-            options={{
-              fontSize: effectiveFontSize,
-              lineHeight: Math.round(effectiveFontSize * 1.5),
-              fontFamily: MONACO_FONT_FAMILY,
-              fontLigatures: false,
-              ...WRAPPED_DIFF_EDITOR_OPTIONS,
-              renderSideBySide: diffViewMode === "side-by-side",
-              hideUnchangedRegions: { enabled: true },
-              renderIndicators: true,
-              renderMarginRevertIcon: false,
-              originalEditable: false,
-              readOnly: true,
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              lineNumbers: "on",
-              automaticLayout: true,
-              glyphMargin: true,
-              folding: true,
-              smoothScrolling: true,
-              padding: { top: 8 },
-            }}
+            options={options}
           />
         </div>
         {portalEntries}

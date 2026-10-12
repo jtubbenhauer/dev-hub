@@ -64,6 +64,7 @@ vi.mock("@/components/editor/comments-sidebar", () => ({
 let sidebarTabsOpenMode: "sidebar" | "dialog" = "sidebar";
 vi.mock("@/hooks/use-settings", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/use-settings")>()),
+  useLspEnabledSetting: () => ({ isLspEnabled: false }),
   useChatSidebarTabsOpenSetting: () => ({
     sidebarTabsOpenMode,
     isLoading: false,

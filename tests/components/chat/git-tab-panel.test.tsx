@@ -422,6 +422,7 @@ describe("GitTabPanel", () => {
         "src/foo.ts",
         "hello",
         "typescript",
+        "ws-1",
       );
     });
     expect(setActivePanelTab).toHaveBeenCalledWith("files");

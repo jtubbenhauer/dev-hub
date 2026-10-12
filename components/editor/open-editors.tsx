@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
+import { useEditorTabMetadataSelector } from "@/hooks/use-editor-tab-metadata";
 import { useEditorStore } from "@/stores/editor-store";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, X, File } from "lucide-react";
@@ -10,8 +11,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export function OpenEditors() {
-  const openFiles = useEditorStore((s) => s.openFiles);
+export const OpenEditors = memo(function OpenEditors() {
+  const openFiles = useEditorStore(useEditorTabMetadataSelector());
   const activeFilePath = useEditorStore((s) => s.activeFilePath);
   const setActiveFile = useEditorStore((s) => s.setActiveFile);
   const closeFile = useEditorStore((s) => s.closeFile);
@@ -99,4 +100,4 @@ export function OpenEditors() {
       )}
     </div>
   );
-}
+});

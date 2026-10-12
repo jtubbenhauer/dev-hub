@@ -15,12 +15,13 @@ import { useTheme } from "@/components/providers/theme-provider";
 import {
   registerMonacoThemes,
   getMonacoThemeName,
-  MONACO_FONT_FAMILY,
 } from "@/lib/editor/monaco-themes";
 import {
   useFontSizeSetting,
   useMobileFontSizeSetting,
   useTabSizeSetting,
+  useCodeLensSetting,
+  useMinimapSetting,
 } from "@/hooks/use-settings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -38,10 +39,14 @@ import type { FileComment } from "@/types";
 import { MessageCircle } from "lucide-react";
 import { useMonacoDiagnosticMarkers } from "@/hooks/use-monaco-diagnostic-markers";
 import { useLspEditorAttachment } from "@/hooks/use-lsp-editor-attachment";
-import { trackBuiltinTs } from "@/lib/lsp/client/builtin-typescript";
-
+import { useBuiltinTypeScriptGate } from "@/lib/lsp/client/use-builtin-typescript-gate";
+import { loadMonacoReact } from "@/lib/editor/monaco-bootstrap";
+import { registerEditorSaveAction } from "@/components/editor/editor-save-action";
+import { registerConfiguredEditorCleanup } from "@/components/editor/configured-editor-lifecycle";
+import { useMonacoEditorOptions } from "@/hooks/use-monaco-editor-options";
+// prettier-ignore
 const Editor = dynamic(
-  () => import("@monaco-editor/react").then((mod) => mod.default),
+  () => loadMonacoReact().then((mod) => mod.default),
   {
     ssr: false,
     loading: () => <div className="bg-muted h-full w-full animate-pulse" />,
@@ -107,6 +112,8 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     ref,
   ) {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+    const disposeSaveRef = useRef<(() => void) | null>(null);
+    useEffect(() => () => disposeSaveRef.current?.(), []);
 
     useImperativeHandle(ref, () => ({
       focus: () => editorRef.current?.focus(),
@@ -128,6 +135,8 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     const { fontSize } = useFontSizeSetting();
     const { mobileFontSize } = useMobileFontSizeSetting();
     const { tabSize } = useTabSizeSetting();
+    const { isCodeLensEnabled } = useCodeLensSetting();
+    const { isMinimapEnabled } = useMinimapSetting();
     const isMobile = useIsMobile();
 
     const activeSessionId = useChatStore((s) => s.activeSessionId);
@@ -230,12 +239,18 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       content,
     });
 
+    const { isReady: isBuiltinPolicyReady, prepareMonaco } =
+      useBuiltinTypeScriptGate({
+        workspaceId,
+        filePath,
+        isLspEligible,
+      });
     const handleBeforeMount = useCallback(
       (monacoInstance: typeof import("monaco-editor")) => {
-        trackBuiltinTs(monacoInstance);
+        prepareMonaco(monacoInstance);
         registerMonacoThemes(monacoInstance);
       },
-      [],
+      [prepareMonaco],
     );
 
     const handleEditorDidMount = useCallback(
@@ -245,8 +260,11 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       ) => {
         editorRef.current = editorInstance;
         monacoRef.current = monacoInstance;
+        registerConfiguredEditorCleanup(editorInstance);
 
-        editorInstance.addCommand(
+        disposeSaveRef.current?.();
+        disposeSaveRef.current = registerEditorSaveAction(
+          editorInstance,
           monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
           () => onSaveRef.current?.(),
         );
@@ -355,26 +373,6 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       }
     }, []);
 
-    useEffect(() => {
-      const editorInstance = editorRef.current;
-      if (!editorInstance) return;
-
-      const currentValue = editorInstance.getValue();
-      if (currentValue !== content) {
-        editorInstance.setValue(content);
-      }
-    }, [content]);
-
-    useEffect(() => {
-      const editorInstance = editorRef.current;
-      if (!editorInstance) return;
-
-      editorInstance.updateOptions({
-        fontSize: isMobile ? mobileFontSize : fontSize,
-        tabSize,
-      });
-    }, [fontSize, mobileFontSize, tabSize, isMobile]);
-
     function handleCommentSubmit(body: string) {
       if (!workspaceId || !filePath || !commentInput) return;
       const contentSnapshot = editorRef.current?.getValue() ?? null;
@@ -428,48 +426,35 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     }
 
     const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
+    const options = useMonacoEditorOptions({
+      fontSize: effectiveFontSize,
+      tabSize,
+      isMobile,
+      isCommentMode,
+      modelPath: lspModelPath,
+      isCodeLensEnabled,
+      isMinimapEnabled,
+    });
     const commentCount = commentsData?.length ?? 0;
 
     return (
       <div className="flex h-full w-full overflow-hidden">
         <div className="relative flex-1 overflow-hidden">
-          <Editor
-            path={lspModelPath}
-            height="100%"
-            language={getMonacoLanguage(language)}
-            theme={getMonacoThemeName(theme, resolvedMode)}
-            value={content}
-            onChange={handleChange}
-            beforeMount={handleBeforeMount}
-            onMount={handleEditorDidMount}
-            options={{
-              fontSize: effectiveFontSize,
-              lineHeight: Math.round(effectiveFontSize * 1.5),
-              fontFamily: MONACO_FONT_FAMILY,
-              fontLigatures: false,
-              tabSize,
-              minimap: { enabled: !isMobile },
-              scrollBeyondLastLine: false,
-              wordWrap: "on",
-              lineNumbers: "on",
-              renderLineHighlight: "line",
-              automaticLayout: true,
-              bracketPairColorization: { enabled: true },
-              cursorBlinking: "smooth",
-              cursorSmoothCaretAnimation: "on",
-              smoothScrolling: true,
-              padding: { top: 8 },
-              folding: true,
-              foldingStrategy: "indentation",
-              glyphMargin: isCommentMode,
-              suggestOnTriggerCharacters: true,
-              quickSuggestions: {
-                other: true,
-                comments: false,
-                strings: false,
-              },
-            }}
-          />
+          {isBuiltinPolicyReady ? (
+            <Editor
+              path={lspModelPath}
+              height="100%"
+              language={getMonacoLanguage(language)}
+              theme={getMonacoThemeName(theme, resolvedMode)}
+              value={content}
+              onChange={handleChange}
+              beforeMount={handleBeforeMount}
+              onMount={handleEditorDidMount}
+              options={options}
+            />
+          ) : (
+            <div className="bg-muted h-full w-full animate-pulse" />
+          )}
 
           {isCommentMode && commentInput && filePath && (
             <div

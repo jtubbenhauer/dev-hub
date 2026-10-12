@@ -5,11 +5,12 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 // Captured surfaces populated by the mocked DiffEditor on mount.
 let capturedOptions: Record<string, unknown> | undefined;
 let capturedSaveHandler: (() => void) | undefined;
-let addCommandSpy: ReturnType<typeof vi.fn>;
+let addActionSpy: ReturnType<typeof vi.fn>;
 
 function makeFakeModifiedEditor() {
   return {
-    addCommand: addCommandSpy,
+    addAction: addActionSpy,
+    onDidDispose: vi.fn(() => ({ dispose: vi.fn() })),
     createDecorationsCollection: vi.fn(() => ({
       set: vi.fn(),
       clear: vi.fn(),
@@ -59,7 +60,7 @@ vi.mock("next/dynamic", () => ({
 }));
 
 // Mocked DiffEditor: captures the options object and drives onMount with a
-// fake editor whose addCommand surface is spyable.
+// fake editor whose addAction surface is spyable.
 vi.mock("@monaco-editor/react", () => ({
   DiffEditor: (props: {
     options?: Record<string, unknown>;
@@ -76,6 +77,10 @@ vi.mock("@monaco-editor/react", () => ({
     }, []);
     return <div data-testid="diff-editor" />;
   },
+}));
+
+vi.mock("@/lib/editor/monaco-bootstrap", () => ({
+  loadMonacoReact: () => import("@monaco-editor/react"),
 }));
 
 vi.mock("@/lib/editor/monaco-themes", () => ({
@@ -153,8 +158,9 @@ describe("MonacoReviewEditor toolbar / forceSideBySide / readOnly props", () => 
   beforeEach(() => {
     capturedOptions = undefined;
     capturedSaveHandler = undefined;
-    addCommandSpy = vi.fn((_keybinding: number, handler: () => void) => {
-      capturedSaveHandler = handler;
+    addActionSpy = vi.fn((action: { run: () => void }) => {
+      capturedSaveHandler = action.run;
+      return { dispose: vi.fn() };
     });
     fetchMock.mockClear();
     act(() => {
@@ -205,7 +211,7 @@ describe("MonacoReviewEditor toolbar / forceSideBySide / readOnly props", () => 
   it("does NOT register the save command in readOnly, and never triggers a save fetch", async () => {
     await renderEditor({ readOnly: true });
     // Save keybinding is never registered at mount.
-    expect(addCommandSpy).not.toHaveBeenCalled();
+    expect(addActionSpy).not.toHaveBeenCalled();
     expect(capturedSaveHandler).toBeUndefined();
     // Nothing to trigger — no write path fires.
     expect(fetchMock).not.toHaveBeenCalled();
@@ -214,7 +220,9 @@ describe("MonacoReviewEditor toolbar / forceSideBySide / readOnly props", () => 
   it("registers the save command and issues a PUT when not readOnly", async () => {
     await renderEditor();
     await waitFor(() => {
-      expect(addCommandSpy).toHaveBeenCalled();
+      expect(addActionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ keybindings: [2048 | 49] }),
+      );
     });
     expect(capturedSaveHandler).toBeTypeOf("function");
 

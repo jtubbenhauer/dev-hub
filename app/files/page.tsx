@@ -1,13 +1,17 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useShallow } from "zustand/react/shallow";
+import { useEditorTabMetadataSelector } from "@/hooks/use-editor-tab-metadata";
 import { useSearchParams } from "next/navigation";
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
 import { FileTree } from "@/components/editor/file-tree";
 import type { FileTreeEntry } from "@/types";
 import { OpenEditors } from "@/components/editor/open-editors";
 import { FileTabs } from "@/components/editor/file-tabs";
-import { EditorSwitcher } from "@/components/editor/editor-switcher";
+import { FilesActiveEditor } from "@/components/editor/files-active-editor";
+import { FileDiagnosticCounts } from "@/components/editor/file-diagnostic-counts";
 import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import { CsvPreviewToggle } from "@/components/editor/csv-preview";
 import { ImageViewer } from "@/components/editor/image-viewer";
@@ -25,7 +29,7 @@ import {
   isImagePath,
 } from "@/lib/file-preview";
 
-import { useFileTabsSetting } from "@/hooks/use-settings";
+import { useFileTabsSetting, useLspEnabledSetting } from "@/hooks/use-settings";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -42,19 +46,24 @@ import {
   FolderOpen,
   FileCode2,
   GitCompare,
-  CircleX,
-  TriangleAlert,
   Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGitStatus } from "@/hooks/use-git";
-import { useLintOnSave, useDiagnosticsForFile } from "@/hooks/use-diagnostics";
+import { useLintOnSave } from "@/hooks/use-diagnostics";
 import { ProblemsPanel } from "@/components/editor/problems-panel";
 import { LspStatusToggle } from "@/components/editor/lsp-status-toggle";
 import { useLspOpenFileHandler } from "@/hooks/use-lsp-open-file-handler";
 import { openFileInFilesPage } from "@/lib/files/open-in-files-page";
+import {
+  buildFileSaveBody,
+  resolveTabWorkspaceId,
+} from "@/lib/files/save-request";
+import { completeFileSave } from "@/lib/files/save-completion";
+import { submitFileSave } from "@/lib/files/submit-file-save";
+import { didOpenFile } from "@/lib/files/open-result";
 
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = () => Math.max(500, window.innerWidth * 0.5);
@@ -91,12 +100,14 @@ function FilesContent() {
     [workspaces, activeWorkspaceId],
   );
 
-  const openFiles = useEditorStore((s) => s.openFiles);
+  const openFiles = useEditorStore(useEditorTabMetadataSelector());
+  const tabPaths = useEditorStore(
+    useShallow((s) => s.openFiles.map((file) => file.path)),
+  );
   const activeFilePath = useEditorStore((s) => s.activeFilePath);
   const isFileTreeOpen = useEditorStore((s) => s.isFileTreeOpen);
   const toggleFileTree = useEditorStore((s) => s.toggleFileTree);
   const updateFileContent = useEditorStore((s) => s.updateFileContent);
-  const markFileSaved = useEditorStore((s) => s.markFileSaved);
   const editorOpenFile = useEditorStore((s) => s.openFile);
   const setActiveFile = useEditorStore((s) => s.setActiveFile);
   const saveWorkspaceState = useEditorStore((s) => s.saveWorkspaceState);
@@ -104,17 +115,19 @@ function FilesContent() {
   const getSavedActiveFile = useEditorStore((s) => s.getSavedActiveFile);
   const expandPathToFile = useEditorStore((s) => s.expandPathToFile);
   const expandFolder = useEditorStore((s) => s.expandFolder);
-  const closeAllFiles = useEditorStore((s) => s.closeAllFiles);
   const toggleExpandedPath = useEditorStore((s) => s.toggleExpandedPath);
-  const workspaceFileStates = useEditorStore((s) => s.workspaceFileStates);
+  const savedExpandedPaths = useEditorStore((s) =>
+    activeWorkspaceId
+      ? s.workspaceFileStates[activeWorkspaceId]?.expandedPaths
+      : undefined,
+  );
 
   const { isFileTabsDisabled } = useFileTabsSetting();
+  const { isLspEnabled } = useLspEnabledSetting();
 
   const expandedPaths = useMemo(() => {
-    if (!activeWorkspaceId) return new Set<string>();
-    const ws = workspaceFileStates[activeWorkspaceId];
-    return new Set(ws?.expandedPaths ?? []);
-  }, [activeWorkspaceId, workspaceFileStates]);
+    return new Set(savedExpandedPaths ?? []);
+  }, [savedExpandedPaths]);
 
   const handleToggleExpand = useCallback(
     (path: string) => {
@@ -135,39 +148,26 @@ function FilesContent() {
   );
 
   const handleFileTreeFileClick = useCallback(
-    async (entry: FileTreeEntry) => {
+    (entry: FileTreeEntry) => {
       if (!activeWorkspaceId) return;
       expandPathToFile(activeWorkspaceId, entry.path);
-      const file = await readFileForEditor(activeWorkspaceId, entry.path);
-      if (!file) return;
-      if (isFileTabsDisabled) closeAllFiles();
-      editorOpenFile({
+      void openFileInFilesPage({
+        workspaceId: activeWorkspaceId,
         path: entry.path,
-        name: entry.name,
-        content: file.content,
-        language: file.language,
-        isDirty: false,
-        originalContent: file.content,
+        isFileTabsDisabled,
       });
     },
-    [
-      activeWorkspaceId,
-      editorOpenFile,
-      closeAllFiles,
-      isFileTabsDisabled,
-      expandPathToFile,
-    ],
+    [activeWorkspaceId, isFileTabsDisabled, expandPathToFile],
   );
 
   const handleFileTreeSearchResultClick = useCallback(
-    async (filePath: string) => {
+    (filePath: string) => {
       if (activeWorkspaceId) {
         expandPathToFile(activeWorkspaceId, filePath);
-        await openFileInFilesPage({
+        void openFileInFilesPage({
           workspaceId: activeWorkspaceId,
           path: filePath,
           isFileTabsDisabled,
-          canDiscardDirtyTabs: true,
         });
       }
     },
@@ -185,7 +185,6 @@ function FilesContent() {
         path: relativePath,
         isFileTabsDisabled,
         shouldCommit,
-        canDiscardDirtyTabs: false,
       });
       if (opened) expandPathToFile(activeWorkspaceId, relativePath);
       return opened;
@@ -233,6 +232,7 @@ function FilesContent() {
           const file = await readFileForEditor(activeWorkspaceId, tab.path);
           if (!file) return null;
           return {
+            workspaceId: activeWorkspaceId,
             path: tab.path,
             name: tab.name,
             content: file.content,
@@ -246,7 +246,7 @@ function FilesContent() {
       }),
     ).then((results) => {
       for (const file of results) {
-        if (file) editorOpenFile(file);
+        if (file) didOpenFile(editorOpenFile(file), file.path);
       }
       if (savedActive) {
         const restored = results.find((f) => f?.path === savedActive);
@@ -268,10 +268,9 @@ function FilesContent() {
   useEffect(() => {
     if (!activeWorkspaceId || isRestoring) return;
     saveWorkspaceState(activeWorkspaceId);
-    // openFiles and activeFilePath must trigger this save even though saveWorkspaceState reads them internally
   }, [
     activeWorkspaceId,
-    openFiles,
+    tabPaths,
     activeFilePath,
     isRestoring,
     saveWorkspaceState,
@@ -280,48 +279,23 @@ function FilesContent() {
   useEffect(() => {
     const openPath = searchParams.get("open");
     if (!openPath || !activeWorkspaceId) return;
-    if (openedFromParamRef.current === openPath) return;
+    if (openedFromParamRef.current === `${activeWorkspaceId}:${openPath}`)
+      return;
 
-    openedFromParamRef.current = openPath;
+    openedFromParamRef.current = `${activeWorkspaceId}:${openPath}`;
 
     expandPathToFile(activeWorkspaceId, openPath);
 
-    const alreadyOpen = openFiles.find((f) => f.path === openPath);
-    if (alreadyOpen) {
-      if (isFileTabsDisabled) closeAllFiles();
-      setActiveFile(openPath);
-      return;
-    }
-
-    if (isFileTabsDisabled) closeAllFiles();
-
     // Wait for saved tabs to restore so they cannot steal focus from the
     // requested file (image previews open without a fetch, so they finish first).
-    (restoreTabsPromiseRef.current ?? Promise.resolve())
-      .then(() => readFileForEditor(activeWorkspaceId, openPath))
-      .then((file) => {
-        if (!file) return;
-        const name = openPath.split("/").pop() ?? openPath;
-        editorOpenFile({
-          path: openPath,
-          name,
-          content: file.content,
-          language: file.language,
-          isDirty: false,
-          originalContent: file.content,
-        });
-      })
-      .catch(() => {});
-  }, [
-    searchParams,
-    activeWorkspaceId,
-    openFiles,
-    editorOpenFile,
-    setActiveFile,
-    expandPathToFile,
-    isFileTabsDisabled,
-    closeAllFiles,
-  ]);
+    void (restoreTabsPromiseRef.current ?? Promise.resolve()).then(() =>
+      openFileInFilesPage({
+        workspaceId: activeWorkspaceId,
+        path: openPath,
+        isFileTabsDisabled,
+      }),
+    );
+  }, [searchParams, activeWorkspaceId, expandPathToFile, isFileTabsDisabled]);
 
   const expandedFolderRef = useRef<string | null>(null);
 
@@ -350,43 +324,58 @@ function FilesContent() {
     activeWorkspaceId ?? undefined,
     activeFilePath ?? undefined,
   );
-  const { errorCount, warningCount } = useDiagnosticsForFile(
-    activeWorkspaceId ?? undefined,
-    activeFilePath ?? undefined,
-  );
+  const queryClient = useQueryClient();
 
   const handleSave = useCallback(async () => {
+    const state = useEditorStore.getState();
+    const activeFile = state.openFiles.find(
+      (file) => file.path === state.activeFilePath,
+    );
     if (!activeFile || !activeWorkspaceId) return;
     // Preview tabs hold no text content, so saving would truncate the file.
     if (isBinaryPreviewLanguage(activeFile.language)) return;
 
     setSavingPath(activeFile.path);
+    const snapshot = {
+      workspaceId: resolveTabWorkspaceId(activeFile, activeWorkspaceId),
+      path: activeFile.path,
+      instanceId: activeFile.instanceId,
+      submittedBase: activeFile.originalContent,
+      savedContent: activeFile.content,
+    };
     try {
-      const res = await fetch("/api/files/content", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspaceId: activeWorkspaceId,
-          path: activeFile.path,
-          content: activeFile.content,
+      await submitFileSave(
+        buildFileSaveBody({
+          workspaceId: snapshot.workspaceId,
+          path: snapshot.path,
+          content: snapshot.savedContent,
+          originalContent: snapshot.submittedBase,
+          isLspEnabled,
         }),
+      );
+      completeFileSave({
+        snapshotWorkspaceId: snapshot.workspaceId,
+        getBoundWorkspaceId: () =>
+          useWorkspaceStore.getState().activeWorkspaceId,
+        acknowledge: () => useEditorStore.getState().markFileSavedAs(snapshot),
+        runFollowUps: () => {
+          void lintFile();
+          void queryClient.invalidateQueries({
+            queryKey: ["git-status", snapshot.workspaceId],
+          });
+          toast.success("Saved");
+        },
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Save failed");
-      }
-      markFileSaved(activeFile.path);
-      void lintFile();
-      toast.success("Saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Save failed");
     } finally {
       setSavingPath(null);
     }
-  }, [activeFile, activeWorkspaceId, markFileSaved, lintFile]);
+  }, [activeWorkspaceId, isLspEnabled, lintFile, queryClient]);
 
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
+  const saveActiveFile = useCallback(() => void handleSaveRef.current(), []);
 
   const filesLeaderActions = useMemo(
     () => [
@@ -573,18 +562,10 @@ function FilesContent() {
               {activeFile?.path ?? "No file open"}
             </span>
 
-            {errorCount > 0 && (
-              <span className="text-destructive flex items-center gap-1 text-xs">
-                <CircleX className="size-3" />
-                {errorCount}
-              </span>
-            )}
-            {warningCount > 0 && (
-              <span className="flex items-center gap-1 text-xs text-yellow-500">
-                <TriangleAlert className="size-3" />
-                {warningCount}
-              </span>
-            )}
+            <FileDiagnosticCounts
+              workspaceId={activeWorkspaceId ?? undefined}
+              filePath={activeFilePath ?? undefined}
+            />
             <LspStatusToggle />
 
             {activeFile && isActiveFileUnstaged && (
@@ -662,7 +643,14 @@ function FilesContent() {
                     size="sm"
                     className="h-7 w-7 p-0"
                     onClick={() =>
-                      downloadTextFile(activeFile.name, activeFile.content)
+                      downloadTextFile(
+                        activeFile.name,
+                        useEditorStore
+                          .getState()
+                          .openFiles.find(
+                            (file) => file.path === activeFile.path,
+                          )?.content ?? "",
+                      )
                     }
                     aria-label="Download file"
                     title="Download file"
@@ -690,15 +678,20 @@ function FilesContent() {
                   className="min-h-0 flex-1 overflow-hidden"
                   data-lsp-surface="files-page"
                 >
-                  <EditorSwitcher
+                  <FilesActiveEditor
                     ref={editorHandleRef}
-                    content={activeFile.content}
                     language={activeFile.language}
                     onChange={handleChange}
-                    onSave={() => void handleSaveRef.current()}
+                    onSave={saveActiveFile}
                     workspaceId={activeWorkspaceId ?? undefined}
                     filePath={activeFile.path}
-                    isLspEligible
+                    isLspEligible={
+                      !activeFile ||
+                      resolveTabWorkspaceId(
+                        activeFile,
+                        activeWorkspaceId ?? activeWorkspace.id,
+                      ) === activeWorkspaceId
+                    }
                   />
                 </div>
                 <ProblemsPanel

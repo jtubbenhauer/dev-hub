@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
+import { MoveToFileDialog } from "@/components/lsp/move-to-file-dialog";
 import { useLspEnabledSetting } from "@/hooks/use-settings";
-import { restoreBuiltinTypeScriptFeatures } from "@/lib/lsp/client/builtin-typescript";
 import {
-  connectLspSession,
+  restoreBuiltinTypeScriptFeatures,
+  suppressBuiltinTypeScriptFeatures,
+} from "@/lib/lsp/client/builtin-typescript";
+import {
+  getLspSessionConnector,
   getRegisteredLspMonaco,
-} from "@/lib/lsp/client/lsp-session";
+  type LspSessionConnector,
+} from "@/lib/lsp/client/lsp-session-registry";
 import {
   createLspSessionController,
   type LspSessionController,
@@ -18,6 +23,14 @@ function restoreBuiltinIfRegistered(): void {
   const monaco = getRegisteredLspMonaco();
   if (monaco) restoreBuiltinTypeScriptFeatures(monaco);
 }
+
+// The connector is registered with Monaco, so pages without an editor never load the LSP runtime.
+const connectThroughRegisteredConnector: LspSessionConnector = (options) => {
+  const connect = getLspSessionConnector();
+  return connect
+    ? connect(options)
+    : Promise.reject(new Error("LSP session runtime is not loaded"));
+};
 
 export function LspSessionDriver() {
   const { isLspEnabled } = useLspEnabledSetting();
@@ -39,17 +52,23 @@ export function LspSessionDriver() {
   );
   const controllerRef = useRef<LspSessionController | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const unsubscribe = useLspStore.subscribe((state, previous) => {
+      if (state.status !== "starting" || previous.status === "starting") return;
+      const monaco = getRegisteredLspMonaco();
+      if (monaco) suppressBuiltinTypeScriptFeatures(monaco);
+    });
     return () => {
+      unsubscribe();
       controllerRef.current?.dispose();
       controllerRef.current = null;
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     controllerRef.current ??= createLspSessionController({
       fetchImpl: fetch,
-      connect: connectLspSession,
+      connect: connectThroughRegisteredConnector,
       restoreBuiltin: restoreBuiltinIfRegistered,
     });
     const workspace =
@@ -75,5 +94,5 @@ export function LspSessionDriver() {
     retryNonce,
   ]);
 
-  return null;
+  return <MoveToFileDialog />;
 }

@@ -1,4 +1,7 @@
 "use client";
+import { registerEditorSaveAction } from "@/components/editor/editor-save-action";
+import { registerConfiguredEditorCleanup } from "@/components/editor/configured-editor-lifecycle";
+import { useMonacoDiffOptions } from "@/hooks/use-monaco-diff-options";
 
 import {
   useEffect,
@@ -27,7 +30,6 @@ import { useTheme } from "@/components/providers/theme-provider";
 import {
   registerMonacoThemes,
   getMonacoThemeName,
-  MONACO_FONT_FAMILY,
 } from "@/lib/editor/monaco-themes";
 import { WRAPPED_DIFF_EDITOR_OPTIONS } from "@/lib/editor/monaco-diff-options";
 import {
@@ -50,9 +52,10 @@ import { attachCommentToChat } from "@/lib/comment-chat-bridge";
 import { useChatStore } from "@/stores/chat-store";
 import type { FileComment, ReviewFile } from "@/types";
 import { trackBuiltinTs } from "@/lib/lsp/client/builtin-typescript";
+import { loadMonacoReact } from "@/lib/editor/monaco-bootstrap";
 
 const DiffEditor = dynamic(
-  () => import("@monaco-editor/react").then((mod) => mod.DiffEditor),
+  () => loadMonacoReact().then((mod) => mod.DiffEditor),
   {
     ssr: false,
     loading: () => <div className="bg-muted h-full w-full animate-pulse" />,
@@ -278,6 +281,8 @@ export const MonacoReviewEditor = forwardRef<
   }, [getModifiedEditor]);
 
   const handleSaveRef = useRef(handleSave);
+  const disposeSaveRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => disposeSaveRef.current?.(), []);
   handleSaveRef.current = handleSave;
 
   const handleBeforeMount = useCallback(
@@ -297,9 +302,13 @@ export const MonacoReviewEditor = forwardRef<
       monacoRef.current = monacoInstance;
 
       const modifiedEditor = diffEditor.getModifiedEditor();
+      registerConfiguredEditorCleanup(modifiedEditor);
+      registerConfiguredEditorCleanup(diffEditor.getOriginalEditor());
 
       if (!readOnly) {
-        modifiedEditor.addCommand(
+        disposeSaveRef.current?.();
+        disposeSaveRef.current = registerEditorSaveAction(
+          modifiedEditor,
           monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
           () => handleSaveRef.current?.(),
         );
@@ -544,6 +553,13 @@ export const MonacoReviewEditor = forwardRef<
     [getModifiedEditor],
   );
 
+  const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
+  const options = useMonacoDiffOptions({
+    fontSize: effectiveFontSize,
+    renderSideBySide: forceSideBySide || diffViewMode === "side-by-side",
+    readOnly,
+    isReview: true,
+  });
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -553,7 +569,6 @@ export const MonacoReviewEditor = forwardRef<
   }
 
   const fileName = fileContent.path.split("/").pop() ?? fileContent.path;
-  const effectiveFontSize = isMobile ? mobileFontSize : fontSize;
   const commentCount = fileCommentsData?.length ?? 0;
 
   return (
@@ -669,29 +684,7 @@ export const MonacoReviewEditor = forwardRef<
             theme={getMonacoThemeName(theme, resolvedMode)}
             beforeMount={handleBeforeMount}
             onMount={handleMount}
-            options={{
-              fontSize: effectiveFontSize,
-              lineHeight: Math.round(effectiveFontSize * 1.5),
-              fontFamily: MONACO_FONT_FAMILY,
-              fontLigatures: false,
-              ...WRAPPED_DIFF_EDITOR_OPTIONS,
-              renderSideBySide:
-                forceSideBySide || diffViewMode === "side-by-side",
-              hideUnchangedRegions: { enabled: true },
-              renderIndicators: true,
-              renderMarginRevertIcon: true,
-              originalEditable: false,
-              readOnly,
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              lineNumbers: "on",
-              renderLineHighlight: "line",
-              automaticLayout: true,
-              glyphMargin: true,
-              folding: true,
-              smoothScrolling: true,
-              padding: { top: 8 },
-            }}
+            options={options}
           />
         </div>
 

@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ChatFileDialog } from "@/components/chat/chat-file-dialog";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 import { IMAGE_LANGUAGE, PDF_LANGUAGE } from "@/lib/file-preview";
 import { downloadTextFile } from "@/lib/download-file";
+vi.mock("@/hooks/use-settings", () => ({
+  useLspEnabledSetting: () => ({ isLspEnabled: false }),
+}));
 
 vi.mock("@/components/editor/editor-switcher", () => ({
   EditorSwitcher: () => <div data-testid="editor-switcher" />,
@@ -19,6 +23,14 @@ vi.mock("@/lib/download-file", () => ({
   downloadTextFile: vi.fn(),
 }));
 
+function renderDialog() {
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ChatFileDialog />
+    </QueryClientProvider>,
+  );
+}
+
 describe("ChatFileDialog download button", () => {
   beforeEach(() => {
     vi.mocked(downloadTextFile).mockClear();
@@ -31,6 +43,7 @@ describe("ChatFileDialog download button", () => {
       isLoading: false,
       file: {
         path: "src/lib/example.ts",
+        instanceId: 1,
         content: "edited content",
         language: "typescript",
         workspaceId: "ws-1",
@@ -38,7 +51,7 @@ describe("ChatFileDialog download button", () => {
       originalContent: "original content",
     });
 
-    render(<ChatFileDialog />);
+    renderDialog();
     await userEvent.click(
       screen.getByRole("button", { name: "Download file" }),
     );
@@ -55,6 +68,7 @@ describe("ChatFileDialog download button", () => {
       isLoading: false,
       file: {
         path: "docs/report.pdf",
+        instanceId: 2,
         content: "",
         language: PDF_LANGUAGE,
         workspaceId: "ws-1",
@@ -62,7 +76,7 @@ describe("ChatFileDialog download button", () => {
       originalContent: "",
     });
 
-    render(<ChatFileDialog />);
+    renderDialog();
     const downloadLink = screen.getByRole("link", { name: "Download file" });
 
     expect(downloadLink).toHaveAttribute("download", "report.pdf");
@@ -78,6 +92,7 @@ describe("ChatFileDialog download button", () => {
       isLoading: false,
       file: {
         path: "assets/logo.png",
+        instanceId: 3,
         content: "",
         language: IMAGE_LANGUAGE,
         workspaceId: "ws-1",
@@ -85,7 +100,7 @@ describe("ChatFileDialog download button", () => {
       originalContent: "",
     });
 
-    render(<ChatFileDialog />);
+    renderDialog();
 
     expect(screen.getByRole("img", { name: "logo.png" })).toHaveAttribute(
       "src",

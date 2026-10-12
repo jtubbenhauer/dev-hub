@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +22,10 @@ import { SplitPanelFileTabs } from "@/components/chat/split-panel-file-tabs";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useChatStore } from "@/stores/chat-store";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
-import { useChatSidebarTabsOpenSetting } from "@/hooks/use-settings";
+import {
+  useChatSidebarTabsOpenSetting,
+  useLspEnabledSetting,
+} from "@/hooks/use-settings";
 import {
   useFileComments,
   useResolveFileComment,
@@ -33,7 +37,8 @@ import { useLintOnSave } from "@/hooks/use-diagnostics";
 import type { FileTreeEntry, FileComment } from "@/types";
 import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
 import { FileViewToggle } from "@/components/chat/file-view-toggle";
-import { useFileViewMode } from "@/components/chat/use-file-view-mode";
+import { SplitPanelActiveFile } from "@/components/editor/split-panel-active-file";
+import { useEditorTabMetadataSelector } from "@/hooks/use-editor-tab-metadata";
 import { PdfViewer } from "@/components/editor/pdf-viewer";
 import { ImageViewer } from "@/components/editor/image-viewer";
 import {
@@ -51,6 +56,13 @@ import {
 } from "@/lib/file-preview";
 import { useLspOpenFileHandler } from "@/hooks/use-lsp-open-file-handler";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
+import { didOpenFile } from "@/lib/files/open-result";
+import {
+  buildFileSaveBody,
+  resolveTabWorkspaceId,
+} from "@/lib/files/save-request";
+import { completeFileSave } from "@/lib/files/save-completion";
+import { submitFileSave } from "@/lib/files/submit-file-save";
 
 const MonacoEditor = dynamic(
   () => import("@/components/editor/monaco-editor").then((m) => m.MonacoEditor),
@@ -84,7 +96,10 @@ export function SplitPanelFiles({
   workspaceId,
   workspacePath,
 }: SplitPanelFilesProps) {
-  const openFiles = useSidePanelStore((s) => s.openFiles);
+  const openFiles = useSidePanelStore(useEditorTabMetadataSelector());
+  const tabPaths = useSidePanelStore(
+    useShallow((s) => s.openFiles.map((file) => file.path)),
+  );
   const activeFilePath = useSidePanelStore((s) => s.activeFilePath);
   const isFilePickerOpen = useSidePanelStore((s) => s.isFilePickerOpen);
   const isLoading = useSidePanelStore((s) => s.isLoading);
@@ -92,7 +107,6 @@ export function SplitPanelFiles({
 
   const openFileInTab = useSidePanelStore((s) => s.openFileInTab);
   const setContent = useSidePanelStore((s) => s.setContent);
-  const markSaved = useSidePanelStore((s) => s.markSaved);
   const setError = useSidePanelStore((s) => s.setError);
   const clearError = useSidePanelStore((s) => s.clearError);
   const toggleFilePicker = useSidePanelStore((s) => s.toggleFilePicker);
@@ -103,25 +117,23 @@ export function SplitPanelFiles({
 
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const { sidebarTabsOpenMode } = useChatSidebarTabsOpenSetting();
+  const { isLspEnabled } = useLspEnabledSetting();
+  const latestWorkspaceIdRef = useRef(workspaceId);
+  useEffect(() => {
+    latestWorkspaceIdRef.current = workspaceId;
+  }, [workspaceId]);
 
   const expandedPaths = useSidePanelStore((s) => s.expandedPaths);
   const toggleExpandedPath = useSidePanelStore((s) => s.toggleExpandedPath);
   const expandPathToFile = useSidePanelStore((s) => s.expandPathToFile);
   // prettier-ignore
-  useLspOpenFileHandler("split-panel", async (relativePath, shouldCommit) => {
-    let opened = true;
-    await openFileInSidePanel(workspaceId, relativePath, () => {
-      opened = false;
-    }, shouldCommit);
-    return opened;
-  }, () => useSidePanelStore.getState().activeFilePath);
+  useLspOpenFileHandler("split-panel", (rel, shouldCommit) => openFileInSidePanel(workspaceId, rel, () => {}, shouldCommit), () => useSidePanelStore.getState().activeFilePath);
 
   const activeFile = useMemo(
     () => openFiles.find((f) => f.path === activeFilePath) ?? null,
     [openFiles, activeFilePath],
   );
   const currentFilePath = activeFile?.path ?? null;
-  const currentFileContent = activeFile?.content ?? null;
   const currentFileLanguage = activeFile?.language ?? null;
   const isDirty = activeFile?.isDirty ?? false;
   const isPdf = currentFileLanguage === PDF_LANGUAGE;
@@ -129,14 +141,6 @@ export function SplitPanelFiles({
   const isBinaryPreview = isPdf || isImage;
 
   const queryClient = useQueryClient();
-
-  const {
-    mode: fileViewMode,
-    canDiff,
-    repoRelativeKey,
-    setMode,
-  } = useFileViewMode(workspaceId, workspacePath, activeFile);
-  const isDiff = canDiff && fileViewMode === "diff";
 
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -235,7 +239,10 @@ export function SplitPanelFiles({
       const previewLanguage = getBinaryPreviewLanguage(path);
       if (previewLanguage) {
         clearError();
-        openFileInTab(path, "", previewLanguage);
+        didOpenFile(
+          openFileInTab(path, "", previewLanguage, workspaceId),
+          path,
+        );
         setIsLoading(false);
         return;
       }
@@ -268,7 +275,15 @@ export function SplitPanelFiles({
           return;
         }
 
-        openFileInTab(path, content, data.language ?? "plaintext");
+        didOpenFile(
+          openFileInTab(
+            path,
+            content,
+            data.language ?? "plaintext",
+            workspaceId,
+          ),
+          path,
+        );
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
         setError("Failed to load file");
@@ -309,7 +324,11 @@ export function SplitPanelFiles({
         }),
       );
       for (const file of results) {
-        if (file) openFileInTab(file.path, file.content, file.language);
+        if (file)
+          didOpenFile(
+            openFileInTab(file.path, file.content, file.language, wsId),
+            file.path,
+          );
       }
       if (savedActive) {
         const restored = results.find((r) => r?.path === savedActive);
@@ -343,7 +362,7 @@ export function SplitPanelFiles({
   useEffect(() => {
     if (isRestoringRef.current) return;
     saveWorkspaceFiles(workspaceId);
-  }, [workspaceId, openFiles, activeFilePath, saveWorkspaceFiles]);
+  }, [workspaceId, tabPaths, activeFilePath, saveWorkspaceFiles]);
 
   const handleFileClick = useCallback(
     (path: string) => {
@@ -355,14 +374,19 @@ export function SplitPanelFiles({
           );
         return;
       }
-      const existingTab = openFiles.find((f) => f.path === path);
-      if (existingTab) {
+      const existingTab = useSidePanelStore
+        .getState()
+        .openFiles.find((f) => f.path === path);
+      if (
+        existingTab &&
+        resolveTabWorkspaceId(existingTab, workspaceId) === workspaceId
+      ) {
         useSidePanelStore.getState().setActiveTab(path);
         return;
       }
       loadFile(path);
     },
-    [sidebarTabsOpenMode, workspaceId, openFiles, loadFile],
+    [sidebarTabsOpenMode, workspaceId, loadFile],
   );
 
   const handleTreeFileClick = useCallback(
@@ -383,29 +407,50 @@ export function SplitPanelFiles({
 
   const saveFileMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/files/content", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspaceId,
-          path: currentFilePath,
-          content: currentFileContent,
+      const state = useSidePanelStore.getState();
+      const activeFile = state.openFiles.find(
+        (file) => file.path === state.activeFilePath,
+      );
+      if (!activeFile) throw new Error("No file to save");
+      const snapshot = {
+        workspaceId: resolveTabWorkspaceId(activeFile, workspaceId),
+        path: activeFile.path,
+        instanceId: activeFile.instanceId,
+        submittedBase: activeFile.originalContent,
+        savedContent: activeFile.content,
+      };
+      await submitFileSave(
+        buildFileSaveBody({
+          workspaceId: snapshot.workspaceId,
+          path: snapshot.path,
+          content: snapshot.savedContent,
+          originalContent: snapshot.submittedBase,
+          isLspEnabled,
         }),
-      });
-      if (!res.ok) throw new Error("Save failed");
+      );
+      return snapshot;
     },
-    onSuccess: () => {
-      markSaved();
-      void lintFile();
-      queryClient.invalidateQueries({
-        queryKey: ["git-file-content", workspaceId],
-      });
-      queryClient.invalidateQueries({ queryKey: ["git-status", workspaceId] });
-      queryClient.invalidateQueries({
-        queryKey: ["git-file-diffs", workspaceId],
+    onSuccess: (snapshot) => {
+      completeFileSave({
+        snapshotWorkspaceId: snapshot.workspaceId,
+        getBoundWorkspaceId: () => latestWorkspaceIdRef.current,
+        acknowledge: () =>
+          useSidePanelStore.getState().markFileSavedAs(snapshot),
+        runFollowUps: () => {
+          void lintFile();
+          queryClient.invalidateQueries({
+            queryKey: ["git-file-content", workspaceId],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["git-status", workspaceId],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["git-file-diffs", workspaceId],
+          });
+        },
       });
     },
-    onError: () => toast.error("Failed to save file"),
+    onError: (error) => toast.error(error.message),
   });
 
   const handleSave = useCallback(() => {
@@ -523,182 +568,214 @@ export function SplitPanelFiles({
 
       <SplitPanelFileTabs />
 
-      {currentFilePath && !error && (
-        <div className="flex items-center gap-2 border-b px-3 py-1.5">
-          <span
-            data-testid="split-panel-filename"
-            className="text-muted-foreground min-w-0 flex-1 truncate text-xs"
-            title={currentFilePath}
-          >
-            {currentFilePath}
-          </span>
-          {isDirty && (
-            <span className="bg-warning size-1.5 shrink-0 rounded-full" />
-          )}
-          {canDiff && !isBinaryPreview && (
-            <FileViewToggle
-              mode={isDiff ? "diff" : "editor"}
-              onChange={setMode}
-            />
-          )}
-          {!isBinaryPreview && !isDiff && (
-            <MarkdownPreviewToggle
-              language={currentFileLanguage ?? "plaintext"}
-              filePath={currentFilePath}
-            />
-          )}
-          {!isBinaryPreview && !isDiff && (
-            <CsvPreviewToggle filePath={currentFilePath} />
-          )}
-          {!isBinaryPreview && (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              data-testid="split-panel-save"
-              disabled={!isDirty || saveFileMutation.isPending}
-              onClick={handleSave}
-              title="Save (Cmd+S)"
-            >
-              {saveFileMutation.isPending ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <Save className="size-3" />
-              )}
-            </Button>
-          )}
-          <Link
-            href={`/files?open=${encodeURIComponent(currentFilePath)}`}
-            className="text-muted-foreground hover:text-foreground"
-            title="Open in full editor"
-          >
-            <ExternalLink className="size-3" />
-          </Link>
-        </div>
-      )}
-
-      {isLoading && (
-        <div className="flex flex-1 items-center justify-center">
-          <Loader2 className="text-muted-foreground size-5 animate-spin" />
-        </div>
-      )}
-
-      {!currentFilePath && !error && !isLoading && (
-        <div className="text-muted-foreground flex flex-1 items-center justify-center px-6 text-center text-sm">
-          Click a file path in chat or browse files above to open a file
-        </div>
-      )}
-
-      {error && !isLoading && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-          {error.startsWith("BINARY:") ? (
-            <>
-              <p className="text-muted-foreground text-sm">
-                Cannot display binary file: {error.slice(7).split("/").pop()}
-              </p>
-              <Link
-                href={`/files?open=${encodeURIComponent(error.slice(7))}`}
-                className="text-primary text-xs underline"
-              >
-                Open in full editor
-              </Link>
-            </>
-          ) : error.startsWith("LARGE:") ? (
-            <>
-              <p className="text-muted-foreground text-sm">
-                File too large to display ({error.slice(6)})
-              </p>
-              {currentFilePath && (
+      <SplitPanelActiveFile
+        workspaceId={workspaceId}
+        workspacePath={workspacePath}
+      >
+        {({
+          currentFileContent,
+          isDiff,
+          canDiff,
+          repoRelativeKey,
+          setMode,
+        }) => (
+          <>
+            {currentFilePath && !error && (
+              <div className="flex items-center gap-2 border-b px-3 py-1.5">
+                <span
+                  data-testid="split-panel-filename"
+                  className="text-muted-foreground min-w-0 flex-1 truncate text-xs"
+                  title={currentFilePath}
+                >
+                  {currentFilePath}
+                </span>
+                {isDirty && (
+                  <span className="bg-warning size-1.5 shrink-0 rounded-full" />
+                )}
+                {canDiff && !isBinaryPreview && (
+                  <FileViewToggle
+                    mode={isDiff ? "diff" : "editor"}
+                    onChange={setMode}
+                  />
+                )}
+                {!isBinaryPreview && !isDiff && (
+                  <MarkdownPreviewToggle
+                    language={currentFileLanguage ?? "plaintext"}
+                    filePath={currentFilePath}
+                  />
+                )}
+                {!isBinaryPreview && !isDiff && (
+                  <CsvPreviewToggle filePath={currentFilePath} />
+                )}
+                {!isBinaryPreview && (
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    data-testid="split-panel-save"
+                    disabled={!isDirty || saveFileMutation.isPending}
+                    onClick={handleSave}
+                    title="Save (Cmd+S)"
+                  >
+                    {saveFileMutation.isPending ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Save className="size-3" />
+                    )}
+                  </Button>
+                )}
                 <Link
                   href={`/files?open=${encodeURIComponent(currentFilePath)}`}
-                  className="text-primary text-xs underline"
+                  className="text-muted-foreground hover:text-foreground"
+                  title="Open in full editor"
                 >
-                  Open in full editor
+                  <ExternalLink className="size-3" />
                 </Link>
-              )}
-            </>
-          ) : (
-            <p className="text-muted-foreground text-sm">{error}</p>
-          )}
-        </div>
-      )}
-
-      {currentFilePath &&
-        !error &&
-        !isLoading &&
-        currentFileContent !== null &&
-        (isPdf ? (
-          <div className="flex min-h-0 flex-1">
-            <PdfViewer workspaceId={workspaceId} filePath={currentFilePath} />
-          </div>
-        ) : isImage ? (
-          <div className="flex min-h-0 flex-1">
-            <ImageViewer workspaceId={workspaceId} filePath={currentFilePath} />
-          </div>
-        ) : isDiff ? (
-          <div className="flex min-h-0 flex-1" data-testid="split-panel-diff">
-            <div className="min-w-0 flex-1">
-              <SidePanelDiffView
-                workspaceId={workspaceId}
-                filePath={repoRelativeKey}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="flex min-h-0 flex-1">
-            <div className="min-w-0 flex-1" data-lsp-surface="split-panel">
-              <MarkdownPreviewFrame
-                content={currentFileContent}
-                language={currentFileLanguage ?? "plaintext"}
-                filePath={currentFilePath}
-              >
-                <CsvPreviewFrame
-                  content={currentFileContent}
-                  filePath={currentFilePath}
-                  workspaceId={workspaceId}
-                >
-                  <MonacoEditor
-                    content={currentFileContent}
-                    language={currentFileLanguage ?? "plaintext"}
-                    onChange={setContent}
-                    onSave={handleSave}
-                    filePath={currentFilePath}
-                    workspaceId={workspaceId}
-                    isLspEligible
-                  />
-                </CsvPreviewFrame>
-              </MarkdownPreviewFrame>
-            </div>
-            {isCommentsOpen && comments.length > 0 && (
-              <div className="w-64 shrink-0 border-l">
-                <CommentsSidebar
-                  comments={comments}
-                  onScrollToLine={() => {}}
-                  onResolve={handleResolve}
-                  onDelete={handleDelete}
-                  onUpdate={handleUpdate}
-                  onAttachToChat={handleAttachToChat}
-                  onClose={handleCloseComments}
-                />
               </div>
             )}
-          </div>
-        ))}
 
-      {currentFilePath &&
-        !error &&
-        !isLoading &&
-        comments.length > 0 &&
-        !isCommentsOpen && (
-          <div className="border-t px-3 py-1">
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground text-xs underline"
-              onClick={() => setIsCommentsOpen(true)}
-            >
-              {comments.length} comment{comments.length !== 1 ? "s" : ""}
-            </button>
-          </div>
+            {isLoading && (
+              <div className="flex flex-1 items-center justify-center">
+                <Loader2 className="text-muted-foreground size-5 animate-spin" />
+              </div>
+            )}
+
+            {!currentFilePath && !error && !isLoading && (
+              <div className="text-muted-foreground flex flex-1 items-center justify-center px-6 text-center text-sm">
+                Click a file path in chat or browse files above to open a file
+              </div>
+            )}
+
+            {error && !isLoading && (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                {error.startsWith("BINARY:") ? (
+                  <>
+                    <p className="text-muted-foreground text-sm">
+                      Cannot display binary file:{" "}
+                      {error.slice(7).split("/").pop()}
+                    </p>
+                    <Link
+                      href={`/files?open=${encodeURIComponent(error.slice(7))}`}
+                      className="text-primary text-xs underline"
+                    >
+                      Open in full editor
+                    </Link>
+                  </>
+                ) : error.startsWith("LARGE:") ? (
+                  <>
+                    <p className="text-muted-foreground text-sm">
+                      File too large to display ({error.slice(6)})
+                    </p>
+                    {currentFilePath && (
+                      <Link
+                        href={`/files?open=${encodeURIComponent(currentFilePath)}`}
+                        className="text-primary text-xs underline"
+                      >
+                        Open in full editor
+                      </Link>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-sm">{error}</p>
+                )}
+              </div>
+            )}
+
+            {currentFilePath &&
+              !error &&
+              !isLoading &&
+              currentFileContent !== null &&
+              (isPdf ? (
+                <div className="flex min-h-0 flex-1">
+                  <PdfViewer
+                    workspaceId={workspaceId}
+                    filePath={currentFilePath}
+                  />
+                </div>
+              ) : isImage ? (
+                <div className="flex min-h-0 flex-1">
+                  <ImageViewer
+                    workspaceId={workspaceId}
+                    filePath={currentFilePath}
+                  />
+                </div>
+              ) : isDiff ? (
+                <div
+                  className="flex min-h-0 flex-1"
+                  data-testid="split-panel-diff"
+                >
+                  <div className="min-w-0 flex-1">
+                    <SidePanelDiffView
+                      workspaceId={workspaceId}
+                      filePath={repoRelativeKey}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex min-h-0 flex-1">
+                  <div
+                    className="min-w-0 flex-1"
+                    data-lsp-surface="split-panel"
+                  >
+                    <MarkdownPreviewFrame
+                      content={currentFileContent}
+                      language={currentFileLanguage ?? "plaintext"}
+                      filePath={currentFilePath}
+                    >
+                      <CsvPreviewFrame
+                        content={currentFileContent}
+                        filePath={currentFilePath}
+                        workspaceId={workspaceId}
+                      >
+                        <MonacoEditor
+                          content={currentFileContent}
+                          language={currentFileLanguage ?? "plaintext"}
+                          onChange={setContent}
+                          onSave={handleSave}
+                          filePath={currentFilePath}
+                          workspaceId={workspaceId}
+                          isLspEligible={
+                            !activeFile ||
+                            resolveTabWorkspaceId(activeFile, workspaceId) ===
+                              workspaceId
+                          }
+                        />
+                      </CsvPreviewFrame>
+                    </MarkdownPreviewFrame>
+                  </div>
+                  {isCommentsOpen && comments.length > 0 && (
+                    <div className="w-64 shrink-0 border-l">
+                      <CommentsSidebar
+                        comments={comments}
+                        onScrollToLine={() => {}}
+                        onResolve={handleResolve}
+                        onDelete={handleDelete}
+                        onUpdate={handleUpdate}
+                        onAttachToChat={handleAttachToChat}
+                        onClose={handleCloseComments}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+            {currentFilePath &&
+              !error &&
+              !isLoading &&
+              comments.length > 0 &&
+              !isCommentsOpen && (
+                <div className="border-t px-3 py-1">
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground text-xs underline"
+                    onClick={() => setIsCommentsOpen(true)}
+                  >
+                    {comments.length} comment{comments.length !== 1 ? "s" : ""}
+                  </button>
+                </div>
+              )}
+          </>
         )}
+      </SplitPanelActiveFile>
     </div>
   );
 }

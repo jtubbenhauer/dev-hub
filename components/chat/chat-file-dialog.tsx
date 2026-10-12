@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import Link from "next/link";
 import { Download, ExternalLink, FileCode2, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,13 @@ import {
   PDF_LANGUAGE,
 } from "@/lib/file-preview";
 import { downloadTextFile } from "@/lib/download-file";
+import { useLspEnabledSetting } from "@/hooks/use-settings";
+import {
+  buildFileSaveBody,
+  resolveTabWorkspaceId,
+} from "@/lib/files/save-request";
+import { completeFileSave } from "@/lib/files/save-completion";
+import { submitFileSave } from "@/lib/files/submit-file-save";
 
 function getFileName(filePath: string): string {
   return filePath.split("/").pop() || filePath;
@@ -38,9 +46,10 @@ export function ChatFileDialog() {
     (state) => state.originalContent,
   );
   const setContent = useChatFileDialogStore((state) => state.setContent);
-  const markSaved = useChatFileDialogStore((state) => state.markSaved);
+  const { isLspEnabled } = useLspEnabledSetting();
   const reset = useChatFileDialogStore((state) => state.reset);
   const [isSaving, setIsSaving] = useState(false);
+  const queryClient = useQueryClient();
 
   const isDirty = file !== null && file.content !== originalContent;
   const isBinaryPreview =
@@ -62,29 +71,43 @@ export function ChatFileDialog() {
   const handleSave = useCallback(async () => {
     if (!file || !isDirty || isSaving) return;
     setIsSaving(true);
+    const snapshot = {
+      workspaceId: resolveTabWorkspaceId(file, file.workspaceId),
+      path: file.path,
+      instanceId: file.instanceId,
+      submittedBase: originalContent,
+      savedContent: file.content,
+    };
     try {
-      const response = await fetch("/api/files/content", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspaceId: file.workspaceId,
-          path: file.path,
-          content: file.content,
+      await submitFileSave(
+        buildFileSaveBody({
+          workspaceId: snapshot.workspaceId,
+          path: snapshot.path,
+          content: snapshot.savedContent,
+          originalContent: snapshot.submittedBase,
+          isLspEnabled,
         }),
+      );
+      completeFileSave({
+        snapshotWorkspaceId: snapshot.workspaceId,
+        getBoundWorkspaceId: () =>
+          useChatFileDialogStore.getState().file?.workspaceId,
+        acknowledge: () =>
+          useChatFileDialogStore.getState().markSavedAs(snapshot),
+        runFollowUps: () => {
+          void queryClient.invalidateQueries({
+            queryKey: ["git-status", snapshot.workspaceId],
+          });
+          toast.success("File saved");
+        },
       });
-      if (!response.ok) {
-        toast.error("Failed to save file");
-        return;
-      }
-      markSaved();
-      toast.success("File saved");
     } catch (error) {
       if (!(error instanceof Error)) throw error;
-      toast.error("Failed to save file");
+      toast.error(error.message);
     } finally {
       setIsSaving(false);
     }
-  }, [file, isDirty, isSaving, markSaved]);
+  }, [file, originalContent, isDirty, isSaving, isLspEnabled, queryClient]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>

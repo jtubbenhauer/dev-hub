@@ -78,13 +78,6 @@ export function useLspEditorAttachment({
     }
   }, [isEditorReady, candidateUri, monacoRef]);
 
-  useEffect(() => {
-    if (!isEditorReady) return;
-    editorRef.current?.updateOptions({
-      "semanticHighlighting.enabled": modelPath ? true : "configuredByTheme",
-    });
-  }, [isEditorReady, modelPath, editorRef]);
-
   const contentRef = useRef(content);
   useEffect(() => {
     contentRef.current = content;

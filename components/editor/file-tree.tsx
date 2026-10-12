@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useWorkspaceFiles } from "@/components/file-picker/file-picker";
 import {
@@ -43,7 +43,7 @@ interface FileTreeNodeProps {
   onFileClick: (entry: FileTreeEntry) => void;
 }
 
-function FileTreeNode({
+const FileTreeNode = memo(function FileTreeNode({
   entry,
   depth,
   expandedPaths,
@@ -121,7 +121,7 @@ function FileTreeNode({
       )}
     </>
   );
-}
+});
 
 function flattenVisibleEntries(
   entries: FileTreeEntry[],
@@ -224,7 +224,7 @@ export interface FileTreeProps {
   searchInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
-export function FileTree({
+export const FileTree = memo(function FileTree({
   searchInputRef,
   workspaceId,
   expandedPaths,
@@ -571,4 +571,4 @@ export function FileTree({
       </ScrollArea>
     </div>
   );
-}
+});

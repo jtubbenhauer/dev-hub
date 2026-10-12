@@ -85,6 +85,8 @@ function environment(surface = "files-page") {
     getModel: () => currentModel,
     getContainerDomNode: () => child,
     updateOptions: vi.fn(),
+    getRawOptions: () => ({}),
+    onDidChangeConfiguration: () => ({ dispose: () => undefined }),
     setPosition: vi.fn((_position: Monaco.IPosition) => {
       order.push("setPosition");
     }),
@@ -206,9 +208,7 @@ describe("useLspEditorAttachment", () => {
     expect(result.current).toBeUndefined();
     expect(useLspStore.getState().documentOwners).toEqual({});
     expect(registerLspMonacoInstance).not.toHaveBeenCalled();
-    expect(fixture.editor.updateOptions).toHaveBeenLastCalledWith({
-      "semanticHighlighting.enabled": "configuredByTheme",
-    });
+    expect(fixture.editor.updateOptions).not.toHaveBeenCalled();
   });
 
   it.each(["a.ts", "my file.ts"])(
@@ -233,9 +233,7 @@ describe("useLspEditorAttachment", () => {
       expect(registerLspMonacoInstance).toHaveBeenCalledWith(
         fixture.monacoRef.current,
       );
-      expect(fixture.editor.updateOptions).toHaveBeenLastCalledWith({
-        "semanticHighlighting.enabled": true,
-      });
+      expect(fixture.editor.updateOptions).not.toHaveBeenCalled();
       unmount();
       expect(useLspStore.getState().documentOwners).toEqual({});
     },

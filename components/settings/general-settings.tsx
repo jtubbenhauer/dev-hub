@@ -69,6 +69,7 @@ import type {
 import { useTheme } from "@/components/providers/theme-provider";
 import { ChatSuggestionSettingsCard } from "@/components/settings/chat-suggestion-settings";
 import { ChatEngineSettingsCard } from "@/components/settings/chat-engine-settings";
+import { EditorSettingsSection } from "@/components/settings/editor-settings-section";
 import { SOUND_OPTIONS, soundSrc, playSound } from "@/lib/sounds";
 import {
   DEFAULT_EDITOR_FLAVOR,
@@ -544,6 +545,8 @@ function EditorSettingsCard() {
             </SelectContent>
           </Select>
         </div>
+
+        <EditorSettingsSection />
 
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-0.5">

@@ -16,6 +16,10 @@ import { DEFAULT_SOUND_SETTINGS } from "@/lib/sounds";
 import { CHAT_SUGGESTIONS_ENABLED_SETTING_KEY } from "@/lib/chat-suggest/constants";
 import { CHAT_ENGINE_SETTING_KEY, type ChatEngine } from "@/lib/engine/types";
 import {
+  CODE_LENS_ENABLED_SETTING_KEY,
+  MINIMAP_ENABLED_SETTING_KEY,
+} from "@/lib/editor/editor-setting-keys";
+import {
   DEFAULT_EDITOR_FLAVOR,
   EDITOR_FLAVOR_OPTIONS,
   type EditorFlavor,
@@ -71,6 +75,8 @@ export const SETTINGS_KEYS = {
   NOTIFICATIONS_PUSH_ENABLED: "notifications-push-enabled",
   CHAT_SUGGESTIONS_ENABLED: CHAT_SUGGESTIONS_ENABLED_SETTING_KEY,
   LSP_ENABLED: "lsp-enabled",
+  CODE_LENS_ENABLED: CODE_LENS_ENABLED_SETTING_KEY,
+  MINIMAP_ENABLED: MINIMAP_ENABLED_SETTING_KEY,
 } as const;
 
 export type EditorType = "monaco" | "neovim";
@@ -532,6 +538,26 @@ export function useLspEnabledSetting(): {
   const { data, isLoading } = useSettings();
   const isLspEnabled = data?.[SETTINGS_KEYS.LSP_ENABLED] === true;
   return { isLspEnabled, isLoading };
+}
+
+export function useCodeLensSetting(): {
+  isCodeLensEnabled: boolean;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  // Default: false (code lens costs language-server work while typing)
+  const isCodeLensEnabled = data?.[SETTINGS_KEYS.CODE_LENS_ENABLED] === true;
+  return { isCodeLensEnabled, isLoading };
+}
+
+export function useMinimapSetting(): {
+  isMinimapEnabled: boolean;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  // Default: true (only an explicit false hides the minimap)
+  const isMinimapEnabled = data?.[SETTINGS_KEYS.MINIMAP_ENABLED] !== false;
+  return { isMinimapEnabled, isLoading };
 }
 
 export function useExternalEditorSetting(): {

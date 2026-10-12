@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/config";
 import { db } from "@/lib/db";
 import { settings } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
+import { isBooleanEditorSettingKey } from "@/lib/editor/editor-setting-keys";
 
 // GET: return all settings for the authenticated user
 export async function GET() {
@@ -62,6 +63,12 @@ export async function PUT(request: NextRequest) {
   }
 
   const { key, value } = body as { key: string; value: unknown };
+  if (isBooleanEditorSettingKey(key) && typeof value !== "boolean") {
+    return NextResponse.json(
+      { error: `Setting '${key}' must be a boolean` },
+      { status: 400 },
+    );
+  }
 
   try {
     await db

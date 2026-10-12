@@ -103,6 +103,7 @@ describe("FilePathCode — desktop file click", () => {
         "src/utils.ts",
         "const x = 1",
         "typescript",
+        "ws-1",
       );
     });
 

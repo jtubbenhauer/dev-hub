@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { preloadMarkdownRenderers } from "@/components/markdown/lazy-markdown";
 import { render, screen } from "@testing-library/react";
 import { GitHubMarkdown } from "@/components/git/github-markdown";
+
+// The markdown renderer is lazy; load it once so renders are synchronous.
+beforeAll(async () => {
+  await preloadMarkdownRenderers();
+});
 
 describe("GitHubMarkdown", () => {
   it("renders bold markdown text", () => {

@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
+import { preloadMarkdownRenderers } from "@/components/markdown/lazy-markdown";
 import { render } from "@testing-library/react";
 import { MarkdownContent } from "@/components/chat/markdown-content";
 
@@ -24,6 +25,11 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/side-panel-open-file", () => ({
   openFileInSidePanel: vi.fn(),
 }));
+
+// The markdown renderer is lazy; load it once so renders are synchronous.
+beforeAll(async () => {
+  await preloadMarkdownRenderers();
+});
 
 describe("MarkdownContent - nested anchor prevention", () => {
   it("does not nest <a> inside <a> when markdown link contains an inline code file path", () => {

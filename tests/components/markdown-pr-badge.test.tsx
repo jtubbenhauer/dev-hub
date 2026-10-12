@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { preloadMarkdownRenderers } from "@/components/markdown/lazy-markdown";
 import { render, screen } from "@testing-library/react";
 import { MarkdownContent } from "@/components/chat/markdown-content";
 
@@ -36,6 +37,11 @@ beforeEach(() => {
     isLoading: false,
     isError: false,
   });
+});
+
+// The markdown renderer is lazy; load it once so renders are synchronous.
+beforeAll(async () => {
+  await preloadMarkdownRenderers();
 });
 
 describe("MarkdownContent PR badge rendering", () => {

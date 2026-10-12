@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { preloadMarkdownRenderers } from "@/components/markdown/lazy-markdown";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -32,6 +33,11 @@ function FileView({
     </div>
   );
 }
+
+// The markdown renderer is lazy; load it once so renders are synchronous.
+beforeAll(async () => {
+  await preloadMarkdownRenderers();
+});
 
 describe("markdown preview", () => {
   beforeEach(() => {

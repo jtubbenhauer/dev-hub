@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { preloadMarkdownRenderers } from "@/components/markdown/lazy-markdown";
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MarkdownContent } from "@/components/chat/markdown-content";
@@ -37,6 +38,11 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/side-panel-open-file", () => ({
   openFileInSidePanel: vi.fn(),
 }));
+
+// The markdown renderer is lazy; load it once so renders are synchronous.
+beforeAll(async () => {
+  await preloadMarkdownRenderers();
+});
 
 function renderSingleLink(content: string): HTMLAnchorElement {
   const { container } = render(<MarkdownContent content={content} />);

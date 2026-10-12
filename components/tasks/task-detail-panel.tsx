@@ -2,8 +2,6 @@
 
 import { Fragment, useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import Link from "next/link";
 import {
   X,
@@ -28,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LazyTaskMarkdown } from "@/components/markdown/lazy-markdown";
 import { TaskWorktreeDialog } from "@/components/dashboard/task-worktree-dialog";
 import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-provider-workspace-dialog";
 import {
@@ -616,9 +615,7 @@ export function TaskDetailPanel({
                   Description
                 </div>
                 <div className="prose prose-sm dark:prose-invert max-w-none text-sm break-words">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {detail.markdown_description}
-                  </ReactMarkdown>
+                  <LazyTaskMarkdown content={detail.markdown_description} />
                 </div>
               </div>
             ) : null}

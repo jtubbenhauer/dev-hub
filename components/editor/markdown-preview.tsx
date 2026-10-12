@@ -5,8 +5,17 @@ import { Eye, Pencil } from "lucide-react";
 import "highlight.js/styles/github.css";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/stores/editor-store";
-import { GitHubMarkdown } from "@/components/git/github-markdown";
+import {
+  LazyGitHubMarkdown,
+  preloadMarkdownRenderers,
+} from "@/components/markdown/lazy-markdown";
 import { stripFrontmatter, isMarkdownLanguage } from "@/lib/file-preview";
+
+// Starts the shared markdown chunk while the pointer approaches the toggle,
+// so the preview usually renders without the raw-text fallback.
+function warmMarkdownRenderers() {
+  void preloadMarkdownRenderers().catch(() => undefined);
+}
 
 interface MarkdownPreviewToggleProps {
   language: string;
@@ -39,6 +48,8 @@ export function MarkdownPreviewToggle({
       className={className}
       aria-label={isPreview ? "Edit markdown" : "Preview markdown"}
       title={isPreview ? "Back to editor" : "Show rendered markdown"}
+      onPointerEnter={warmMarkdownRenderers}
+      onFocus={warmMarkdownRenderers}
       onClick={() =>
         useEditorStore
           .getState()
@@ -86,7 +97,7 @@ export function MarkdownPreviewFrame({
         data-testid="markdown-preview"
         className="bg-background absolute inset-0 overflow-auto px-6 py-4"
       >
-        <GitHubMarkdown content={stripFrontmatter(content)} />
+        <LazyGitHubMarkdown content={stripFrontmatter(content)} />
       </div>
     </div>
   );

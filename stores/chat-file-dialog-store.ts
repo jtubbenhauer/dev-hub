@@ -1,7 +1,15 @@
 import { create } from "zustand";
 import { getBinaryPreviewLanguage } from "@/lib/file-preview";
+import type {
+  DiskReplacement,
+  FileSaveSnapshot,
+  SaveAcknowledgment,
+} from "@/lib/files/tab-state";
+
+let tabInstanceCounter = 0;
 
 interface ChatDialogFile {
+  readonly instanceId: number;
   readonly path: string;
   readonly content: string;
   readonly language: string;
@@ -20,6 +28,17 @@ interface ChatFileDialogState {
   ) => Promise<void>;
   setContent: (content: string) => void;
   markSaved: () => void;
+  markSavedAs: (
+    input: FileSaveSnapshot & {
+      readonly workspaceId: string;
+      readonly instanceId: number;
+    },
+  ) => SaveAcknowledgment;
+  replaceContentFromDisk: (
+    workspaceId: string,
+    path: string,
+    content: string,
+  ) => DiskReplacement;
   reset: () => void;
 }
 
@@ -50,7 +69,13 @@ export const useChatFileDialogStore = create<ChatFileDialogState>(
         set({
           isOpen: true,
           isLoading: false,
-          file: { path, content: "", language: previewLanguage, workspaceId },
+          file: {
+            path,
+            content: "",
+            language: previewLanguage,
+            workspaceId,
+            instanceId: ++tabInstanceCounter,
+          },
           originalContent: "",
         });
         return;
@@ -74,6 +99,7 @@ export const useChatFileDialogStore = create<ChatFileDialogState>(
         }
 
         const file = {
+          instanceId: ++tabInstanceCounter,
           path,
           content: data.content,
           language: data.language ?? "plaintext",
@@ -97,6 +123,27 @@ export const useChatFileDialogStore = create<ChatFileDialogState>(
       const file = get().file;
       if (!file) return;
       set({ originalContent: file.content });
+    },
+    markSavedAs: (input) => {
+      const { file, originalContent } = get();
+      if (
+        !file ||
+        file.workspaceId !== input.workspaceId ||
+        file.path !== input.path ||
+        file.instanceId !== input.instanceId ||
+        originalContent !== input.submittedBase
+      )
+        return "ignored";
+      set({ originalContent: input.savedContent });
+      return "acknowledged";
+    },
+    replaceContentFromDisk: (workspaceId, path, content) => {
+      const { file, originalContent } = get();
+      if (!file || file.workspaceId !== workspaceId || file.path !== path)
+        return "not-open";
+      if (file.content !== originalContent) return "dirty-skipped";
+      set({ file: { ...file, content }, originalContent: content });
+      return "replaced";
     },
     reset: () => set(initialState),
   }),

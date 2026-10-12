@@ -112,20 +112,25 @@ export interface ProcessInfo {
   command: string;
 }
 
-export interface SystemStats {
+export interface SystemSummary {
   cpu: CpuStats;
   memory: MemoryStats;
+  uptime: number; // seconds
+  timestamp: number; // Date.now()
+}
+
+export interface SystemStats extends SystemSummary {
   disks: DiskStats[];
   network: NetworkStats[];
   processes: ProcessInfo[];
-  uptime: number; // seconds
-  timestamp: number; // Date.now()
 }
 
 export interface SystemStatsHistory {
   timestamps: number[];
   cpu: number[]; // usage % series
   memory: number[]; // usage % series
+  // Network rates exist only for full collections, so this series can be shorter than `timestamps`.
+  networkTimestamps: number[];
   networkRx: number[]; // bytes/sec series
   networkTx: number[]; // bytes/sec series
 }
@@ -155,6 +160,8 @@ export interface GitStatus {
 }
 
 export interface OpenFile {
+  workspaceId?: string;
+  instanceId?: number;
   path: string;
   name: string;
   content: string;

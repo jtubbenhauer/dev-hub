@@ -13,11 +13,11 @@ const input = {
   workspaceId: "ws-1",
   path: "src/target.ts",
   isFileTabsDisabled: true,
-  canDiscardDirtyTabs: false,
 };
-function seed(path: string, isDirty = false) {
+function seed(path: string, isDirty = false, workspaceId?: string) {
   useEditorStore.getState().openFile({
     path,
+    workspaceId,
     name: path,
     content: isDirty ? "unsaved" : "clean",
     originalContent: "clean",
@@ -104,20 +104,14 @@ describe("openFileInFilesPage", () => {
     ]);
   });
 
-  it("discards all tabs including a dirty target when explicitly permitted", async () => {
+  it("guards dirty other tabs even when the target is already open", async () => {
     seed("other.ts", true);
     seed(input.path, true);
 
-    expect(
-      await openFileInFilesPage({ ...input, canDiscardDirtyTabs: true }),
-    ).toBe(true);
-    expect(useEditorStore.getState().openFiles).toEqual([
-      expect.objectContaining({
-        path: input.path,
-        content: "disk",
-        isDirty: false,
-      }),
-    ]);
+    const before = useEditorStore.getState();
+    expect(await openFileInFilesPage(input)).toBe(false);
+    expect(useEditorStore.getState()).toBe(before);
+    expect(toast.warning).toHaveBeenCalled();
   });
 
   it("retains other tabs when tabs are enabled", async () => {
@@ -211,5 +205,76 @@ describe("openFileInFilesPage", () => {
         isDirty: false,
       }),
     ]);
+  });
+
+  it("opens new files with their workspace", async () => {
+    expect(await openFileInFilesPage(input)).toBe(true);
+    expect(useEditorStore.getState().openFiles[0].workspaceId).toBe(
+      input.workspaceId,
+    );
+  });
+  it("replaces clean foreign tabs", async () => {
+    seed(input.path, false, "foreign");
+    const previous = useEditorStore.getState().openFiles[0];
+    expect(await openFileInFilesPage(input)).toBe(true);
+    expect(useEditorStore.getState().openFiles[0]).toMatchObject({
+      content: "disk",
+      workspaceId: input.workspaceId,
+    });
+    expect(useEditorStore.getState().openFiles[0].instanceId).not.toBe(
+      previous.instanceId,
+    );
+  });
+  it("activates foreign dirty tabs without fetching or closing others", async () => {
+    seed(input.path, true, "foreign");
+    const previous = useEditorStore.getState().openFiles[0];
+    seed("other.ts");
+    expect(await openFileInFilesPage(input)).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().openFiles[0]).toBe(previous);
+    expect(useEditorStore.getState().openFiles).toHaveLength(2);
+    expect(useEditorStore.getState().activeFilePath).toBe(input.path);
+    expect(toast.warning).toHaveBeenCalledWith(
+      `${input.path} from another workspace has unsaved changes — save or close it first`,
+    );
+  });
+  it("rechecks foreign dirty state after fetching", async () => {
+    seed(input.path, false, "foreign");
+    const instanceId = useEditorStore.getState().openFiles[0].instanceId;
+    vi.mocked(fetch).mockImplementation(async () => {
+      useEditorStore.getState().updateFileContent(input.path, "typed");
+      return response();
+    });
+    expect(await openFileInFilesPage(input)).toBe(false);
+    expect(useEditorStore.getState().openFiles[0]).toMatchObject({
+      content: "typed",
+      workspaceId: "foreign",
+      instanceId,
+    });
+    expect(toast.warning).toHaveBeenCalled();
+  });
+  it("reuses a same-workspace tab without fetching", async () => {
+    seed(input.path, true, input.workspaceId);
+    vi.mocked(fetch).mockRejectedValue(new Error("must not fetch"));
+    expect(await openFileInFilesPage(input)).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().openFiles[0].content).toBe("unsaved");
+  });
+  it("never bulk closes clean tabs", async () => {
+    seed("other.ts");
+    const closeAll = vi.spyOn(useEditorStore.getState(), "closeAllFiles");
+    const close = vi.spyOn(useEditorStore.getState(), "closeFile");
+    expect(await openFileInFilesPage(input)).toBe(true);
+    expect(close).toHaveBeenCalledWith("other.ts");
+    expect(closeAll).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+  it("changes nothing when an open is superseded", async () => {
+    seed(input.path, true, input.workspaceId);
+    const before = useEditorStore.getState();
+    expect(
+      await openFileInFilesPage({ ...input, shouldCommit: () => false }),
+    ).toBe(false);
+    expect(useEditorStore.getState()).toBe(before);
   });
 });

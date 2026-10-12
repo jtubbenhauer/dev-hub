@@ -164,6 +164,26 @@ export function writeFileContent(
   fs.writeFileSync(resolvedPath, content, "utf-8");
 }
 
+export function writeFileContentIfUnchanged(
+  workspacePath: string,
+  filePath: string,
+  content: string,
+  baseContent: string,
+): "written" | "stale" {
+  const resolvedPath = validatePathWithinWorkspace(workspacePath, filePath);
+  let current: string;
+  try {
+    current = fs.readFileSync(resolvedPath, "utf-8");
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT")
+      return "stale";
+    throw error;
+  }
+  if (current !== baseContent) return "stale";
+  fs.writeFileSync(resolvedPath, content, "utf-8");
+  return "written";
+}
+
 export function getLanguageFromFilename(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
   const languageMap: Record<string, string> = {

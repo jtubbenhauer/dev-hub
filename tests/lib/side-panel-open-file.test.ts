@@ -2,12 +2,47 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { IMAGE_LANGUAGE, PDF_LANGUAGE } from "@/lib/file-preview";
+import { toast } from "sonner";
+vi.mock("sonner", () => ({ toast: { warning: vi.fn() } }));
 import {
   isPendingNavigationCurrent,
   setPendingNavigation,
 } from "@/lib/lsp/client/navigation-registry";
 
 describe("openFileInSidePanel", () => {
+  it("returns true for a new file", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ content: "disk" })),
+    );
+    expect(await openFileInSidePanel("B", "a.ts", vi.fn())).toBe(true);
+    expect(useSidePanelStore.getState().openFiles[0].workspaceId).toBe("B");
+  });
+  it("returns false and falls back on a failed fetch", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 404 })),
+    );
+    const fallback = vi.fn();
+    expect(await openFileInSidePanel("B", "a.ts", fallback)).toBe(false);
+    expect(fallback).toHaveBeenCalledOnce();
+  });
+  it("returns false for a foreign dirty tab", async () => {
+    useSidePanelStore
+      .getState()
+      .openFileInTab("a.ts", "base", "typescript", "A");
+    useSidePanelStore.getState().updateFileContent("a.ts", "dirty");
+    const previous = useSidePanelStore.getState().openFiles[0];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ content: "disk" })),
+    );
+    expect(await openFileInSidePanel("B", "a.ts", vi.fn())).toBe(false);
+    expect(useSidePanelStore.getState().openFiles[0]).toBe(previous);
+    expect(toast.warning).toHaveBeenCalledWith(
+      "a.ts from another workspace has unsaved changes — save or close it first",
+    );
+  });
   beforeEach(() => {
     useSidePanelStore.getState().clearFile();
     vi.restoreAllMocks();

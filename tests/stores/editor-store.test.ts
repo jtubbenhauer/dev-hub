@@ -1,6 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useEditorStore } from "@/stores/editor-store";
 import type { OpenFile } from "@/types";
+import { fileTabContract } from "./file-tab-contract";
+
+fileTabContract({
+  getState: useEditorStore.getState,
+  reset: () => useEditorStore.getState().closeAllFiles(),
+  open: (workspaceId) =>
+    useEditorStore
+      .getState()
+      .openFile({ ...makeFile("a.ts", workspaceId ?? "base"), workspaceId }),
+  close: () => useEditorStore.getState().closeFile("a.ts"),
+});
 
 function makeFile(path: string, content = "original"): OpenFile {
   return {

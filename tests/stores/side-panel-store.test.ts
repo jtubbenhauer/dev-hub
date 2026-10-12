@@ -1,5 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useSidePanelStore } from "@/stores/side-panel-store";
+import { fileTabContract } from "./file-tab-contract";
+
+fileTabContract({
+  getState: useSidePanelStore.getState,
+  reset: () => useSidePanelStore.getState().clearFile(),
+  open: (workspaceId) =>
+    useSidePanelStore
+      .getState()
+      .openFileInTab("a.ts", workspaceId ?? "base", "typescript", workspaceId),
+  close: () => useSidePanelStore.getState().closeTab("a.ts"),
+});
 
 const initialState = {
   isOpen: false,

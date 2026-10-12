@@ -1,5 +1,13 @@
 import { create } from "zustand";
+import {
+  createFileContentActions,
+  getFileOpenResult,
+  type OpenFileResult,
+} from "@/lib/files/tab-state";
+
+let tabInstanceCounter = 0;
 import { persist } from "zustand/middleware";
+import { createUnchangedPersistStorage } from "@/components/editor/unchanged-persist-storage";
 
 import type { OpenFile } from "@/types";
 
@@ -31,7 +39,7 @@ function getWsFiles(
   return states[id] ?? { files: [], activeFilePath: null };
 }
 
-interface SidePanelState {
+interface SidePanelState extends ReturnType<typeof createFileContentActions> {
   isOpen: boolean;
   activeTab: "files";
   activePanelTab: ActivePanelTab;
@@ -50,8 +58,18 @@ interface SidePanelState {
   } | null;
   branchCompareBaseRefs: Record<string, string>;
 
-  openFileInTab: (path: string, content: string, language: string) => void;
-  openFile: (path: string, content: string, language: string) => void;
+  openFileInTab: (
+    path: string,
+    content: string,
+    language: string,
+    workspaceId?: string,
+  ) => OpenFileResult;
+  openFile: (
+    path: string,
+    content: string,
+    language: string,
+    workspaceId?: string,
+  ) => OpenFileResult;
   closeTab: (path: string) => void;
   setActiveTab: (path: string) => void;
   setActivePanelTab: (tab: ActivePanelTab) => void;
@@ -84,6 +102,7 @@ interface SidePanelState {
 export const useSidePanelStore = create<SidePanelState>()(
   persist(
     (set, get) => ({
+      ...createFileContentActions(get, set),
       isOpen: false,
       activeTab: "files",
       activePanelTab: "status",
@@ -98,20 +117,23 @@ export const useSidePanelStore = create<SidePanelState>()(
       gitTabSelection: null,
       branchCompareBaseRefs: {},
 
-      openFileInTab: (path, content, language) => {
+      openFileInTab: (path, content, language, workspaceId) => {
         const { openFiles } = get();
         const existing = openFiles.find((f) => f.path === path);
-        if (existing) {
+        const result = getFileOpenResult(existing, workspaceId);
+        if (result === "activated" || result === "kept-foreign-dirty") {
           set({
             isOpen: true,
             activeFilePath: path,
             activePanelTab: "files",
             error: null,
           });
-          return;
+          return result;
         }
         const name = path.split("/").pop() ?? path;
         const newFile: OpenFile = {
+          workspaceId,
+          instanceId: ++tabInstanceCounter,
           path,
           name,
           content,
@@ -121,15 +143,18 @@ export const useSidePanelStore = create<SidePanelState>()(
         };
         set({
           isOpen: true,
-          openFiles: [...openFiles, newFile],
+          openFiles: existing
+            ? openFiles.map((tab) => (tab === existing ? newFile : tab))
+            : [...openFiles, newFile],
           activeFilePath: path,
           activePanelTab: "files",
           error: null,
         });
+        return result;
       },
 
-      openFile: (path, content, language) => {
-        get().openFileInTab(path, content, language);
+      openFile: (path, content, language, workspaceId) => {
+        return get().openFileInTab(path, content, language, workspaceId);
       },
 
       closeTab: (path) => {
@@ -306,6 +331,7 @@ export const useSidePanelStore = create<SidePanelState>()(
     }),
     {
       name: "dev-hub:side-panel",
+      storage: createUnchangedPersistStorage(),
       version: 1,
       migrate: (persisted) => persisted as SidePanelState,
       merge: (persisted, current) => {

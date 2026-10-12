@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createUnchangedPersistStorage } from "@/components/editor/unchanged-persist-storage";
 import type { OpenFile } from "@/types";
+import {
+  createFileContentActions,
+  getFileOpenResult,
+  type OpenFileResult,
+} from "@/lib/files/tab-state";
+
+let tabInstanceCounter = 0;
 
 export type DiffViewMode = "unified" | "side-by-side";
 
@@ -16,7 +24,7 @@ interface WorkspaceFileState {
   expandedPaths: string[];
 }
 
-interface EditorState {
+interface EditorState extends ReturnType<typeof createFileContentActions> {
   openFiles: OpenFile[];
   activeFilePath: string | null;
   isFileTreeOpen: boolean;
@@ -25,7 +33,7 @@ interface EditorState {
   csvPreviewPath: string | null;
   workspaceFileStates: Record<string, WorkspaceFileState>;
 
-  openFile: (file: OpenFile) => void;
+  openFile: (file: OpenFile) => OpenFileResult;
   closeFile: (path: string) => void;
   setActiveFile: (path: string) => void;
   updateFileContent: (path: string, content: string) => void;
@@ -59,6 +67,7 @@ function getWsState(
 export const useEditorStore = create<EditorState>()(
   persist(
     (set, get) => ({
+      ...createFileContentActions(get, set),
       openFiles: [],
       activeFilePath: null,
       isFileTreeOpen: true,
@@ -69,14 +78,27 @@ export const useEditorStore = create<EditorState>()(
 
       openFile: (file) => {
         const existing = get().openFiles.find((f) => f.path === file.path);
-        if (existing) {
+        const result = getFileOpenResult(existing, file.workspaceId);
+        if (result === "activated" || result === "kept-foreign-dirty") {
           set({ activeFilePath: file.path });
-          return;
+          return result;
         }
+        const newFile = { ...file, instanceId: ++tabInstanceCounter };
         set((state) => ({
-          openFiles: [...state.openFiles, file],
+          openFiles: existing
+            ? state.openFiles.map((tab) =>
+                tab === existing
+                  ? {
+                      ...newFile,
+                      originalContent: file.content,
+                      isDirty: false,
+                    }
+                  : tab,
+              )
+            : [...state.openFiles, newFile],
           activeFilePath: file.path,
         }));
+        return result;
       },
 
       closeFile: (path) => {
@@ -220,6 +242,7 @@ export const useEditorStore = create<EditorState>()(
     }),
     {
       name: "dev-hub-editor",
+      storage: createUnchangedPersistStorage(),
       partialize: (state) => ({
         isFileTreeOpen: state.isFileTreeOpen,
         diffViewMode: state.diffViewMode,

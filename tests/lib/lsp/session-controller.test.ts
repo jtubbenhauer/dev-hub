@@ -25,7 +25,7 @@ interface ConnectOptions {
 }
 
 interface FakeHandle extends LspSessionHandle {
-  readonly dispose: Mock<() => void>;
+  readonly dispose: Mock<() => Promise<void>>;
 }
 
 const initialLspState = useLspStore.getState();
@@ -96,7 +96,7 @@ const restoreBuiltin = vi.fn();
 function succeedingConnect(options: ConnectOptions): Promise<LspSessionHandle> {
   const handle: FakeHandle = {
     workspaceId: options.workspaceId,
-    dispose: vi.fn(),
+    dispose: vi.fn(() => Promise.resolve()),
   };
   handles.push(handle);
   return Promise.resolve(handle);
@@ -378,7 +378,10 @@ describe("createLspSessionController lifecycle", () => {
     controller.update(inputs({ workspace: workspaceB }));
     await flushMicrotasks();
 
-    const staleHandle: FakeHandle = { workspaceId: "ws-a", dispose: vi.fn() };
+    const staleHandle: FakeHandle = {
+      workspaceId: "ws-a",
+      dispose: vi.fn(() => Promise.resolve()),
+    };
     resolveFirstConnect(staleHandle);
     await flushMicrotasks();
 

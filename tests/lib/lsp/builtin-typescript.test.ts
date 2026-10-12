@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createSessionFixture, fakeUri } from "./lsp-session-fixture";
+import { createSessionFixture } from "./lsp-session-fixture";
 import { createLspSessionController } from "@/lib/lsp/client/session-controller";
+
+const defaultsGetter = vi.hoisted(() =>
+  vi.fn<() => ReturnType<typeof createSessionFixture>["typescript"] | null>(),
+);
+vi.mock("@/lib/editor/monaco-bootstrap", () => ({
+  getStandaloneTypeScriptDefaults: defaultsGetter,
+}));
 
 let builtin: typeof import("@/lib/lsp/client/builtin-typescript");
 let fixture: ReturnType<typeof createSessionFixture>;
@@ -12,12 +19,10 @@ const overlapping = [
   "registerDocumentRangeFormattingEditProvider",
   "registerOnTypeFormattingEditProvider",
   "registerInlayHintsProvider",
-] as const;
-const preserved = [
   "registerReferenceProvider",
-  "registerRenameProvider",
   "registerDocumentHighlightProvider",
   "registerDocumentSymbolProvider",
+  "registerRenameProvider",
   "registerCodeActionProvider",
 ] as const;
 
@@ -26,8 +31,42 @@ describe("built-in TypeScript registrations", () => {
     vi.resetModules();
     builtin = await import("@/lib/lsp/client/builtin-typescript");
     fixture = createSessionFixture();
+    defaultsGetter.mockReturnValue(fixture.typescript);
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it("holds providers when suppressed before standalone defaults exist", () => {
+    // Given
+    defaultsGetter.mockReturnValue(null);
+    builtin.suppressBuiltinTypeScriptFeatures(fixture.monaco);
+    // When
+    fixture.languages.registerHoverProvider("typescript", {});
+    // Then
+    expect(fixture.registrations.size).toBe(0);
+    expect(fixture.editor.onDidChangeMarkers).not.toHaveBeenCalled();
+    expect(fixture.editor.removeAllMarkers).not.toHaveBeenCalled();
+    for (const defaults of Object.values(fixture.typescript)) {
+      expect(defaults.setDiagnosticsOptions).not.toHaveBeenCalled();
+    }
+  });
+
+  it("restores providers without subscribing to markers when defaults disappear", () => {
+    builtin.trackBuiltinTs(fixture.monaco);
+    fixture.languages.registerHoverProvider("typescript", {});
+    builtin.suppressBuiltinTypeScriptFeatures(fixture.monaco);
+    defaultsGetter.mockReturnValue(null);
+    for (const defaults of Object.values(fixture.typescript)) {
+      defaults.setDiagnosticsOptions.mockClear();
+    }
+
+    builtin.restoreBuiltinTypeScriptFeatures(fixture.monaco);
+
+    expect(fixture.registrations.size).toBe(1);
+    expect(fixture.editor.onDidChangeMarkers).not.toHaveBeenCalled();
+    for (const defaults of Object.values(fixture.typescript)) {
+      expect(defaults.setDiagnosticsOptions).not.toHaveBeenCalled();
+    }
+  });
 
   it("passes registrations and owner disposal through when OFF", () => {
     builtin.trackBuiltinTs(fixture.monaco);
@@ -76,11 +115,39 @@ describe("built-in TypeScript registrations", () => {
     expect([...fixture.registrations]).toEqual(initial);
   });
 
-  it.each(preserved)("leaves %s built-in when ON", (kind) => {
+  it.each(overlapping)(
+    "passes a json %s registration straight to the original",
+    (kind) => {
+      builtin.trackBuiltinTs(fixture.monaco);
+      const provider = {};
+      fixture.languages[kind]("json", provider);
+      builtin.suppressBuiltinTypeScriptFeatures(fixture.monaco);
+      builtin.restoreBuiltinTypeScriptFeatures(fixture.monaco);
+      expect([...fixture.registrations]).toEqual([
+        { selector: "json", provider },
+      ]);
+    },
+  );
+
+  it("forwards code action metadata when registering and restoring", () => {
+    const registerOriginal = vi.fn(
+      fixture.languages.registerCodeActionProvider,
+    );
+    fixture.languages.registerCodeActionProvider = registerOriginal;
     builtin.trackBuiltinTs(fixture.monaco);
-    fixture.languages[kind]("typescript", {});
+    const provider = { provideCodeActions: () => null };
+    const metadata = { providedCodeActionKinds: ["quickfix"] };
+    fixture.monaco.languages.registerCodeActionProvider(
+      "typescript",
+      provider,
+      metadata,
+    );
     builtin.suppressBuiltinTypeScriptFeatures(fixture.monaco);
-    expect(fixture.registrations.size).toBe(1);
+    builtin.restoreBuiltinTypeScriptFeatures(fixture.monaco);
+    expect(registerOriginal.mock.calls).toEqual([
+      ["typescript", provider, metadata],
+      ["typescript", provider, metadata],
+    ]);
   });
 
   it.each(["typescript", "javascript"])(
@@ -126,67 +193,25 @@ describe("built-in TypeScript registrations", () => {
     expect(fixture.registrations.size).toBe(1);
   });
 
-  it("restores each exact diagnostics snapshot when OFF or terminal failure restores built-ins", () => {
+  it("leaves diagnostics configuration untouched when built-ins toggle", () => {
+    // Given
     const defaults = Object.values(fixture.typescript);
-    const snapshots = defaults.map((value) => value.getDiagnosticsOptions());
+    // When
+    builtin.suppressBuiltinTypeScriptFeatures(fixture.monaco);
     builtin.restoreBuiltinTypeScriptFeatures(fixture.monaco);
-    builtin.suppressBuiltinTypeScriptFeatures(fixture.monaco);
-    builtin.suppressBuiltinTypeScriptFeatures(fixture.monaco);
-    defaults.forEach((value, index) => {
-      expect(value.getDiagnosticsOptions()).toEqual({
-        ...snapshots[index],
-        noSemanticValidation: true,
-        noSyntaxValidation: true,
-        noSuggestionDiagnostics: true,
-      });
+    // Then: no defaults change event can kill or respawn a worker.
+    for (const value of defaults) {
       expect(value.setModeConfiguration).not.toHaveBeenCalled();
-      expect(value.setDiagnosticsOptions).toHaveBeenCalledTimes(1);
-    });
-    builtin.restoreBuiltinTypeScriptFeatures(fixture.monaco);
-    defaults.forEach((value, index) =>
-      expect(value.getDiagnosticsOptions()).toBe(snapshots[index]),
-    );
-    const next = { noSemanticValidation: false, onlyVisible: true };
-    defaults[0].setDiagnosticsOptions(next);
-    builtin.suppressBuiltinTypeScriptFeatures(fixture.monaco);
-    builtin.restoreBuiltinTypeScriptFeatures(fixture.monaco);
-    expect(defaults[0].getDiagnosticsOptions()).toBe(next);
+      expect(value.setDiagnosticsOptions).not.toHaveBeenCalled();
+    }
   });
 
-  it("clears existing and late builtin markers without recursive empty-marker clearing", () => {
-    const uri = fakeUri("file:///Workspace/src/a.ts");
-    const marker = {
-      resource: uri,
-      severity: 8,
-      message: "late",
-      startLineNumber: 1,
-      startColumn: 1,
-      endLineNumber: 1,
-      endColumn: 2,
-    };
-    let markers = ["typescript", "javascript", "lsp", "eslint"].map(
-      (owner) => ({ ...marker, owner }),
-    );
-    fixture.editor.getModelMarkers.mockImplementation(({ owner }) =>
-      markers.filter((entry) => entry.owner === owner),
-    );
-    fixture.editor.removeAllMarkers.mockImplementation((owner) => {
-      markers = markers.filter((entry) => entry.owner !== owner);
-      fixture.editor.onDidChangeMarkers.mock.calls[0]?.[0]([uri]);
-    });
+  it("does not install a marker guard when diagnostics adapters are disabled", () => {
+    // Given / When
     builtin.suppressBuiltinTypeScriptFeatures(fixture.monaco);
-    expect(markers.map((entry) => entry.owner)).toEqual(["lsp", "eslint"]);
-    fixture.editor.removeAllMarkers.mockClear();
-    markers.push({ ...marker, owner: "typescript" });
-    fixture.editor.onDidChangeMarkers.mock.calls[0]?.[0]([uri]);
-    expect(fixture.editor.removeAllMarkers.mock.calls).toEqual([
-      ["typescript"],
-    ]);
-    builtin.restoreBuiltinTypeScriptFeatures(fixture.monaco);
-    expect(fixture.mirrorDisposable.dispose).toHaveBeenCalledOnce();
-    markers.push({ ...marker, owner: "javascript" });
-    fixture.editor.onDidChangeMarkers.mock.calls[0]?.[0]([uri]);
-    expect(markers.some((entry) => entry.owner === "javascript")).toBe(true);
+    // Then
+    expect(fixture.editor.onDidChangeMarkers).not.toHaveBeenCalled();
+    expect(fixture.editor.removeAllMarkers).not.toHaveBeenCalled();
   });
 
   it("restores providers and diagnostics when the controller reaches terminal failure", async () => {

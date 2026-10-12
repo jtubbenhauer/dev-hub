@@ -351,7 +351,7 @@ describe("native client traffic through the bridge", () => {
     ]);
   });
 
-  it("returns initialize id 0 capabilities without referencesProvider", async () => {
+  it("returns initialize id 0 capabilities with referencesProvider", async () => {
     const { initializeResponse } = await runNativeClientSessionOnFreshServer();
 
     expect(initializeResponse.id).toBe(0);
@@ -359,7 +359,7 @@ describe("native client traffic through the bridge", () => {
       ? initializeResponse.result.capabilities
       : undefined;
     expect(capabilities).toHaveProperty("hoverProvider", true);
-    expect(capabilities).not.toHaveProperty("referencesProvider");
+    expect(capabilities).toHaveProperty("referencesProvider", true);
   });
 
   it("returns fake-hover in scope and null out of scope", async () => {

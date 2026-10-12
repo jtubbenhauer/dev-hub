@@ -8,11 +8,8 @@ type TrackedRegistration = {
 };
 type Tracker = {
   readonly registrations: Set<TrackedRegistration>;
-  baseline: {
-    readonly ts: Monaco.typescript.DiagnosticsOptions;
-    readonly js: Monaco.typescript.DiagnosticsOptions;
-  } | null;
-  markerGuard: Monaco.IDisposable | null;
+  isSuppressed: boolean;
+  stopWorkers: (() => void) | null;
 };
 
 function getTracker(monaco: typeof Monaco): Tracker {
@@ -24,30 +21,42 @@ function getTracker(monaco: typeof Monaco): Tracker {
   if (existing) return existing;
   const tracker: Tracker = {
     registrations: new Set(),
-    baseline: null,
-    markerGuard: null,
+    isSuppressed: false,
+    stopWorkers: null,
   };
   languages[trackerKey] = tracker;
-  function wrap<Provider>(
+  function wrap<Provider, ExtraArguments extends unknown[]>(
     registerOriginal: (
       selector: Monaco.languages.LanguageSelector,
       provider: Provider,
+      ...extraArguments: ExtraArguments
     ) => Monaco.IDisposable,
   ) {
     return (
       selector: Monaco.languages.LanguageSelector,
       provider: Provider,
+      ...extraArguments: ExtraArguments
     ): Monaco.IDisposable => {
       if (selector !== "typescript" && selector !== "javascript") {
-        return registerOriginal.call(languages, selector, provider);
+        return registerOriginal.call(
+          languages,
+          selector,
+          provider,
+          ...extraArguments,
+        );
       }
       const record = {
         registerOriginal,
         selector,
         provider,
-        actualDisposable: tracker.baseline
+        actualDisposable: tracker.isSuppressed
           ? null
-          : registerOriginal.call(languages, selector, provider),
+          : registerOriginal.call(
+              languages,
+              selector,
+              provider,
+              ...extraArguments,
+            ),
         isDisposedByOwner: false,
         restore() {
           if (!record.isDisposedByOwner && record.actualDisposable === null) {
@@ -55,6 +64,7 @@ function getTracker(monaco: typeof Monaco): Tracker {
               languages,
               record.selector,
               record.provider,
+              ...extraArguments,
             );
           }
         },
@@ -90,59 +100,44 @@ function getTracker(monaco: typeof Monaco): Tracker {
   languages.registerInlayHintsProvider = wrap(
     languages.registerInlayHintsProvider,
   );
+  languages.registerReferenceProvider = wrap(
+    languages.registerReferenceProvider,
+  );
+  languages.registerDocumentHighlightProvider = wrap(
+    languages.registerDocumentHighlightProvider,
+  );
+  languages.registerDocumentSymbolProvider = wrap(
+    languages.registerDocumentSymbolProvider,
+  );
+  languages.registerRenameProvider = wrap(languages.registerRenameProvider);
+  languages.registerCodeActionProvider = wrap(
+    languages.registerCodeActionProvider,
+  );
   return tracker;
 }
 
-export function trackBuiltinTs(monaco: typeof Monaco): void {
-  getTracker(monaco);
+export function trackBuiltinTs(
+  monaco: typeof Monaco,
+  stopWorkers?: () => void,
+): void {
+  const tracker = getTracker(monaco);
+  if (stopWorkers) tracker.stopWorkers = stopWorkers;
 }
 
 export function suppressBuiltinTypeScriptFeatures(monaco: typeof Monaco): void {
   const tracker = getTracker(monaco);
-  if (tracker.baseline) return;
-  const { typescriptDefaults, javascriptDefaults } = monaco.typescript;
-  tracker.baseline = {
-    ts: typescriptDefaults.getDiagnosticsOptions(),
-    js: javascriptDefaults.getDiagnosticsOptions(),
-  };
+  if (tracker.isSuppressed) return;
+  tracker.isSuppressed = true;
   for (const record of tracker.registrations) {
     record.actualDisposable?.dispose();
     record.actualDisposable = null;
   }
-  let isClearing = false;
-  const clearBuiltinMarkers = () => {
-    if (!tracker.baseline || isClearing) return;
-    isClearing = true;
-    try {
-      for (const owner of ["typescript", "javascript"]) {
-        if (monaco.editor.getModelMarkers({ owner }).length > 0) {
-          monaco.editor.removeAllMarkers(owner);
-        }
-      }
-    } finally {
-      isClearing = false;
-    }
-  };
-  tracker.markerGuard = monaco.editor.onDidChangeMarkers(clearBuiltinMarkers);
-  for (const defaults of [typescriptDefaults, javascriptDefaults]) {
-    defaults.setDiagnosticsOptions({
-      ...defaults.getDiagnosticsOptions(),
-      noSemanticValidation: true,
-      noSyntaxValidation: true,
-      noSuggestionDiagnostics: true,
-    });
-  }
-  clearBuiltinMarkers();
+  tracker.stopWorkers?.();
 }
 
 export function restoreBuiltinTypeScriptFeatures(monaco: typeof Monaco): void {
   const tracker = getTracker(monaco);
-  const baseline = tracker.baseline;
-  if (!baseline) return;
-  tracker.baseline = null;
-  tracker.markerGuard?.dispose();
-  tracker.markerGuard = null;
+  if (!tracker.isSuppressed) return;
+  tracker.isSuppressed = false;
   for (const record of tracker.registrations) record.restore();
-  monaco.typescript.typescriptDefaults.setDiagnosticsOptions(baseline.ts);
-  monaco.typescript.javascriptDefaults.setDiagnosticsOptions(baseline.js);
 }

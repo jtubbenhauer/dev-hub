@@ -135,9 +135,11 @@ export function createLspSessionController(
     return handle !== null || activeFlowAttempt === attemptId;
   }
 
-  function disposeHandle(): void {
-    handle?.dispose();
+  // Settles once the client finished its shutdown handshake (or gave up on it).
+  function disposeHandle(): Promise<void> {
+    const disposal = handle?.dispose() ?? Promise.resolve();
     handle = null;
+    return disposal.then(ignoreOutcome, ignoreOutcome);
   }
 
   function postControl(
@@ -155,14 +157,15 @@ export function createLspSessionController(
     attemptId += 1;
     clearTimers();
     clearReleaseTimer();
-    disposeHandle();
+    const sessionDisposal = disposeHandle();
+    const workspaceToStop = hasStartedServer ? targetWorkspace : null;
+    // A server close during the client's shutdown handshake is reported as a crash, so stop afterwards.
     const stopRequest =
-      targetWorkspace !== null && hasStartedServer
-        ? postControl("stop", targetWorkspace.id).then(
-            ignoreOutcome,
-            ignoreOutcome,
-          )
-        : Promise.resolve();
+      workspaceToStop === null
+        ? Promise.resolve()
+        : sessionDisposal
+            .then(() => postControl("stop", workspaceToStop.id))
+            .then(ignoreOutcome, ignoreOutcome);
     pendingStop = Promise.all([pendingStop, stopRequest, startCleanup]).then(
       ignoreOutcome,
     );
@@ -178,7 +181,7 @@ export function createLspSessionController(
     message: string | null,
   ): void {
     clearTimers();
-    disposeHandle();
+    void disposeHandle();
     useLspStore.getState().setSession(null, null);
     setStatus(status, message);
     restoreBuiltin();
@@ -206,7 +209,7 @@ export function createLspSessionController(
     // Invalidate the attempt so a still-pending connect() result is disposed as superseded.
     attemptId += 1;
     clearTimers();
-    disposeHandle();
+    void disposeHandle();
     if (code === LSP_CLOSE_CODES.BUSY) {
       hasStartedServer = false;
       finishWithoutSession("busy", null);
@@ -328,7 +331,7 @@ export function createLspSessionController(
       return;
     }
     if (attempt !== attemptId) {
-      connectedHandle.dispose();
+      void connectedHandle.dispose();
       return;
     }
     handle = connectedHandle;
@@ -402,7 +405,7 @@ export function createLspSessionController(
     if (targetWorkspace !== null && !isRetryRequested) return;
     if (isRetryRequested) {
       clearTimers();
-      disposeHandle();
+      void disposeHandle();
     }
     targetWorkspace = workspace;
     failureCount = 0;
@@ -415,7 +418,7 @@ export function createLspSessionController(
     attemptId += 1;
     clearTimers();
     clearReleaseTimer();
-    disposeHandle();
+    void disposeHandle();
     restoreBuiltin();
   }
 

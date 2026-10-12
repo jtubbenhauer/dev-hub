@@ -1,6 +1,27 @@
 import type * as Monaco from "monaco-editor";
 import { vi } from "vitest";
-import type { LspBrowserTransport } from "@/lib/lsp/client/browser-transport";
+import type {
+  DiagnosticsOptions,
+  ModeConfiguration,
+} from "@codingame/monaco-vscode-standalone-typescript-language-features";
+
+export class FakeSessionWebSocket extends EventTarget {
+  static instances: FakeSessionWebSocket[] = [];
+  static isAutoOpen = true;
+  readonly close = vi.fn((code = 1000) => {
+    this.dispatchEvent(new CloseEvent("close", { code }));
+  });
+
+  constructor(readonly url: string) {
+    super();
+    FakeSessionWebSocket.instances.push(this);
+    if (FakeSessionWebSocket.isAutoOpen) queueMicrotask(() => this.open());
+  }
+
+  open() {
+    this.dispatchEvent(new Event("open"));
+  }
+}
 
 export function fakeUri(encoded: string) {
   // Only URI stringification is exercised; never load Monaco's runtime in jsdom.
@@ -23,39 +44,9 @@ export function fakeModel(uri: string) {
   } as unknown as Monaco.editor.ITextModel;
 }
 
-export function fakeSource(
-  surface: string | null,
-  model: Monaco.editor.ITextModel | null = null,
-) {
-  const container = document.createElement("div");
-  const child = document.createElement("div");
-  if (surface !== null) container.setAttribute("data-lsp-surface", surface);
-  container.append(child);
-  return {
-    getModel: () => model,
-    getContainerDomNode: () => child,
-  } as unknown as Monaco.editor.ICodeEditor;
-}
-
 export function createSessionFixture() {
-  const order: string[] = [];
-  const features = {
-    dispose: vi.fn(() => {
-      order.push("client");
-    }),
-  };
-  const construct = vi.fn();
-  class FakeMonacoLspClient {
-    constructor(transport: unknown) {
-      construct(transport);
-      this.createFeatures();
-    }
-    protected createFeatures() {
-      return features;
-    }
-  }
-  const defaults = (modeConfiguration: Monaco.typescript.ModeConfiguration) => {
-    let diagnostics: Monaco.typescript.DiagnosticsOptions = {
+  const defaults = (modeConfiguration: ModeConfiguration) => {
+    let diagnostics: DiagnosticsOptions = {
       noSemanticValidation: modeConfiguration.hovers,
       noSyntaxValidation: false,
       diagnosticCodesToIgnore: [1234],
@@ -63,14 +54,12 @@ export function createSessionFixture() {
     return {
       modeConfiguration,
       getDiagnosticsOptions: vi.fn(() => diagnostics),
-      setDiagnosticsOptions: vi.fn(
-        (next: Monaco.typescript.DiagnosticsOptions) => {
-          diagnostics = next;
-        },
-      ),
+      setDiagnosticsOptions: vi.fn((next: DiagnosticsOptions) => {
+        diagnostics = next;
+      }),
       setModeConfiguration: vi.fn(function (
-        this: { modeConfiguration: Monaco.typescript.ModeConfiguration },
-        next: Monaco.typescript.ModeConfiguration,
+        this: { modeConfiguration: ModeConfiguration },
+        next: ModeConfiguration,
       ) {
         this.modeConfiguration = next;
       }),
@@ -98,7 +87,6 @@ export function createSessionFixture() {
       codeActions: false,
     }),
   };
-  const models: Monaco.editor.ITextModel[] = [];
   const registrations = new Set<{
     readonly selector: Monaco.languages.LanguageSelector;
     readonly provider: unknown;
@@ -129,63 +117,20 @@ export function createSessionFixture() {
     registerDocumentSymbolProvider: register,
     registerCodeActionProvider: register,
   };
-  const editors: Monaco.editor.ICodeEditor[] = [];
-  const openerDisposable = {
-    dispose: vi.fn(() => {
-      order.push("opener");
-    }),
-  };
   const mirrorDisposable = {
-    dispose: vi.fn(() => {
-      order.push("mirror");
-    }),
+    dispose: vi.fn(),
   };
   const editor = {
-    getModels: vi.fn(() => models),
-    getEditors: vi.fn(() => editors),
-    createModel: vi.fn(
-      (
-        _content: string,
-        _language: string | undefined,
-        uri: Monaco.Uri | undefined,
-      ) => {
-        const model = fakeModel(uri?.toString() ?? "inmemory://model/1");
-        models.push(model);
-        return model;
-      },
-    ),
-    registerEditorOpener: vi.fn(
-      (_opener: Monaco.editor.ICodeEditorOpener) => openerDisposable,
-    ),
     onDidChangeMarkers: vi.fn(
       (_listener: (uris: readonly Monaco.Uri[]) => void) => mirrorDisposable,
     ),
     getModelMarkers: vi.fn<typeof Monaco.editor.getModelMarkers>(() => []),
-    removeAllMarkers: vi.fn((_owner: string) => {
-      order.push("markers");
-    }),
+    removeAllMarkers: vi.fn<(_owner: string) => void>(),
   };
-  const Uri = { parse: vi.fn(fakeUri) };
-  const transport = {
-    state: {
-      value: { state: "open" },
-      onChange: vi.fn(() => ({ dispose: vi.fn() })),
-    },
-    send: vi.fn(async () => {}),
-    setListener: vi.fn(),
-    toString: () => "fake",
-    detach: vi.fn(() => {
-      order.push("transport");
-    }),
-    getTrackedDocumentMapSizes: () => ({ documentUris: 0, sentByPath: 0 }),
-  } satisfies LspBrowserTransport;
   // The fake deliberately implements only the APIs this adapter consumes.
   const monaco = {
-    lsp: { MonacoLspClient: FakeMonacoLspClient },
-    typescript,
     languages,
     editor,
-    Uri,
   } as unknown as typeof Monaco;
   return {
     monaco,
@@ -193,21 +138,6 @@ export function createSessionFixture() {
     registrations,
     typescript,
     editor,
-    Uri,
-    transport,
-    models,
-    editors,
-    order,
-    features,
-    construct,
-    openerDisposable,
     mirrorDisposable,
   };
 }
-
-export const sessionOptions = {
-  wsUrl: "ws://localhost:7601",
-  workspaceId: "workspace & 1",
-  workspaceRoot: "/Workspace",
-  onUnexpectedClose: vi.fn(),
-};

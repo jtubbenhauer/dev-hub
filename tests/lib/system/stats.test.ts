@@ -12,9 +12,14 @@ const si = vi.hoisted(() => ({
   time: vi.fn(),
 }));
 const osMock = vi.hoisted(() => ({ uptime: vi.fn() }));
+const memoryUsage = vi.hoisted(() => ({ readDarwinVmStat: vi.fn() }));
 
 vi.mock("systeminformation", () => ({ default: si }));
 vi.mock("node:os", () => ({ default: osMock, uptime: osMock.uptime }));
+vi.mock("@/lib/system/memory-usage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/system/memory-usage")>()),
+  readDarwinVmStat: memoryUsage.readDarwinVmStat,
+}));
 
 const FIVE_MINUTES_MS = 5 * 60 * 1_000;
 let currentLoadDelayMs = 0;
@@ -50,8 +55,9 @@ function resetSystemInformationMocks() {
   });
   si.mem.mockResolvedValue({
     total: 16_000,
-    used: 4_000,
-    free: 12_000,
+    used: 14_000,
+    free: 2_000,
+    available: 12_000,
     swaptotal: 2_000,
     swapused: 500,
   });
@@ -92,6 +98,7 @@ function resetSystemInformationMocks() {
     ],
   }));
   osMock.uptime.mockReturnValue(3_661.9);
+  memoryUsage.readDarwinVmStat.mockReset().mockResolvedValue(null);
 }
 
 async function loadStatsModule() {
@@ -139,7 +146,7 @@ describe("system stats collection", () => {
       memory: {
         total: 16_000,
         used: 4_000,
-        free: 12_000,
+        free: 2_000,
         usagePercent: 25,
         swapTotal: 2_000,
         swapUsed: 500,
@@ -157,6 +164,25 @@ describe("system stats collection", () => {
       si.time,
     ])
       expect(heavyCommand).not.toHaveBeenCalled();
+  });
+
+  it("reports macOS memory from vm_stat in summary and full collections", async () => {
+    memoryUsage.readDarwinVmStat.mockResolvedValue(
+      [
+        "Mach Virtual Memory Statistics: (page size of 1000 bytes)",
+        "Pages wired down:                              1.",
+        "Pages purgeable:                               2.",
+        "Anonymous pages:                               8.",
+        "Pages occupied by compressor:                  1.",
+      ].join("\n"),
+    );
+    const stats = await loadStatsModule();
+
+    const summary = await settle(stats.getSystemSummary());
+    const full = await settle(stats.getSystemStats());
+
+    expect(summary.memory).toMatchObject({ used: 8_000, usagePercent: 50 });
+    expect(full.memory).toMatchObject({ used: 8_000, usagePercent: 50 });
   });
 
   it("maps a full collection the same way as before", async () => {

@@ -12,6 +12,10 @@ import type {
   ProcessInfo,
   SystemStatsHistory,
 } from "@/types";
+import {
+  calculateUsedMemoryBytes,
+  readDarwinVmStat,
+} from "@/lib/system/memory-usage";
 
 const RING_BUFFER_SIZE = 60; // 5 minutes at 5s intervals
 const COLLECTION_INTERVAL_MS = 5_000;
@@ -85,6 +89,7 @@ function getCpuStaticInfo(): Promise<CpuStaticInfo> {
 function buildSummary(
   cpuLoad: Systeminformation.CurrentLoadData,
   mem: Systeminformation.MemData,
+  darwinVmStat: string | null,
   temp: Systeminformation.CpuTemperatureData | null,
   cpuInfo: CpuStaticInfo,
 ): SystemSummary {
@@ -96,11 +101,12 @@ function buildSummary(
     temperature: temp?.main && temp.main > 0 ? temp.main : undefined,
   };
 
+  const usedMemory = calculateUsedMemoryBytes(mem, darwinVmStat);
   const memory: MemoryStats = {
     total: mem.total,
-    used: mem.used,
+    used: usedMemory,
     free: mem.free,
-    usagePercent: Math.round((mem.used / mem.total) * 1000) / 10,
+    usagePercent: Math.round((usedMemory / mem.total) * 1000) / 10,
     swapTotal: mem.swaptotal,
     swapUsed: mem.swapused,
     swapPercent:
@@ -118,26 +124,36 @@ function buildSummary(
 }
 
 async function collectSummary(): Promise<SystemSummary> {
-  const [cpuLoad, mem, temp, cpuInfo] = await Promise.all([
+  const [cpuLoad, mem, darwinVmStat, temp, cpuInfo] = await Promise.all([
     si.currentLoad(),
     si.mem(),
+    readDarwinVmStat(),
     si.cpuTemperature().catch(() => null),
     getCpuStaticInfo(),
   ]);
-  return buildSummary(cpuLoad, mem, temp, cpuInfo);
+  return buildSummary(cpuLoad, mem, darwinVmStat, temp, cpuInfo);
 }
 
 async function collectFull(): Promise<SystemStats> {
-  const [cpuLoad, mem, temp, cpuInfo, disksRaw, networkRaw, processes] =
-    await Promise.all([
-      si.currentLoad(),
-      si.mem(),
-      si.cpuTemperature().catch(() => null),
-      getCpuStaticInfo(),
-      si.fsSize(),
-      si.networkStats(),
-      si.processes(),
-    ]);
+  const [
+    cpuLoad,
+    mem,
+    darwinVmStat,
+    temp,
+    cpuInfo,
+    disksRaw,
+    networkRaw,
+    processes,
+  ] = await Promise.all([
+    si.currentLoad(),
+    si.mem(),
+    readDarwinVmStat(),
+    si.cpuTemperature().catch(() => null),
+    getCpuStaticInfo(),
+    si.fsSize(),
+    si.networkStats(),
+    si.processes(),
+  ]);
 
   // Filter out /mnt/* mounts (Windows drives in WSL) and tiny pseudo-filesystems
   const disks: DiskStats[] = disksRaw
@@ -174,7 +190,7 @@ async function collectFull(): Promise<SystemStats> {
       command: p.command,
     }));
 
-  const summary = buildSummary(cpuLoad, mem, temp, cpuInfo);
+  const summary = buildSummary(cpuLoad, mem, darwinVmStat, temp, cpuInfo);
   return {
     cpu: summary.cpu,
     memory: summary.memory,

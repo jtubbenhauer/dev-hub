@@ -1,0 +1,182 @@
+lib/omo/facade/write-prompt.ts
+  s_9b616f005b7655::t_d0cc1c28dd2d5b 4
+  s_9b616f005b7655::t_fe4881e66ad942 76-82
+stores/chat-store.ts
+  s_9b616f005b7655::t_b5a382cd30c86d 30-31
+  s_9b616f005b7655::t_a188b09269fe48 2958-2959,3199-3200,3755
+lib/omo/session-registry-dispatch.ts
+  s_9b616f005b7655::t_0c123be7016138 207,213
+  s_9b616f005b7655::t_3752e51d596396 53-70
+  s_9b616f005b7655::t_30feadd7e8326e 248
+stores/sub-agent-activity-store.ts
+  s_9b616f005b7655::t_cdade4369b1ff1 1-107
+lib/omo/facade/write.ts
+  s_9b616f005b7655::t_685092f6fba5bf 39,139
+  s_9b616f005b7655::t_9a2d3150828182 96-97
+  s_9b616f005b7655::t_119003292a9448 189-199
+  s_9b616f005b7655::t_8abfe12241e65b 14
+  s_9b616f005b7655::t_9e42abe45128df 3
+lib/omo/session-registry.ts
+  s_9b616f005b7655::t_e0cd9cb324d90b 32
+  s_9b616f005b7655::t_1747a098530c9b 52-62
+lib/omo/facade/read.ts
+  s_9b616f005b7655::t_890414c1b2a669 110-116
+tests/components/chat/prompt-input-suggestion.test.tsx
+  s_9b616f005b7655::t_76cf773f22dc9d 54-56
+tests/lib/omo/facade/read-error-cases.ts
+  s_9b616f005b7655::t_dc9787fdf70878 126,129-152,159
+lib/omo/runtime.ts
+  s_9b616f005b7655::t_a0418ad10f1cbd 60-63
+lib/omo/adapter/live-task-events.ts
+  s_9b616f005b7655::t_3cb1ad5021703c 342-347
+  s_9b616f005b7655::t_51899ab12239ea 203-223
+  s_9b616f005b7655::t_e33478f83fca8e 142-176
+  s_9b616f005b7655::t_5a4ad1936d3d88 247-252,263
+  s_9b616f005b7655::t_9ee15b5f5b936b 11
+  s_9b616f005b7655::t_66614206d39ce7 348-353
+tests/components/chat/prompt-input-comments.test.tsx
+  s_9b616f005b7655::t_76cf773f22dc9d 47-49
+lib/omo/facade/write-errors.ts
+  s_9b616f005b7655::t_c1bd3f6bd3ec5f 14
+  s_9b616f005b7655::t_0b5a246766ca75 138-145
+  s_b553157837130b::t_0dafeb0adec134 137
+lib/opencode/types.ts
+  s_9b616f005b7655::t_d3839e92ae6824 19-20
+  s_9b616f005b7655::t_05b8227bdf4743 83-99,105-106,109
+lib/omo/permission-presets.ts
+  s_9b616f005b7655::t_9b0fa73c0b1ae1 1-61
+lib/omo/facade/write-body.ts
+  s_9b616f005b7655::t_6ad9897967d691 1-4
+  s_9b616f005b7655::t_af1dd073975961 24
+  s_9b616f005b7655::t_561099711e3c5e 105-106,115,120-127
+  s_9b616f005b7655::t_5b9589dbaccc9c 128-129
+lib/omo/session-registry-errors.ts
+  s_9b616f005b7655::t_14f8c56c57b043 64-73
+components/chat/omo-permission-preset-selector.tsx
+  s_fab9204c30ebab::t_3b9e350c408dda 1-2,4-43,45-88,95-96,101-141
+  s_fab9204c30ebab::t_77f257579bcc5f 44
+  s_fab9204c30ebab::t_08192750fbdfa6 89-94,97-100
+  s_fab9204c30ebab::t_7ffef01dfd390d 3
+lib/omo/dialog-ledger.ts
+  s_9b616f005b7655::t_a45f22e149ee60 36-53,60
+  s_9b616f005b7655::t_1c4ee9179578da 222-225,235-236
+  s_9b616f005b7655::t_0daf7043f9bb70 209
+  s_9b616f005b7655::t_87dde8ffee48f3 1
+  s_9b616f005b7655::t_ce3e3042c68975 237
+  s_9b616f005b7655::t_fff5f7316dfc60 130-183
+tests/stores/chat-store-omo-permission-preset.test.ts
+  s_9b616f005b7655::t_3cc1111b366138 1-151
+tests/components/chat/prompt-input-builtin-commands.test.tsx
+  s_9b616f005b7655::t_76cf773f22dc9d 51-53
+tests/components/chat/prompt-input-mobile-enter.test.tsx
+  s_9b616f005b7655::t_76cf773f22dc9d 52-54
+tests/lib/omo/facade/write-preset-cases.ts
+  s_9b616f005b7655::t_3d5d6afefb50e8 26-27,60-61,74-75,94-95,112-113,135-136,152-153,166-167,195-196,228-229
+  s_9b616f005b7655::t_dc984acb046c3a 188-190
+  s_9b616f005b7655::t_beac1c7ec88c45 1-25,28-59,62-73,76-93,96-111,114-134,137-151,154-165,168-187,191-194,197-227,230-240
+components/chat/prompt-input.tsx
+  s_fab9204c30ebab::t_ee379f7fb2b503 33
+lib/omo/event-stream.ts
+  s_9b616f005b7655::t_9d342f709918ac 103-104,107-108
+  s_9b616f005b7655::t_56cf0ce540d73b 109
+tests/lib/omo/adapter/dialogs-permission.test.ts
+  s_9b616f005b7655::t_6acd5a0274ae80 1-180
+tests/lib/omo/facade/write-permission-cases.ts
+  s_9b616f005b7655::t_18d29f7fcecfdd 1-111
+tests/lib/omo/session-registry-dispatch.test.ts
+  s_9b616f005b7655::t_bc10f43d691263 312
+  s_9b616f005b7655::t_d162ef3c62901b 15
+  s_9b616f005b7655::t_5ab0b04c4bf45a 270-285,287-311,313-336
+  s_9b616f005b7655::t_9291a84a54ffc3 286
+stores/omo-permission-preset-store.ts
+  s_9b616f005b7655::t_cd3954e4eff2f3 1-82
+lib/omo/adapter/dialogs.ts
+  s_9b616f005b7655::t_0d0d56688f8e61 149-150,153-157,160-166,212-219
+  s_9b616f005b7655::t_83cf9c4346625a 1,7-14
+  s_9b616f005b7655::t_6c63df6494388e 54-70,77-90
+tests/lib/omo/event-stream-delivery-cases.ts
+  s_9b616f005b7655::t_d9d52481431bb6 187-220
+components/chat/running-sub-agents-banner.tsx
+  s_fab9204c30ebab::t_ca69d46a6a969a 6-9,17-18,23
+  s_9b616f005b7655::t_1fe853630dc13d 296,298-302
+  s_fab9204c30ebab::t_7ec84d32794cef 320,322-324,326
+  s_fab9204c30ebab::t_f3ab5a129ce898 47-71,73-149
+  s_fab9204c30ebab::t_ba82ab805f4fe5 72
+tests/lib/omo/facade/write.test.ts
+  s_9b616f005b7655::t_458f28d1514334 5
+  s_9b616f005b7655::t_66f16a5106faf4 6
+lib/omo/adapter/live-adapter-types.ts
+  s_9b616f005b7655::t_2c072164515f87 32
+  s_9b616f005b7655::t_950351c862e1a5 2
+tests/lib/omo/adapter/live-task-events.test.ts
+  s_9b616f005b7655::t_c3513adc129005 382-494
+tests/components/chat/prompt-input-pr.test.tsx
+  s_9b616f005b7655::t_76cf773f22dc9d 47-49
+lib/omo/adapter/permission-prompts.ts
+  s_9b616f005b7655::t_1b4ccd7fb43fde 1-104
+tests/lib/omo/facade/write-fixture.ts
+  s_9b616f005b7655::t_2b7678d1f80028 127-130,134-151
+  s_9b616f005b7655::t_fd3001bce42c92 231
+  s_9b616f005b7655::t_5c35f4952eb631 196
+  s_9b616f005b7655::t_e967877894335d 181
+  s_b553157837130b::t_c15192affc4d75 152
+lib/omo/facade/write-permission-preset.ts
+  s_9b616f005b7655::t_2fe8d85f4db488 1-85
+lib/omo/session-registry-types.ts
+  s_9b616f005b7655::t_ba4f03dfef48d2 4
+  s_9b616f005b7655::t_1ddc608b012cb9 66
+lib/omo/facade/write-actions.ts
+  s_9b616f005b7655::t_cb16cd145041f8 9,13
+  s_9b616f005b7655::t_e74cd02eb2c96f 139-167
+  s_9b616f005b7655::t_160a278416dec7 2-5
+  s_9b616f005b7655::t_220ee545ae760d 60-65,69-71
+tests/components/chat/omo-permission-preset-selector.test.tsx
+  s_a14af25ea19db4::t_2254d091532bc2 1-200
+tests/components/chat/running-sub-agents-banner-activity.test.tsx
+  s_a14af25ea19db4::t_7140ca5e19a4e8 1-225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "10090f63ed002d171ef0fa3142ffeb75bcaa646a",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_b553157837130b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ee0f6bceeffeFuvZecC1BfKyhE",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_fab9204c30ebab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ec60dc2a9ffenpes0CLxzXe00A",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

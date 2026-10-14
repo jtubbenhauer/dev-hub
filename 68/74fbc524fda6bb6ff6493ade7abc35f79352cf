@@ -1,0 +1,236 @@
+stores/chat-store.ts
+  s_9b616f005b7655::t_582fb00bacae25 390-392
+  s_9b616f005b7655::t_01b6fe7cc92eb6 45
+  s_9b616f005b7655::t_696fde42743ff0 353-367
+  s_9b616f005b7655::t_fdad16ac8c84d5 1945-1946,1948-1950,1957,1963,1965-1968,1972
+  s_9b616f005b7655::t_d5070e188f2835 1165-1167
+  s_9b616f005b7655::t_1e7bbdaae2442f 376-382
+  s_9b616f005b7655::t_508de815251aa6 1033
+  s_9b616f005b7655::t_3fd7dc9593de0f 998-1001
+  s_9b616f005b7655::t_6aa18d44c1587a 1168
+  s_9b616f005b7655::t_b4e9c650f26c9e 1969-1971
+components/chat/omo-permission-preset-selector.tsx
+  s_9b616f005b7655::t_12524e0a4ca944 18,46
+app/api/sessions/cache/route.ts
+  s_9b616f005b7655::t_136a7f1b115886 227
+  s_9b616f005b7655::t_ce57dc09d38c55 16
+tests/hooks/use-omo-session-stats.test.tsx
+  s_9b616f005b7655::t_37611f1e5218b9 1-59
+README.md
+  s_9b616f005b7655::t_445f849a298dcf 159
+tests/components/chat/agent-selector.test.tsx
+  s_9b616f005b7655::t_93a3c70dc60d8a 80-119
+  s_9b616f005b7655::t_9d948410c4c0c7 4
+lib/engine/request-engine.ts
+  s_9b616f005b7655::t_da730b5f0ff6d5 52-55
+  s_9b616f005b7655::t_0bf60483cb773e 1-51,56-67
+tests/components/chat/omo-mode-selector.test.tsx
+  s_9b616f005b7655::t_5c8f3f44223518 7,15,39-40,102,131-135,146-153,170-178,186,204,207-208,233,236,242,254,256,260-263,280,291,293,296,300-303,311,325,329-332,357-430,439,441,444,448-451,474,477-480,492,505,513,544,552,567-616
+tests/components/chat/new-chat-menu.test.tsx
+  s_7db0f371cdb51a::t_531e6132f11dd6 1-147
+tests/stores/chat-store-omo-permission-preset.test.ts
+  s_9b616f005b7655::t_e5ad5eb275b0ca 2,11-25,28-29,32,66,82,87,90,100,103-105,108,115,118,125-153
+  s_9b616f005b7655::t_80f595211cab64 154
+stores/new-chat-engine-store.ts
+  s_9b616f005b7655::t_d9a3ea44dbf3d7 1-22
+lib/engine/types.ts
+  s_9b616f005b7655::t_a2e7978f194485 10-13
+tests/lib/engine/request-engine.test.ts
+  s_9b616f005b7655::t_a02fd0be92d3f6 114-116
+  s_9b616f005b7655::t_2f2913af7754cc 1-76,78-92,94-113,117-123
+  s_9b616f005b7655::t_8f61cdbaa340e5 77
+  s_0de4f8403f6149::t_7eb970a77deb32 93
+tests/components/chat/use-session-management.test.ts
+  s_9b616f005b7655::t_2adbe4febe8d40 82-85,89,96-186
+  s_9b616f005b7655::t_1b4ca5b62ebbff 2-3,7,16-17
+  s_9b616f005b7655::t_76c4ab8f51cef9 18-19
+  s_9b616f005b7655::t_f47f836428765e 187
+components/chat/use-chat-effects.ts
+  s_9b616f005b7655::t_36f42f501add56 1
+  s_9b616f005b7655::t_3db72e7f575e65 37-39,52-58
+  s_a14af25ea19db4::t_052f3f2b3e12db 59-61
+hooks/use-active-chat-engine.ts
+  s_9b616f005b7655::t_a5396189e3b084 28-30
+  s_9b616f005b7655::t_4d9ba5cd967d9a 1-27,31-37
+tests/stores/chat-store-sse-reconcile.test.ts
+  s_9b616f005b7655::t_01a933df00d949 247-269
+  s_9b616f005b7655::t_f42752a99f0df7 201,214-246
+app/api/opencode/[...path]/route.ts
+  s_9b616f005b7655::t_da730b5f0ff6d5 158,228-232
+  s_9b616f005b7655::t_a9740377c8d688 5,11-13,29-34,36-38,40,42-54,57-68,72-81,89,93-97,111,114,116,161,183-227,233-322
+components/chat/use-session-management.ts
+  s_9b616f005b7655::t_a22e8a9dbda2da 249-256
+  s_9b616f005b7655::t_730047b46a823d 443-444
+  s_9b616f005b7655::t_52ae434c651721 52-53
+  s_9b616f005b7655::t_ad44cb4ce303a3 20-24
+  s_9b616f005b7655::t_d47d03f3096a48 4
+  s_9b616f005b7655::t_7ef568b00343a0 1
+  s_9b616f005b7655::t_3eb461815894a5 107-110
+  s_9b616f005b7655::t_5e1a9f5a2cd443 105-106,111-115,118,122,125,130-134,136,138-140,142-147,149-158,161,167,172,178
+tests/components/chat/use-chat-effects.test.tsx
+  s_9b616f005b7655::t_47d166f0957516 6-25,34,38,57-80
+  s_9b616f005b7655::t_286c695e15745e 81-82
+tests/components/settings/chat-engine-setting.test.tsx
+  s_9b616f005b7655::t_6b68e04bb60ba8 5,31,63,78-81,94,105,109,116-120,127-128,131,136,141,147-148,155
+tests/api/opencode-events.test.ts
+  s_9b616f005b7655::t_1e9473d77660bf 27-28
+components/chat/chat-engine-badge.tsx
+  s_9b616f005b7655::t_f5718128f02a06 4-5,8,11-12,23-34
+  s_9b616f005b7655::t_cc5647e73f5590 1-3,6-7,9-10,13-22,35
+components/chat/empty-chat.tsx
+  s_7db0f371cdb51a::t_4a540666d1cfae 3,5-10,12,27-29,36-38,58-91,93
+  s_7db0f371cdb51a::t_b9c292f6a51d3c 21-25,94
+  s_9b616f005b7655::t_f870590a08deb4 30
+  s_7db0f371cdb51a::t_df79987192a0bd 92
+components/chat/new-chat-menu.tsx
+  s_7db0f371cdb51a::t_9fdf83c8e3200a 1-89
+tests/stores/chat-store-engine-choice.test.ts
+  s_9b616f005b7655::t_6295e7380e124f 34
+  s_9b616f005b7655::t_0ecefd73063323 1-33,35-102
+lib/opencode/session-export.ts
+  s_9b616f005b7655::t_2d55173a0789a2 108
+  s_9b616f005b7655::t_95b5392d950a07 1
+tests/components/chat/model-selector.test.tsx
+  s_9b616f005b7655::t_d4dc87ca72b5dc 96-122
+  s_9b616f005b7655::t_c6c16ba65389de 3,6
+  s_9b616f005b7655::t_8d95c3009223de 7
+lib/omo/route-dispatch.ts
+  s_9b616f005b7655::t_a0cf7f22538808 74
+app/api/sessions/messages/route.ts
+  s_9b616f005b7655::t_58c935665cf7cb 94
+  s_9b616f005b7655::t_7b2deeccb22f42 366
+  s_9b616f005b7655::t_eb42fcefa27491 9
+components/chat/session-list.tsx
+  s_9b616f005b7655::t_e5240920d8c804 111-114
+  s_7db0f371cdb51a::t_05a5bd73c2c32a 368
+  s_9b616f005b7655::t_46b1f0fde0355a 404
+  s_7db0f371cdb51a::t_8982aa4c1d13a3 421-424,426-431
+  s_7db0f371cdb51a::t_ac486747eb1fd0 146-148
+  s_9b616f005b7655::t_807ab59605f536 425
+  s_7db0f371cdb51a::t_d986592c238e42 630
+  s_9b616f005b7655::t_dc491a78fa682d 78
+  s_7db0f371cdb51a::t_091fa1b6902b11 967
+  s_7db0f371cdb51a::t_fb619b602bfbf3 35-39,43,46-50
+  s_7db0f371cdb51a::t_6febe78017e522 364,369-372,374-396,401-403,405-408
+  s_7db0f371cdb51a::t_49e3e1c32a1f97 18
+  s_7db0f371cdb51a::t_5331b302325e57 480-484
+  s_7db0f371cdb51a::t_d821fd68812ba5 729-739
+tests/components/chat/omo-permission-preset-selector.test.tsx
+  s_9b616f005b7655::t_c1af5c59c92916 54
+  s_9b616f005b7655::t_15d4e9978afa64 102-105
+  s_9b616f005b7655::t_395845c65cea7f 10
+  s_9b616f005b7655::t_c1b75e443e5f41 32
+  s_9b616f005b7655::t_fc12e9df23f3de 75-101,106-110
+components/chat/chat-interface.tsx
+  s_9b616f005b7655::t_9ded1ea98c8193 32,36
+  s_9b616f005b7655::t_8b7e83cb7d081c 879-886,933-938
+  s_9b616f005b7655::t_c8c49a57d5a0bb 33
+  s_9b616f005b7655::t_881f27d9eeb334 1500-1502,1504-1510
+  s_9b616f005b7655::t_ba5e6673bb22b7 939-940
+  s_9b616f005b7655::t_c39b7d9a6ab2c8 1511-1512
+  s_9b616f005b7655::t_90a6b6cf0c6455 1404
+lib/engine/workspace-engines.ts
+  s_9b616f005b7655::t_8f5245899408aa 1-10,13-17,19,21
+  s_9b616f005b7655::t_3824ef56a66466 11-12,18,20
+tests/components/workspace-engine-editor.test.tsx
+  s_9b616f005b7655::t_f84e8f4b3cff81 125,137,143-147,153-154,160,171-173,177,186
+tests/components/session-picker.test.tsx
+  s_9b616f005b7655::t_3738eb43e5d84f 315-343
+  s_9b616f005b7655::t_becd43a55f4fc2 1,9,11
+tests/components/session-list.test.tsx
+  s_7db0f371cdb51a::t_d7df04a8ee9e02 116,516
+  s_7db0f371cdb51a::t_caa88694793d66 79,94-96,100-101,115,117-119,143,149-150,171-184,190-192
+  s_7db0f371cdb51a::t_80dcb69690881d 473-515,517-583
+  s_7db0f371cdb51a::t_504b4929ed5697 1-2,5-52
+  s_7db0f371cdb51a::t_4ca45b96ccea39 185-189
+components/session-picker/session-picker.tsx
+  s_9b616f005b7655::t_b622a5d4d3511f 280-283
+  s_9b616f005b7655::t_88c787e57177a4 14
+tests/lib/engine/types.test.ts
+  s_9b616f005b7655::t_6cc6d8870da2b8 1-14
+components/workspace/workspace-engine-editor.tsx
+  s_9b616f005b7655::t_ee48aee05854ce 129,131
+  s_9b616f005b7655::t_1576ef4616ef89 91,99
+components/settings/chat-engine-settings.tsx
+  s_9b616f005b7655::t_02ebb0f747d6d1 28,36-40,48-49,55,57
+tests/components/empty-chat.test.tsx
+  s_7db0f371cdb51a::t_fc4710ce8e7a97 1-3,13-31,50-118
+tests/hooks/use-active-chat-engine.test.tsx
+  s_9b616f005b7655::t_b071b23bce9a19 1-114
+tests/stores/new-chat-engine-store.test.ts
+  s_9b616f005b7655::t_99caa25ec0648f 1-26
+components/chat/model-selector.tsx
+  s_9b616f005b7655::t_a39e8aed521d50 20,22
+  s_9b616f005b7655::t_178a97dbd11ee3 117-121
+  s_9b616f005b7655::t_b3f842f22f3fd0 140-141,147,152,155,164,169-175,178,184,187
+  s_9b616f005b7655::t_4a1b3002423572 58
+tests/components/chat/use-agent-model-sync.test.tsx
+  s_9b616f005b7655::t_f844ee9da98a5e 148-165
+  s_9b616f005b7655::t_84949dd06b9edb 37-44,47-51
+app/api/opencode/events/route.ts
+  s_9b616f005b7655::t_60e1d6c07447d1 284-290
+  s_9b616f005b7655::t_259beb609c1b72 160-161
+  s_9b616f005b7655::t_ea6c1fa7f08159 272-276,278-283,293-294
+  s_9b616f005b7655::t_00b670b0799066 8,10,21,24,32-33,35-37,50-59
+  s_0de4f8403f6149::t_e999141415b1e5 295
+components/chat/agent-selector.tsx
+  s_9b616f005b7655::t_2b31834c3b6b7c 19-20,34,38-42,45-46,53,60,65,68-69,72-74,76,82,85
+  s_9b616f005b7655::t_90b0858bbff6b2 113
+hooks/use-omo-session-stats.ts
+  s_9b616f005b7655::t_70b0f6abff30dc 4,34
+components/chat/use-agent-model-sync.ts
+  s_9b616f005b7655::t_170ec162ee6bee 2
+  s_9b616f005b7655::t_105d148dcdedff 66-71
+tests/api/omo-dispatch.test.ts
+  s_9b616f005b7655::t_3d3d1ff7721b20 568-571,581-582,584
+  s_9b616f005b7655::t_49f74ccf36090f 489-490
+  s_9b616f005b7655::t_e72653d67b8374 266-271,273-274,280-282,286-287,289-290,296-301,305-329,334-336,338-389,395-416,418-467,469
+  s_9b616f005b7655::t_86a5820ae7d4d6 688-709
+  s_9b616f005b7655::t_97425da7475cfd 520-522
+  s_9b616f005b7655::t_32e498735ce22b 546-548,551
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6874fbc524fda6bb6ff6493ade7abc35f79352cf",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0de4f8403f6149": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ec5a4d6daffeely6Z9Rde8er8r",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_7db0f371cdb51a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ec5340795ffeQj6RQ4W9kGajJn",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

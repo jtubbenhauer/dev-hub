@@ -1,0 +1,37 @@
+tests/lib/omo/adapter/live-task-events.test.ts
+  s_9b616f005b7655::t_b5ded1869a1145 285-325
+  s_9b616f005b7655::t_02c5f11706a991 327,329-343,345-350,354-363,367,370,374-377
+  s_9b616f005b7655::t_e0ffedb2ad2e01 364-366,368-369,371
+  s_9b616f005b7655::t_56b383b7192bbb 326,328,344,351-353,372-373,378-381
+lib/omo/adapter/live-task-events.ts
+  s_9b616f005b7655::t_c6c86b2f9407f4 256-267
+  s_9b616f005b7655::t_cda9eedafa7901 200
+  s_9b616f005b7655::t_1dc4879f1c4b20 129,133-141
+  s_9b616f005b7655::t_f72af4eeca2d59 231
+  s_9b616f005b7655::t_a2daaf4b93c018 183-184
+  s_9b616f005b7655::t_00b60211d8b53b 268-277
+  s_9b616f005b7655::t_ca6e1ec7f492c1 142-144,148,155-159
+  s_9b616f005b7655::t_0212626bcfe644 16
+  s_9b616f005b7655::t_3eb4da1528a829 130-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "45a8d277071a55bcd694977bbe9bb1a4264be0d2",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

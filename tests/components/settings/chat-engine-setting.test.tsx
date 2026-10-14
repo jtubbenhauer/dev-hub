@@ -2,10 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { ChatEngineSettingsCard } from "@/components/settings/chat-engine-settings";
 import { useChatStore } from "@/stores/chat-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { Workspace } from "@/types";
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -29,36 +28,7 @@ class MockPointerEvent extends Event {
 }
 window.PointerEvent = MockPointerEvent as unknown as typeof PointerEvent;
 
-type WorkspaceRow = Workspace & { engine?: string | null };
-
-function workspaceRow(id: string, engine?: string | null): WorkspaceRow {
-  const row: WorkspaceRow = {
-    id,
-    userId: "user-1",
-    name: id,
-    path: `/tmp/${id}`,
-    type: "repo",
-    parentRepoPath: null,
-    packageManager: null,
-    quickCommands: null,
-    backend: "local",
-    provider: null,
-    opencodeUrl: null,
-    agentUrl: null,
-    providerMeta: null,
-    shellCommand: null,
-    sshTarget: null,
-    sshPath: null,
-    worktreeSymlinks: null,
-    linkedTaskId: null,
-    linkedTaskMeta: null,
-    color: null,
-    createdAt: new Date(0),
-    lastAccessedAt: new Date(0),
-  };
-  if (engine !== undefined) row.engine = engine;
-  return row;
-}
+const ENGINE_SELECT_NAME = "Default engine for new chats";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -84,20 +54,13 @@ const fetchMock = vi.fn(
       server.chatEngine = body.value;
       return jsonResponse(body);
     }
-    if (url.startsWith("/api/sessions/cache?") && method === "DELETE") {
-      return jsonResponse({ deleted: true });
-    }
     return jsonResponse({ error: "unexpected request" }, 404);
   },
 );
 
 function callsWithMethod(method: string) {
   return fetchMock.mock.calls
-    .map((call, index) => ({
-      url: String(call[0]),
-      init: call[1],
-      order: fetchMock.mock.invocationCallOrder[index],
-    }))
+    .map((call) => ({ url: String(call[0]), init: call[1] }))
     .filter((call) => (call.init?.method ?? "GET") === method);
 }
 
@@ -112,8 +75,10 @@ function renderCard() {
   );
 }
 
-async function openEngineSelect() {
-  const trigger = await screen.findByRole("combobox", { name: "Chat engine" });
+async function findEngineSelect() {
+  const trigger = await screen.findByRole("combobox", {
+    name: ENGINE_SELECT_NAME,
+  });
   await waitFor(() => expect(trigger).toBeEnabled());
   return trigger;
 }
@@ -126,91 +91,68 @@ beforeEach(() => {
   server.putStatus = 200;
   fetchMock.mockClear();
   resetWorkspace.mockClear();
+  vi.mocked(toast.success).mockClear();
   vi.stubGlobal("fetch", fetchMock);
   useChatStore.setState({ resetWorkspace });
-  useWorkspaceStore.setState({
-    workspaces: [
-      workspaceRow("ws-inherit", null),
-      workspaceRow("ws-omo", "omo"),
-      workspaceRow("ws-opencode", "opencode"),
-      workspaceRow("ws-legacy"),
-    ],
-  });
 });
 
 afterEach(() => {
   useChatStore.setState({ resetWorkspace: originalResetWorkspace });
-  useWorkspaceStore.setState({ workspaces: [] });
   vi.unstubAllGlobals();
 });
 
 describe("ChatEngineSettingsCard", () => {
-  it("saves the new default, then purges and resets every inheriting workspace", async () => {
+  it("saves the default for new chats without clearing existing chats", async () => {
     const user = userEvent.setup();
     renderCard();
 
-    const trigger = await openEngineSelect();
+    const trigger = await findEngineSelect();
     expect(trigger).toHaveTextContent("OpenCode");
     await user.click(trigger);
     await user.click(
       await screen.findByRole("option", { name: "OmO Native (omo)" }),
     );
 
-    await waitFor(() => expect(resetWorkspace).toHaveBeenCalledTimes(2));
-    expect(resetWorkspace.mock.calls.map(([id]) => id)).toEqual([
-      "ws-inherit",
-      "ws-legacy",
-    ]);
-
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        "New chats default to OmO Native (omo)",
+      ),
+    );
     const [settingsPut] = callsWithMethod("PUT");
     expect(settingsPut.url).toBe("/api/settings");
     expect(JSON.parse(String(settingsPut.init?.body))).toEqual({
       key: "chat-engine",
       value: "omo",
     });
-
-    const purges = callsWithMethod("DELETE");
-    expect(purges.map((call) => call.url)).toEqual([
-      "/api/sessions/cache?workspaceId=ws-inherit",
-      "/api/sessions/cache?workspaceId=ws-legacy",
-    ]);
-    const firstResetOrder = resetWorkspace.mock.invocationCallOrder[0];
-    for (const purge of purges) {
-      expect(settingsPut.order).toBeLessThan(purge.order);
-      expect(purge.order).toBeLessThan(firstResetOrder);
-    }
+    expect(callsWithMethod("DELETE")).toHaveLength(0);
+    expect(resetWorkspace).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(
-        screen.getByRole("combobox", { name: "Chat engine" }),
+        screen.getByRole("combobox", { name: ENGINE_SELECT_NAME }),
       ).toHaveTextContent("OmO Native (omo)"),
     );
   });
 
-  it("does not purge or reset anything when saving the setting fails", async () => {
+  it("keeps the current default when saving fails", async () => {
     server.putStatus = 500;
     const user = userEvent.setup();
     renderCard();
 
-    await user.click(await openEngineSelect());
+    await user.click(await findEngineSelect());
     await user.click(
       await screen.findByRole("option", { name: "OmO Native (omo)" }),
     );
 
     await waitFor(() => expect(callsWithMethod("PUT")).toHaveLength(1));
-    await waitFor(() =>
-      expect(
-        screen.getByRole("combobox", { name: "Chat engine" }),
-      ).toBeEnabled(),
-    );
-    expect(callsWithMethod("DELETE")).toHaveLength(0);
-    expect(resetWorkspace).not.toHaveBeenCalled();
+    expect(await findEngineSelect()).toHaveTextContent("OpenCode");
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it("shows the stored default engine", async () => {
     server.chatEngine = "omo";
     renderCard();
 
-    const trigger = await openEngineSelect();
+    const trigger = await findEngineSelect();
 
     await waitFor(() => expect(trigger).toHaveTextContent("OmO Native (omo)"));
   });

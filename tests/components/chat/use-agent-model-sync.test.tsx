@@ -34,9 +34,21 @@ const primaryAgents = vi.hoisted((): Agent[] => {
 });
 
 const modelBindingState = vi.hoisted(() => ({ bindings: {} }));
+const activeEngineState = vi.hoisted(() => ({
+  value: { engine: "opencode", isLoading: false },
+}));
+const useAgentsMock = vi.hoisted(() =>
+  vi.fn((_workspaceId: string | null, _engine?: string) => ({
+    primaryAgents,
+  })),
+);
 
 vi.mock("@/components/chat/agent-selector", () => ({
-  useAgents: () => ({ primaryAgents }),
+  useAgents: useAgentsMock,
+}));
+
+vi.mock("@/hooks/use-active-chat-engine", () => ({
+  useActiveChatEngine: () => activeEngineState.value,
 }));
 
 vi.mock("@/hooks/use-settings", () => ({
@@ -133,6 +145,24 @@ describe("useAgentModelSync", () => {
   beforeEach(() => {
     useChatStore.setState(initialStoreState, true);
     modelBindingState.bindings = {};
+    activeEngineState.value = { engine: "opencode", isLoading: false };
+    useAgentsMock.mockClear();
+  });
+
+  it("loads the open chat's engine agents and waits while the engine is unknown", () => {
+    activeEngineState.value = { engine: "omo", isLoading: false };
+    seedWorkspace({});
+
+    const { rerender } = renderHook(
+      (props: HarnessProps) => useHarness(props),
+      { initialProps: { activeSessionId: "sess-a", variants: noVariants } },
+    );
+    expect(useAgentsMock).toHaveBeenLastCalledWith("ws-a", "omo");
+
+    activeEngineState.value = { engine: "opencode", isLoading: true };
+    rerender({ activeSessionId: "sess-a", variants: noVariants });
+
+    expect(useAgentsMock).toHaveBeenLastCalledWith(null, "opencode");
   });
 
   it("preserves a stored variant when switching to a session with a different agent", () => {

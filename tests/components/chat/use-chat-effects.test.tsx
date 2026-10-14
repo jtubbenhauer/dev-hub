@@ -3,6 +3,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatEffects } from "@/components/chat/use-chat-effects";
 import { useChatStore } from "@/stores/chat-store";
 
+vi.mock("@/hooks/use-workspace-engine", () => ({
+  useWorkspaceEngine: () => ({ engine: "opencode", isLoading: false }),
+}));
+
+const initialStoreState = useChatStore.getState();
+
+function stubStoreLoaders() {
+  const store = useChatStore.getState();
+  vi.spyOn(store, "setActiveWorkspaceId").mockImplementation(() => {});
+  vi.spyOn(store, "fetchSessions").mockResolvedValue();
+  const fetchMessages = vi.spyOn(store, "fetchMessages").mockResolvedValue();
+  const fetchCommands = vi.spyOn(store, "fetchCommands").mockResolvedValue();
+  vi.spyOn(store, "fetchPinnedSessions").mockResolvedValue();
+  vi.spyOn(store, "fetchSessionNotes").mockResolvedValue();
+  const refreshMessages = vi
+    .spyOn(store, "_refreshMessagesFromRemote")
+    .mockResolvedValue();
+  return { fetchMessages, fetchCommands, refreshMessages };
+}
+
 describe("useChatEffects active message sync", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -11,19 +31,11 @@ describe("useChatEffects active message sync", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
+    useChatStore.setState(initialStoreState, true);
   });
 
   it("loads once without polling the full history while idle", async () => {
-    const store = useChatStore.getState();
-    vi.spyOn(store, "setActiveWorkspaceId").mockImplementation(() => {});
-    vi.spyOn(store, "fetchSessions").mockResolvedValue();
-    const fetchMessages = vi.spyOn(store, "fetchMessages").mockResolvedValue();
-    vi.spyOn(store, "fetchCommands").mockResolvedValue();
-    vi.spyOn(store, "fetchPinnedSessions").mockResolvedValue();
-    vi.spyOn(store, "fetchSessionNotes").mockResolvedValue();
-    const refreshMessages = vi
-      .spyOn(store, "_refreshMessagesFromRemote")
-      .mockResolvedValue();
+    const { fetchMessages, refreshMessages } = stubStoreLoaders();
 
     const { unmount } = renderHook(() =>
       useChatEffects({
@@ -40,6 +52,32 @@ describe("useChatEffects active message sync", () => {
 
     expect(fetchMessages).toHaveBeenCalledOnce();
     expect(refreshMessages).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("loads commands for the open chat's engine and reloads them when it changes", () => {
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "omo_a",
+    });
+    const { fetchCommands } = stubStoreLoaders();
+
+    const { unmount } = renderHook(() =>
+      useChatEffects({
+        activeWorkspaceId: "ws-a",
+        activeSessionId: "omo_a",
+        healthStatus: undefined,
+        isActiveWorkspaceRemote: false,
+      }),
+    );
+    expect(fetchCommands).toHaveBeenLastCalledWith("ws-a", "omo");
+
+    act(() => {
+      useChatStore.setState({ activeSessionId: "ses_b" });
+    });
+
+    expect(fetchCommands).toHaveBeenLastCalledWith("ws-a", "opencode");
+    expect(fetchCommands).toHaveBeenCalledTimes(2);
     unmount();
   });
 });

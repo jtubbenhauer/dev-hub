@@ -17,8 +17,9 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { useActiveChatEngine } from "@/hooks/use-active-chat-engine";
 import { useModelAllowlist } from "@/hooks/use-settings";
-import { useWorkspaceEngine } from "@/hooks/use-workspace-engine";
+import type { ChatEngine } from "@/lib/engine/types";
 import type { Provider, Model } from "@/lib/opencode/types";
 
 const STORAGE_KEY = "dev-hub:selected-model";
@@ -54,6 +55,7 @@ interface ProviderWithModels {
 
 interface ProviderState {
   workspaceId: string;
+  engine: ChatEngine;
   providers: ProviderWithModels[];
   defaultModels: Record<string, string>;
 }
@@ -112,15 +114,17 @@ export function ModelSelector({
       ? controlledOnOpenChange
       : setInternalOpen;
   const { allowlist } = useModelAllowlist();
-  const isProviderStateCurrent = providerState?.workspaceId === workspaceId;
+  const { engine, isLoading: isEngineLoading } =
+    useActiveChatEngine(workspaceId);
+  const isProviderStateCurrent =
+    providerState?.workspaceId === workspaceId &&
+    providerState.engine === engine;
   const providers = isProviderStateCurrent
     ? providerState.providers
     : EMPTY_PROVIDERS;
   const defaultModels = isProviderStateCurrent
     ? providerState.defaultModels
     : EMPTY_DEFAULT_MODELS;
-  const { engine, isLoading: isEngineLoading } =
-    useWorkspaceEngine(workspaceId);
   const isCurrentWorkspaceLoading =
     isLoading ||
     isEngineLoading ||
@@ -133,22 +137,22 @@ export function ModelSelector({
   );
 
   useEffect(() => {
-    if (!workspaceId) return;
-    let isCurrentWorkspace = true;
+    if (!workspaceId || isEngineLoading) return;
+    let isCurrentRequest = true;
     const controller = new AbortController();
 
     const fetchProviders = async () => {
       setIsLoading(true);
       try {
-        const params = new URLSearchParams({ workspaceId });
+        const params = new URLSearchParams({ workspaceId, engine });
         const response = await fetch(
           `/api/opencode/config/providers?${params.toString()}`,
           { signal: controller.signal },
         );
-        if (!response.ok || !isCurrentWorkspace) return;
+        if (!response.ok || !isCurrentRequest) return;
 
         const data: ConfigProvidersResponse = await response.json();
-        if (!isCurrentWorkspace) return;
+        if (!isCurrentRequest) return;
         const providerList: ProviderWithModels[] = data.providers.map(
           (provider) => ({
             provider,
@@ -157,24 +161,30 @@ export function ModelSelector({
         );
         setProviderState({
           workspaceId,
+          engine,
           providers: providerList,
           defaultModels: data.default ?? {},
         });
       } catch {
-        if (isCurrentWorkspace) {
-          setProviderState({ workspaceId, providers: [], defaultModels: {} });
+        if (isCurrentRequest) {
+          setProviderState({
+            workspaceId,
+            engine,
+            providers: [],
+            defaultModels: {},
+          });
         }
       } finally {
-        if (isCurrentWorkspace) setIsLoading(false);
+        if (isCurrentRequest) setIsLoading(false);
       }
     };
 
     void fetchProviders();
     return () => {
-      isCurrentWorkspace = false;
+      isCurrentRequest = false;
       controller.abort();
     };
-  }, [workspaceId]);
+  }, [workspaceId, engine, isEngineLoading]);
 
   // Emit available variants for the currently selected model
   const variantsForSelectedModel = useMemo(() => {

@@ -24,6 +24,8 @@ const mockToWorkspace = vi.fn((row: { id: string }) => ({
   ...row,
   backend: "remote",
   path: "/workspace",
+  opencodeUrl: `http://${row.id}`,
+  agentUrl: "https://agent.example.com",
 }));
 const mockGetBackend = vi.fn((workspace: { id: string }) => ({
   getOpenCodeUrl: vi.fn(async () => `http://${workspace.id}`),

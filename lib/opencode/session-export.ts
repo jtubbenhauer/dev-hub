@@ -1,4 +1,4 @@
-import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
+import { engineForSessionId } from "@/lib/engine/types";
 import { handleOmoRead } from "@/lib/omo/facade/read";
 import { toOmoWorkspace } from "@/lib/omo/route-dispatch";
 import { fetchWithHeaderTimeout } from "@/lib/opencode/fetch-timeout";
@@ -104,12 +104,8 @@ async function connectUpstream(
   target: SessionExportTarget,
 ): Promise<UpstreamConnection> {
   const { userId, workspaceId, sessionId } = target;
-  const engine = await resolveWorkspaceEngine(userId, workspaceId);
 
-  if (engine === "omo") {
-    if (sessionId.startsWith("ses_")) {
-      throw new OpenCodeTargetError(404, "Session not found");
-    }
+  if (engineForSessionId(sessionId) === "omo") {
     const workspace = await resolveOmoWorkspace(userId, workspaceId);
     const omoWorkspace = toOmoWorkspace(workspace);
     const readOmo = (path: string, query: URLSearchParams) =>
@@ -128,9 +124,6 @@ async function connectUpstream(
     };
   }
 
-  if (sessionId.startsWith("omo_")) {
-    throw new OpenCodeTargetError(404, "Session not found");
-  }
   const openCodeTarget = await resolveOpenCodeTarget(userId, workspaceId);
   const { workspace, serverUrl, directory } = openCodeTarget;
   if (!workspace) {

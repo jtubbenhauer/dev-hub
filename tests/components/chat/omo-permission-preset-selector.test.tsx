@@ -7,6 +7,7 @@ import {
   OMO_PERMISSION_PRESET_DETAILS,
   OMO_PERMISSION_PRESETS,
 } from "@/lib/omo/permission-presets";
+import { useChatStore } from "@/stores/chat-store";
 import { useOmoPermissionPresetStore } from "@/stores/omo-permission-preset-store";
 
 const useWorkspaceEngineMock = vi.hoisted(() => vi.fn());
@@ -28,6 +29,7 @@ vi.mock("sonner", () => ({ toast: { error: toastErrorMock } }));
 const WORKSPACE_ID = "ws-1";
 const SESSION_ID = "omo_session-1";
 const initialPresetState = useOmoPermissionPresetStore.getState();
+const initialChatState = useChatStore.getState();
 
 function spyOnSetPreset() {
   const setPresetSpy = vi.fn(useOmoPermissionPresetStore.getState().setPreset);
@@ -49,6 +51,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  useChatStore.setState(initialChatState, true);
 });
 
 describe("OmoPermissionPresetSelector", () => {
@@ -67,6 +70,42 @@ describe("OmoPermissionPresetSelector", () => {
 
     expect(container).toBeEmptyDOMElement();
     expect(useWorkspaceEngineMock).toHaveBeenCalledWith(WORKSPACE_ID);
+  });
+
+  it("shows for an omo chat in an OpenCode workspace", () => {
+    useWorkspaceEngineMock.mockReturnValue({
+      engine: "opencode",
+      isLoading: false,
+    });
+    useChatStore.setState({
+      activeWorkspaceId: WORKSPACE_ID,
+      activeSessionId: SESSION_ID,
+    });
+
+    render(
+      <OmoPermissionPresetSelector
+        workspaceId={WORKSPACE_ID}
+        sessionId={SESSION_ID}
+      />,
+    );
+
+    expect(getTrigger()).toHaveTextContent("Default");
+  });
+
+  it("renders nothing for an OpenCode chat in an omo workspace", () => {
+    useChatStore.setState({
+      activeWorkspaceId: WORKSPACE_ID,
+      activeSessionId: "ses_1",
+    });
+
+    const { container } = render(
+      <OmoPermissionPresetSelector
+        workspaceId={WORKSPACE_ID}
+        sessionId="ses_1"
+      />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("shows Default when no preset is stored for the workspace", () => {

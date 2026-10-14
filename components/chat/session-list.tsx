@@ -15,6 +15,7 @@ import {
   ArrowUpDown,
   Group,
   GripVertical,
+  ChevronDown,
   ChevronRight,
   Pin,
   PinOff,
@@ -31,11 +32,22 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { engineForSessionId, type ChatEngine } from "@/lib/engine/types";
 import type { Session, SessionStatus } from "@/lib/opencode/types";
 import { useChatStore, type SessionWithWorkspace } from "@/stores/chat-store";
+import { ChatEngineBadge } from "@/components/chat/chat-engine-badge";
+import {
+  NewChatEngineMenuItems,
+  NewChatMenu,
+} from "@/components/chat/new-chat-menu";
 import { SessionTitleEditor } from "@/components/chat/session-title-editor";
 import type { SessionAgeFilter } from "@/lib/session-filters";
 import {
@@ -63,7 +75,7 @@ interface BaseSessionListProps {
   taskProgressBySessionId?: Readonly<Record<string, SessionTaskProgress>>;
   subAgentCountBySessionId?: Readonly<Record<string, SessionSubAgentCount>>;
   isLoading?: boolean;
-  onCreateSession: () => void;
+  onCreateSession: (engine?: ChatEngine) => void;
   onDeleteSession: (sessionId: string, workspaceId?: string) => void;
   onPinSession?: (sessionId: string, workspaceId?: string) => void;
   onUnpinSession?: (sessionId: string, workspaceId?: string) => void;
@@ -96,7 +108,10 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
   onSelectSession: (sessionId: string, workspaceId: string) => void;
   workspaces?: { id: string; name: string; backend: string }[];
   activeWorkspaceId?: string | null;
-  onCreateSessionInWorkspace?: (workspaceId: string) => void;
+  onCreateSessionInWorkspace?: (
+    workspaceId: string,
+    engine?: ChatEngine,
+  ) => void;
   groupByWorkspace?: boolean;
   onToggleGroupByWorkspace?: () => void;
   workspaceOrder?: string[];
@@ -128,6 +143,9 @@ export function SessionList(props: SessionListProps) {
     sessionNotes,
     onClearSessionNote,
   } = props;
+  const activeChatWorkspaceId = useChatStore(
+    (state) => state.activeWorkspaceId,
+  );
 
   const sortedSessions = useMemo(() => {
     if (props.mode === "workspace") {
@@ -343,34 +361,51 @@ export function SessionList(props: SessionListProps) {
           props.onCreateSessionInWorkspace ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon-xs" variant="ghost">
+                <Button size="icon-xs" variant="ghost" aria-label="New chat">
                   <Plus className="size-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[180px]">
+              {/* Start-aligned so the engine submenu fits beside it on phones */}
+              <DropdownMenuContent align="start" className="min-w-[180px]">
+                <DropdownMenuLabel className="text-muted-foreground text-xs">
+                  New chat in
+                </DropdownMenuLabel>
                 {props.workspaces.map((ws) => (
-                  <DropdownMenuItem
-                    key={ws.id}
-                    onClick={() => props.onCreateSessionInWorkspace!(ws.id)}
-                    className="gap-2"
-                  >
-                    {ws.backend === "remote" ? (
-                      <Globe className="size-3.5 text-blue-500" />
-                    ) : (
-                      <FolderGit2 className="size-3.5" />
-                    )}
-                    <span className="flex-1 truncate">{ws.name}</span>
-                    {ws.id === props.activeWorkspaceId && (
-                      <Check className="text-muted-foreground size-3.5" />
-                    )}
-                  </DropdownMenuItem>
+                  <DropdownMenuSub key={ws.id}>
+                    <DropdownMenuSubTrigger className="pointer-coarse:py-2.5">
+                      {ws.backend === "remote" ? (
+                        <Globe className="size-3.5 text-blue-500" />
+                      ) : (
+                        <FolderGit2 className="size-3.5" />
+                      )}
+                      <span className="flex-1 truncate">{ws.name}</span>
+                      {ws.id === props.activeWorkspaceId && (
+                        <Check className="text-muted-foreground size-3.5" />
+                      )}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent className="min-w-40">
+                        <NewChatEngineMenuItems
+                          workspaceId={ws.id}
+                          onSelectEngine={(engine) =>
+                            props.onCreateSessionInWorkspace!(ws.id, engine)
+                          }
+                        />
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button size="icon-xs" variant="ghost" onClick={onCreateSession}>
-              <Plus className="size-3.5" />
-            </Button>
+            <NewChatMenu
+              workspaceId={activeChatWorkspaceId}
+              onCreate={(engine) => onCreateSession(engine)}
+            >
+              <Button size="icon-xs" variant="ghost" aria-label="New chat">
+                <Plus className="size-3.5" />
+              </Button>
+            </NewChatMenu>
           )}
         </div>
       </div>
@@ -383,10 +418,17 @@ export function SessionList(props: SessionListProps) {
           <div className="flex flex-col items-center gap-2 p-4 text-center">
             <MessageSquare className="text-muted-foreground/50 size-8" />
             <p className="text-muted-foreground text-xs">No sessions yet</p>
-            <Button size="sm" variant="outline" onClick={onCreateSession}>
-              <Plus className="size-3.5" />
-              New Chat
-            </Button>
+            <NewChatMenu
+              workspaceId={activeChatWorkspaceId}
+              onCreate={(engine) => onCreateSession(engine)}
+              align="center"
+            >
+              <Button size="sm" variant="outline">
+                <Plus className="size-3.5" />
+                New Chat
+                <ChevronDown className="size-3 opacity-50" />
+              </Button>
+            </NewChatMenu>
           </div>
         ) : (
           <div className="overflow-hidden p-1">
@@ -435,7 +477,11 @@ export function SessionList(props: SessionListProps) {
                     onCreateSession={
                       props.mode === "unified" &&
                       props.onCreateSessionInWorkspace
-                        ? () => props.onCreateSessionInWorkspace!(workspaceId)
+                        ? (engine: ChatEngine) =>
+                            props.onCreateSessionInWorkspace!(
+                              workspaceId,
+                              engine,
+                            )
                         : undefined
                     }
                     onDragStart={() => setDraggedWorkspaceId(workspaceId)}
@@ -581,7 +627,7 @@ interface WorkspaceGroupProps {
   onUnpinSession?: (sessionId: string, workspaceId?: string) => void;
   sessionNotes?: Record<string, string>;
   onClearSessionNote?: (sessionId: string, workspaceId?: string) => void;
-  onCreateSession?: () => void;
+  onCreateSession?: (engine: ChatEngine) => void;
   onDragStart: () => void;
   onDragOver: (e: React.DragEvent) => void;
   onDragEnd: () => void;
@@ -680,18 +726,17 @@ function WorkspaceGroup({
           </>
         )}
         {onCreateSession && (
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            className="size-4 shrink-0 opacity-0 transition-opacity group-hover/header:opacity-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCreateSession();
-            }}
-            title={`New chat in ${workspaceName}`}
-          >
-            <Plus className="size-3" />
-          </Button>
+          <NewChatMenu workspaceId={workspaceId} onCreate={onCreateSession}>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              className="size-4 shrink-0 opacity-0 transition-opacity group-hover/header:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:size-6 pointer-coarse:opacity-100"
+              onClick={(e) => e.stopPropagation()}
+              title={`New chat in ${workspaceName}`}
+            >
+              <Plus className="size-3" />
+            </Button>
+          </NewChatMenu>
         )}
         <span className="text-muted-foreground/60 shrink-0 pr-1 text-[10px] tabular-nums">
           {sessions.length}
@@ -919,6 +964,7 @@ function SessionItem({
         )}
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="text-muted-foreground text-xs">{formattedTime}</p>
+          <ChatEngineBadge engine={engineForSessionId(session.id)} />
           {taskProgress && taskProgress.total > 0 && (
             <SessionTaskProgressIndicator
               progress={taskProgress}

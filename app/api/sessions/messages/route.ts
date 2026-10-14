@@ -6,7 +6,7 @@ import {
   authorizeOpenCodeSession,
   OpenCodeTargetError,
 } from "@/lib/opencode/proxy-target";
-import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
+import { engineForSessionId } from "@/lib/engine/types";
 import { getOmoSessionMessages } from "@/lib/omo/session-messages-route";
 import { fetchWithHeaderTimeout } from "@/lib/opencode/fetch-timeout";
 import { truncateMessagesForTransport } from "@/lib/opencode/truncate-messages";
@@ -91,8 +91,7 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  const engine = await resolveWorkspaceEngine(userId, workspaceId);
-  if (engine === "omo") {
+  if (engineForSessionId(sessionId) === "omo") {
     return getOmoSessionMessages({
       userId,
       workspaceId,
@@ -102,9 +101,6 @@ export async function GET(request: NextRequest) {
       isFresh: forceFresh,
       isReplace: url.searchParams.get("replace") === "1",
     });
-  }
-  if (sessionId.startsWith("omo_")) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
   let target: Awaited<ReturnType<typeof resolveOpenCodeTarget>> | null = null;
   let targetResolutionError: OpenCodeTargetError | null = null;
@@ -367,7 +363,7 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const engine = await resolveWorkspaceEngine(session.user.id, workspaceId);
+  const engine = engineForSessionId(sessionId);
   try {
     if (engine === "omo") {
       await resolveOmoWorkspace(session.user.id, workspaceId);
@@ -382,9 +378,6 @@ export async function DELETE(request: NextRequest) {
       );
     }
     throw error;
-  }
-  if (engine === "omo" && sessionId.startsWith("ses_")) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
   if (
     engine === "omo" &&

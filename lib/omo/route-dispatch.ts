@@ -71,6 +71,7 @@ export async function proxyOmoRequest(
   if (request.method === "GET") {
     const query = new URLSearchParams(new URL(request.url).searchParams);
     query.delete("workspaceId");
+    query.delete("engine");
     return handleOmoRead({ method: "GET", path, query, workspace, userId });
   }
 

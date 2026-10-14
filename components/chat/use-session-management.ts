@@ -1,5 +1,7 @@
+import type { ChatEngine } from "@/lib/engine/types";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useChatStore } from "@/stores/chat-store";
+import { getNewChatEngineChoice } from "@/stores/new-chat-engine-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useIsMobile, useHasCoarsePointer } from "@/hooks/use-mobile";
 import type { Workspace } from "@/types";
@@ -13,6 +15,11 @@ interface UseSessionManagementArgs {
   allWorkspaces: Workspace[];
   healthStatus: string | undefined;
   promptInputRef: RefObject<PromptInputHandle | null>;
+}
+
+interface PendingSessionCreation {
+  workspaceId: string;
+  engine: ChatEngine | undefined;
 }
 
 export function useSessionManagement({
@@ -42,10 +49,8 @@ export function useSessionManagement({
     clearSessionNote,
   } = useChatStore.getState();
 
-  const [
-    pendingSessionCreationWorkspaceId,
-    setPendingSessionCreationWorkspaceId,
-  ] = useState<string | null>(null);
+  const [pendingSessionCreation, setPendingSessionCreation] =
+    useState<PendingSessionCreation | null>(null);
   const [isUnifiedMode, setIsUnifiedMode] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("dev-hub:chat-unified-mode") === "true";
@@ -97,68 +102,80 @@ export function useSessionManagement({
     }
   }, []);
 
+  const createChat = useCallback(
+    async (workspaceId: string, engine: ChatEngine | undefined) => {
+      const session = await createSession(
+        workspaceId,
+        engine ?? getNewChatEngineChoice(workspaceId),
+      );
+      if (!session) toast.error("Couldn't create a new chat");
+    },
+    [createSession],
+  );
+
   // Create session once workspace becomes healthy after resume
   useEffect(() => {
-    if (!pendingSessionCreationWorkspaceId) return;
+    if (!pendingSessionCreation) return;
     if (healthStatus !== "healthy") return;
 
     const ws = allWorkspaces.find(
-      (w) => w.id === pendingSessionCreationWorkspaceId,
+      (w) => w.id === pendingSessionCreation.workspaceId,
     );
     if (!ws || ws.backend !== "remote") {
-      setPendingSessionCreationWorkspaceId(null);
+      setPendingSessionCreation(null);
       return;
     }
 
     (async () => {
-      await createSession(pendingSessionCreationWorkspaceId);
-      setPendingSessionCreationWorkspaceId(null);
+      await createChat(
+        pendingSessionCreation.workspaceId,
+        pendingSessionCreation.engine,
+      );
+      setPendingSessionCreation(null);
     })();
-  }, [
-    pendingSessionCreationWorkspaceId,
-    healthStatus,
-    allWorkspaces,
-    createSession,
-  ]);
+  }, [pendingSessionCreation, healthStatus, allWorkspaces, createChat]);
 
-  const handleCreateSession = useCallback(() => {
-    if (!activeWorkspaceId) return;
+  const handleCreateSession = useCallback(
+    (engine?: ChatEngine) => {
+      if (!activeWorkspaceId) return;
 
-    const ws = allWorkspaces.find((w) => w.id === activeWorkspaceId);
-    if (ws?.backend === "remote" && healthStatus !== "healthy") {
-      setPendingSessionCreationWorkspaceId(activeWorkspaceId);
-      resumeWorkspace(activeWorkspaceId);
-      return;
-    }
+      const ws = allWorkspaces.find((w) => w.id === activeWorkspaceId);
+      if (ws?.backend === "remote" && healthStatus !== "healthy") {
+        setPendingSessionCreation({ workspaceId: activeWorkspaceId, engine });
+        resumeWorkspace(activeWorkspaceId);
+        return;
+      }
 
-    createSession(activeWorkspaceId);
-  }, [
-    activeWorkspaceId,
-    allWorkspaces,
-    healthStatus,
-    createSession,
-    resumeWorkspace,
-  ]);
+      void createChat(activeWorkspaceId, engine);
+    },
+    [
+      activeWorkspaceId,
+      allWorkspaces,
+      healthStatus,
+      createChat,
+      resumeWorkspace,
+    ],
+  );
 
   const handleCreateSessionInWorkspace = useCallback(
-    (workspaceId: string) => {
+    (workspaceId: string, engine?: ChatEngine) => {
       useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
       setActiveWorkspaceId(workspaceId);
 
       const ws = allWorkspaces.find((w) => w.id === workspaceId);
       if (ws?.backend === "remote" && healthStatus !== "healthy") {
-        setPendingSessionCreationWorkspaceId(workspaceId);
+        setPendingSessionCreation({ workspaceId, engine });
         resumeWorkspace(workspaceId);
         return;
       }
 
-      createSession(workspaceId);
+      void createChat(workspaceId, engine);
     },
     [
       setActiveWorkspaceId,
       allWorkspaces,
       healthStatus,
-      createSession,
+      createChat,
       resumeWorkspace,
     ],
   );
@@ -229,11 +246,14 @@ export function useSessionManagement({
     [setActiveSession, promptInputRef, shouldSuppressAutoFocus],
   );
 
-  const handleMobileCreateSession = useCallback(() => {
-    if (!activeWorkspaceId) return;
-    createSession(activeWorkspaceId);
-    setIsMobileSessionsOpen(false);
-  }, [activeWorkspaceId, createSession]);
+  const handleMobileCreateSession = useCallback(
+    (engine?: ChatEngine) => {
+      if (!activeWorkspaceId) return;
+      void createChat(activeWorkspaceId, engine);
+      setIsMobileSessionsOpen(false);
+    },
+    [activeWorkspaceId, createChat],
+  );
 
   const handleSelectUnifiedSession = useCallback(
     (sessionId: string, workspaceId: string) => {
@@ -420,7 +440,8 @@ export function useSessionManagement({
     expandedWorkspaces,
     isMobileSessionsOpen,
     setIsMobileSessionsOpen,
-    pendingSessionCreationWorkspaceId,
+    pendingSessionCreationWorkspaceId:
+      pendingSessionCreation?.workspaceId ?? null,
 
     resumeWorkspace,
     handleCreateSession,

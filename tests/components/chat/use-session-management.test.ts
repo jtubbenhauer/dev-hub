@@ -1,14 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { useSessionManagement } from "@/components/chat/use-session-management";
 import { useIsMobile, useHasCoarsePointer } from "@/hooks/use-mobile";
 import type { PromptInputHandle } from "@/components/chat/prompt-input";
+import { useNewChatEngineStore } from "@/stores/new-chat-engine-store";
 import type { RefObject } from "react";
 import type { Workspace } from "@/types";
 
 vi.mock("@/hooks/use-mobile", () => ({
   useIsMobile: vi.fn(),
   useHasCoarsePointer: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
 const storeMocks = vi.hoisted(() => ({
@@ -73,13 +79,110 @@ vi.mock("@/stores/workspace-store", () => ({
   },
 }));
 
+const nullPromptInputRef = {
+  current: null,
+} as RefObject<PromptInputHandle | null>;
+
 describe("useSessionManagement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useNewChatEngineStore.setState({ engineByWorkspace: {} });
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
       return 0;
     });
+  });
+
+  it("creates each chat on the engine picked for it", () => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
+    storeMocks.createSession.mockResolvedValue({ id: "omo_1" });
+    const { result } = renderHook(() =>
+      useSessionManagement({
+        activeWorkspaceId: "ws-1",
+        allWorkspaces: [makeWorkspace("ws-1"), makeWorkspace("ws-2")],
+        healthStatus: "healthy",
+        promptInputRef: nullPromptInputRef,
+      }),
+    );
+
+    act(() => {
+      result.current.handleCreateSession("omo");
+      result.current.handleCreateSessionInWorkspace("ws-2", "opencode");
+    });
+
+    expect(storeMocks.createSession).toHaveBeenCalledWith("ws-1", "omo");
+    expect(storeMocks.createSession).toHaveBeenCalledWith("ws-2", "opencode");
+  });
+
+  it("uses the engine picked in the empty chat when the caller names none", () => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
+    storeMocks.createSession.mockResolvedValue({ id: "omo_1" });
+    useNewChatEngineStore.getState().setNewChatEngine("ws-1", "omo");
+    const { result } = renderHook(() =>
+      useSessionManagement({
+        activeWorkspaceId: "ws-1",
+        allWorkspaces: [makeWorkspace("ws-1")],
+        healthStatus: "healthy",
+        promptInputRef: nullPromptInputRef,
+      }),
+    );
+
+    act(() => result.current.handleCreateSession());
+
+    expect(storeMocks.createSession).toHaveBeenCalledWith("ws-1", "omo");
+  });
+
+  it("tells the user when a chat can't be created", async () => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
+    storeMocks.createSession.mockResolvedValue(null);
+    const { result } = renderHook(() =>
+      useSessionManagement({
+        activeWorkspaceId: "ws-1",
+        allWorkspaces: [makeWorkspace("ws-1")],
+        healthStatus: "healthy",
+        promptInputRef: nullPromptInputRef,
+      }),
+    );
+
+    act(() => result.current.handleCreateSession("omo"));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Couldn't create a new chat"),
+    );
+  });
+
+  it("creates the picked engine's chat once a sleeping remote workspace is healthy", async () => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 200 })),
+    );
+    storeMocks.createSession.mockResolvedValue({ id: "omo_1" });
+    const remoteWorkspaces = [makeWorkspace("ws-1", { backend: "remote" })];
+    const { result, rerender } = renderHook(
+      ({ healthStatus }: { healthStatus: string }) =>
+        useSessionManagement({
+          activeWorkspaceId: "ws-1",
+          allWorkspaces: remoteWorkspaces,
+          healthStatus,
+          promptInputRef: nullPromptInputRef,
+        }),
+      { initialProps: { healthStatus: "stopped" } },
+    );
+
+    act(() => result.current.handleCreateSession("omo"));
+    expect(storeMocks.createSession).not.toHaveBeenCalled();
+
+    rerender({ healthStatus: "healthy" });
+
+    await waitFor(() =>
+      expect(storeMocks.createSession).toHaveBeenCalledWith("ws-1", "omo"),
+    );
+    expect(storeMocks.createSession).toHaveBeenCalledTimes(1);
   });
 
   afterEach(() => {

@@ -1,4 +1,5 @@
 import { useAgents } from "@/components/chat/agent-selector";
+import { useActiveChatEngine } from "@/hooks/use-active-chat-engine";
 import { useModelAgentBindings } from "@/hooks/use-settings";
 import { isOmoSkillAgentName } from "@/lib/engine/omo-mode";
 import type { Agent } from "@/lib/opencode/types";
@@ -62,7 +63,12 @@ export function useAgentModelSync({
   availableVariants,
   setSelectedVariant,
 }: UseAgentModelSyncArgs): UseAgentModelSyncResult {
-  const { primaryAgents } = useAgents(activeWorkspaceId);
+  const { engine, isLoading: isEngineLoading } =
+    useActiveChatEngine(activeWorkspaceId);
+  const { primaryAgents } = useAgents(
+    isEngineLoading ? null : activeWorkspaceId,
+    engine,
+  );
   const orderedAgents = useMemo(() => {
     const utilityNames = new Set(["compaction", "title", "summary"]);
     return primaryAgents.filter(

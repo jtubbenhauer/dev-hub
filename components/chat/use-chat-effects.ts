@@ -1,3 +1,4 @@
+import { useActiveChatEngine } from "@/hooks/use-active-chat-engine";
 import { useChatStore } from "@/stores/chat-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import { useEffect, useRef } from "react";
@@ -33,18 +34,29 @@ export function useChatEffects({
     setActiveWorkspaceId(activeWorkspaceId);
   }, [activeWorkspaceId, setActiveWorkspaceId]);
 
+  const { engine: activeChatEngine, isLoading: isActiveChatEngineLoading } =
+    useActiveChatEngine(activeWorkspaceId);
+
   useEffect(() => {
     if (!activeWorkspaceId) return;
     fetchSessions(activeWorkspaceId);
-    fetchCommands(activeWorkspaceId);
     fetchPinnedSessions(activeWorkspaceId);
     fetchSessionNotes(activeWorkspaceId);
   }, [
     activeWorkspaceId,
     fetchSessions,
-    fetchCommands,
     fetchPinnedSessions,
     fetchSessionNotes,
+  ]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId || isActiveChatEngineLoading) return;
+    fetchCommands(activeWorkspaceId, activeChatEngine);
+  }, [
+    activeWorkspaceId,
+    activeChatEngine,
+    isActiveChatEngineLoading,
+    fetchCommands,
   ]);
 
   // Fetch messages when active session changes

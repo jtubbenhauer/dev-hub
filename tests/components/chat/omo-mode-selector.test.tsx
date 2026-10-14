@@ -4,14 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSelector } from "@/components/chat/agent-selector";
+import { ActiveChatEngineBadge } from "@/components/chat/chat-engine-badge";
 import { ModelSelector } from "@/components/chat/model-selector";
 import { useAgentModelSync } from "@/components/chat/use-agent-model-sync";
 import { VariantSelector } from "@/components/chat/variant-selector";
-import { WorkspaceEngineBadge } from "@/components/chat/workspace-engine-badge";
 import { workspaceEngineQueryKey } from "@/hooks/use-workspace-engine";
 import { OMO_NO_MODE_AGENT } from "@/lib/engine/omo-mode";
 import { buildCatalog } from "@/lib/omo/adapter/catalog-shapes";
 import { useChatStore } from "@/stores/chat-store";
+import { useNewChatEngineStore } from "@/stores/new-chat-engine-store";
 
 interface SelectedModel {
   providerID: string;
@@ -35,7 +36,8 @@ vi.mock("@/hooks/use-settings", async (importOriginal) => {
 
 const OMO_WORKSPACE_ID = "ws-omo";
 const OPENCODE_WORKSPACE_ID = "ws-opencode";
-const SESSION_ID = "sess-1";
+const OMO_SESSION_ID = "omo_sess-1";
+const OPENCODE_SESSION_ID = "ses_1";
 const BOUND_MODEL: SelectedModel = {
   providerID: "anthropic",
   modelID: "claude-opus",
@@ -97,6 +99,7 @@ interface FetchRoutes {
   workspaceEngines: Record<string, string | null>;
   globalEngine?: string;
   agents?: unknown;
+  omoAgents?: unknown;
   providers?: unknown;
 }
 
@@ -125,7 +128,11 @@ function stubFetch(routes: FetchRoutes) {
       });
     }
     if (url.pathname === "/api/opencode/agent") {
-      return jsonResponse(routes.agents ?? []);
+      const agents =
+        url.searchParams.get("engine") === "omo"
+          ? routes.omoAgents
+          : routes.agents;
+      return jsonResponse(agents ?? []);
     }
     if (url.pathname === "/api/opencode/config/providers") {
       return jsonResponse(routes.providers ?? { providers: [], default: {} });
@@ -134,6 +141,14 @@ function stubFetch(routes: FetchRoutes) {
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
+}
+
+function requestedAgentEngines(fetchMock: ReturnType<typeof stubFetch>) {
+  const engines = fetchMock.mock.calls
+    .map(([input]) => new URL(String(input), "http://localhost"))
+    .filter((url) => url.pathname === "/api/opencode/agent")
+    .map((url) => url.searchParams.get("engine"));
+  return [...new Set(engines)];
 }
 
 function createQueryClient(): QueryClient {
@@ -152,7 +167,15 @@ function renderWithQueryClient(
   };
 }
 
-function ChatSelectorsHarness({ workspaceId }: { workspaceId: string }) {
+interface ChatSelectorsHarnessProps {
+  workspaceId: string;
+  sessionId: string | null;
+}
+
+function ChatSelectorsHarness({
+  workspaceId,
+  sessionId,
+}: ChatSelectorsHarnessProps) {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
     null,
@@ -160,7 +183,7 @@ function ChatSelectorsHarness({ workspaceId }: { workspaceId: string }) {
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const { orderedAgents } = useAgentModelSync({
     activeWorkspaceId: workspaceId,
-    activeSessionId: SESSION_ID,
+    activeSessionId: sessionId,
     selectedAgent,
     setSelectedAgent,
     selectedModel,
@@ -178,10 +201,11 @@ function ChatSelectorsHarness({ workspaceId }: { workspaceId: string }) {
         selectedAgent={selectedAgent}
         onAgentChange={(agent) => {
           setSelectedAgent(agent);
+          if (sessionId === null) return;
           const { setSessionAgent, clearSessionModel } =
             useChatStore.getState();
-          setSessionAgent(SESSION_ID, workspaceId, agent);
-          clearSessionModel(SESSION_ID, workspaceId);
+          setSessionAgent(sessionId, workspaceId, agent);
+          clearSessionModel(sessionId, workspaceId);
         }}
       />
       <output data-testid="selected-model">
@@ -206,15 +230,16 @@ function recordBindingLookups(bindings: Record<string, SelectedModel>) {
 
 const initialStoreState = useChatStore.getState();
 
-function activateWorkspace(workspaceId: string) {
+function openChat(workspaceId: string, sessionId: string | null) {
   useChatStore.setState({
     activeWorkspaceId: workspaceId,
-    activeSessionId: SESSION_ID,
+    activeSessionId: sessionId,
   });
 }
 
 beforeEach(() => {
   useChatStore.setState(initialStoreState, true);
+  useNewChatEngineStore.setState({ engineByWorkspace: {} });
   bindingState.bindings = {};
 });
 
@@ -226,13 +251,16 @@ describe("omo Mode selector", () => {
   it("labels the facade's skills as modes and stores the picked mode as the session agent", async () => {
     stubFetch({
       workspaceEngines: { [OMO_WORKSPACE_ID]: "omo" },
-      agents: omoCatalog.agents,
+      omoAgents: omoCatalog.agents,
     });
-    activateWorkspace(OMO_WORKSPACE_ID);
+    openChat(OMO_WORKSPACE_ID, OMO_SESSION_ID);
     const user = userEvent.setup();
 
     renderWithQueryClient(
-      <ChatSelectorsHarness workspaceId={OMO_WORKSPACE_ID} />,
+      <ChatSelectorsHarness
+        workspaceId={OMO_WORKSPACE_ID}
+        sessionId={OMO_SESSION_ID}
+      />,
     );
 
     const trigger = await screen.findByRole("combobox", {
@@ -249,7 +277,7 @@ describe("omo Mode selector", () => {
 
     await user.click(modeOption);
 
-    expect(useChatStore.getState().getSessionAgent(SESSION_ID)).toBe(
+    expect(useChatStore.getState().getSessionAgent(OMO_SESSION_ID)).toBe(
       "skill:ulw-plan",
     );
     expect(
@@ -260,16 +288,19 @@ describe("omo Mode selector", () => {
   it("restores a stored skill mode and clears it back to no mode", async () => {
     stubFetch({
       workspaceEngines: { [OMO_WORKSPACE_ID]: "omo" },
-      agents: omoCatalog.agents,
+      omoAgents: omoCatalog.agents,
     });
-    activateWorkspace(OMO_WORKSPACE_ID);
+    openChat(OMO_WORKSPACE_ID, OMO_SESSION_ID);
     useChatStore
       .getState()
-      .setSessionAgent(SESSION_ID, OMO_WORKSPACE_ID, "skill:ulw-plan");
+      .setSessionAgent(OMO_SESSION_ID, OMO_WORKSPACE_ID, "skill:ulw-plan");
     const user = userEvent.setup();
 
     renderWithQueryClient(
-      <ChatSelectorsHarness workspaceId={OMO_WORKSPACE_ID} />,
+      <ChatSelectorsHarness
+        workspaceId={OMO_WORKSPACE_ID}
+        sessionId={OMO_SESSION_ID}
+      />,
     );
 
     await user.click(
@@ -277,7 +308,7 @@ describe("omo Mode selector", () => {
     );
     await user.click(await screen.findByRole("option", { name: "No mode" }));
 
-    expect(useChatStore.getState().getSessionAgent(SESSION_ID)).toBe(
+    expect(useChatStore.getState().getSessionAgent(OMO_SESSION_ID)).toBe(
       OMO_NO_MODE_AGENT,
     );
     expect(
@@ -291,11 +322,14 @@ describe("omo Mode selector", () => {
       globalEngine: "opencode",
       agents: openCodeAgents,
     });
-    activateWorkspace(OPENCODE_WORKSPACE_ID);
+    openChat(OPENCODE_WORKSPACE_ID, OPENCODE_SESSION_ID);
     const user = userEvent.setup();
 
     const { queryClient } = renderWithQueryClient(
-      <ChatSelectorsHarness workspaceId={OPENCODE_WORKSPACE_ID} />,
+      <ChatSelectorsHarness
+        workspaceId={OPENCODE_WORKSPACE_ID}
+        sessionId={OPENCODE_SESSION_ID}
+      />,
     );
 
     await waitFor(() => {
@@ -320,7 +354,80 @@ describe("omo Mode selector", () => {
 
     await user.click(screen.getByRole("option", { name: "build" }));
 
-    expect(useChatStore.getState().getSessionAgent(SESSION_ID)).toBe("build");
+    expect(useChatStore.getState().getSessionAgent(OPENCODE_SESSION_ID)).toBe(
+      "build",
+    );
+  });
+});
+
+describe("chat selectors with both engines in one workspace", () => {
+  it("shows omo modes for an omo chat in an OpenCode workspace", async () => {
+    const fetchMock = stubFetch({
+      workspaceEngines: { [OPENCODE_WORKSPACE_ID]: null },
+      globalEngine: "opencode",
+      agents: openCodeAgents,
+      omoAgents: omoCatalog.agents,
+    });
+    openChat(OPENCODE_WORKSPACE_ID, OMO_SESSION_ID);
+
+    renderWithQueryClient(
+      <ChatSelectorsHarness
+        workspaceId={OPENCODE_WORKSPACE_ID}
+        sessionId={OMO_SESSION_ID}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("combobox", { name: "Mode: No mode" }),
+    ).toBeInTheDocument();
+    expect(requestedAgentEngines(fetchMock)).toEqual(["omo"]);
+  });
+
+  it("shows the OpenCode agent picker for an OpenCode chat in an omo workspace", async () => {
+    const fetchMock = stubFetch({
+      workspaceEngines: { [OMO_WORKSPACE_ID]: "omo" },
+      agents: openCodeAgents,
+      omoAgents: omoCatalog.agents,
+    });
+    openChat(OMO_WORKSPACE_ID, OPENCODE_SESSION_ID);
+
+    renderWithQueryClient(
+      <ChatSelectorsHarness
+        workspaceId={OMO_WORKSPACE_ID}
+        sessionId={OPENCODE_SESSION_ID}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox")).toHaveTextContent("code");
+    });
+    expect(screen.getByRole("combobox")).not.toHaveAttribute("aria-label");
+    expect(requestedAgentEngines(fetchMock)).toEqual(["opencode"]);
+  });
+
+  it("uses the engine picked for the next chat before the chat exists", async () => {
+    const fetchMock = stubFetch({
+      workspaceEngines: { [OPENCODE_WORKSPACE_ID]: null },
+      globalEngine: "opencode",
+      agents: openCodeAgents,
+      omoAgents: omoCatalog.agents,
+    });
+    openChat(OPENCODE_WORKSPACE_ID, null);
+    useNewChatEngineStore
+      .getState()
+      .setNewChatEngine(OPENCODE_WORKSPACE_ID, "omo");
+
+    renderWithQueryClient(
+      <ChatSelectorsHarness
+        workspaceId={OPENCODE_WORKSPACE_ID}
+        sessionId={null}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("combobox", { name: "Mode: No mode" }),
+    ).toBeInTheDocument();
+    expect(requestedAgentEngines(fetchMock)).toEqual(["omo"]);
   });
 });
 
@@ -329,16 +436,19 @@ describe("useAgentModelSync under omo", () => {
     const lookups = recordBindingLookups({ "skill:ulw-plan": BOUND_MODEL });
     stubFetch({
       workspaceEngines: { [OMO_WORKSPACE_ID]: "omo" },
-      agents: omoCatalog.agents,
+      omoAgents: omoCatalog.agents,
     });
-    activateWorkspace(OMO_WORKSPACE_ID);
+    openChat(OMO_WORKSPACE_ID, OMO_SESSION_ID);
     useChatStore
       .getState()
-      .setSessionAgent(SESSION_ID, OMO_WORKSPACE_ID, "skill:ulw-plan");
+      .setSessionAgent(OMO_SESSION_ID, OMO_WORKSPACE_ID, "skill:ulw-plan");
     const user = userEvent.setup();
 
     renderWithQueryClient(
-      <ChatSelectorsHarness workspaceId={OMO_WORKSPACE_ID} />,
+      <ChatSelectorsHarness
+        workspaceId={OMO_WORKSPACE_ID}
+        sessionId={OMO_SESSION_ID}
+      />,
     );
 
     await user.click(
@@ -361,10 +471,13 @@ describe("useAgentModelSync under omo", () => {
       workspaceEngines: { [OPENCODE_WORKSPACE_ID]: null },
       agents: openCodeAgents,
     });
-    activateWorkspace(OPENCODE_WORKSPACE_ID);
+    openChat(OPENCODE_WORKSPACE_ID, OPENCODE_SESSION_ID);
 
     renderWithQueryClient(
-      <ChatSelectorsHarness workspaceId={OPENCODE_WORKSPACE_ID} />,
+      <ChatSelectorsHarness
+        workspaceId={OPENCODE_WORKSPACE_ID}
+        sessionId={OPENCODE_SESSION_ID}
+      />,
     );
 
     await waitFor(() => {
@@ -376,7 +489,7 @@ describe("useAgentModelSync under omo", () => {
   });
 });
 
-describe("WorkspaceEngineBadge", () => {
+describe("ActiveChatEngineBadge", () => {
   it.each([
     {
       label: "an omo workspace override",
@@ -389,7 +502,7 @@ describe("WorkspaceEngineBadge", () => {
       globalEngine: "omo",
     },
   ])(
-    "renders the omo badge for $label",
+    "renders the omo badge with no open chat for $label",
     async ({ workspaceEngine, globalEngine }) => {
       stubFetch({
         workspaceEngines: { [OMO_WORKSPACE_ID]: workspaceEngine },
@@ -397,7 +510,7 @@ describe("WorkspaceEngineBadge", () => {
       });
 
       renderWithQueryClient(
-        <WorkspaceEngineBadge workspaceId={OMO_WORKSPACE_ID} />,
+        <ActiveChatEngineBadge workspaceId={OMO_WORKSPACE_ID} />,
       );
 
       const badge = await screen.findByText("omo");
@@ -428,7 +541,7 @@ describe("WorkspaceEngineBadge", () => {
       globalEngine: "omo",
     },
   ])(
-    "renders nothing for $label",
+    "renders nothing with no open chat for $label",
     async ({ workspaceEngine, globalEngine }) => {
       stubFetch({
         workspaceEngines: { [OPENCODE_WORKSPACE_ID]: workspaceEngine },
@@ -436,7 +549,7 @@ describe("WorkspaceEngineBadge", () => {
       });
 
       const { container, queryClient } = renderWithQueryClient(
-        <WorkspaceEngineBadge workspaceId={OPENCODE_WORKSPACE_ID} />,
+        <ActiveChatEngineBadge workspaceId={OPENCODE_WORKSPACE_ID} />,
       );
 
       await waitFor(() => {
@@ -451,6 +564,56 @@ describe("WorkspaceEngineBadge", () => {
       expect(container).toBeEmptyDOMElement();
     },
   );
+
+  it("renders the omo badge for an omo chat in an OpenCode workspace", async () => {
+    stubFetch({
+      workspaceEngines: { [OPENCODE_WORKSPACE_ID]: null },
+      globalEngine: "opencode",
+    });
+    openChat(OPENCODE_WORKSPACE_ID, OMO_SESSION_ID);
+
+    renderWithQueryClient(
+      <ActiveChatEngineBadge workspaceId={OPENCODE_WORKSPACE_ID} />,
+    );
+
+    expect(await screen.findByText("omo")).toHaveAttribute(
+      "title",
+      "Chat engine: OmO Native",
+    );
+  });
+
+  it("renders nothing for an OpenCode chat in an omo workspace", async () => {
+    stubFetch({ workspaceEngines: { [OMO_WORKSPACE_ID]: "omo" } });
+    openChat(OMO_WORKSPACE_ID, OPENCODE_SESSION_ID);
+
+    const { container, queryClient } = renderWithQueryClient(
+      <ActiveChatEngineBadge workspaceId={OMO_WORKSPACE_ID} />,
+    );
+
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryState(workspaceEngineQueryKey(OMO_WORKSPACE_ID))
+          ?.status,
+      ).toBe("success");
+    });
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("follows the engine picked for the next chat", async () => {
+    stubFetch({
+      workspaceEngines: { [OPENCODE_WORKSPACE_ID]: null },
+      globalEngine: "opencode",
+    });
+    useNewChatEngineStore
+      .getState()
+      .setNewChatEngine(OPENCODE_WORKSPACE_ID, "omo");
+
+    renderWithQueryClient(
+      <ActiveChatEngineBadge workspaceId={OPENCODE_WORKSPACE_ID} />,
+    );
+
+    expect(await screen.findByText("omo")).toBeInTheDocument();
+  });
 });
 
 describe("omo thinking levels", () => {

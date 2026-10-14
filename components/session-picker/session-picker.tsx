@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useChatStore } from "@/stores/chat-store";
+import { getNewChatEngineChoice } from "@/stores/new-chat-engine-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { createChatHref } from "@/lib/chat-url-state";
 import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match";
@@ -276,7 +277,10 @@ export function SessionPickerDialog() {
     if (!activeWorkspaceId) return;
     close();
     navigateToChat();
-    await createSession(activeWorkspaceId);
+    await createSession(
+      activeWorkspaceId,
+      getNewChatEngineChoice(activeWorkspaceId),
+    );
   }, [activeWorkspaceId, close, navigateToChat, createSession]);
 
   const handleSelect = useCallback(

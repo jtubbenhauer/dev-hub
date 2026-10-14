@@ -13,6 +13,7 @@ import {
   resolveOpenCodeTarget,
 } from "@/lib/opencode/proxy-target";
 import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
+import { engineForSessionId } from "@/lib/engine/types";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -222,9 +223,8 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const engine = await resolveWorkspaceEngine(session.user.id, workspaceId);
   try {
-    if (engine === "omo") {
+    if (engineForSessionId(sessionId) === "omo") {
       await resolveOmoWorkspace(session.user.id, workspaceId);
     } else {
       await resolveOpenCodeTarget(session.user.id, workspaceId);

@@ -1,6 +1,9 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { ModelSelector } from "@/components/chat/model-selector";
+import { useChatStore } from "@/stores/chat-store";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const initialChatState = useChatStore.getState();
 
 const AVAILABLE_MODEL = {
   providerID: "opencode",
@@ -90,6 +93,33 @@ describe("ModelSelector", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    useChatStore.setState(initialChatState, true);
+  });
+
+  it("loads an omo chat's models in an OpenCode workspace, ignoring the allowlist", async () => {
+    useChatStore.setState({
+      activeWorkspaceId: "workspace-1",
+      activeSessionId: "omo_1",
+    });
+    const onModelChange = vi.fn();
+
+    render(
+      <ModelSelector
+        workspaceId="workspace-1"
+        selectedModel={{ providerID: "opencode", modelID: "big-pickle" }}
+        onModelChange={onModelChange}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox")).toHaveTextContent("Big Pickle"),
+    );
+    const providersUrl = new URL(
+      String(vi.mocked(fetch).mock.calls[0]?.[0]),
+      "http://localhost",
+    );
+    expect(providersUrl.searchParams.get("engine")).toBe("omo");
+    expect(onModelChange).not.toHaveBeenCalled();
   });
 
   it("replaces a late unavailable agent model with an available model", async () => {

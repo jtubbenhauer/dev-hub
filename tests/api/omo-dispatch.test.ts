@@ -263,44 +263,210 @@ describe("opencode proxy dispatch", () => {
     expect(mockResolveOpenCodeTarget).not.toHaveBeenCalled();
   });
 
-  it("rejects OpenCode session ids under omo", async () => {
+  it("sends an OpenCode session to OpenCode even in an omo workspace", async () => {
+    // Given
+    const fetchMock = vi.fn(async (_url: unknown, _init?: RequestInit) =>
+      Response.json({ id: "ses_abc", directory: "/tmp/omo-workspace" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
     const { GET } = await import("@/app/api/opencode/[...path]/route");
+
+    // When
     const response = await GET(
       request(`/api/opencode/session/ses_abc?workspaceId=${OMO_WS}`),
       { params: Promise.resolve({ path: ["session", "ses_abc"] }) },
     );
 
-    expect(response.status).toBe(404);
+    // Then
+    expect(response.status).toBe(200);
+    expect(mockResolveOpenCodeTarget).toHaveBeenCalledWith(USER, OMO_WS);
     expect(mockHandleOmoRead).not.toHaveBeenCalled();
   });
 
-  it("rejects omo session ids under opencode before any target resolution", async () => {
+  it("sends an omo session to the omo facade even in an OpenCode workspace", async () => {
+    // Given
     const { GET } = await import("@/app/api/opencode/[...path]/route");
+
+    // When
     const response = await GET(
       request(`/api/opencode/session/omo_x?workspaceId=${OC_WS}`),
       { params: Promise.resolve({ path: ["session", "omo_x"] }) },
     );
 
-    expect(response.status).toBe(404);
+    // Then
+    expect(response.status).toBe(200);
+    expect(mockHandleOmoRead.mock.calls[0]?.[0]).toMatchObject({
+      path: "/session/omo_x",
+      workspace: { id: OC_WS },
+    });
     expect(mockResolveOpenCodeTarget).not.toHaveBeenCalled();
   });
 
-  it("keeps the OpenCode path for opencode workspaces", async () => {
+  it("creates a session with the engine the client picked", async () => {
+    // Given
+    const { POST } = await import("@/app/api/opencode/[...path]/route");
+
+    // When
+    const response = await POST(
+      request(`/api/opencode/session?workspaceId=${OC_WS}&engine=omo`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ path: ["session"] }) },
+    );
+
+    // Then
+    expect(response.status).toBe(204);
+    expect(mockHandleOmoWrite.mock.calls[0]?.[0]).toMatchObject({
+      method: "POST",
+      path: "/session",
+    });
+    expect(mockResolveOpenCodeTarget).not.toHaveBeenCalled();
+  });
+
+  it("lists the sessions of both engines with the workspace default first", async () => {
+    // Given
     const fetchMock = vi.fn(async (_url: unknown, _init?: RequestInit) =>
       Response.json([{ id: "ses_1" }]),
     );
     vi.stubGlobal("fetch", fetchMock);
+    mockHandleOmoRead.mockImplementation(async () =>
+      Response.json([{ id: "omo_1" }]),
+    );
     const { GET } = await import("@/app/api/opencode/[...path]/route");
+
+    // When
+    const response = await GET(
+      request(`/api/opencode/session?workspaceId=${OC_WS}&limit=5`),
+      { params: Promise.resolve({ path: ["session"] }) },
+    );
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([{ id: "ses_1" }, { id: "omo_1" }]);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "http://opencode/session?limit=5&directory=%2Ftmp%2Foc-workspace",
+    );
+    expect(mockHandleOmoRead.mock.calls[0]?.[0].path).toBe("/session");
+  });
+
+  it("merges session statuses from both engines", async () => {
+    // Given
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ ses_1: { type: "busy" } })),
+    );
+    mockHandleOmoRead.mockImplementation(async () =>
+      Response.json({ omo_1: { type: "idle" } }),
+    );
+    const { GET } = await import("@/app/api/opencode/[...path]/route");
+
+    // When
+    const response = await GET(
+      request(`/api/opencode/session/status?workspaceId=${OMO_WS}`),
+      { params: Promise.resolve({ path: ["session", "status"] }) },
+    );
+
+    // Then
+    expect(await response.json()).toEqual({
+      ses_1: { type: "busy" },
+      omo_1: { type: "idle" },
+    });
+  });
+
+  it("answers with the default engine's failure so the client keeps its cache", async () => {
+    // Given
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ error: "down" }, { status: 502 })),
+    );
+    mockHandleOmoRead.mockImplementation(async () =>
+      Response.json([{ id: "omo_1" }]),
+    );
+    const { GET } = await import("@/app/api/opencode/[...path]/route");
+
+    // When
     const response = await GET(
       request(`/api/opencode/session?workspaceId=${OC_WS}`),
       { params: Promise.resolve({ path: ["session"] }) },
     );
 
+    // Then
+    expect(response.status).toBe(502);
+  });
+
+  it("leaves out the other engine when it fails", async () => {
+    // Given
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json([{ id: "ses_1" }])),
+    );
+    mockHandleOmoRead.mockImplementation(async () =>
+      Response.json({ error: "engine_unavailable" }, { status: 503 }),
+    );
+    const { GET } = await import("@/app/api/opencode/[...path]/route");
+
+    // When
+    const response = await GET(
+      request(`/api/opencode/question?workspaceId=${OC_WS}`),
+      { params: Promise.resolve({ path: ["question"] }) },
+    );
+
+    // Then
     expect(response.status).toBe(200);
-    expect(mockResolveOpenCodeTarget).toHaveBeenCalledWith(USER, OC_WS);
-    expect(mockGetOrStartServer).toHaveBeenCalledOnce();
+    expect(await response.json()).toEqual([{ id: "ses_1" }]);
+  });
+
+  it.each([
+    { questionId: "dh_q_123", engine: "omo" },
+    { questionId: "que_123", engine: "opencode" },
+  ])(
+    "answers question $questionId through $engine",
+    async ({ questionId, engine }) => {
+      // Given
+      const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+      vi.stubGlobal("fetch", fetchMock);
+      const { POST } = await import("@/app/api/opencode/[...path]/route");
+
+      // When
+      await POST(
+        request(
+          `/api/opencode/question/${questionId}/reply?workspaceId=${OMO_WS}`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ answers: [["yes"]] }),
+          },
+        ),
+        {
+          params: Promise.resolve({ path: ["question", questionId, "reply"] }),
+        },
+      );
+
+      // Then
+      expect(mockHandleOmoWrite.mock.calls.length > 0).toBe(engine === "omo");
+      expect(fetchMock.mock.calls.length > 0).toBe(engine === "opencode");
+    },
+  );
+
+  it("does not forward dev-hub's engine param to OpenCode", async () => {
+    // Given
+    const fetchMock = vi.fn(async (_url: unknown, _init?: RequestInit) =>
+      Response.json([]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { GET } = await import("@/app/api/opencode/[...path]/route");
+
+    // When
+    await GET(
+      request(`/api/opencode/command?workspaceId=${OMO_WS}&engine=opencode`),
+      { params: Promise.resolve({ path: ["command"] }) },
+    );
+
+    // Then
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
-      "http://opencode/session?directory=%2Ftmp%2Foc-workspace",
+      "http://opencode/command?directory=%2Ftmp%2Fomo-workspace",
     );
     expect(mockHandleOmoRead).not.toHaveBeenCalled();
   });
@@ -320,6 +486,8 @@ describe("events dispatch", () => {
       request: { sessionID: "omo_x", questions: [] },
     });
     const subscribersBefore = runtime.registry.subscriberCount(OMO_WS);
+    const openCodeWorkspaceSubscribersBefore =
+      runtime.registry.subscriberCount(OC_WS);
     const listenersBefore = runtime.client.listenerCount();
 
     let upstreamSignal: AbortSignal | undefined;
@@ -349,6 +517,9 @@ describe("events dispatch", () => {
     expect(runtime.registry.subscriberCount(OMO_WS)).toBe(
       subscribersBefore + 1,
     );
+    expect(runtime.registry.subscriberCount(OC_WS)).toBe(
+      openCodeWorkspaceSubscribersBefore + 1,
+    );
 
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
@@ -372,9 +543,12 @@ describe("events dispatch", () => {
     await reader?.cancel();
 
     expect(runtime.registry.subscriberCount(OMO_WS)).toBe(subscribersBefore);
+    expect(runtime.registry.subscriberCount(OC_WS)).toBe(
+      openCodeWorkspaceSubscribersBefore,
+    );
     expect(runtime.client.listenerCount()).toBe(listenersBefore);
     expect(upstreamSignal?.aborted).toBe(true);
-    expect(mockGetOrStartServer).toHaveBeenCalledOnce();
+    expect(mockGetOrStartServer).toHaveBeenCalled();
   });
 });
 
@@ -391,9 +565,11 @@ describe("events dispatch with an unusable omo workspace", () => {
     state.engines.set(UNTRUSTED_WS, "omo");
   });
 
-  it("keeps streaming the healthy workspaces when one cannot be set up", async () => {
+  it("keeps streaming the healthy workspaces when one cannot reach any engine", async () => {
+    const { getOmoReadRuntime } = await import("@/lib/omo/facade/read-runtime");
+    const runtime = getOmoReadRuntime();
+    const healthySubscribersBefore = runtime.registry.subscriberCount(OMO_WS);
     const { GET } = await import("@/app/api/opencode/events/route");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const response = await GET(
       request(
@@ -402,11 +578,10 @@ describe("events dispatch with an unusable omo workspace", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(warn).toHaveBeenCalledWith(
-      "[events] skipping OmO workspace",
-      UNTRUSTED_WS,
-      expect.any(Error),
+    expect(runtime.registry.subscriberCount(OMO_WS)).toBe(
+      healthySubscribersBefore + 1,
     );
+    expect(runtime.registry.subscriberCount(UNTRUSTED_WS)).toBe(0);
     await response.body?.cancel();
   });
 
@@ -507,6 +682,28 @@ describe("session history dispatch", () => {
       "/session/omo_x/message",
     );
     expect(mockGetOrStartServer).not.toHaveBeenCalled();
+    expect(mockResolveOpenCodeTarget).not.toHaveBeenCalled();
+  });
+
+  it("loads an omo session's history in an OpenCode workspace", async () => {
+    // Given
+    mockHandleOmoRead.mockImplementation(async () =>
+      Response.json([msg("omo_1", "omo_y", 100)]),
+    );
+    const { GET } = await import("@/app/api/sessions/messages/route");
+
+    // When
+    const response = await GET(
+      request(`/api/sessions/messages?workspaceId=${OC_WS}&sessionId=omo_y`),
+    );
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(ids(await response.json())).toEqual(["omo_1"]);
+    expect(mockHandleOmoRead.mock.calls[0]?.[0]).toMatchObject({
+      path: "/session/omo_y/message",
+      workspace: { id: OC_WS },
+    });
     expect(mockResolveOpenCodeTarget).not.toHaveBeenCalled();
   });
 

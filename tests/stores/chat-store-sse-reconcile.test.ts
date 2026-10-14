@@ -198,7 +198,7 @@ describe("SSE onopen wiring for omo workspaces (D23)", () => {
     expect(calledPaths.some((p: string) => /^\/session\//.test(p))).toBe(false);
   });
 
-  it("never calls the identities endpoint for an opencode workspace", async () => {
+  it("reconciles a workspace whose default engine is OpenCode, since it can hold omo chats too", async () => {
     vi.useFakeTimers();
     useChatStore.setState({
       workspaceStates: { [WS_OC]: workspace() },
@@ -211,7 +211,62 @@ describe("SSE onopen wiring for omo workspaces (D23)", () => {
     const calledPaths = fetchMock.mock.calls.map((call: unknown[]) =>
       pathnameOf(String(call[0])),
     );
-    expect(calledPaths).not.toContain("/api/opencode/session/identities");
+    expect(calledPaths).toContain("/api/opencode/session/identities");
+    expect(calledPaths).not.toContain(`/api/workspaces/${WS_OC}`);
+  });
+});
+
+describe("reconcileOmoSessionIdentities in a workspace with both engines", () => {
+  it("removes an omo chat omo no longer knows and keeps every OpenCode chat", async () => {
+    // Given
+    useChatStore.setState({
+      workspaceStates: {
+        [WS_OC]: workspace({
+          sessions: {
+            ses_1: session("ses_1"),
+            omo_gone: session("omo_gone"),
+            omo_kept: session("omo_kept"),
+          },
+          messages: { ses_1: [], omo_gone: [], omo_kept: [] },
+        }),
+      },
+    });
+    const entry = queueIdentitiesResponse();
+
+    // When
+    const reconcile = useChatStore
+      .getState()
+      .reconcileOmoSessionIdentities(WS_OC);
+    entry.resolve({ roots: ["omo_kept"], children: [], replaced: [] });
+    await reconcile;
+
+    // Then
+    const sessions = useChatStore.getState().workspaceStates[WS_OC].sessions;
+    expect(Object.keys(sessions).sort()).toEqual(["omo_kept", "ses_1"]);
+  });
+
+  it("leaves every chat alone when the reply is not an identities list", async () => {
+    // Given
+    useChatStore.setState({
+      workspaceStates: {
+        [WS_OC]: workspace({
+          sessions: { ses_1: session("ses_1"), omo_1: session("omo_1") },
+          messages: { ses_1: [], omo_1: [] },
+        }),
+      },
+    });
+    const entry = queueIdentitiesResponse();
+
+    // When
+    const reconcile = useChatStore
+      .getState()
+      .reconcileOmoSessionIdentities(WS_OC);
+    entry.resolve([]);
+    await reconcile;
+
+    // Then
+    const sessions = useChatStore.getState().workspaceStates[WS_OC].sessions;
+    expect(Object.keys(sessions).sort()).toEqual(["omo_1", "ses_1"]);
   });
 });
 

@@ -15,7 +15,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { useWorkspaceEngine } from "@/hooks/use-workspace-engine";
+import { useActiveChatEngine } from "@/hooks/use-active-chat-engine";
 import {
   OMO_PERMISSION_PRESET_DETAILS,
   OMO_PERMISSION_PRESETS,
@@ -43,7 +43,7 @@ export function OmoPermissionPresetSelector({
   const [isOpen, setIsOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const descriptionIdPrefix = useId();
-  const { engine } = useWorkspaceEngine(workspaceId);
+  const { engine } = useActiveChatEngine(workspaceId);
   const preset: OmoPermissionPreset | undefined = useOmoPermissionPresetStore(
     (state) => state.presetByWorkspace[workspaceId],
   );

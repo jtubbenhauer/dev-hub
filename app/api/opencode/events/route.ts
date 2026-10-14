@@ -5,8 +5,9 @@ import { workspaces } from "@/drizzle/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend";
 import { superviseSseTarget } from "@/lib/opencode/sse-supervisor";
-import { resolveWorkspaceEngine } from "@/lib/engine/resolve-engine";
+import { canWorkspaceRunEngine } from "@/lib/engine/workspace-engines";
 import type { OmoRuntimeWorkspace } from "@/lib/omo/runtime";
+import type { Workspace } from "@/types";
 
 export const maxDuration = 300;
 
@@ -17,23 +18,24 @@ interface UpstreamTarget {
   connect: (signal: AbortSignal) => Promise<Response>;
 }
 
-async function resolveTargets(
+async function loadWorkspaces(
   workspaceIds: string[],
   userId: string,
-): Promise<UpstreamTarget[]> {
+): Promise<Workspace[]> {
   if (workspaceIds.length === 0) return [];
-
   const rows = await db
     .select()
     .from(workspaces)
     .where(
       and(inArray(workspaces.id, workspaceIds), eq(workspaces.userId, userId)),
     );
+  return rows.map(toWorkspace);
+}
 
-  return rows.map((row) => ({
-    workspaceId: row.id,
+function openCodeEventTarget(workspace: Workspace): UpstreamTarget {
+  return {
+    workspaceId: workspace.id,
     connect: async (signal: AbortSignal) => {
-      const workspace = toWorkspace(row);
       const backend = getBackend(workspace);
       const serverUrl = await backend.getOpenCodeUrl();
       const eventUrl = new URL("/event", serverUrl);
@@ -45,7 +47,16 @@ async function resolveTargets(
         signal,
       });
     },
-  }));
+  };
+}
+
+function toOmoRuntimeWorkspace(workspace: Workspace): OmoRuntimeWorkspace {
+  return {
+    id: workspace.id,
+    path: workspace.path,
+    backend: workspace.backend,
+    agentUrl: workspace.agentUrl,
+  };
 }
 
 function safeEnqueue(
@@ -98,27 +109,6 @@ const SSE_HEADERS = {
   "x-accel-buffering": "no",
 };
 
-async function resolveOmoWorkspaces(
-  workspaceIds: string[],
-  userId: string,
-): Promise<OmoRuntimeWorkspace[]> {
-  const rows = await db
-    .select()
-    .from(workspaces)
-    .where(
-      and(inArray(workspaces.id, workspaceIds), eq(workspaces.userId, userId)),
-    );
-  return rows.map((row) => {
-    const workspace = toWorkspace(row);
-    return {
-      id: workspace.id,
-      path: workspace.path,
-      backend: workspace.backend,
-      agentUrl: workspace.agentUrl,
-    };
-  });
-}
-
 function createOpenCodeEventStream(
   targets: UpstreamTarget[],
   signal: AbortSignal,
@@ -167,15 +157,9 @@ function createOpenCodeEventStream(
 
 async function mixedEngineEvents(
   request: NextRequest,
-  userId: string,
-  openCodeWorkspaceIds: string[],
-  omoWorkspaceIds: string[],
+  targets: UpstreamTarget[],
+  omoWorkspaces: OmoRuntimeWorkspace[],
 ): Promise<Response> {
-  const [targets, omoWorkspaces] = await Promise.all([
-    resolveTargets(openCodeWorkspaceIds, userId),
-    resolveOmoWorkspaces(omoWorkspaceIds, userId),
-  ]);
-
   const abortController = new AbortController();
   const children: EngineEventStream[] = [];
   let isSettled = false;
@@ -285,27 +269,30 @@ export async function GET(request: NextRequest) {
   }
 
   const workspaceIds = workspaceIdsParam.split(",").filter(Boolean);
-  const userId = session.user.id;
-  const engines = await Promise.all(
-    workspaceIds.map((workspaceId) =>
-      resolveWorkspaceEngine(userId, workspaceId),
-    ),
+  // A workspace can hold chats of both engines, so it streams every engine
+  // it can reach rather than only its default one.
+  const requestedWorkspaces = await loadWorkspaces(
+    workspaceIds,
+    session.user.id,
   );
-  const omoWorkspaceIds = workspaceIds.filter(
-    (_, index) => engines[index] === "omo",
-  );
-  if (omoWorkspaceIds.length > 0) {
-    const openCodeWorkspaceIds = workspaceIds.filter(
-      (_, index) => engines[index] !== "omo",
-    );
-    return mixedEngineEvents(
-      request,
-      userId,
-      openCodeWorkspaceIds,
-      omoWorkspaceIds,
+  const targets = requestedWorkspaces
+    .filter((workspace) => canWorkspaceRunEngine(workspace, "opencode"))
+    .map(openCodeEventTarget);
+  const omoWorkspaces = requestedWorkspaces
+    .filter((workspace) => canWorkspaceRunEngine(workspace, "omo"))
+    .map(toOmoRuntimeWorkspace);
+  if (targets.length === 0 && omoWorkspaces.length === 0) {
+    return NextResponse.json(
+      {
+        error: "Event stream unavailable",
+        detail: "No requested workspace can reach a chat engine",
+      },
+      { status: 503 },
     );
   }
-  const targets = await resolveTargets(workspaceIds, session.user.id);
+  if (omoWorkspaces.length > 0) {
+    return mixedEngineEvents(request, targets, omoWorkspaces);
+  }
 
   const abortController = new AbortController();
   const encoder = new TextEncoder();

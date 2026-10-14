@@ -29,9 +29,11 @@ import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { RunningSubAgentsBanner } from "@/components/chat/running-sub-agents-banner";
 import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
-import { WorkspaceEngineBadge } from "@/components/chat/workspace-engine-badge";
+import { ActiveChatEngineBadge } from "@/components/chat/chat-engine-badge";
+import { NewChatMenu } from "@/components/chat/new-chat-menu";
 import { SidePanel } from "@/components/chat/side-panel";
 import { useSidePanelStore } from "@/stores/side-panel-store";
+import { getNewChatEngineChoice } from "@/stores/new-chat-engine-store";
 import { Button } from "@/components/ui/button";
 import { VscodeIcon } from "@/components/ui/vscode-icon";
 import {
@@ -874,8 +876,14 @@ export function ChatInterface() {
 
       let sessionId = activeSessionId;
       if (!sessionId) {
-        const newSession = await createSession(activeWorkspaceId);
-        if (!newSession) return;
+        const newSession = await createSession(
+          activeWorkspaceId,
+          getNewChatEngineChoice(activeWorkspaceId),
+        );
+        if (!newSession) {
+          toast.error("Couldn't create a new chat");
+          return;
+        }
         sessionId = newSession.id;
       }
 
@@ -922,8 +930,14 @@ export function ChatInterface() {
 
       let sessionId = activeSessionId;
       if (!sessionId) {
-        const newSession = await createSession(activeWorkspaceId);
-        if (!newSession) return;
+        const newSession = await createSession(
+          activeWorkspaceId,
+          getNewChatEngineChoice(activeWorkspaceId),
+        );
+        if (!newSession) {
+          toast.error("Couldn't create a new chat");
+          return;
+        }
         sessionId = newSession.id;
       }
 
@@ -1387,7 +1401,7 @@ export function ChatInterface() {
 
             {/* Session info */}
             <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-              <WorkspaceEngineBadge workspaceId={activeWorkspaceId} />
+              <ActiveChatEngineBadge workspaceId={activeWorkspaceId} />
               {activeSessionTitle ? (
                 <span
                   className="text-foreground truncate text-sm font-medium"
@@ -1483,19 +1497,19 @@ export function ChatInterface() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button
-              size="icon-sm"
-              variant="outline"
-              onClick={async () => {
-                if (activeWorkspaceId) {
-                  await createSession(activeWorkspaceId);
-                }
-              }}
-              disabled={!activeWorkspaceId}
-              title="New session"
+            <NewChatMenu
+              workspaceId={activeWorkspaceId}
+              onCreate={(engine) => handleCreateSession(engine)}
             >
-              <Plus className="size-4" />
-            </Button>
+              <Button
+                size="icon-sm"
+                variant="outline"
+                disabled={!activeWorkspaceId}
+                title="New chat"
+              >
+                <Plus className="size-4" />
+              </Button>
+            </NewChatMenu>
 
             <Button
               size="icon-sm"

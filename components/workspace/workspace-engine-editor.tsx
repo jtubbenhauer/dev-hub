@@ -21,7 +21,6 @@ import {
 import {
   CHAT_ENGINE_LABELS,
   getWorkspaceEngineOverride,
-  purgeAndResetWorkspaceChats,
   useChatEngineSetting,
 } from "@/hooks/use-chat-engine";
 import {
@@ -36,7 +35,6 @@ const INHERIT_ENGINE_VALUE = "inherit";
 interface EngineOverrideChange {
   readonly workspaceId: string;
   readonly engineOverride: ChatEngine | null;
-  readonly previousEngine: ChatEngine;
   readonly nextEngine: ChatEngine;
 }
 
@@ -90,25 +88,15 @@ function WorkspaceEngineForm({ workspace }: { workspace: Workspace }) {
 
   const updateMutation = useMutation({
     mutationFn: saveEngineOverride,
-    onSuccess: async (updatedWorkspace, change) => {
+    onSuccess: (updatedWorkspace, change) => {
       queryClient.setQueryData<Workspace[]>(["workspaces"], (workspaces) =>
         workspaces?.map((item) =>
           item.id === updatedWorkspace.id ? updatedWorkspace : item,
         ),
       );
       void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      if (change.previousEngine !== change.nextEngine) {
-        const failedWorkspaceIds = await purgeAndResetWorkspaceChats([
-          change.workspaceId,
-        ]);
-        if (failedWorkspaceIds.length > 0) {
-          toast.error(
-            "Engine changed, but cached chat sessions could not be cleared",
-          );
-        }
-      }
       toast.success(
-        `Chat engine set to ${CHAT_ENGINE_LABELS[change.nextEngine]}`,
+        `New chats in this workspace default to ${CHAT_ENGINE_LABELS[change.nextEngine]}`,
       );
     },
     onError: (error: Error) => {
@@ -129,7 +117,6 @@ function WorkspaceEngineForm({ workspace }: { workspace: Workspace }) {
     updateMutation.mutate({
       workspaceId: workspace.id,
       engineOverride: nextOverride,
-      previousEngine: engineOverride ?? defaultEngine,
       nextEngine: nextOverride ?? defaultEngine,
     });
   };
@@ -139,9 +126,9 @@ function WorkspaceEngineForm({ workspace }: { workspace: Workspace }) {
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <p className="text-sm font-medium">Chat engine</p>
+        <p className="text-sm font-medium">Default engine for new chats</p>
         <p className="text-muted-foreground text-xs">
-          Changing the engine clears this workspace&apos;s cached chat sessions.
+          Existing chats keep the engine they started on.
         </p>
       </div>
       <div className="space-y-1.5">

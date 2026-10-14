@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -6,7 +6,9 @@ import {
   SessionPickerDialog,
   useSessionPicker,
 } from "@/components/session-picker/session-picker";
+import type { ChatEngine } from "@/lib/engine/types";
 import { useChatStore } from "@/stores/chat-store";
+import { useNewChatEngineStore } from "@/stores/new-chat-engine-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 // Mock next/navigation
@@ -308,5 +310,34 @@ describe("SessionPickerDialog", () => {
     );
 
     expect(screen.getByText("No sessions match")).toBeInTheDocument();
+  });
+});
+
+describe("SessionPickerDialog new session engine", () => {
+  const originalCreateSession = useChatStore.getState().createSession;
+
+  beforeEach(() => {
+    resetStores();
+    mockPathname.mockReturnValue("/chat");
+  });
+
+  afterEach(() => {
+    useChatStore.setState({ createSession: originalCreateSession });
+    useNewChatEngineStore.setState({ engineByWorkspace: {} });
+  });
+
+  it("creates the new session on the engine picked for the workspace's next chat", async () => {
+    seedStores([makeSession("s1", "First Session", 2000)]);
+    const createSession = vi.fn<
+      (workspaceId: string, engine?: ChatEngine) => Promise<null>
+    >(async () => null);
+    useChatStore.setState({ createSession });
+    useNewChatEngineStore.getState().setNewChatEngine("ws-1", "omo");
+    renderPicker();
+
+    await userEvent.click(screen.getByText("Open Picker"));
+    await userEvent.click(screen.getByText("New Session"));
+
+    expect(createSession).toHaveBeenCalledWith("ws-1", "omo");
   });
 });

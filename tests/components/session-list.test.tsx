@@ -1,8 +1,55 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SessionList } from "@/components/chat/session-list";
-import type { SessionWithWorkspace } from "@/stores/chat-store";
+import type { ChatEngine } from "@/lib/engine/types";
+import { useChatStore, type SessionWithWorkspace } from "@/stores/chat-store";
+
+HTMLElement.prototype.scrollIntoView = vi.fn();
+HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
+HTMLElement.prototype.releasePointerCapture = vi.fn();
+
+class MockPointerEvent extends Event {
+  button: number;
+  ctrlKey: boolean;
+  pointerType: string;
+
+  constructor(type: string, props: PointerEventInit) {
+    super(type, props);
+    this.button = props.button || 0;
+    this.ctrlKey = props.ctrlKey || false;
+    this.pointerType = props.pointerType || "mouse";
+  }
+}
+window.PointerEvent = MockPointerEvent as unknown as typeof PointerEvent;
+
+const workspaceDefaults = vi.hoisted(() => ({
+  engineByWorkspaceId: {} as Record<string, ChatEngine>,
+}));
+vi.mock("@/hooks/use-workspace-engine", () => ({
+  useWorkspaceEngine: (workspaceId: string | null) => ({
+    engine:
+      (workspaceId === null
+        ? undefined
+        : workspaceDefaults.engineByWorkspaceId[workspaceId]) ?? "opencode",
+    isLoading: false,
+  }),
+}));
+
+const initialChatState = useChatStore.getInitialState();
+
+beforeEach(() => {
+  workspaceDefaults.engineByWorkspaceId = {};
+  useChatStore.setState(initialChatState, true);
+});
+
+function getSessionRow(sessionId: string): HTMLElement {
+  const row = document.querySelector<HTMLElement>(
+    `[data-session-id="${sessionId}"]`,
+  );
+  if (!row) throw new Error(`No session row rendered for ${sessionId}`);
+  return row;
+}
 
 function makeUnifiedSession(
   id: string,
@@ -29,7 +76,7 @@ const baseProps = {
 };
 
 describe("SessionList — unified mode workspace picker", () => {
-  it("renders dropdown trigger when workspaces and callback are provided", () => {
+  it("renders a New chat menu trigger when workspaces and callback are provided", () => {
     render(
       <SessionList
         {...baseProps}
@@ -44,33 +91,14 @@ describe("SessionList — unified mode workspace picker", () => {
       />,
     );
 
-    const triggers = screen.getAllByRole("button");
-    const plusButton = triggers.find(
-      (btn) =>
-        btn.querySelector("[data-slot='dropdown-menu-trigger']") !== null ||
-        btn.closest("[data-slot='dropdown-menu-trigger']") !== null ||
-        btn.getAttribute("data-slot") === "dropdown-menu-trigger",
+    expect(screen.getByRole("button", { name: "New chat" })).toHaveAttribute(
+      "aria-haspopup",
+      "menu",
     );
-    expect(plusButton ?? triggers.length).toBeTruthy();
   });
 
-  it("renders plain Plus button when not in unified mode", () => {
-    const onCreateSession = vi.fn();
-    render(
-      <SessionList
-        {...baseProps}
-        mode="workspace"
-        sessions={{}}
-        onSelectSession={vi.fn()}
-        onCreateSession={onCreateSession}
-      />,
-    );
-
-    const buttons = screen.getAllByRole("button");
-    expect(buttons.length).toBeGreaterThan(0);
-  });
-
-  it("renders plain Plus button in unified mode when no workspaces provided", () => {
+  it("creates a chat through the New chat menu in unified mode without workspaces", async () => {
+    const user = userEvent.setup();
     const onCreateSession = vi.fn();
     render(
       <SessionList
@@ -84,8 +112,11 @@ describe("SessionList — unified mode workspace picker", () => {
       />,
     );
 
-    const buttons = screen.getAllByRole("button");
-    expect(buttons.length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "New chat" }));
+    await user.click(await screen.findByRole("menuitem", { name: "OpenCode" }));
+
+    expect(onCreateSession).toHaveBeenCalledTimes(1);
+    expect(onCreateSession).toHaveBeenCalledWith("opencode");
   });
 
   it("shows workspace names in dropdown when opened", async () => {
@@ -109,14 +140,14 @@ describe("SessionList — unified mode workspace picker", () => {
       />,
     );
 
-    const triggerButton = screen.getByRole("button", { expanded: false });
-    await user.click(triggerButton);
+    await user.click(screen.getByRole("button", { name: "New chat" }));
 
     expect(await screen.findByText("Local Project")).toBeInTheDocument();
     expect(await screen.findByText("Remote Server")).toBeInTheDocument();
   });
 
-  it("calls onCreateSessionInWorkspace with correct ID when item clicked", async () => {
+  it("creates a chat with the picked engine in the picked workspace", async () => {
+    workspaceDefaults.engineByWorkspaceId = { "ws-2": "omo" };
     const user = userEvent.setup();
     const onCreateInWorkspace = vi.fn();
 
@@ -137,13 +168,28 @@ describe("SessionList — unified mode workspace picker", () => {
       />,
     );
 
-    const triggerButton = screen.getByRole("button", { expanded: false });
-    await user.click(triggerButton);
+    await user.click(screen.getByRole("button", { name: "New chat" }));
+    const remoteWorkspace = await screen.findByRole("menuitem", {
+      name: "Remote Server",
+    });
+    expect(remoteWorkspace).toHaveAttribute("aria-haspopup", "menu");
+    await user.click(remoteWorkspace);
 
-    const remoteItem = await screen.findByText("Remote Server");
-    await user.click(remoteItem);
+    const omoItem = await screen.findByRole("menuitem", {
+      name: "OMO Native",
+    });
+    expect(omoItem).toHaveAccessibleDescription("Default");
+    const openCodeItem = screen.getByRole("menuitem", { name: "OpenCode" });
+    expect(openCodeItem).not.toHaveAccessibleDescription();
 
-    expect(onCreateInWorkspace).toHaveBeenCalledWith("ws-2");
+    // jsdom has no layout, so Radix's pointer-grace check closes a submenu as
+    // soon as the pointer leaves its trigger. Pick the item from the keyboard.
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(openCodeItem).toHaveFocus());
+    await user.keyboard("{Enter}");
+
+    expect(onCreateInWorkspace).toHaveBeenCalledTimes(1);
+    expect(onCreateInWorkspace).toHaveBeenCalledWith("ws-2", "opencode");
   });
 
   it("shows question icon instead of brain icon when session has pending question", () => {
@@ -421,6 +467,117 @@ describe("SessionList — unified mode workspace picker", () => {
     expect(
       container.querySelector("[data-session-id='sess-1'] progress"),
     ).toHaveClass("accent-sky-500");
+  });
+});
+
+describe("SessionList — new chat engine menus", () => {
+  it("creates an omo chat from the workspace-mode header +", async () => {
+    useChatStore.setState({ activeWorkspaceId: "ws-1" });
+    workspaceDefaults.engineByWorkspaceId = { "ws-1": "omo" };
+    const user = userEvent.setup();
+    const onCreateSession = vi.fn();
+    render(
+      <SessionList
+        {...baseProps}
+        mode="workspace"
+        sessions={{ ses_1: makeUnifiedSession("ses_1", "ws-1") }}
+        onSelectSession={vi.fn()}
+        onCreateSession={onCreateSession}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "New chat" }));
+    const omoItem = await screen.findByRole("menuitem", {
+      name: "OMO Native",
+    });
+    expect(omoItem).toHaveAccessibleDescription("Default");
+    await user.click(omoItem);
+
+    expect(onCreateSession).toHaveBeenCalledTimes(1);
+    expect(onCreateSession).toHaveBeenCalledWith("omo");
+  });
+
+  it("creates a chat from the empty-list New Chat button", async () => {
+    const user = userEvent.setup();
+    const onCreateSession = vi.fn();
+    render(
+      <SessionList
+        {...baseProps}
+        mode="workspace"
+        sessions={{}}
+        onSelectSession={vi.fn()}
+        onCreateSession={onCreateSession}
+      />,
+    );
+
+    const emptyListButton = screen.getByRole("button", { name: "New Chat" });
+    expect(emptyListButton).toHaveTextContent("New Chat");
+    await user.click(emptyListButton);
+    await user.click(await screen.findByRole("menuitem", { name: "OpenCode" }));
+
+    expect(onCreateSession).toHaveBeenCalledTimes(1);
+    expect(onCreateSession).toHaveBeenCalledWith("opencode");
+  });
+
+  it("creates a chat in a workspace from its group header +", async () => {
+    const user = userEvent.setup();
+    const onCreateInWorkspace = vi.fn();
+    const onToggleWorkspaceExpanded = vi.fn();
+    render(
+      <SessionList
+        {...baseProps}
+        mode="unified"
+        sessions={[makeUnifiedSession("ses_1", "ws-1")]}
+        workspaceNames={{ "ws-1": "Workspace" }}
+        workspaceBranches={{}}
+        groupByWorkspace
+        onToggleWorkspaceExpanded={onToggleWorkspaceExpanded}
+        onSelectSession={vi.fn()}
+        onCreateSessionInWorkspace={onCreateInWorkspace}
+      />,
+    );
+
+    const groupTrigger = screen.getByRole("button", {
+      name: "New chat in Workspace",
+    });
+    await user.click(groupTrigger);
+    expect(groupTrigger).toHaveAttribute("data-state", "open");
+    expect(groupTrigger).toHaveClass("data-[state=open]:opacity-100");
+    await user.click(
+      await screen.findByRole("menuitem", { name: "OMO Native" }),
+    );
+
+    expect(onCreateInWorkspace).toHaveBeenCalledTimes(1);
+    expect(onCreateInWorkspace).toHaveBeenCalledWith("ws-1", "omo");
+    expect(onToggleWorkspaceExpanded).not.toHaveBeenCalled();
+  });
+});
+
+describe("SessionList — engine badge", () => {
+  it("shows the omo badge on omo sessions only", () => {
+    render(
+      <SessionList
+        {...baseProps}
+        mode="workspace"
+        sessions={{
+          omo_abc: makeUnifiedSession("omo_abc", "ws-1", {
+            title: "Omo chat",
+          }),
+          ses_def: makeUnifiedSession("ses_def", "ws-1", {
+            title: "OpenCode chat",
+          }),
+        }}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    expect(within(getSessionRow("omo_abc")).getByText("omo")).toHaveAttribute(
+      "title",
+      "Chat engine: OmO Native",
+    );
+    expect(
+      within(getSessionRow("ses_def")).queryByText("omo"),
+    ).not.toBeInTheDocument();
   });
 });
 

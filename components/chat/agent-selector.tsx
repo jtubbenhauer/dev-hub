@@ -16,7 +16,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { ModeSelector } from "@/components/chat/mode-selector";
-import { useWorkspaceEngine } from "@/hooks/use-workspace-engine";
+import { useActiveChatEngine } from "@/hooks/use-active-chat-engine";
+import type { ChatEngine } from "@/lib/engine/types";
 import { cn } from "@/lib/utils";
 import type { Agent } from "@/lib/opencode/types";
 
@@ -30,49 +31,58 @@ interface UseAgentsResult {
 
 interface AgentState {
   workspaceId: string;
+  engine: ChatEngine | undefined;
   agents: Agent[];
 }
 
-export function useAgents(workspaceId: string | null): UseAgentsResult {
+// Without an engine the server answers with the workspace's default engine.
+export function useAgents(
+  workspaceId: string | null,
+  engine?: ChatEngine,
+): UseAgentsResult {
   const [agentState, setAgentState] = useState<AgentState | null>(null);
   const [isFetching, setIsFetching] = useState(false);
-  const isAgentStateCurrent = agentState?.workspaceId === workspaceId;
+  const isAgentStateCurrent =
+    agentState?.workspaceId === workspaceId && agentState.engine === engine;
   const agents = isAgentStateCurrent ? agentState.agents : EMPTY_AGENTS;
   const isLoading =
     isFetching || (workspaceId !== null && !isAgentStateCurrent);
 
   useEffect(() => {
     if (!workspaceId) return;
-    let isCurrentWorkspace = true;
+    let isCurrentRequest = true;
     const controller = new AbortController();
 
     const fetchAgents = async () => {
       setIsFetching(true);
       try {
         const params = new URLSearchParams({ workspaceId });
+        if (engine) params.set("engine", engine);
         const response = await fetch(
           `/api/opencode/agent?${params.toString()}`,
           { signal: controller.signal },
         );
-        if (!response.ok || !isCurrentWorkspace) return;
+        if (!response.ok || !isCurrentRequest) return;
 
         const data: Record<string, Agent> = await response.json();
-        if (isCurrentWorkspace) {
-          setAgentState({ workspaceId, agents: Object.values(data) });
+        if (isCurrentRequest) {
+          setAgentState({ workspaceId, engine, agents: Object.values(data) });
         }
       } catch {
-        if (isCurrentWorkspace) setAgentState({ workspaceId, agents: [] });
+        if (isCurrentRequest) {
+          setAgentState({ workspaceId, engine, agents: [] });
+        }
       } finally {
-        if (isCurrentWorkspace) setIsFetching(false);
+        if (isCurrentRequest) setIsFetching(false);
       }
     };
 
     void fetchAgents();
     return () => {
-      isCurrentWorkspace = false;
+      isCurrentRequest = false;
       controller.abort();
     };
-  }, [workspaceId]);
+  }, [workspaceId, engine]);
 
   const primaryAgents = useMemo(
     () => agents.filter((a) => a.mode === "primary" || a.mode === "all"),
@@ -100,7 +110,7 @@ export function AgentSelector({
   onOpenChange: controlledOnOpenChange,
 }: AgentSelectorProps) {
   const [internalOpen, setInternalOpen] = useState(false);
-  const { engine } = useWorkspaceEngine(workspaceId);
+  const { engine } = useActiveChatEngine(workspaceId);
 
   if (engine === "omo") {
     return (

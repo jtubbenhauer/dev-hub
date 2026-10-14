@@ -6,7 +6,6 @@ import {
   useSettings,
 } from "@/hooks/use-settings";
 import { isChatEngine, type ChatEngine } from "@/lib/engine/types";
-import { useChatStore } from "@/stores/chat-store";
 import type { Workspace } from "@/types";
 
 export const CHAT_ENGINE_LABELS: Record<ChatEngine, string> = {
@@ -34,29 +33,4 @@ export function getWorkspaceEngineOverride(
   const storedEngine = "engine" in workspace ? workspace.engine : null;
   if (storedEngine === null || storedEngine === undefined) return null;
   return isChatEngine(storedEngine) ? storedEngine : DEFAULT_CHAT_ENGINE;
-}
-
-async function purgeWorkspaceSessionCache(workspaceId: string): Promise<void> {
-  const params = new URLSearchParams({ workspaceId });
-  const response = await fetch(`/api/sessions/cache?${params}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to clear cached sessions (${response.status})`);
-  }
-}
-
-// Purges run before the resets so a refetch triggered by a reset cannot load
-// cached sessions from the previous engine. Returns the ids whose purge failed.
-export async function purgeAndResetWorkspaceChats(
-  workspaceIds: readonly string[],
-): Promise<string[]> {
-  const purgeResults = await Promise.allSettled(
-    workspaceIds.map(purgeWorkspaceSessionCache),
-  );
-  const { resetWorkspace } = useChatStore.getState();
-  for (const workspaceId of workspaceIds) resetWorkspace(workspaceId);
-  return workspaceIds.filter(
-    (_, index) => purgeResults[index]?.status === "rejected",
-  );
 }

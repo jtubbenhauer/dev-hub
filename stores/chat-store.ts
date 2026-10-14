@@ -42,11 +42,7 @@ import {
   SESSION_DELETION_FAILED_MESSAGE,
   type SessionDeletionResult,
 } from "@/lib/chat/session-deletion";
-import {
-  CHAT_ENGINE_SETTING_KEY,
-  isChatEngine,
-  type ChatEngine,
-} from "@/lib/engine/types";
+import { engineForSessionId, type ChatEngine } from "@/lib/engine/types";
 
 export type StreamingStatus =
   | "idle"
@@ -306,62 +302,6 @@ function getSessionDeletionStatus(
   return deletedSessionIdsByWorkspace.get(workspaceId)?.get(sessionId);
 }
 
-// Per-workspace chat-engine detection for SSE onopen wiring (D23). Cached
-// indefinitely per workspace id — invalidated by resetWorkspace, which runs
-// whenever a workspace's engine changes.
-const _workspaceEngineCache = new Map<string, ChatEngine>();
-let _globalChatEngineCache: ChatEngine | null = null;
-let _globalChatEngineFetch: Promise<ChatEngine> | null = null;
-
-async function fetchGlobalChatEngine(): Promise<ChatEngine> {
-  if (_globalChatEngineCache) return _globalChatEngineCache;
-  if (_globalChatEngineFetch) return _globalChatEngineFetch;
-  _globalChatEngineFetch = (async (): Promise<ChatEngine> => {
-    try {
-      const response = await fetch("/api/settings");
-      if (!response.ok) return "opencode";
-      const data = (await response.json()) as Record<string, unknown> | null;
-      const value = data?.[CHAT_ENGINE_SETTING_KEY];
-      return isChatEngine(value) ? value : "opencode";
-    } catch {
-      return "opencode";
-    }
-  })();
-  const engine = await _globalChatEngineFetch;
-  _globalChatEngineCache = engine;
-  _globalChatEngineFetch = null;
-  return engine;
-}
-
-async function getWorkspaceEngine(workspaceId: string): Promise<ChatEngine> {
-  const cached = _workspaceEngineCache.get(workspaceId);
-  if (cached) return cached;
-  try {
-    const response = await fetch(
-      `/api/workspaces/${encodeURIComponent(workspaceId)}`,
-    );
-    if (!response.ok) return "opencode";
-    const workspace = (await response.json()) as unknown;
-    const override =
-      typeof workspace === "object" &&
-      workspace !== null &&
-      "engine" in workspace &&
-      typeof (workspace as { engine?: unknown }).engine === "string"
-        ? (workspace as { engine: string }).engine
-        : null;
-    const engine =
-      override !== null
-        ? isChatEngine(override)
-          ? override
-          : "opencode"
-        : await fetchGlobalChatEngine();
-    _workspaceEngineCache.set(workspaceId, engine);
-    return engine;
-  } catch {
-    return "opencode";
-  }
-}
-
 // D23 — coalesced per-workspace pins/notes refetch after session.metadata_moved.
 const METADATA_MOVED_COALESCE_MS = 500;
 const metadataMovedRefetchTimers = new Map<
@@ -410,6 +350,21 @@ interface OmoIdentitiesResponse {
   replaced: Array<{ old: string; new: string; info: Session }>;
 }
 
+function isOmoIdentitiesResponse(
+  value: unknown,
+): value is OmoIdentitiesResponse {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "roots" in value &&
+    Array.isArray(value.roots) &&
+    "children" in value &&
+    Array.isArray(value.children) &&
+    "replaced" in value &&
+    Array.isArray(value.replaced)
+  );
+}
+
 const reconcileOmoIdentitiesInFlight = new Map<string, Promise<void>>();
 const reconcileOmoIdentitiesTrailing = new Set<string>();
 
@@ -418,7 +373,13 @@ async function runReconcileOmoSessionIdentitiesOnce(
   get: () => ChatState,
 ): Promise<void> {
   const ws = get().workspaceStates[workspaceId];
-  const snapshotSessions = ws?.sessions ?? {};
+  // omo only knows its own sessions; the workspace's OpenCode chats must never
+  // look missing to it.
+  const snapshotSessions = Object.fromEntries(
+    Object.entries(ws?.sessions ?? {}).filter(
+      ([sessionId]) => engineForSessionId(sessionId) === "omo",
+    ),
+  );
   const snapshotIds = new Set(Object.keys(snapshotSessions));
   const snapshotGen = get().sessionMutationGen[workspaceId] ?? 0;
 
@@ -426,7 +387,9 @@ async function runReconcileOmoSessionIdentitiesOnce(
   try {
     const res = await fetch(buildProxyUrl("session/identities", workspaceId));
     if (!res.ok) return;
-    response = (await res.json()) as OmoIdentitiesResponse;
+    const body: unknown = await res.json();
+    if (!isOmoIdentitiesResponse(body)) return;
+    response = body;
   } catch {
     return;
   }
@@ -534,9 +497,6 @@ export function _resetModuleCaches() {
   sessionCachePurgeMutations.clear();
   purgedSessionCacheKeys.clear();
 
-  _workspaceEngineCache.clear();
-  _globalChatEngineCache = null;
-  _globalChatEngineFetch = null;
   for (const timer of metadataMovedRefetchTimers.values()) {
     clearTimeout(timer);
   }
@@ -1035,7 +995,10 @@ interface ChatState {
 
   // Session CRUD
   fetchSessions: (workspaceId: string) => Promise<void>;
-  createSession: (workspaceId: string) => Promise<Session | null>;
+  createSession: (
+    workspaceId: string,
+    engine?: ChatEngine,
+  ) => Promise<Session | null>;
   deleteSession: (
     sessionId: string,
     workspaceId: string,
@@ -1067,7 +1030,7 @@ interface ChatState {
     workspaceId: string,
     messageId: string,
   ) => Promise<void>;
-  fetchCommands: (workspaceId: string) => Promise<void>;
+  fetchCommands: (workspaceId: string, engine?: ChatEngine) => Promise<void>;
   summarizeSession: (
     sessionId: string,
     workspaceId: string,
@@ -1198,6 +1161,10 @@ interface ChatState {
   getActiveSessionNotes: () => Record<string, string>;
   getUnifiedSessionNotes: () => Record<string, string>;
 }
+
+// Commands are refetched whenever the open chat switches engine, so only the
+// newest answer may replace the list.
+let latestCommandsRequestId = 0;
 
 function buildProxyUrl(
   path: string,
@@ -1975,28 +1942,34 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      fetchCommands: async (workspaceId) => {
+      fetchCommands: async (workspaceId, engine) => {
+        const requestId = ++latestCommandsRequestId;
         try {
-          const response = await fetch(buildProxyUrl("command", workspaceId));
+          const response = await fetch(
+            buildProxyUrl("command", workspaceId, engine ? { engine } : {}),
+          );
           if (!response.ok) {
             console.warn(`[chat] fetchCommands failed: ${response.status}`);
             return;
           }
 
           const data: Command[] = await response.json();
-          set({ commands: data });
+          if (requestId === latestCommandsRequestId) set({ commands: data });
         } catch (error) {
           console.warn("[chat] fetchCommands error:", error);
         }
       },
 
-      createSession: async (workspaceId) => {
+      createSession: async (workspaceId, engine) => {
         try {
-          const response = await fetch(buildProxyUrl("session", workspaceId), {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({}),
-          });
+          const response = await fetch(
+            buildProxyUrl("session", workspaceId, engine ? { engine } : {}),
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({}),
+            },
+          );
           if (!response.ok) return null;
 
           const session: Session = await response.json();
@@ -2956,7 +2929,9 @@ export const useChatStore = create<ChatState>()(
           if (agent) body.agent = agent;
           if (variant) body.variant = variant;
           const permissionPreset = getOmoPermissionPreset(workspaceId);
-          if (permissionPreset) body.permissionPreset = permissionPreset;
+          if (permissionPreset && engineForSessionId(sessionId) === "omo") {
+            body.permissionPreset = permissionPreset;
+          }
 
           const response = await fetch(
             buildProxyUrl(`session/${sessionId}/prompt_async`, workspaceId),
@@ -3197,7 +3172,9 @@ export const useChatStore = create<ChatState>()(
           if (agent) body.agent = agent;
           if (variant) body.variant = variant;
           const permissionPreset = getOmoPermissionPreset(workspaceId);
-          if (permissionPreset) body.permissionPreset = permissionPreset;
+          if (permissionPreset && engineForSessionId(sessionId) === "omo") {
+            body.permissionPreset = permissionPreset;
+          }
 
           const response = await fetch(
             buildProxyUrl(`session/${sessionId}/command`, workspaceId),
@@ -3478,11 +3455,7 @@ export const useChatStore = create<ChatState>()(
           }
 
           for (const wsId of workspaceIds) {
-            void getWorkspaceEngine(wsId).then((engine) => {
-              if (engine !== "omo") return;
-              if (!isCurrentSource()) return;
-              scheduleOmoIdentitiesReconcile(wsId, get);
-            });
+            scheduleOmoIdentitiesReconcile(wsId, get);
           }
         };
 
@@ -3567,7 +3540,6 @@ export const useChatStore = create<ChatState>()(
       },
 
       resetWorkspace: (workspaceId) => {
-        _workspaceEngineCache.delete(workspaceId);
         const state = get();
         const workspace = state.workspaceStates[workspaceId];
         const sessionIds = new Set<string>([

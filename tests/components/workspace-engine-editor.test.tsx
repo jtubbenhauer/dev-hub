@@ -82,9 +82,6 @@ const fetchMock = vi.fn(
       const body = JSON.parse(String(init?.body)) as { engine: string | null };
       return jsonResponse(workspaceRow(body.engine));
     }
-    if (url.startsWith("/api/sessions/cache?") && method === "DELETE") {
-      return jsonResponse({ deleted: true });
-    }
     return jsonResponse({ error: "unexpected request" }, 404);
   },
 );
@@ -125,6 +122,7 @@ beforeEach(() => {
   server.putStatus = 200;
   fetchMock.mockClear();
   resetWorkspace.mockClear();
+  vi.mocked(toast.success).mockClear();
   vi.mocked(toast.error).mockClear();
   vi.stubGlobal("fetch", fetchMock);
   useChatStore.setState({ resetWorkspace });
@@ -136,27 +134,30 @@ afterEach(() => {
 });
 
 describe("WorkspaceEngineEditor", () => {
-  it("saves an omo override, then purges and resets the workspace", async () => {
+  it("saves an omo default for the workspace's new chats without clearing its chats", async () => {
     const queryClient = renderEditor(workspaceRow(null));
 
     expect(screen.queryByRole("combobox", { name: "Engine" })).toBeNull();
     await chooseEngine("OmO Native (omo)");
 
-    await waitFor(() => expect(resetWorkspace).toHaveBeenCalledWith("ws-1"));
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        "New chats in this workspace default to OmO Native (omo)",
+      ),
+    );
     const [workspacePut] = callsWithMethod("PUT");
     expect(workspacePut.url).toBe("/api/workspaces/ws-1");
     expect(JSON.parse(String(workspacePut.init?.body))).toEqual({
       engine: "omo",
     });
-    expect(callsWithMethod("DELETE").map((call) => call.url)).toEqual([
-      "/api/sessions/cache?workspaceId=ws-1",
-    ]);
+    expect(callsWithMethod("DELETE")).toHaveLength(0);
+    expect(resetWorkspace).not.toHaveBeenCalled();
     expect(
       queryClient.getQueryData<WorkspaceRow[]>(["workspaces"])?.[0]?.engine,
     ).toBe("omo");
   });
 
-  it("offers the inherited default and skips the reset when the effective engine is unchanged", async () => {
+  it("can go back to inheriting the global default", async () => {
     server.defaultEngine = "omo";
     renderEditor(workspaceRow("omo"));
 
@@ -167,13 +168,13 @@ describe("WorkspaceEngineEditor", () => {
       engine: null,
     });
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Engine" })).toBeEnabled(),
+      expect(toast.success).toHaveBeenCalledWith(
+        "New chats in this workspace default to OmO Native (omo)",
+      ),
     );
-    expect(callsWithMethod("DELETE")).toHaveLength(0);
-    expect(resetWorkspace).not.toHaveBeenCalled();
   });
 
-  it("reports a rejected update without resetting the workspace", async () => {
+  it("reports a rejected update", async () => {
     server.putStatus = 400;
     renderEditor(workspaceRow(null));
 
@@ -182,7 +183,6 @@ describe("WorkspaceEngineEditor", () => {
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith("engine rejected"),
     );
-    expect(callsWithMethod("DELETE")).toHaveLength(0);
-    expect(resetWorkspace).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });

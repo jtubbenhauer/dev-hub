@@ -156,7 +156,7 @@ For omo (OmO Native) remote workspaces, dev-hub sends `DEVHUB_AGENT_TOKEN` only 
 
 ### OmO Native engine
 
-Each workspace can use OpenCode (default) or omo. Set it per workspace, or change the global default in Settings. Other optional environment variables:
+Each chat runs on OpenCode or omo, so a workspace can hold chats of both engines and run them at the same time. Pick the engine from the New Chat menu or the empty-chat toggle. The engine setting only sets the default for new chats: change it per workspace on the Workspaces page, or globally in Settings. Existing chats keep the engine they started on. Other optional environment variables:
 
 - `OMO_BIN`: path to the `omo` binary (default: `~/.bun/bin/omo`, then `omo` on PATH)
 - `OMO_CODING_AGENT_DIR`: omo agent directory (default `~/.omo/agent`)

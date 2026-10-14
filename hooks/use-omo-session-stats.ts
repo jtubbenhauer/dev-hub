@@ -1,7 +1,7 @@
 "use client";
 
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { useWorkspaceEngine } from "@/hooks/use-workspace-engine";
+import { engineForSessionId } from "@/lib/engine/types";
 import type { OmoSessionStats } from "@/lib/chat/omo-session-stats";
 import { useChatStore } from "@/stores/chat-store";
 
@@ -23,17 +23,15 @@ export function useOmoSessionStats(
   workspaceId: string | null,
   sessionId: string | null,
 ): OmoSessionStats | null {
-  const { engine } = useWorkspaceEngine(workspaceId);
   const statusType = useChatStore((state) =>
     workspaceId && sessionId
       ? state.workspaceStates[workspaceId]?.sessionStatuses[sessionId]?.type
       : undefined,
   );
   const isEnabled =
-    engine === "omo" &&
     workspaceId !== null &&
     sessionId !== null &&
-    sessionId.startsWith("omo_");
+    engineForSessionId(sessionId) === "omo";
   const isBusy = statusType === "busy" || statusType === "retry";
   const { data } = useQuery({
     // The status is part of the key so a turn finishing refetches at once.

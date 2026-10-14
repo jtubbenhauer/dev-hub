@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useAgents } from "@/components/chat/agent-selector";
+import type { ChatEngine } from "@/lib/engine/types";
 import type { Agent } from "@/lib/opencode/types";
 
 function deferredResponse() {
@@ -73,6 +74,46 @@ describe("useAgents", () => {
 
     expect(result.current.primaryAgents.map((agent) => agent.name)).toEqual([
       "Hephaestus",
+    ]);
+  });
+
+  it("asks for the requested engine's agents and refetches when the engine changes", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ build: makeAgent("build") }), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ "skill:ulw-plan": makeAgent("skill:ulw-plan") }),
+          { status: 200 },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, rerender } = renderHook(
+      ({ engine }: { engine: ChatEngine }) => useAgents("workspace-a", engine),
+      { initialProps: { engine: "opencode" as ChatEngine } },
+    );
+    await waitFor(() => {
+      expect(result.current.primaryAgents.map((agent) => agent.name)).toEqual([
+        "build",
+      ]);
+    });
+
+    rerender({ engine: "omo" });
+    expect(result.current.primaryAgents).toEqual([]);
+
+    await waitFor(() => {
+      expect(result.current.primaryAgents.map((agent) => agent.name)).toEqual([
+        "skill:ulw-plan",
+      ]);
+    });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/opencode/agent?workspaceId=workspace-a&engine=opencode",
+      "/api/opencode/agent?workspaceId=workspace-a&engine=omo",
     ]);
   });
 

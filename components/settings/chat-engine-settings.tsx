@@ -23,50 +23,21 @@ import {
 } from "@/hooks/use-settings";
 import {
   CHAT_ENGINE_LABELS,
-  getWorkspaceEngineOverride,
-  purgeAndResetWorkspaceChats,
   useChatEngineSetting,
 } from "@/hooks/use-chat-engine";
-import {
-  CHAT_ENGINES,
-  isChatEngine,
-  type ChatEngine,
-} from "@/lib/engine/types";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { CHAT_ENGINES, isChatEngine } from "@/lib/engine/types";
 
 export function ChatEngineSettingsCard() {
   const { chatEngine, isLoading } = useChatEngineSetting();
   const mutation = useSettingsMutation();
 
-  const switchDefaultEngine = async (nextEngine: ChatEngine) => {
-    try {
-      await mutation.mutateAsync({
-        key: SETTINGS_KEYS.CHAT_ENGINE,
-        value: nextEngine,
-      });
-    } catch {
-      return;
-    }
-    const inheritingWorkspaceIds = useWorkspaceStore
-      .getState()
-      .workspaces.filter(
-        (workspace) => getWorkspaceEngineOverride(workspace) === null,
-      )
-      .map((workspace) => workspace.id);
-    const failedWorkspaceIds = await purgeAndResetWorkspaceChats(
-      inheritingWorkspaceIds,
-    );
-    toast.success(`Chat engine set to ${CHAT_ENGINE_LABELS[nextEngine]}`);
-    if (failedWorkspaceIds.length > 0) {
-      toast.error(
-        `Could not clear cached chat sessions for ${failedWorkspaceIds.length} workspace(s)`,
-      );
-    }
-  };
-
   const handleEngineChange = (value: string) => {
     if (!isChatEngine(value) || value === chatEngine) return;
-    void switchDefaultEngine(value);
+    const engineLabel = CHAT_ENGINE_LABELS[value];
+    mutation.mutate(
+      { key: SETTINGS_KEYS.CHAT_ENGINE, value },
+      { onSuccess: () => toast.success(`New chats default to ${engineLabel}`) },
+    );
   };
 
   return (
@@ -74,17 +45,16 @@ export function ChatEngineSettingsCard() {
       <CardHeader>
         <CardTitle>Chat Engine</CardTitle>
         <CardDescription>
-          The engine that runs chat sessions. A workspace can override it from
-          the Workspaces page.
+          The engine a new chat starts on when you don&apos;t pick one. A
+          workspace can override it from the Workspaces page.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-0.5">
-            <Label htmlFor="chat-engine">Chat engine</Label>
+            <Label htmlFor="chat-engine">Default engine for new chats</Label>
             <p className="text-muted-foreground text-xs">
-              Switching clears cached chat sessions for workspaces that use the
-              default
+              Existing chats keep the engine they started on
             </p>
           </div>
           <Select

@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useMemo,
+  useDeferredValue,
   createContext,
   useContext,
 } from "react";
@@ -133,10 +134,13 @@ export function FilePickerDialog() {
 
   const { data: files, isLoading } = useWorkspaceFiles(pickerWorkspaceId);
 
+  // Multi-term queries over large repos take a noticeable moment; keep typing
+  // responsive and let the results catch up.
+  const deferredQuery = useDeferredValue(query);
   const results = useMemo(() => {
     if (!files) return [];
-    return fuzzySearch(query, files, 100);
-  }, [query, files]);
+    return fuzzySearch(deferredQuery, files, 100);
+  }, [deferredQuery, files]);
 
   // Reset state when dialog opens (during-render pattern)
   const [prevIsOpen, setPrevIsOpen] = useState(false);

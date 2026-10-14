@@ -74,4 +74,75 @@ describe("fuzzySearch", () => {
     expect(match).toHaveProperty("positions");
     expect(match.positions).toBeInstanceOf(Set);
   });
+
+  describe("ranking and narrowing", () => {
+    // Alphabetical, like `git ls-files`: the weaker matches come first.
+    const migrationPaths = [
+      "apps/api/lib/operations/list-patient-invoices.ts",
+      "libs/ui/resolve-multi-patient-invoices/resolve-multi-patient-invoices.component.ts",
+      "libs/migrations/d4w/destination/entities/patient-invoices.ts",
+      "libs/migrations/exact/destination/entities/patient-invoices-v2.ts",
+      "libs/migrations/exact/destination/entities/patient-invoices.ts",
+      "libs/migrations/exact/source/entities/patient-invoice-lines.ts",
+    ];
+
+    it("ranks files named exactly like the query above paths that only contain it", () => {
+      // When
+      const results = fuzzySearch("patient-invoices", migrationPaths);
+
+      // Then
+      expect(results.slice(0, 3).map((r) => r.path)).toEqual([
+        "libs/migrations/d4w/destination/entities/patient-invoices.ts",
+        "libs/migrations/exact/destination/entities/patient-invoices.ts",
+        "libs/migrations/exact/destination/entities/patient-invoices-v2.ts",
+      ]);
+    });
+
+    it("ranks a file name that starts with the query above one that only contains it", () => {
+      // When
+      const results = fuzzySearch("patient-invoices", migrationPaths);
+
+      // Then
+      const paths = results.map((r) => r.path);
+      expect(
+        paths.indexOf(
+          "libs/migrations/exact/destination/entities/patient-invoices-v2.ts",
+        ),
+      ).toBeLessThan(
+        paths.indexOf("apps/api/lib/operations/list-patient-invoices.ts"),
+      );
+    });
+
+    it("narrows results to paths matching every space-separated term", () => {
+      // When
+      const results = fuzzySearch("exact  patient-invoices", migrationPaths);
+
+      // Then
+      expect(results.map((r) => r.path)).toEqual([
+        "libs/migrations/exact/destination/entities/patient-invoices.ts",
+        "libs/migrations/exact/destination/entities/patient-invoices-v2.ts",
+        // Still a fuzzy match for both terms, so it stays, ranked last.
+        "libs/migrations/exact/source/entities/patient-invoice-lines.ts",
+      ]);
+    });
+
+    it("matches space-separated terms in any order", () => {
+      // When
+      const results = fuzzySearch("patient-invoices exact", migrationPaths);
+
+      // Then
+      expect(results[0]?.path).toBe(
+        "libs/migrations/exact/destination/entities/patient-invoices.ts",
+      );
+    });
+
+    it("treats a whitespace-only query like an empty query", () => {
+      // When
+      const results = fuzzySearch("   ", migrationPaths);
+
+      // Then
+      expect(results.map((r) => r.path)).toEqual(migrationPaths);
+      expect(results.every((r) => r.positions.size === 0)).toBe(true);
+    });
+  });
 });

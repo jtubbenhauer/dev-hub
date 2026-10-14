@@ -7,6 +7,7 @@ import {
   getFileOpenResult,
   type OpenFileResult,
 } from "@/lib/files/tab-state";
+import { resolveTabWorkspaceId } from "@/lib/files/save-request";
 
 let tabInstanceCounter = 0;
 
@@ -51,6 +52,7 @@ interface EditorState extends ReturnType<typeof createFileContentActions> {
   expandPathToFile: (workspaceId: string, filePath: string) => void;
   expandFolder: (workspaceId: string, folderPath: string) => void;
   saveWorkspaceState: (workspaceId: string) => void;
+  releaseOtherWorkspaceTabs: (workspaceId: string) => void;
   getSavedTabs: (workspaceId: string) => SavedTab[];
   getSavedActiveFile: (workspaceId: string) => string | null;
 }
@@ -62,6 +64,10 @@ function getWsState(
   return (
     states[workspaceId] ?? { tabs: [], activeFilePath: null, expandedPaths: [] }
   );
+}
+
+function toSavedTab(file: OpenFile): SavedTab {
+  return { path: file.path, name: file.name, language: file.language };
 }
 
 export const useEditorStore = create<EditorState>()(
@@ -213,21 +219,67 @@ export const useEditorStore = create<EditorState>()(
 
       saveWorkspaceState: (workspaceId) =>
         set((state) => {
-          const tabs: SavedTab[] = state.openFiles.map((f) => ({
-            path: f.path,
-            name: f.name,
-            language: f.language,
-          }));
+          const ownTabs = state.openFiles.filter(
+            (f) => resolveTabWorkspaceId(f, workspaceId) === workspaceId,
+          );
           const existing = getWsState(state.workspaceFileStates, workspaceId);
           return {
             workspaceFileStates: {
               ...state.workspaceFileStates,
               [workspaceId]: {
                 ...existing,
-                tabs,
-                activeFilePath: state.activeFilePath,
+                tabs: ownTabs.map(toSavedTab),
+                activeFilePath: ownTabs.some(
+                  (f) => f.path === state.activeFilePath,
+                )
+                  ? state.activeFilePath
+                  : null,
               },
             },
+          };
+        }),
+
+      // Saves other workspaces' tabs for their owners and closes the clean ones.
+      // Dirty tabs stay open so unsaved edits are never discarded.
+      releaseOtherWorkspaceTabs: (workspaceId) =>
+        set((state) => {
+          const isOwnTab = (file: OpenFile) =>
+            resolveTabWorkspaceId(file, workspaceId) === workspaceId;
+          const foreignTabs = state.openFiles.filter((f) => !isOwnTab(f));
+          if (foreignTabs.length === 0) return state;
+
+          const workspaceFileStates = { ...state.workspaceFileStates };
+          const ownerIds = new Set(
+            foreignTabs.map((f) => resolveTabWorkspaceId(f, workspaceId)),
+          );
+          for (const ownerId of ownerIds) {
+            const ownerTabs = foreignTabs.filter(
+              (f) => f.workspaceId === ownerId,
+            );
+            const existing = getWsState(workspaceFileStates, ownerId);
+            workspaceFileStates[ownerId] = {
+              ...existing,
+              tabs: ownerTabs.map(toSavedTab),
+              activeFilePath: ownerTabs.some(
+                (f) => f.path === state.activeFilePath,
+              )
+                ? state.activeFilePath
+                : existing.activeFilePath,
+            };
+          }
+
+          const openFiles = state.openFiles.filter(
+            (f) => f.isDirty || isOwnTab(f),
+          );
+          const isActiveStillOpen = openFiles.some(
+            (f) => f.path === state.activeFilePath,
+          );
+          return {
+            openFiles,
+            workspaceFileStates,
+            activeFilePath: isActiveStillOpen
+              ? state.activeFilePath
+              : (openFiles.find(isOwnTab)?.path ?? null),
           };
         }),
 

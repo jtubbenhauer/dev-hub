@@ -239,3 +239,104 @@ describe("toggleDiffViewMode / setDiffViewMode", () => {
     expect(useEditorStore.getState().diffViewMode).toBe("unified");
   });
 });
+
+function makeOwnedFile(path: string, workspaceId: string): OpenFile {
+  return { ...makeFile(path), workspaceId };
+}
+
+function resetWorkspaceTabs() {
+  useEditorStore.setState({
+    openFiles: [],
+    activeFilePath: null,
+    workspaceFileStates: {},
+  });
+}
+
+describe("saveWorkspaceState", () => {
+  beforeEach(resetWorkspaceTabs);
+
+  it("saves only the tabs that belong to the workspace", () => {
+    // Given
+    const { openFile } = useEditorStore.getState();
+    openFile(makeOwnedFile("a.ts", "ws-A"));
+    openFile(makeFile("unowned.ts"));
+    openFile(makeOwnedFile("b.ts", "ws-B"));
+
+    // When
+    useEditorStore.getState().saveWorkspaceState("ws-A");
+
+    // Then
+    const saved = useEditorStore.getState().workspaceFileStates["ws-A"];
+    expect(saved.tabs.map((tab) => tab.path)).toEqual(["a.ts", "unowned.ts"]);
+    expect(saved.activeFilePath).toBeNull();
+  });
+});
+
+describe("releaseOtherWorkspaceTabs", () => {
+  beforeEach(resetWorkspaceTabs);
+
+  it("closes clean tabs from other workspaces and saves them for their owner", () => {
+    // Given
+    const { openFile } = useEditorStore.getState();
+    openFile(makeOwnedFile("a1.ts", "ws-A"));
+    openFile(makeOwnedFile("a2.ts", "ws-A"));
+
+    // When
+    useEditorStore.getState().releaseOtherWorkspaceTabs("ws-B");
+
+    // Then
+    const state = useEditorStore.getState();
+    expect(state.openFiles).toEqual([]);
+    expect(state.activeFilePath).toBeNull();
+    expect(state.workspaceFileStates["ws-A"]).toMatchObject({
+      tabs: [
+        { path: "a1.ts", name: "a1.ts", language: "typescript" },
+        { path: "a2.ts", name: "a2.ts", language: "typescript" },
+      ],
+      activeFilePath: "a2.ts",
+    });
+  });
+
+  it("keeps dirty tabs from other workspaces open so edits are not lost", () => {
+    // Given
+    const { openFile, updateFileContent } = useEditorStore.getState();
+    openFile(makeOwnedFile("a1.ts", "ws-A"));
+    openFile(makeOwnedFile("a2.ts", "ws-A"));
+    updateFileContent("a1.ts", "unsaved edit");
+
+    // When
+    useEditorStore.getState().releaseOtherWorkspaceTabs("ws-B");
+
+    // Then
+    const state = useEditorStore.getState();
+    expect(state.openFiles.map((file) => file.path)).toEqual(["a1.ts"]);
+    expect(state.openFiles[0].content).toBe("unsaved edit");
+  });
+
+  it("activates one of the workspace's own tabs when the active tab is released", () => {
+    // Given
+    const { openFile } = useEditorStore.getState();
+    openFile(makeOwnedFile("b1.ts", "ws-B"));
+    openFile(makeOwnedFile("a1.ts", "ws-A"));
+
+    // When
+    useEditorStore.getState().releaseOtherWorkspaceTabs("ws-B");
+
+    // Then
+    const state = useEditorStore.getState();
+    expect(state.openFiles.map((file) => file.path)).toEqual(["b1.ts"]);
+    expect(state.activeFilePath).toBe("b1.ts");
+  });
+
+  it("leaves the store untouched when every tab belongs to the workspace", () => {
+    // Given
+    useEditorStore.getState().openFile(makeOwnedFile("b1.ts", "ws-B"));
+    const before = useEditorStore.getState();
+
+    // When
+    useEditorStore.getState().releaseOtherWorkspaceTabs("ws-B");
+
+    // Then
+    expect(useEditorStore.getState()).toBe(before);
+  });
+});

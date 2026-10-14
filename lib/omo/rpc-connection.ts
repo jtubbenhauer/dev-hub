@@ -11,6 +11,11 @@ import {
   recordString,
   type OmoRequestOptions,
 } from "@/lib/omo/rpc-protocol";
+import {
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  OmoRequestDeadline,
+  type OmoCompactionTracker,
+} from "@/lib/omo/rpc-request-deadline";
 import type { OmoPreBindBuffer } from "@/lib/omo/rpc-session-buffer";
 
 export type OmoPendingRequest = {
@@ -19,7 +24,7 @@ export type OmoPendingRequest = {
   readonly onResponse?: (response: JsonlRecord) => void;
   readonly command: string;
   readonly isInternal: boolean;
-  readonly timer: NodeJS.Timeout;
+  readonly deadline: OmoRequestDeadline;
 };
 
 type BindOmoSocketOptions = {
@@ -35,6 +40,7 @@ type SendOmoRequestOptions = {
   readonly requestOptions?: OmoRequestOptions;
   readonly isInternal: boolean;
   readonly pendingRequests: Map<string, OmoPendingRequest>;
+  readonly compactions: OmoCompactionTracker;
 };
 
 type RouteOmoRecordOptions = {
@@ -63,25 +69,37 @@ export function bindOmoSocket(options: BindOmoSocketOptions): void {
 export function sendOmoRequest(
   request: SendOmoRequestOptions,
 ): Promise<JsonlRecord> {
-  const { socket, id, record, requestOptions, isInternal, pendingRequests } =
-    request;
+  const {
+    socket,
+    id,
+    record,
+    requestOptions,
+    isInternal,
+    pendingRequests,
+    compactions,
+  } = request;
   if (socket === undefined || socket.destroyed) {
     return Promise.reject(new OmoTransportGoneError());
   }
 
   const command = recordString(record, "type") ?? "unknown";
-  const timeoutMs = requestOptions?.timeoutMs ?? 30_000;
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pendingRequests.delete(id);
-      reject(new Error("Timed out waiting for OmO response"));
-    }, timeoutMs);
+    const deadline = new OmoRequestDeadline({
+      command,
+      sessionId: recordString(record, "sessionId"),
+      timeoutMs: requestOptions?.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+      compactions,
+      onExpire: () => {
+        pendingRequests.delete(id);
+        reject(new Error("Timed out waiting for OmO response"));
+      },
+    });
     pendingRequests.set(id, {
       resolve,
       reject,
       command,
       isInternal,
-      timer,
+      deadline,
       ...(requestOptions?.onResponse
         ? { onResponse: requestOptions.onResponse }
         : {}),
@@ -104,7 +122,7 @@ export function rejectPendingOmoRequests(
   pendingRequests: Map<string, OmoPendingRequest>,
 ): void {
   for (const pending of pendingRequests.values()) {
-    clearTimeout(pending.timer);
+    pending.deadline.clear();
     pending.reject(new OmoTransportGoneError());
   }
   pendingRequests.clear();
@@ -120,11 +138,19 @@ export function routeOmoRecord(options: RouteOmoRecordOptions): boolean {
   } = options;
   const type = recordString(record, "type");
   const isHostSuperseded = type === "host_superseded";
+  if (type === "queued") {
+    // The host's receipt for a request, addressed by for_request, not id.
+    const requestId = recordString(record, "for_request");
+    if (requestId !== undefined) {
+      pendingRequests.get(requestId)?.deadline.acknowledge();
+    }
+    return false;
+  }
   const id = recordString(record, "id");
   if (type === "response" && id !== undefined) {
     const pending = pendingRequests.get(id);
     if (pending !== undefined) {
-      clearTimeout(pending.timer);
+      pending.deadline.clear();
       pendingRequests.delete(id);
       if (!pending.isInternal) onExternalResponse();
       if (record["success"] === false) {

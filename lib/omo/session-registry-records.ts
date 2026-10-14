@@ -145,6 +145,7 @@ export function adapterSeedForReplay(
     ...(lastUserMessageID ? { lastUserMessageID } : {}),
     ...(lastKnownModel ? { lastKnownModel } : {}),
     ...(lastKnownProvider ? { lastKnownProvider } : {}),
+    ...(opened.isStreaming ? { isStreaming: true } : {}),
   };
 }
 

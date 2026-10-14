@@ -64,27 +64,33 @@ describe("handleOmoWrite retry and engine errors", () => {
     expect(fixture.registry.attach).toHaveBeenCalledTimes(2);
   });
 
-  it("returns Retry-After when an open reaches a draining host", async () => {
-    // Given
-    const fixture = await useWriteFixture();
-    fixture.source.authorized.add("root");
-    fixture.registry.attach.mockRejectedValue(
-      namedWriteError("OmoCommandError", {
-        error: "draining",
-        errorCode: "host_draining",
-      }),
-    );
+  it.each(["host_draining", "host_stopping"])(
+    "returns Retry-After when an open is refused with %s",
+    async (errorCode) => {
+      // Given
+      const fixture = await useWriteFixture();
+      fixture.source.authorized.add("root");
+      fixture.registry.attach.mockRejectedValue(
+        namedWriteError("OmoCommandError", {
+          error: errorCode,
+          errorCode,
+          errorData: { instanceId: "generation-1" },
+        }),
+      );
 
-    // When
-    const response = await fixture.request("/session/omo_root/prompt_async", {
-      body: BODY,
-    });
+      // When
+      const response = await fixture.request("/session/omo_root/prompt_async", {
+        body: BODY,
+      });
 
-    // Then
-    expect(response.status).toBe(503);
-    expect(response.headers.get("Retry-After")).toBe("2");
-    expect(await writeJson(response)).toEqual({ error: "engine_unavailable" });
-  });
+      // Then
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Retry-After")).toBe("2");
+      expect(await writeJson(response)).toEqual({
+        error: "engine_unavailable",
+      });
+    },
+  );
 
   it("returns engine_unavailable for POST /session when the socket is missing", async () => {
     // Given

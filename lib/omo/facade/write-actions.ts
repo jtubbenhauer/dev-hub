@@ -5,6 +5,7 @@ import {
   questionAnswers,
   requiredString,
 } from "@/lib/omo/facade/write-body";
+import { sendWithAcceptanceWindow } from "@/lib/omo/facade/write-prompt";
 import type { OmoWriteContext } from "@/lib/omo/facade/write-types";
 import {
   invalidRequestResponse,
@@ -54,11 +55,10 @@ export async function commandOmoSession(
     return invalidRequestResponse();
   }
   const binding = await attachOmoWriteSession(context, rawId);
-  await context.runtime.registry.request(binding, {
+  return sendWithAcceptanceWindow(context, binding, {
     type: "prompt",
     message: `/${command}${argumentsValue === null ? "" : ` ${argumentsValue}`}`,
   });
-  return noContentResponse();
 }
 
 export async function summarizeOmoSession(
@@ -66,8 +66,7 @@ export async function summarizeOmoSession(
   rawId: string,
 ): Promise<Response> {
   const binding = await attachOmoWriteSession(context, rawId);
-  await context.runtime.registry.request(binding, { type: "compact" });
-  return noContentResponse();
+  return sendWithAcceptanceWindow(context, binding, { type: "compact" });
 }
 
 export async function forkOmoSession(

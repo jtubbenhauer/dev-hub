@@ -103,6 +103,26 @@ describe("handleOmoRead errors and health", () => {
     expect(fixture.registry.attach).not.toHaveBeenCalled();
   });
 
+  it("returns Retry-After when opening a session reaches a stopping host", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    const { OmoCommandError } = await import("@/lib/omo/errors");
+    fixture.source.authorized.add("busy");
+    fixture.registry.attach.mockRejectedValue(
+      new OmoCommandError("open_session", "host_stopping", "host_stopping", {
+        instanceId: "generation-1",
+      }),
+    );
+
+    // When
+    const response = await fixture.request("/session/omo_busy/message");
+
+    // Then
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("2");
+    expect(await readJson(response)).toEqual({ error: "engine_unavailable" });
+  });
+
   it("always returns an empty permission list", async () => {
     // Given
     const fixture = await useReadFixture();

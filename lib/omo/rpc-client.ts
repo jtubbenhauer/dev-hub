@@ -20,6 +20,7 @@ import {
   type OmoRequestOptions,
   type OmoSessionBoundListener,
 } from "@/lib/omo/rpc-protocol";
+import { OmoCompactionTracker } from "@/lib/omo/rpc-request-deadline";
 import { OmoSessionOpener } from "@/lib/omo/rpc-session-open";
 import type { Transport } from "@/lib/omo/rpc-transport";
 
@@ -35,6 +36,7 @@ export class OmoRpcClient {
   private pendingRequests = new Map<string, OmoPendingRequest>();
   private readonly listeners = new OmoRpcListeners();
   private readonly sessionOpener = new OmoSessionOpener();
+  private readonly compactions = new OmoCompactionTracker();
   private readonly intentionallyClosedSockets = new WeakSet<Duplex>();
   private readonly handledSockets = new WeakSet<Duplex>();
   private readonly lifecycle: OmoRpcLifecycle;
@@ -138,7 +140,7 @@ export class OmoRpcClient {
       socket.destroy();
     }
     for (const pending of this.pendingRequests.values()) {
-      clearTimeout(pending.timer);
+      pending.deadline.clear();
     }
     this.pendingRequests.clear();
     this.listeners.clear();
@@ -179,6 +181,7 @@ export class OmoRpcClient {
     try {
       socket = await this.transport.connect();
       if (this.lifecycle.isClosed) throw new OmoTransportGoneError();
+      this.compactions.clear();
       this.socket = socket;
       this.attachSocket(socket);
       await this.sendRequest(
@@ -233,6 +236,7 @@ export class OmoRpcClient {
       ...(options ? { requestOptions: options } : {}),
       isInternal,
       pendingRequests: this.pendingRequests,
+      compactions: this.compactions,
     });
   }
 
@@ -276,6 +280,13 @@ export class OmoRpcClient {
   }
 
   private handleRecord(record: JsonlRecord): void {
+    const changedSessionId =
+      this.compactions.sessionWithChangedCompaction(record);
+    if (changedSessionId !== undefined) {
+      for (const pending of this.pendingRequests.values()) {
+        pending.deadline.compactionChanged(changedSessionId);
+      }
+    }
     const isHostSuperseded = routeOmoRecord({
       record,
       pendingRequests: this.pendingRequests,

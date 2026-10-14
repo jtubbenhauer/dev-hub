@@ -40,16 +40,53 @@ function retryAfterSeconds(errorData: unknown): string {
   );
 }
 
-function commandErrorResponse(error: Error): Response | null {
-  if (
-    !(error instanceof OmoCommandError) &&
-    !isNamedError(error, "OmoCommandError")
-  ) {
-    return null;
+function isCommandError(error: unknown): error is Error {
+  return (
+    error instanceof OmoCommandError || isNamedError(error, "OmoCommandError")
+  );
+}
+
+function unknownCommandMessage(errorData: unknown): string | undefined {
+  if (!isJsonObject(errorData) || typeof errorData["command"] !== "string") {
+    return undefined;
   }
+  const command = errorData["command"];
+  if (errorData["reason"] === "interactive_only") {
+    return `/${command} only works in the omo terminal. The message wasn't sent.`;
+  }
+  const rawSuggestions = errorData["suggestions"];
+  const suggestions = Array.isArray(rawSuggestions)
+    ? rawSuggestions.filter(
+        (suggestion): suggestion is string => typeof suggestion === "string",
+      )
+    : [];
+  const didYouMean =
+    suggestions.length === 0
+      ? ""
+      : ` Did you mean ${suggestions.map((name) => `/${name}`).join(", ")}?`;
+  return `Unknown command /${command}.${didYouMean} The message wasn't sent.`;
+}
+
+function commandFailureMessage(error: Error): string {
+  const record = errorRecord(error);
+  if (record["errorCode"] === "unknown_command") {
+    const message = unknownCommandMessage(record["errorData"]);
+    if (message !== undefined) return message;
+  }
+  const message = record["error"];
+  return typeof message === "string" ? message : error.message;
+}
+
+export function lateOmoFailureMessage(error: unknown): string {
+  if (isCommandError(error)) return commandFailureMessage(error);
+  return "omo didn't confirm the request in time. It may still go through, so check the session before you try again.";
+}
+
+function commandErrorResponse(error: Error): Response | null {
+  if (!isCommandError(error)) return null;
   const record = errorRecord(error);
   const errorCode = record["errorCode"];
-  if (errorCode === "host_draining") {
+  if (errorCode === "host_draining" || errorCode === "host_stopping") {
     return jsonResponse(
       { error: "engine_unavailable" },
       { status: 503, headers: { "Retry-After": "2" } },
@@ -66,10 +103,9 @@ function commandErrorResponse(error: Error): Response | null {
       },
     );
   }
-  const message = record["error"];
   return jsonResponse(
     {
-      error: typeof message === "string" ? message : error.message,
+      error: commandFailureMessage(error),
       ...(typeof errorCode === "string" ? { errorCode } : {}),
     },
     { status: 422 },

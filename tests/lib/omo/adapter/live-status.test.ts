@@ -157,6 +157,75 @@ describe("createLiveAdapter status events", () => {
     expect(result).toEqual({ events: [], effects: [] });
   });
 
+  it("shows a compaction outside a turn as busy, then idle when it ends", () => {
+    const adapter = createLiveAdapter(OPTIONS);
+
+    const started = adapter.handle({
+      type: "compaction_start",
+      reason: "manual",
+      requestId: "compaction-1",
+    });
+    const ended = adapter.handle({
+      type: "compaction_end",
+      reason: "manual",
+      requestId: "compaction-1",
+      result: { summary: "Summary", tokensBefore: 10 },
+      aborted: false,
+      willRetry: false,
+    });
+
+    expect(started.events).toEqual([
+      {
+        type: "session.status",
+        properties: { sessionID: OPTIONS.sessionId, status: { type: "busy" } },
+      },
+    ]);
+    expect(ended.events).toEqual([
+      {
+        type: "session.status",
+        properties: { sessionID: OPTIONS.sessionId, status: { type: "idle" } },
+      },
+      {
+        type: "session.compacted",
+        properties: { sessionID: OPTIONS.sessionId },
+      },
+    ]);
+  });
+
+  it("keeps a running turn busy when a compaction inside it ends", () => {
+    const adapter = createLiveAdapter(OPTIONS);
+    adapter.handle({ type: "agent_start" });
+    adapter.handle({ type: "compaction_start", reason: "overflow" });
+
+    const ended = adapter.handle({
+      type: "compaction_end",
+      reason: "overflow",
+      result: { summary: "Summary" },
+      aborted: false,
+      willRetry: true,
+    });
+
+    expect(ended.events.map((event) => event.type)).toEqual([
+      "session.compacted",
+    ]);
+  });
+
+  it("treats a session that was streaming when attached as a running turn", () => {
+    const adapter = createLiveAdapter(OPTIONS);
+    adapter.seed({ isStreaming: true });
+    adapter.handle({ type: "compaction_start", reason: "threshold" });
+
+    const ended = adapter.handle({
+      type: "compaction_end",
+      reason: "threshold",
+      result: null,
+      aborted: true,
+      willRetry: false,
+    });
+
+    expect(ended.events).toEqual([]);
+  });
+
   it("maps a successful set_session_name response to a complete session", () => {
     const result = createLiveAdapter(OPTIONS).handle({
       type: "response",

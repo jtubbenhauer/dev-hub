@@ -79,7 +79,10 @@ function commandErrorResponse(error: OmoCommandError): Response | null {
       },
     );
   }
-  if (error.errorCode === "host_draining") {
+  if (
+    error.errorCode === "host_draining" ||
+    error.errorCode === "host_stopping"
+  ) {
     return jsonResponse(
       { error: "engine_unavailable" },
       { status: 503, headers: { "Retry-After": "2" } },

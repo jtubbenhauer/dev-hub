@@ -36,6 +36,7 @@ export interface LiveAdapterSeed {
   readonly lastUserMessageID?: string;
   readonly lastKnownModel?: string;
   readonly lastKnownProvider?: string;
+  readonly isStreaming?: boolean;
 }
 
 export interface LiveAdapterOptions {

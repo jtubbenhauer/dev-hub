@@ -92,7 +92,11 @@ function isRetryableProbeOpen(error: unknown): boolean {
       : isInternalRecord(error) && typeof error["errorCode"] === "string"
         ? error["errorCode"]
         : undefined;
-  return errorCode === "host_draining" || errorCode === "host_memory_pressure";
+  return (
+    errorCode === "host_draining" ||
+    errorCode === "host_stopping" ||
+    errorCode === "host_memory_pressure"
+  );
 }
 
 async function requestThinkingLevels(

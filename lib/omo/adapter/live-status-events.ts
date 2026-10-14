@@ -9,10 +9,12 @@ import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { Event } from "@/lib/opencode/types";
 
 export interface LiveStatusEventHandlers {
+  readonly seedRunState: (isRunActive: boolean) => void;
   readonly handleAgentStart: () => LiveAdapterResult;
   readonly handleAgentSettled: () => LiveAdapterResult;
   readonly handleRetryStart: (record: JsonlRecord) => LiveAdapterResult;
   readonly handleRetryEnd: (record: JsonlRecord) => LiveAdapterResult;
+  readonly handleCompactionStart: (record: JsonlRecord) => LiveAdapterResult;
   readonly handleCompactionEnd: (record: JsonlRecord) => LiveAdapterResult;
   readonly handleModelChanged: (record: JsonlRecord) => LiveAdapterResult;
   readonly handleSetSessionNameResponse: (
@@ -51,21 +53,37 @@ function rawSessionId(sessionId: string): string {
     : sessionId;
 }
 
+function compactionOperationKey(record: JsonlRecord): string {
+  return typeof record.requestId === "string" ? record.requestId : "";
+}
+
 export function createLiveStatusEventHandlers(
   options: LiveAdapterOptions,
   updateModel: (modelID: string, providerID: string) => void,
 ): LiveStatusEventHandlers {
-  const handleAgentStart = (): LiveAdapterResult =>
-    resultWithEvents([statusEvent(options.sessionId, { type: "busy" })]);
+  let isRunActive = false;
+  const compactionsInProgress = new Set<string>();
 
-  const handleAgentSettled = (): LiveAdapterResult =>
-    resultWithEvents([
+  const seedRunState = (runActive: boolean): void => {
+    isRunActive = runActive;
+  };
+
+  const handleAgentStart = (): LiveAdapterResult => {
+    isRunActive = true;
+    return resultWithEvents([statusEvent(options.sessionId, { type: "busy" })]);
+  };
+
+  const handleAgentSettled = (): LiveAdapterResult => {
+    isRunActive = false;
+    compactionsInProgress.clear();
+    return resultWithEvents([
       statusEvent(options.sessionId, { type: "idle" }),
       {
         type: "session.idle",
         properties: { sessionID: options.sessionId },
       },
     ]);
+  };
 
   const handleRetryStart = (record: JsonlRecord): LiveAdapterResult => {
     if (
@@ -107,12 +125,30 @@ export function createLiveStatusEventHandlers(
     ]);
   };
 
+  // Compaction can run with no agent run around it (a manual compact, or
+  // before a prompt is accepted), so it reports its own busy and idle.
+  const handleCompactionStart = (record: JsonlRecord): LiveAdapterResult => {
+    compactionsInProgress.add(compactionOperationKey(record));
+    return resultWithEvents([statusEvent(options.sessionId, { type: "busy" })]);
+  };
+
   const handleCompactionEnd = (record: JsonlRecord): LiveAdapterResult => {
-    if (record.aborted === true || typeof record.errorMessage === "string") {
-      return emptyResult();
+    const wasTracked = compactionsInProgress.delete(
+      compactionOperationKey(record),
+    );
+    const settledEvents =
+      wasTracked && compactionsInProgress.size === 0 && !isRunActive
+        ? [statusEvent(options.sessionId, { type: "idle" })]
+        : [];
+    if (
+      record.aborted === true ||
+      typeof record.errorMessage === "string" ||
+      !isRecord(record.result)
+    ) {
+      return resultWithEvents(settledEvents);
     }
-    if (!isRecord(record.result)) return emptyResult();
     return resultWithEvents([
+      ...settledEvents,
       {
         type: "session.compacted",
         properties: { sessionID: options.sessionId },
@@ -151,10 +187,12 @@ export function createLiveStatusEventHandlers(
   };
 
   return {
+    seedRunState,
     handleAgentStart,
     handleAgentSettled,
     handleRetryStart,
     handleRetryEnd,
+    handleCompactionStart,
     handleCompactionEnd,
     handleModelChanged,
     handleSetSessionNameResponse,

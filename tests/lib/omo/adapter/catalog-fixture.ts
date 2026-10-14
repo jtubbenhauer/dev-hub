@@ -14,7 +14,7 @@ type CatalogFixtureOptions = {
   readonly omitSessionFile?: boolean;
   readonly selectedModel?: { readonly provider: string; readonly id: string };
   readonly openError?: {
-    readonly code: "host_draining" | "host_memory_pressure";
+    readonly code: "host_draining" | "host_stopping" | "host_memory_pressure";
     readonly retryAfterMs: number;
   };
   readonly commands?: readonly JsonlRecord[];

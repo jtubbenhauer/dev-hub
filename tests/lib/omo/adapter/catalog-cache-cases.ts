@@ -74,26 +74,29 @@ describe("getCatalog cache and open coordination", () => {
     expect(recordsOfType(fixture, "open_session")).toHaveLength(2);
   });
 
-  it("returns stale data when a warm refresh hits host memory pressure", async () => {
-    fixture = await createRegistryFixture([
-      ...(await catalogFixtures()),
-      ...(await catalogFixtures({
-        openError: { code: "host_memory_pressure", retryAfterMs: 2750 },
-      })),
-    ]);
-    const { source } = createStubSessionSource(fixture.workspacePath);
-    const warm = await getCatalog(
-      fixture.runtime,
-      fixture.workspacePath,
-      source,
-    );
-    const expiredTime = Date.now() + 300_001;
-    vi.spyOn(Date, "now").mockReturnValue(expiredTime);
+  it.each(["host_memory_pressure", "host_draining", "host_stopping"] as const)(
+    "returns stale data when a warm refresh is refused with %s",
+    async (code) => {
+      fixture = await createRegistryFixture([
+        ...(await catalogFixtures()),
+        ...(await catalogFixtures({
+          openError: { code, retryAfterMs: 2750 },
+        })),
+      ]);
+      const { source } = createStubSessionSource(fixture.workspacePath);
+      const warm = await getCatalog(
+        fixture.runtime,
+        fixture.workspacePath,
+        source,
+      );
+      const expiredTime = Date.now() + 300_001;
+      vi.spyOn(Date, "now").mockReturnValue(expiredTime);
 
-    await expect(
-      getCatalog(fixture.runtime, fixture.workspacePath, source),
-    ).resolves.toBe(warm);
-  });
+      await expect(
+        getCatalog(fixture.runtime, fixture.workspacePath, source),
+      ).resolves.toBe(warm);
+    },
+  );
 
   it("surfaces retry metadata when a cold probe hits memory pressure", async () => {
     fixture = await createRegistryFixture(

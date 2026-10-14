@@ -213,6 +213,7 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
       lastUserMessageID = state.lastUserMessageID;
       lastKnownModel = state.lastKnownModel ?? "";
       lastKnownProvider = state.lastKnownProvider ?? "";
+      statusHandlers.seedRunState(state.isStreaming === true);
     },
     handle(record): LiveAdapterResult {
       if (record.type === "response" && record.command === "set_session_name") {
@@ -250,6 +251,8 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
           return statusHandlers.handleRetryStart(record);
         case "auto_retry_end":
           return statusHandlers.handleRetryEnd(record);
+        case "compaction_start":
+          return statusHandlers.handleCompactionStart(record);
         case "compaction_end":
           return statusHandlers.handleCompactionEnd(record);
         case "model_changed":

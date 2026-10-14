@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, getIsMac } from "@/lib/utils";
 import { File, Folder, Search, Loader2 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -61,6 +61,23 @@ export function FilePickerProvider({
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
   const toggle = useCallback(() => setIsOpen((v) => !v), []);
+
+  // Cmd+P (Ctrl+P elsewhere) opens the picker instead of the print dialog.
+  useEffect(() => {
+    const isMac = getIsMac();
+    function handleKeyDown(e: KeyboardEvent) {
+      const hasPrimaryModifier = isMac
+        ? e.metaKey && !e.ctrlKey
+        : e.ctrlKey && !e.metaKey;
+      if (!hasPrimaryModifier || e.altKey || e.shiftKey) return;
+      if (e.key !== "p" && e.key !== "P") return;
+      e.preventDefault();
+      open();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
 
   return (
     <FilePickerContext.Provider value={{ isOpen, open, close, toggle }}>

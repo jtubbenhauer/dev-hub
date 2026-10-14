@@ -43,11 +43,19 @@ const mocks = vi.hoisted(() => ({
       });
     }
   }),
+  addKeybindingRule: vi.fn(() => {
+    mocks.order.push("addKeybindingRule");
+  }),
 }));
 
 vi.mock("monaco-editor", () => {
   mocks.order.push("monaco-editor");
-  return { editor: { createModel: mocks.createModel } };
+  return {
+    editor: {
+      createModel: mocks.createModel,
+      addKeybindingRule: mocks.addKeybindingRule,
+    },
+  };
 });
 vi.mock("@/lib/lsp/client/builtin-typescript", () => {
   mocks.order.push("builtin-typescript");
@@ -176,11 +184,20 @@ describe("Monaco bootstrap in jsdom", () => {
     expect(mocks.config).not.toHaveBeenCalled();
     expect(mocks.createModel).not.toHaveBeenCalled();
     expect(window.__devhubMonaco).toBeUndefined();
+    expect(mocks.addKeybindingRule).not.toHaveBeenCalled();
     mocks.startGate.resolve();
     const monaco = await first;
     expect(await second).toBe(monaco);
     expect(await react).toBe(await import("@monaco-editor/react"));
     expect(window.__devhubMonaco).toBe(monaco);
+    // Cmd+P must reach dev-hub's file picker, not VS Code's file-less quick open.
+    expect(mocks.addKeybindingRule).toHaveBeenCalledExactlyOnceWith({
+      keybinding: 0,
+      command: "-workbench.action.quickOpen",
+    });
+    expect(mocks.order.indexOf("started")).toBeLessThan(
+      mocks.order.indexOf("addKeybindingRule"),
+    );
     expect(mocks.wrapper).toHaveBeenCalledOnce();
     expect(mocks.workersReady).toHaveBeenCalledExactlyOnceWith(true);
     expect(mocks.descriptors).not.toHaveBeenCalled();

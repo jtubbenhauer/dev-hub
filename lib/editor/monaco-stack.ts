@@ -36,6 +36,12 @@ export async function initializeMonacoStack() {
     monacoWorkerFactory: configureClassicWorkerFactory,
     serviceOverrides: getLanguagesServiceOverride(),
   }).start();
+  // VS Code's quick open has no file provider here; Cmd+P belongs to dev-hub's
+  // file picker. Keybinding 0 removes every default chord for the command.
+  monaco.editor.addKeybindingRule({
+    keybinding: 0,
+    command: "-workbench.action.quickOpen",
+  });
   for (const defaults of [typescriptDefaults, javascriptDefaults]) {
     defaults.setModeConfiguration({
       ...defaults.modeConfiguration,

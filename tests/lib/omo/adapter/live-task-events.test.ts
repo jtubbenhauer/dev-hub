@@ -155,6 +155,7 @@ describe("createLiveTaskEventHandler when omo omits child_session_id", () => {
           title: "Read math.ts",
           category: "deep-low",
           updatedMs: 2_000,
+          isActive: true,
         },
       },
     ]);
@@ -278,5 +279,25 @@ describe("live adapter after the assistant entry is persisted", () => {
     });
 
     expect(updatedToolParts([started])[0]?.messageID).toBe("omo_assistant-2");
+  });
+});
+
+describe("createLiveTaskEventHandler task status", () => {
+  it("marks a finished task inactive so its worker shows idle", () => {
+    const adapter = createLiveAdapter(OPTIONS);
+
+    const result = adapter.handle({
+      type: "extension_event",
+      name: "omo.task.updated",
+      data: {
+        parent_session_id: "parent-1",
+        tasks: [{ task_id: "st_done", status: "completed" }],
+      },
+      timestamp: 3_000,
+    });
+
+    expect(result.effects).toMatchObject([
+      { linkTaskChild: { taskId: "st_done", isActive: false } },
+    ]);
   });
 });

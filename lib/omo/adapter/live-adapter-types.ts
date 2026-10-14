@@ -28,6 +28,7 @@ export type Effect =
         readonly agent?: string;
         readonly category?: string;
         readonly updatedMs: number;
+        readonly isActive: boolean;
       };
     };
 

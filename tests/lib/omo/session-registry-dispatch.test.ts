@@ -195,7 +195,7 @@ describe("OmoRegistryDispatcher", () => {
     expect(errorLog).toHaveBeenCalled();
   });
 
-  it("links a task worker to its parent through context.task_id once", async () => {
+  it("links a task worker once and reports its status on every task update", async () => {
     sqlite
       .prepare(
         `INSERT INTO omo_session_index
@@ -212,21 +212,26 @@ describe("OmoRegistryDispatcher", () => {
     });
     const events: unknown[] = [];
     dispatcher.subscribe(WORKSPACE.id, (event) => events.push(event));
-    const link = {
-      linkTaskChild: {
-        parentDurableId: "parent-1",
-        taskId: "st_task-1",
-        title: "Read math.ts",
-        updatedMs: 20,
-      },
-    };
+    let isActive = true;
     const { binding } = createTestBinding("parent-1", () => ({
       events: [],
-      effects: [link],
+      effects: [
+        {
+          linkTaskChild: {
+            parentDurableId: "parent-1",
+            taskId: "st_task-1",
+            title: "Read math.ts",
+            updatedMs: 20,
+            isActive,
+          },
+        },
+      ],
     }));
 
     dispatcher.dispatch(binding, { type: "extension_event", name: "x" });
     await binding.effectTail;
+    const whileRunning = dispatcher.sessionStatusesForWorkspace(WORKSPACE.id);
+    isActive = false;
     dispatcher.dispatch(binding, { type: "extension_event", name: "x" });
     await binding.effectTail;
 
@@ -240,12 +245,24 @@ describe("OmoRegistryDispatcher", () => {
       title: "Read math.ts",
     });
     expect(refreshIndex).toHaveBeenCalledOnce();
+    expect(whileRunning).toEqual({ "omo_worker-1": { type: "busy" } });
+    expect(dispatcher.sessionStatusesForWorkspace(WORKSPACE.id)).toEqual({
+      "omo_worker-1": { type: "idle" },
+    });
     expect(events).toMatchObject([
       {
         type: "session.updated",
         properties: {
           info: { id: "omo_worker-1", parentID: "omo_parent-1" },
         },
+      },
+      {
+        type: "session.status",
+        properties: { sessionID: "omo_worker-1", status: { type: "busy" } },
+      },
+      {
+        type: "session.status",
+        properties: { sessionID: "omo_worker-1", status: { type: "idle" } },
       },
     ]);
   });

@@ -67,6 +67,8 @@ function toolPartMatchesTask(part: ToolPart, taskId: string): boolean {
   return typeof output === "string" && output.includes(taskId);
 }
 
+const ACTIVE_TASK_STATUSES = new Set(["pending", "queued", "running"]);
+
 const TASK_ID_IN_OUTPUT = /\[task_id: ([^\s\]]+)/g;
 
 export function taskIdsFromToolPart(part: ToolPart): string[] {
@@ -171,6 +173,7 @@ export function createLiveTaskEventHandler(
               ...(agent === undefined ? {} : { agent }),
               ...(category === undefined ? {} : { category }),
               updatedMs: now,
+              isActive: ACTIVE_TASK_STATUSES.has(String(task.status)),
             },
           });
         }

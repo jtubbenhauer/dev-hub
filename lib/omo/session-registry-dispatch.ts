@@ -35,12 +35,27 @@ type TaskChildLink = LinkTaskChildEffect["linkTaskChild"];
 
 const MAX_LINKED_TASKS = 1_000;
 
+// Workers run out of process, so their busy/idle state comes from omo task
+// events rather than from a session dev-hub is attached to.
+function workerStatusEvent(
+  workerDurableId: string,
+  isActive: boolean,
+): OmoRegistryEvent {
+  return {
+    type: "session.status",
+    properties: {
+      sessionID: `omo_${workerDurableId}`,
+      status: { type: isActive ? "busy" : "idle" },
+    },
+  };
+}
+
 export class OmoRegistryDispatcher {
   readonly leafQueue = new Map<string, Promise<void>>();
   private readonly client: OmoRpcClient;
   private readonly refreshIndex: OmoRegistryDispatcherOptions["refreshIndex"];
   private readonly sinks = new Map<string, Set<OmoRegistryEventSink>>();
-  private readonly linkedTasks = new Set<string>();
+  private readonly linkedTaskWorkers = new Map<string, string>();
   // Per-session latest status only (busy/idle/retry) — bounded by session
   // count, unlike the unbounded event log this replaced.
   private readonly sessionStatuses = new Map<
@@ -169,9 +184,21 @@ export class OmoRegistryDispatcher {
 
   private linkTaskChild(binding: OmoSessionBinding, link: TaskChildLink): void {
     const key = `${binding.workspaceId}:${link.taskId}`;
-    if (this.linkedTasks.has(key)) return;
+    const knownWorkerId = this.linkedTaskWorkers.get(key);
+    if (knownWorkerId !== undefined) {
+      this.emit(binding.workspaceId, [
+        workerStatusEvent(knownWorkerId, link.isActive),
+      ]);
+      return;
+    }
     binding.effectTail = this.continueEffectTail(binding, async () => {
-      if (this.linkedTasks.has(key)) return;
+      const linkedWorkerId = this.linkedTaskWorkers.get(key);
+      if (linkedWorkerId !== undefined) {
+        this.emit(binding.workspaceId, [
+          workerStatusEvent(linkedWorkerId, link.isActive),
+        ]);
+        return;
+      }
       await this.refreshIndex(binding.workspace);
       const worker = await findOmoWorkerByTaskId(
         binding.workspaceId,
@@ -188,7 +215,7 @@ export class OmoRegistryDispatcher {
           updatedMs: link.updatedMs,
         },
       ]);
-      this.rememberLinkedTask(key);
+      this.rememberLinkedTask(key, worker.durableId);
       this.emit(binding.workspaceId, [
         {
           type: "session.updated",
@@ -204,6 +231,7 @@ export class OmoRegistryDispatcher {
             }),
           },
         },
+        workerStatusEvent(worker.durableId, link.isActive),
         ...binding.adapter.linkTaskChild(
           link.taskId,
           `omo_${worker.durableId}`,
@@ -212,11 +240,11 @@ export class OmoRegistryDispatcher {
     });
   }
 
-  private rememberLinkedTask(key: string): void {
-    this.linkedTasks.add(key);
-    if (this.linkedTasks.size <= MAX_LINKED_TASKS) return;
-    const oldest = this.linkedTasks.values().next().value;
-    if (oldest !== undefined) this.linkedTasks.delete(oldest);
+  private rememberLinkedTask(key: string, workerDurableId: string): void {
+    this.linkedTaskWorkers.set(key, workerDurableId);
+    if (this.linkedTaskWorkers.size <= MAX_LINKED_TASKS) return;
+    const oldest = this.linkedTaskWorkers.keys().next().value;
+    if (oldest !== undefined) this.linkedTaskWorkers.delete(oldest);
   }
 
   // Chains onto whatever effectTail already holds instead of replacing it,

@@ -13,6 +13,7 @@ import type { Event } from "@/lib/opencode/types";
 interface ChildSessionState {
   readonly created: number;
   readonly indexFingerprint: string;
+  readonly statusType: "busy" | "idle" | undefined;
 }
 
 const TERMINAL_TASK_STATUSES = new Set([
@@ -125,16 +126,37 @@ function optionalText(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function taskStatus(task: Record<string, unknown>): string | undefined {
+  return typeof task.status === "string"
+    ? task.status.toLowerCase()
+    : undefined;
+}
+
+function childStatusEvent(sessionID: string, isActive: boolean): Event {
+  return {
+    type: "session.status",
+    properties: { sessionID, status: { type: isActive ? "busy" : "idle" } },
+  };
+}
+
+// omo lists every task the session has started in each update, so only an
+// active task may fall back to the one running task call; a finished task from
+// an earlier turn would otherwise attach its child to the newest Task card.
 function toolPartForTask(
   candidates: readonly TrackedToolPart[],
   taskId: string | undefined,
+  isTaskActive: boolean,
 ): TrackedToolPart | undefined {
   const matched =
     taskId === undefined
       ? undefined
       : candidates.find((tracked) => toolPartMatchesTask(tracked.part, taskId));
   if (matched) return matched;
-  return candidates.length === 1 ? candidates[0] : undefined;
+  if (!isTaskActive) return undefined;
+  const running = candidates.filter(
+    (tracked) => tracked.part.state.status === "running",
+  );
+  return running.length === 1 ? running[0] : undefined;
 }
 
 export function createLiveTaskEventHandler(
@@ -158,6 +180,8 @@ export function createLiveTaskEventHandler(
     const effects: Effect[] = [];
     for (const task of tasks) {
       if (!isRecord(task)) continue;
+      const status = taskStatus(task);
+      const isActive = status !== undefined && ACTIVE_TASK_STATUSES.has(status);
       if (typeof task.child_session_id !== "string") {
         // omo runs tasks out of process and omits child_session_id; the
         // worker session is found later through its context.task_id.
@@ -173,7 +197,7 @@ export function createLiveTaskEventHandler(
               ...(agent === undefined ? {} : { agent }),
               ...(category === undefined ? {} : { category }),
               updatedMs: now,
-              isActive: ACTIVE_TASK_STATUSES.has(String(task.status)),
+              isActive,
             },
           });
         }
@@ -204,7 +228,7 @@ export function createLiveTaskEventHandler(
 
       const taskId =
         typeof task.task_id === "string" ? task.task_id : undefined;
-      const taskTool = toolPartForTask(taskToolParts(), taskId);
+      const taskTool = toolPartForTask(taskToolParts(), taskId, isActive);
       if (taskTool) {
         const nextPart = buildOmoToolPart({
           ...taskTool.part,
@@ -229,15 +253,28 @@ export function createLiveTaskEventHandler(
           refreshIndex: true,
         });
       }
-      childSessions.set(rawChild, { created, indexFingerprint: fingerprint });
-      if (
-        typeof task.status === "string" &&
-        TERMINAL_TASK_STATUSES.has(task.status.toLowerCase())
-      ) {
-        events.push({
-          type: "session.idle",
-          properties: { sessionID: session.id },
-        });
+      const isTerminal =
+        status !== undefined && TERMINAL_TASK_STATUSES.has(status);
+      const statusType = isActive
+        ? "busy"
+        : isTerminal
+          ? "idle"
+          : previous?.statusType;
+      childSessions.set(rawChild, {
+        created,
+        indexFingerprint: fingerprint,
+        statusType,
+      });
+      // Finished tasks repeat in every update: report only changes, and send
+      // session.idle (which notifies the user) only for a task seen running.
+      if (statusType !== undefined && statusType !== previous?.statusType) {
+        events.push(childStatusEvent(session.id, statusType === "busy"));
+        if (statusType === "idle" && previous?.statusType === "busy") {
+          events.push({
+            type: "session.idle",
+            properties: { sessionID: session.id },
+          });
+        }
       }
     }
     return { events, effects };

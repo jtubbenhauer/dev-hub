@@ -282,6 +282,103 @@ describe("live adapter after the assistant entry is persisted", () => {
   });
 });
 
+describe("createLiveTaskEventHandler with an earlier finished task", () => {
+  it("links only the running task's child to the running Task card", () => {
+    const adapter = createLiveAdapter(OPTIONS);
+    adapter.handle({
+      type: "tool_execution_start",
+      toolCallId: "call-new",
+      toolName: "task",
+      args: { subagent_type: "explore", description: "New task" },
+      timestamp: 1_000,
+    });
+
+    const result = adapter.handle({
+      type: "extension_event",
+      name: "omo.task.updated",
+      data: {
+        parent_session_id: "parallel-parent-1",
+        tasks: [
+          {
+            task_id: "st_old",
+            agent_type: "explore",
+            status: "completed",
+            child_session_id: "child-old",
+          },
+          {
+            task_id: "st_new",
+            agent_type: "explore",
+            status: "running",
+            child_session_id: "child-new",
+          },
+        ],
+      },
+      timestamp: 2_000,
+    });
+
+    const linkedSessionIds = updatedToolParts([result]).map((part) =>
+      "metadata" in part.state ? part.state.metadata?.["sessionIds"] : [],
+    );
+    expect(linkedSessionIds).toEqual([["omo_child-new"]]);
+  });
+});
+
+describe("createLiveTaskEventHandler task status with child_session_id", () => {
+  function statusEventsPerUpdate(statuses: readonly string[]): Event[][] {
+    const adapter = createLiveAdapter(OPTIONS);
+    return statuses.map((status, index) =>
+      adapter
+        .handle({
+          type: "extension_event",
+          name: "omo.task.updated",
+          data: {
+            parent_session_id: "parallel-parent-1",
+            tasks: [
+              {
+                task_id: "st_child",
+                agent_type: "explore",
+                status,
+                child_session_id: "child-1",
+              },
+            ],
+          },
+          timestamp: 2_000 + index,
+        })
+        .events.filter(
+          (event) =>
+            event.type === "session.status" || event.type === "session.idle",
+        ),
+    );
+  }
+
+  const busy = {
+    type: "session.status",
+    properties: { sessionID: "omo_child-1", status: { type: "busy" } },
+  };
+  const idle = {
+    type: "session.status",
+    properties: { sessionID: "omo_child-1", status: { type: "idle" } },
+  };
+
+  it("reports the child busy while its task runs and idle once it completes", () => {
+    expect(statusEventsPerUpdate(["running", "running", "completed"])).toEqual([
+      [busy],
+      [],
+      [
+        idle,
+        { type: "session.idle", properties: { sessionID: "omo_child-1" } },
+      ],
+    ]);
+  });
+
+  it("does not announce a task that had already finished when first reported", () => {
+    expect(statusEventsPerUpdate(["completed", "completed"])).toEqual([
+      [idle],
+      [],
+    ]);
+  });
+});
+
 describe("createLiveTaskEventHandler task status", () => {
   it("marks a finished task inactive so its worker shows idle", () => {
     const adapter = createLiveAdapter(OPTIONS);

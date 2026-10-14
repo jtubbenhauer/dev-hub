@@ -1,0 +1,92 @@
+lib/omo/adapter/live-status-events.ts
+  s_9b616f005b7655::t_e5dc38fc595b54 56-59,64-69,71-79,86
+  s_9b616f005b7655::t_6d69588779369b 190,195
+  s_9b616f005b7655::t_039a889e3b589b 12,17
+  s_9b616f005b7655::t_53a05da44ad867 128-134,136-148,151
+lib/omo/session-registry-records.ts
+  s_9b616f005b7655::t_761c18ffe26699 148
+lib/omo/rpc-connection.ts
+  s_9b616f005b7655::t_ce0563fc44d05c 141-146,148,153
+  s_9b616f005b7655::t_ee11c9b64b580e 147
+  s_9b616f005b7655::t_2c09afc9ef5cb2 72-80,87-96,102,125
+  s_9b616f005b7655::t_4d1b0c0dbe4556 43
+lib/omo/adapter/live-adapter-types.ts
+  s_9b616f005b7655::t_bade6dd71c065a 39
+tests/lib/omo/adapter/catalog-fixture.ts
+  s_9b616f005b7655::t_d149d422e9dea1 17
+tests/lib/omo/facade/write-prompt-cases.ts
+  s_9b616f005b7655::t_b694a3637aca20 188-189,206-208
+  s_9b616f005b7655::t_ecc22a27551a84 1,4,7,17,21-30
+  s_9b616f005b7655::t_bc0183301b4513 168-187,190-205,209-297
+  s_a14af25ea19db4::t_9c8dce24b8db27 31-32
+lib/omo/rpc-request-deadline.ts
+  s_9b616f005b7655::t_dd8fa5a6ce4550 1-20,22-114,118-129
+  s_9b616f005b7655::t_b694a3637aca20 115-117
+  s_9b616f005b7655::t_4fba5142870499 21
+tests/lib/omo/rpc-client.test.ts
+  s_9b616f005b7655::t_23de12c25c4c70 4
+lib/omo/rpc-client.ts
+  s_9b616f005b7655::t_93df4b0476eb8a 286,288-289
+  s_9b616f005b7655::t_fc9616c811d258 184
+  s_9b616f005b7655::t_cd4a992d3ea057 39,143
+  s_9b616f005b7655::t_e15c2fb7de6ff9 283-285,287
+  s_9b616f005b7655::t_a9d4f159ec11e7 23
+  s_9b616f005b7655::t_49a4b880d0158c 239
+lib/omo/facade/write-prompt.ts
+  s_9b616f005b7655::t_60e1442d8a0e6a 3,6-7,10-11,17-60
+  s_9b616f005b7655::t_f4f0e7cbc3fdba 106
+  s_9b616f005b7655::t_9d5ff3d98232ff 61
+lib/omo/adapter/live-events.ts
+  s_9b616f005b7655::t_2b850e9bcfe795 254-255
+  s_9b616f005b7655::t_f359aaed6c6da2 216
+tests/lib/omo/adapter/live-status.test.ts
+  s_9b616f005b7655::t_be88873961e78d 160-228
+tests/lib/omo/facade/write-error-cases.ts
+  s_9b616f005b7655::t_83d743cc554a01 67-79,81,86-93
+  s_9b616f005b7655::t_b694a3637aca20 82-84
+lib/omo/facade/read-errors.ts
+  s_9b616f005b7655::t_0695edc65568c4 82-85
+lib/omo/facade/write-actions.ts
+  s_9b616f005b7655::t_d342820016770a 58,69
+  s_9b616f005b7655::t_3c796735b47e0a 8
+lib/omo/adapter/catalog.ts
+  s_9b616f005b7655::t_910a45a64b6564 95-99
+tests/lib/omo/facade/read-error-cases.ts
+  s_9b616f005b7655::t_94f8d872161cd6 106-125
+tests/lib/omo/adapter/catalog-cache-cases.ts
+  s_9b616f005b7655::t_e6fbb11a873077 77-93,95-99
+lib/omo/facade/write-errors.ts
+  s_9b616f005b7655::t_b22606a2c12f37 43-51,53-86,89,108
+tests/lib/omo/rpc-client-deadline-cases.ts
+  s_9b616f005b7655::t_98c0b4e0071b39 44
+  s_9b616f005b7655::t_23636adcb738aa 1-43,45-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e68272921614e256dc2faaf8b4e08795eb36f9a2",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

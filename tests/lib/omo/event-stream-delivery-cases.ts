@@ -184,4 +184,38 @@ describe("createOmoWorkspaceEventStream delivery", () => {
       event: { type: "question.asked", properties: entry.payload },
     });
   });
+
+  it("replays open permission prompts when the stream starts", async () => {
+    // Given
+    fixture = await createRegistryFixture([]);
+    const entry = getOmoDialogLedger(fixture.runtime).registerPermission({
+      routingHandle: "route-permission",
+      durableId: "permission",
+      workspaceId: fixture.workspace.id,
+      extUiId: "ui-permission",
+      request: {
+        sessionID: "omo_permission",
+        permission: "bash",
+        patterns: ["ls"],
+        always: ["ls"],
+        metadata: {},
+      },
+    });
+
+    // When
+    const eventStream = createOmoWorkspaceEventStream({
+      workspace: fixture.workspace,
+      runtime: fixture.runtime,
+      signal: new AbortController().signal,
+    });
+    disposers.push(eventStream.dispose);
+
+    // Then
+    expect(
+      parseSseFrame(await readSseFrame(eventStream.stream.getReader())),
+    ).toEqual({
+      workspaceId: "workspace-1",
+      event: { type: "permission.asked", properties: entry.payload },
+    });
+  });
 });

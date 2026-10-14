@@ -1,3 +1,7 @@
+import {
+  isOmoPermissionPreset,
+  type OmoPermissionPreset,
+} from "@/lib/omo/permission-presets";
 import { isJsonObject } from "@/lib/omo/session-registry-records";
 
 export type OmoPromptImage = {
@@ -17,6 +21,7 @@ export type OmoPromptBody = {
   readonly model?: OmoRequestedModel;
   readonly agent?: string;
   readonly variant?: string;
+  readonly permissionPreset?: OmoPermissionPreset;
 };
 
 export type OmoBodyResult<T> =
@@ -97,6 +102,8 @@ export function parsePromptBody(value: unknown): OmoBodyResult<OmoPromptBody> {
   }
   const agent = optionalString(value, "agent");
   const variant = optionalString(value, "variant");
+  const permissionPreset = permissionPresetField(value, "permissionPreset");
+  if (permissionPreset === null) return { ok: false, error: "invalid_request" };
   return {
     ok: true,
     value: {
@@ -105,8 +112,19 @@ export function parsePromptBody(value: unknown): OmoBodyResult<OmoPromptBody> {
       ...(model === undefined ? {} : { model }),
       ...(agent === undefined ? {} : { agent }),
       ...(variant === undefined ? {} : { variant }),
+      ...(permissionPreset === undefined ? {} : { permissionPreset }),
     },
   };
+}
+
+// undefined when the field is absent, null when it isn't a known preset.
+export function permissionPresetField(
+  value: unknown,
+  key: string,
+): OmoPermissionPreset | null | undefined {
+  if (!isJsonObject(value) || value[key] === undefined) return undefined;
+  const field = value[key];
+  return isOmoPermissionPreset(field) ? field : null;
 }
 
 export function requiredString(value: unknown, key: string): string | null {

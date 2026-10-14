@@ -139,13 +139,6 @@ function scanSourceFile(root, filePath, violations) {
       violations,
       relativePath,
       text,
-      /permission\.(?:asked|replied)/g,
-      "permission events are forbidden under lib/omo",
-    );
-    addMatches(
-      violations,
-      relativePath,
-      text,
       /\b(?:execFile|spawn)(?:Sync|Async)?\s*\([^;]*?["']app-server["']/g,
       "app-server execution is forbidden under lib/omo",
     );

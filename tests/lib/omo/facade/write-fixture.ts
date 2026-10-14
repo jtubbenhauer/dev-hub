@@ -124,9 +124,31 @@ export async function createWriteFixture() {
   const binding = createWriteBinding("root");
   const client = {
     isConnected: true,
-    connect: vi.fn(async () => ({ protocolVersion: 1 })),
+    connect: vi.fn(async () => ({
+      protocolVersion: 1,
+      capabilities: [] as readonly string[],
+    })),
     request: vi.fn(async (): Promise<JsonlRecord> => ({ data: {} })),
     sendFireAndForget: vi.fn((_record: JsonlRecord): void => undefined),
+  };
+  const sideClient = {
+    connect: vi.fn(async () => ({
+      protocolVersion: 1,
+      capabilities: [] as readonly string[],
+    })),
+    openSession: vi.fn(
+      async (
+        _params: JsonlRecord,
+        _onBound: () => void,
+      ): Promise<JsonlRecord & { readonly sessionId: string }> => ({
+        sessionId: "side-route-root",
+        attached: true,
+      }),
+    ),
+    request: vi.fn(
+      async (_record: JsonlRecord): Promise<JsonlRecord> => ({ data: {} }),
+    ),
+    close: vi.fn((): void => undefined),
   };
   const registry = {
     create: vi.fn(async () => binding),
@@ -156,6 +178,7 @@ export async function createWriteFixture() {
     refreshIndexFromHost: vi.fn(async () => undefined),
     findBinding: vi.fn((): WriteTestBinding | undefined => undefined),
     cleanupBinding: vi.fn(() => undefined),
+    detachBinding: vi.fn((_binding: WriteTestBinding): void => undefined),
     enqueueLeaf: vi.fn(
       async (
         _workspaceId: string,
@@ -170,6 +193,7 @@ export async function createWriteFixture() {
     registry,
     dialogs: new Map<string, unknown>(),
     catalog: new Map<string, unknown>(),
+    createSideClient: vi.fn(() => sideClient),
   };
   const dialogLedger = new DialogLedger();
   runtime.dialogs.set("\0devhub-omo-dialog-ledger", dialogLedger);
@@ -204,6 +228,7 @@ export async function createWriteFixture() {
     source,
     binding,
     client,
+    sideClient,
     registry,
     runtime,
     dialogLedger,

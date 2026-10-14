@@ -57,6 +57,10 @@ function getRemoteOmoRuntime(
     dialogs: new Map(),
     catalog: new Map(),
     dialogLedger: registry.dialogLedger,
+    createSideClient: () =>
+      new OmoRpcClient({
+        transport: new WebSocketTransport({ url: hostKey, token }),
+      }),
   };
   runtimes.set(hostKey, runtime);
   return runtime;

@@ -11,6 +11,7 @@ import {
   OmoCorruptIndexRowError,
   OmoEngineUnavailableError,
   OmoHydrationOverflowError,
+  OmoPermissionPresetUnsupportedError,
   OmoSessionReplacedError,
   OmoWorkspacePathConflictError,
 } from "@/lib/omo/session-registry-errors";
@@ -132,6 +133,15 @@ export function responseForOmoWriteError(error: unknown): Response | null {
     isNamedError(error, "OmoCorruptIndexRowError")
   ) {
     return jsonResponse({ error: "corrupt_session_index" }, { status: 409 });
+  }
+  if (
+    error instanceof OmoPermissionPresetUnsupportedError ||
+    isNamedError(error, "OmoPermissionPresetUnsupportedError")
+  ) {
+    return jsonResponse(
+      { error: error.message, errorCode: "permission_preset_unsupported" },
+      { status: 422 },
+    );
   }
   if (
     error instanceof OmoHydrationOverflowError ||

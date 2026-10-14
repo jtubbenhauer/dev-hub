@@ -1,5 +1,5 @@
 import type { JsonlRecord } from "@/lib/omo/jsonl";
-import type { Event } from "@/lib/opencode/types";
+import type { Event, SubAgentActivity } from "@/lib/opencode/types";
 
 export type Effect =
   | {
@@ -29,6 +29,7 @@ export type Effect =
         readonly category?: string;
         readonly updatedMs: number;
         readonly isActive: boolean;
+        readonly activity?: SubAgentActivity;
       };
     };
 

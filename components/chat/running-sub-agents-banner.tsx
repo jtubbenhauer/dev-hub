@@ -3,7 +3,10 @@
 import { Bot, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { SessionTaskProgressIndicator } from "@/components/chat/session-task-progress";
+import {
+  SessionTaskProgressIndicator,
+  type SessionTaskProgress,
+} from "@/components/chat/session-task-progress";
 import { SubAgentDialog } from "@/components/chat/sub-agent-dialog";
 import {
   DropdownMenu,
@@ -11,11 +14,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Session } from "@/lib/opencode/types";
+import type { Session, SubAgentActivity } from "@/lib/opencode/types";
+import { cn } from "@/lib/utils";
 import {
   isSessionOwnedByOtherWorkspace,
   useChatStore,
 } from "@/stores/chat-store";
+import { useSubAgentActivityStore } from "@/stores/sub-agent-activity-store";
 
 // Chips are flex-1 with gap-1.5, so these widths only decide how many chips
 // to show; flexbox stretches or squeezes the visible chips to fill the row.
@@ -37,6 +42,109 @@ function getVisibleAgentCount(
       (MIN_AGENT_CHIP_WIDTH + AGENT_CHIP_GAP),
   );
   return Math.max(MIN_VISIBLE_AGENT_CHIPS, chipsBesideOverflowPicker);
+}
+
+interface SubAgentActivityDisplay {
+  readonly text: string | undefined;
+  readonly tooltip: string | undefined;
+}
+
+function useSubAgentActivityDisplay(
+  sessionId: string,
+): SubAgentActivityDisplay {
+  const activity: SubAgentActivity | undefined = useSubAgentActivityStore(
+    (state) => state.activityBySession[sessionId],
+  );
+  if (!activity) return { text: undefined, tooltip: undefined };
+  const currentTool = activity.currentTool?.trim();
+  const lastLine = activity.lastLine?.trim();
+  return {
+    text: currentTool || lastLine || undefined,
+    tooltip: lastLine ? `${activity.summary}\n${lastLine}` : activity.summary,
+  };
+}
+
+interface RunningAgentLabelProps {
+  readonly title: string;
+  readonly activityText: string | undefined;
+}
+
+// A long title stops at 3/5 of the row so the activity text stays visible.
+function RunningAgentLabel({ title, activityText }: RunningAgentLabelProps) {
+  return (
+    <>
+      <span
+        className={cn(
+          "min-w-0 truncate text-xs font-medium",
+          activityText ? "max-w-3/5" : "flex-1",
+        )}
+      >
+        {title}
+      </span>
+      {activityText && (
+        <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+          {activityText}
+        </span>
+      )}
+    </>
+  );
+}
+
+interface RunningAgentEntryProps {
+  readonly sessionId: string;
+  readonly title: string;
+  readonly progress: SessionTaskProgress | undefined;
+  readonly onSelect: () => void;
+}
+
+function RunningAgentChip({
+  sessionId,
+  title,
+  progress,
+  onSelect,
+}: RunningAgentEntryProps) {
+  const activity = useSubAgentActivityDisplay(sessionId);
+  return (
+    <button
+      type="button"
+      title={activity.tooltip}
+      className="bg-background/70 hover:bg-background flex max-w-64 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-violet-500/20 px-2 py-1 text-left transition-colors"
+      onClick={onSelect}
+    >
+      <Loader2 className="size-3 shrink-0 animate-spin text-violet-500 motion-reduce:animate-none" />
+      <RunningAgentLabel title={title} activityText={activity.text} />
+      {progress && (
+        <SessionTaskProgressIndicator
+          progress={progress}
+          compact
+          isSessionActive
+        />
+      )}
+      <ChevronRight className="text-muted-foreground size-3 shrink-0" />
+    </button>
+  );
+}
+
+function RunningAgentMenuItem({
+  sessionId,
+  title,
+  progress,
+  onSelect,
+}: RunningAgentEntryProps) {
+  const activity = useSubAgentActivityDisplay(sessionId);
+  return (
+    <DropdownMenuItem title={activity.tooltip} onSelect={onSelect}>
+      <Loader2 className="size-3 animate-spin text-violet-500 motion-reduce:animate-none" />
+      <RunningAgentLabel title={title} activityText={activity.text} />
+      {progress && (
+        <SessionTaskProgressIndicator
+          progress={progress}
+          compact
+          isSessionActive
+        />
+      )}
+    </DropdownMenuItem>
+  );
 }
 
 interface RunningSubAgentsBannerProps {
@@ -185,25 +293,13 @@ export function RunningSubAgentsBanner({
             className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden"
           >
             {visibleAgents.map((agent) => (
-              <button
+              <RunningAgentChip
                 key={agent.id}
-                type="button"
-                className="bg-background/70 hover:bg-background flex max-w-64 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-violet-500/20 px-2 py-1 text-left transition-colors"
-                onClick={() => setSelectedAgentId(agent.id)}
-              >
-                <Loader2 className="size-3 shrink-0 animate-spin text-violet-500 motion-reduce:animate-none" />
-                <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                  {agent.title}
-                </span>
-                {agent.progress && (
-                  <SessionTaskProgressIndicator
-                    progress={agent.progress}
-                    compact
-                    isSessionActive
-                  />
-                )}
-                <ChevronRight className="text-muted-foreground size-3 shrink-0" />
-              </button>
+                sessionId={agent.id}
+                title={agent.title}
+                progress={agent.progress}
+                onSelect={() => setSelectedAgentId(agent.id)}
+              />
             ))}
             {overflowAgents.length > 0 && (
               <DropdownMenu>
@@ -221,22 +317,13 @@ export function RunningSubAgentsBanner({
                   className="w-72 max-w-(--radix-dropdown-menu-content-available-width)"
                 >
                   {overflowAgents.map((agent) => (
-                    <DropdownMenuItem
+                    <RunningAgentMenuItem
                       key={agent.id}
+                      sessionId={agent.id}
+                      title={agent.title}
+                      progress={agent.progress}
                       onSelect={() => setSelectedAgentId(agent.id)}
-                    >
-                      <Loader2 className="size-3 animate-spin text-violet-500 motion-reduce:animate-none" />
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                        {agent.title}
-                      </span>
-                      {agent.progress && (
-                        <SessionTaskProgressIndicator
-                          progress={agent.progress}
-                          compact
-                          isSessionActive
-                        />
-                      )}
-                    </DropdownMenuItem>
+                    />
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>

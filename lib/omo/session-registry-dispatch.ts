@@ -50,6 +50,24 @@ function workerStatusEvent(
   };
 }
 
+function workerTaskEvents(
+  workerDurableId: string,
+  link: TaskChildLink,
+): OmoRegistryEvent[] {
+  const statusEvent = workerStatusEvent(workerDurableId, link.isActive);
+  if (link.activity === undefined) return [statusEvent];
+  return [
+    statusEvent,
+    {
+      type: "session.activity",
+      properties: {
+        sessionID: `omo_${workerDurableId}`,
+        activity: link.activity,
+      },
+    },
+  ];
+}
+
 export class OmoRegistryDispatcher {
   readonly leafQueue = new Map<string, Promise<void>>();
   private readonly client: OmoRpcClient;
@@ -186,17 +204,13 @@ export class OmoRegistryDispatcher {
     const key = `${binding.workspaceId}:${link.taskId}`;
     const knownWorkerId = this.linkedTaskWorkers.get(key);
     if (knownWorkerId !== undefined) {
-      this.emit(binding.workspaceId, [
-        workerStatusEvent(knownWorkerId, link.isActive),
-      ]);
+      this.emit(binding.workspaceId, workerTaskEvents(knownWorkerId, link));
       return;
     }
     binding.effectTail = this.continueEffectTail(binding, async () => {
       const linkedWorkerId = this.linkedTaskWorkers.get(key);
       if (linkedWorkerId !== undefined) {
-        this.emit(binding.workspaceId, [
-          workerStatusEvent(linkedWorkerId, link.isActive),
-        ]);
+        this.emit(binding.workspaceId, workerTaskEvents(linkedWorkerId, link));
         return;
       }
       await this.refreshIndex(binding.workspace);
@@ -231,7 +245,7 @@ export class OmoRegistryDispatcher {
             }),
           },
         },
-        workerStatusEvent(worker.durableId, link.isActive),
+        ...workerTaskEvents(worker.durableId, link),
         ...binding.adapter.linkTaskChild(
           link.taskId,
           `omo_${worker.durableId}`,

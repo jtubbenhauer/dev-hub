@@ -100,10 +100,12 @@ export function createOmoWorkspaceEventStream(
         KEEPALIVE_INTERVAL_MS,
       );
 
-      for (const request of getOmoDialogLedger(runtime).requestsForWorkspace(
-        workspace.id,
-      )) {
+      const ledger = getOmoDialogLedger(runtime);
+      for (const request of ledger.requestsForWorkspace(workspace.id)) {
         enqueueEvent({ type: "question.asked", properties: request });
+      }
+      for (const request of ledger.permissionsForWorkspace(workspace.id)) {
+        enqueueEvent({ type: "permission.asked", properties: request });
       }
     },
     cancel() {

@@ -27,6 +27,8 @@ import {
 } from "@/lib/opencode/merge-messages";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { getOmoPermissionPreset } from "@/stores/omo-permission-preset-store";
+import { useSubAgentActivityStore } from "@/stores/sub-agent-activity-store";
 import { createAttachmentPromptPart } from "@/lib/attachment-utils";
 import {
   applyMessagePartDelta,
@@ -2953,6 +2955,8 @@ export const useChatStore = create<ChatState>()(
           if (model) body.model = model;
           if (agent) body.agent = agent;
           if (variant) body.variant = variant;
+          const permissionPreset = getOmoPermissionPreset(workspaceId);
+          if (permissionPreset) body.permissionPreset = permissionPreset;
 
           const response = await fetch(
             buildProxyUrl(`session/${sessionId}/prompt_async`, workspaceId),
@@ -3192,6 +3196,8 @@ export const useChatStore = create<ChatState>()(
           if (model) body.model = `${model.providerID}/${model.modelID}`;
           if (agent) body.agent = agent;
           if (variant) body.variant = variant;
+          const permissionPreset = getOmoPermissionPreset(workspaceId);
+          if (permissionPreset) body.permissionPreset = permissionPreset;
 
           const response = await fetch(
             buildProxyUrl(`session/${sessionId}/command`, workspaceId),
@@ -3746,6 +3752,7 @@ export const useChatStore = create<ChatState>()(
       },
 
       handleEvent: (event, sourceWorkspaceId) => {
+        useSubAgentActivityStore.getState().handleEvent(event);
         const eventType = event.type as string;
         const properties = event.properties as
           | Record<string, unknown>

@@ -123,16 +123,40 @@ describe("handleOmoRead errors and health", () => {
     expect(await readJson(response)).toEqual({ error: "engine_unavailable" });
   });
 
-  it("always returns an empty permission list", async () => {
+  it("lists the workspace's open permission prompts", async () => {
     // Given
     const fixture = await useReadFixture();
+    const { DialogLedger } = await import("@/lib/omo/dialog-ledger");
+    const ledger = new DialogLedger();
+    fixture.runtime.dialogs.set("\u0000devhub-omo-dialog-ledger", ledger);
+    const request = {
+      sessionID: "omo_root",
+      permission: "bash",
+      patterns: ["rm -rf build"],
+      always: ["rm -rf build"],
+      metadata: {},
+    };
+    const own = ledger.registerPermission({
+      routingHandle: "route-root",
+      durableId: "root",
+      workspaceId: "workspace-1",
+      extUiId: "ui-1",
+      request,
+    });
+    ledger.registerPermission({
+      routingHandle: "route-other",
+      durableId: "other",
+      workspaceId: "workspace-2",
+      extUiId: "ui-2",
+      request,
+    });
 
     // When
     const response = await fixture.request("/permission");
 
     // Then
     expect(response.status).toBe(200);
-    expect(await readJson(response)).toEqual([]);
+    expect(await readJson(response)).toEqual([own.payload]);
   });
 
   it("reports a healthy connected host", async () => {

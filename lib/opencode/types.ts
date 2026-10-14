@@ -16,6 +16,8 @@ import type {
 import type {
   Agent,
   Command,
+  EventPermissionAsked,
+  EventPermissionReplied,
   EventQuestionAsked,
   EventQuestionRejected,
   EventQuestionReplied,
@@ -78,13 +80,33 @@ export interface MessagePartDeltaEvent {
   };
 }
 
+export interface SubAgentActivity {
+  readonly summary: string;
+  readonly currentTool?: string;
+  readonly lastLine?: string;
+  readonly turns: number;
+  readonly toolCalls?: number;
+  readonly updatedAt: number;
+}
+
+export interface SessionActivityEvent {
+  readonly type: "session.activity";
+  readonly properties: {
+    readonly sessionID: string;
+    readonly activity: SubAgentActivity;
+  };
+}
+
 export type Event =
   | SdkEvent
   | EventQuestionAsked
   | EventQuestionReplied
   | EventQuestionRejected
+  | EventPermissionAsked
+  | EventPermissionReplied
   | MessagePartDeltaEvent
   | MessageRekeyedEvent
+  | SessionActivityEvent
   | SessionResyncRequiredEvent
   | SessionMetadataMovedEvent;
 export type {

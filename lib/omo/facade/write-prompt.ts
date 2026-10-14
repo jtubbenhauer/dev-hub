@@ -1,6 +1,7 @@
 import { attachOmoWriteSession } from "@/lib/omo/facade/write-access";
 import { parsePromptBody } from "@/lib/omo/facade/write-body";
 import { lateOmoFailureMessage } from "@/lib/omo/facade/write-errors";
+import { ensureOmoPermissionPreset } from "@/lib/omo/facade/write-permission-preset";
 import type { OmoWriteContext } from "@/lib/omo/facade/write-types";
 import { jsonResponse, noContentResponse } from "@/lib/omo/facade/write-types";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
@@ -72,6 +73,13 @@ export async function promptOmoSession(
     );
   }
   const binding = await attachOmoWriteSession(context, rawId);
+  if (parsed.value.permissionPreset !== undefined) {
+    await ensureOmoPermissionPreset(
+      context,
+      binding,
+      parsed.value.permissionPreset,
+    );
+  }
   const state = stateRecord(
     await context.runtime.registry.request(binding, { type: "get_state" }),
   );

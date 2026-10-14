@@ -107,7 +107,13 @@ async function routeOmoRead(request: OmoReadRequest): Promise<Response> {
   const context = createOmoReadContext(request.workspace);
   await ensureOmoConnectionIfNeeded(request.workspace, context.runtime);
   if (path === "/global/health") return healthResponse(context);
-  if (path === "/permission") return jsonResponse([]);
+  if (path === "/permission") {
+    return jsonResponse(
+      getOmoDialogLedger(context.runtime).permissionsForWorkspace(
+        request.workspace.id,
+      ),
+    );
+  }
   if (path === "/session/identities") {
     return readOmoSessionIdentities(request.workspace);
   }

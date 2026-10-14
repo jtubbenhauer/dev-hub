@@ -44,6 +44,9 @@ vi.mock("@/components/chat/model-selector", () => ({
 vi.mock("@/components/chat/variant-selector", () => ({
   VariantSelector: () => null,
 }));
+vi.mock("@/components/chat/omo-permission-preset-selector", () => ({
+  OmoPermissionPresetSelector: () => null,
+}));
 vi.mock("@/components/chat/context-usage-indicator", () => ({
   ContextUsageIndicator: () => null,
 }));

@@ -8,7 +8,7 @@ import type { TrackedToolPart } from "@/lib/omo/adapter/live-tool-events";
 import { recordTimestamp } from "@/lib/omo/adapter/live-message-snapshot";
 import { buildOmoSession, buildOmoToolPart } from "@/lib/omo/adapter/shapes";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
-import type { Event } from "@/lib/opencode/types";
+import type { Event, SubAgentActivity } from "@/lib/opencode/types";
 
 interface ChildSessionState {
   readonly created: number;
@@ -139,6 +139,41 @@ function childStatusEvent(sessionID: string, isActive: boolean): Event {
   };
 }
 
+function subAgentActivity(
+  progress: unknown,
+  updatedAt: number,
+): SubAgentActivity | undefined {
+  if (
+    !isRecord(progress) ||
+    typeof progress.activity !== "string" ||
+    typeof progress.turns !== "number"
+  ) {
+    return undefined;
+  }
+  const currentTool = optionalText(progress.current_tool);
+  const lastLine = optionalText(progress.last_assistant_line);
+  return {
+    summary: progress.activity,
+    turns: progress.turns,
+    updatedAt,
+    ...(currentTool === undefined ? {} : { currentTool }),
+    ...(lastLine === undefined ? {} : { lastLine }),
+    ...(typeof progress.tool_calls === "number"
+      ? { toolCalls: progress.tool_calls }
+      : {}),
+  };
+}
+
+function activityFingerprint(activity: SubAgentActivity): string {
+  return JSON.stringify([
+    activity.summary,
+    activity.currentTool,
+    activity.lastLine,
+    activity.turns,
+    activity.toolCalls,
+  ]);
+}
+
 // omo lists every task the session has started in each update, so only an
 // active task may fall back to the one running task call; a finished task from
 // an earlier turn would otherwise attach its child to the newest Task card.
@@ -165,6 +200,27 @@ export function createLiveTaskEventHandler(
   replacePart: (tracked: TrackedToolPart, part: ToolPart) => Event,
 ): (record: JsonlRecord) => LiveAdapterResult {
   const childSessions = new Map<string, ChildSessionState>();
+  const sentActivity = new Map<string, string>();
+
+  // Every update repeats each task's live_progress, so only progress that
+  // changed since it was last sent is returned.
+  const changedActivity = (
+    key: string,
+    task: Record<string, unknown>,
+    isActive: boolean,
+    now: number,
+  ): SubAgentActivity | undefined => {
+    if (!isActive) {
+      sentActivity.delete(key);
+      return undefined;
+    }
+    const activity = subAgentActivity(task.live_progress, now);
+    if (activity === undefined) return undefined;
+    const fingerprint = activityFingerprint(activity);
+    if (sentActivity.get(key) === fingerprint) return undefined;
+    sentActivity.set(key, fingerprint);
+    return activity;
+  };
 
   return (record): LiveAdapterResult => {
     if (record.name !== "omo.task.updated" || !isRecord(record.data)) {
@@ -188,6 +244,12 @@ export function createLiveTaskEventHandler(
         if (typeof task.task_id === "string") {
           const agent = optionalText(task.agent_type);
           const category = optionalText(task.category);
+          const activity = changedActivity(
+            `task:${task.task_id}`,
+            task,
+            isActive,
+            now,
+          );
           effects.push({
             linkTaskChild: {
               parentDurableId: parentRawId,
@@ -198,6 +260,7 @@ export function createLiveTaskEventHandler(
               ...(category === undefined ? {} : { category }),
               updatedMs: now,
               isActive,
+              ...(activity === undefined ? {} : { activity }),
             },
           });
         }
@@ -275,6 +338,18 @@ export function createLiveTaskEventHandler(
             properties: { sessionID: session.id },
           });
         }
+      }
+      const activity = changedActivity(
+        `child:${rawChild}`,
+        task,
+        isActive,
+        now,
+      );
+      if (activity !== undefined) {
+        events.push({
+          type: "session.activity",
+          properties: { sessionID: session.id, activity },
+        });
       }
     }
     return { events, effects };

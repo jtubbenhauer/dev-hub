@@ -29,6 +29,7 @@ export type OmoRuntime = {
   // in `dialogs` above. Optional so callers that build an OmoRuntime without
   // it (e.g. lib/omo/runtime.ts's remote registry) still type-check.
   readonly dialogLedger?: DialogLedger;
+  readonly createSideClient?: () => OmoRpcClient;
 };
 
 declare global {
@@ -48,7 +49,17 @@ function createOmoRuntime(hostKey: string): OmoRuntime {
     getSkillPrefixes: (workspacePath) =>
       skillPrefixesFromCache(catalog, workspacePath),
   });
-  return { client, registry, dialogs, catalog, dialogLedger };
+  return {
+    client,
+    registry,
+    dialogs,
+    catalog,
+    dialogLedger,
+    createSideClient: () =>
+      new OmoRpcClient({
+        transport: new UnixSocketTransport({ socketPath: hostKey }),
+      }),
+  };
 }
 
 export function getOmoRuntime(hostKey: string): OmoRuntime {

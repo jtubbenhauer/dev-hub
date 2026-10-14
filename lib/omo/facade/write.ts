@@ -1,5 +1,6 @@
 import {
   abortOmoSession,
+  answerOmoPermission,
   answerOmoQuestion,
   commandOmoSession,
   forkOmoSession,
@@ -10,6 +11,7 @@ import {
   replacementId,
   responseForOmoWriteError,
 } from "@/lib/omo/facade/write-errors";
+import { setOmoPermissionPreset } from "@/lib/omo/facade/write-permission-preset";
 import { promptOmoSession } from "@/lib/omo/facade/write-prompt";
 import { revertOmoSession } from "@/lib/omo/facade/write-revert";
 import { createOmoWriteContext } from "@/lib/omo/facade/write-runtime";
@@ -34,6 +36,7 @@ const SESSION_ACTIONS = [
   "summarize",
   "revert",
   "fork",
+  "permission_preset",
 ] as const;
 
 type SessionAction = (typeof SESSION_ACTIONS)[number];
@@ -90,6 +93,8 @@ async function routeSessionAction(
       return revertOmoSession(context, rawId, request.body);
     case "fork":
       return forkOmoSession(context, rawId, request.body);
+    case "permission_preset":
+      return setOmoPermissionPreset(context, rawId, request.body);
     default: {
       const exhaustiveAction: never = action;
       throw new TypeError(`Unsupported session action: ${exhaustiveAction}`);
@@ -131,7 +136,7 @@ async function routeSessionWrite(
       : unsupportedResponse();
   }
   const match =
-    /^\/session\/([^/]+)(?:\/(prompt_async|abort|command|summarize|revert|fork))?$/.exec(
+    /^\/session\/([^/]+)(?:\/(prompt_async|abort|command|summarize|revert|fork|permission_preset))?$/.exec(
       path,
     );
   if (match === null) return unsupportedResponse();
@@ -180,6 +185,17 @@ async function routeOmoWrite(request: OmoWriteRequest): Promise<Response> {
       action,
       body: request.body,
     });
+  }
+  const permissionPublicId = /^\/session\/[^/]+\/permissions\/([^/]+)$/.exec(
+    path,
+  )?.[1];
+  if (permissionPublicId !== undefined) {
+    return request.method === "POST"
+      ? answerOmoPermission(context, {
+          publicId: permissionPublicId,
+          body: request.body,
+        })
+      : unsupportedResponse();
   }
   return routeSessionWrite(context, request, path);
 }

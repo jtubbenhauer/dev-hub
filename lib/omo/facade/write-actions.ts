@@ -1,10 +1,16 @@
 import { responseForAnswers } from "@/lib/omo/adapter/dialog-responses";
+import {
+  isPermissionReply,
+  PERMISSION_ANSWER_LABELS,
+} from "@/lib/omo/adapter/permission-prompts";
 import { attachOmoWriteSession } from "@/lib/omo/facade/write-access";
 import {
   optionalArguments,
+  permissionPresetField,
   questionAnswers,
   requiredString,
 } from "@/lib/omo/facade/write-body";
+import { ensureOmoPermissionPreset } from "@/lib/omo/facade/write-permission-preset";
 import { sendWithAcceptanceWindow } from "@/lib/omo/facade/write-prompt";
 import type { OmoWriteContext } from "@/lib/omo/facade/write-types";
 import {
@@ -51,10 +57,18 @@ export async function commandOmoSession(
 ): Promise<Response> {
   const command = requiredString(body, "command");
   const argumentsValue = optionalArguments(body);
-  if (command === null || argumentsValue === undefined) {
+  const permissionPreset = permissionPresetField(body, "permissionPreset");
+  if (
+    command === null ||
+    argumentsValue === undefined ||
+    permissionPreset === null
+  ) {
     return invalidRequestResponse();
   }
   const binding = await attachOmoWriteSession(context, rawId);
+  if (permissionPreset !== undefined) {
+    await ensureOmoPermissionPreset(context, binding, permissionPreset);
+  }
   return sendWithAcceptanceWindow(context, binding, {
     type: "prompt",
     message: `/${command}${argumentsValue === null ? "" : ` ${argumentsValue}`}`,
@@ -121,4 +135,33 @@ export async function answerOmoQuestion(
   context.runtime.client.sendFireAndForget(command);
   context.dialogs.resolve(input.publicId);
   return noContentResponse();
+}
+
+export async function answerOmoPermission(
+  context: OmoWriteContext,
+  input: { readonly publicId: string; readonly body: unknown },
+): Promise<Response> {
+  const entry = context.dialogs.findPermission(input.publicId);
+  if (entry === undefined || entry.workspaceId !== context.workspace.id) {
+    return jsonResponse({ error: "permission_not_found" }, { status: 404 });
+  }
+  const reply = isJsonObject(input.body) ? input.body["response"] : undefined;
+  if (!isPermissionReply(reply)) return invalidRequestResponse();
+  await attachOmoWriteSession(context, entry.durableId);
+  context.runtime.client.sendFireAndForget({
+    type: "extension_ui_response",
+    id: entry.extUiId,
+    sessionId: entry.routingHandle,
+    value: PERMISSION_ANSWER_LABELS[reply],
+  });
+  context.dialogs.resolvePermission(input.publicId);
+  context.runtime.registry.emitEvent(context.workspace.id, {
+    type: "permission.replied",
+    properties: {
+      sessionID: entry.payload.sessionID,
+      requestID: entry.publicId,
+      reply,
+    },
+  });
+  return jsonResponse(true);
 }

@@ -30,6 +30,7 @@ import { AgentSelector } from "@/components/chat/agent-selector";
 import { ModelSelector } from "@/components/chat/model-selector";
 import { ContextUsageIndicator } from "@/components/chat/context-usage-indicator";
 import { VariantSelector } from "@/components/chat/variant-selector";
+import { OmoPermissionPresetSelector } from "@/components/chat/omo-permission-preset-selector";
 import type { Attachment } from "@/lib/attachment-utils";
 import {
   MAX_ATTACHMENTS,
@@ -1219,6 +1220,12 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
               open={isVariantSelectorOpen}
               onOpenChange={onVariantSelectorOpenChange}
             />
+            {workspaceId && (
+              <OmoPermissionPresetSelector
+                workspaceId={workspaceId}
+                sessionId={sessionId}
+              />
+            )}
             <ContextUsageIndicator
               workspaceId={workspaceId}
               sessionId={sessionId}

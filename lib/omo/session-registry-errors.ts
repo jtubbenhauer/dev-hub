@@ -61,3 +61,13 @@ export class OmoEngineUnavailableError extends Error {
     super(`OmO engine unavailable while handling ${command}: ${detail}`);
   }
 }
+
+export class OmoPermissionPresetUnsupportedError extends Error {
+  readonly name = "OmoPermissionPresetUnsupportedError";
+
+  constructor(readonly presetLabel: string) {
+    super(
+      `This omo version doesn't support the ${presetLabel} permission mode. Update omo to use it.`,
+    );
+  }
+}

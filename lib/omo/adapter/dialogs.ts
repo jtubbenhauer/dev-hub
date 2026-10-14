@@ -1,10 +1,17 @@
-import type { QuestionRequest } from "@opencode-ai/sdk/v2";
+import type { PermissionRequest, QuestionRequest } from "@opencode-ai/sdk/v2";
 import { mapDialog } from "@/lib/omo/adapter/dialog-mapping";
 import {
   resolvedAnswers,
   responseForAnswers,
 } from "@/lib/omo/adapter/dialog-responses";
-import { DialogLedger } from "@/lib/omo/dialog-ledger";
+import {
+  isPermissionPrompt,
+  mapPermissionPrompt,
+} from "@/lib/omo/adapter/permission-prompts";
+import {
+  DialogLedger,
+  type PermissionLedgerEntry,
+} from "@/lib/omo/dialog-ledger";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { Event } from "@/lib/opencode/types";
 
@@ -44,12 +51,43 @@ function askedEvent(request: QuestionRequest): Event {
   return { type: "question.asked", properties: request };
 }
 
+function permissionAskedEvent(request: PermissionRequest): Event {
+  return { type: "permission.asked", properties: request };
+}
+
+function clearedPermissionEvents(
+  entries: readonly PermissionLedgerEntry[],
+): Event[] {
+  return entries.map((entry) => ({
+    type: "permission.replied",
+    properties: {
+      sessionID: entry.payload.sessionID,
+      requestID: entry.publicId,
+      reply: "reject",
+    },
+  }));
+}
+
 export function createDialogAdapter(
   options: DialogAdapterOptions,
 ): DialogAdapter {
   let currentAssistantMessageID: string | undefined;
 
   const register = (record: JsonlRecord): Event[] => {
+    if (isPermissionPrompt(record)) {
+      const entry = options.ledger.registerPermission({
+        routingHandle: options.routingHandle,
+        durableId: options.durableId,
+        workspaceId: options.workspaceId,
+        extUiId: record.id,
+        request: mapPermissionPrompt(
+          record,
+          `omo_${options.durableId}`,
+          currentAssistantMessageID,
+        ),
+      });
+      return [permissionAskedEvent(entry.payload)];
+    }
     const mapped = mapDialog(
       record,
       `omo_${options.durableId}`,
@@ -108,15 +146,24 @@ export function createDialogAdapter(
           currentAssistantMessageID = event.properties.toMessageID;
         }
       }
+      // A permission prompt blocks its tool call, so one still open when the
+      // turn settles was cancelled with it (for example by an abort).
       if (record.type === "agent_settled") {
         currentAssistantMessageID = undefined;
-        return [];
+        return clearedPermissionEvents(
+          options.ledger.removePermissionsByRoutingHandle(
+            options.routingHandle,
+          ),
+        );
       }
       if (record.type === "session_closed") {
-        if (record.sessionId === options.routingHandle) {
-          options.ledger.removeByRoutingHandle(options.routingHandle);
-        }
-        return [];
+        if (record.sessionId !== options.routingHandle) return [];
+        options.ledger.removeByRoutingHandle(options.routingHandle);
+        return clearedPermissionEvents(
+          options.ledger.removePermissionsByRoutingHandle(
+            options.routingHandle,
+          ),
+        );
       }
       if (record.type === "extension_ui_request") return register(record);
       if (
@@ -162,9 +209,14 @@ export function createDialogAdapter(
       );
     },
     eventsForSubscriber(): Event[] {
-      return options.ledger
-        .requestsForWorkspace(options.workspaceId)
-        .map(askedEvent);
+      return [
+        ...options.ledger
+          .requestsForWorkspace(options.workspaceId)
+          .map(askedEvent),
+        ...options.ledger
+          .permissionsForWorkspace(options.workspaceId)
+          .map(permissionAskedEvent),
+      ];
     },
     reply(publicId, answers): Promise<DialogActionResult> {
       return send(publicId, answers, false);

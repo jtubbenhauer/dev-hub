@@ -12,6 +12,7 @@ import type { OmoRegistryDispatcher } from "@/lib/omo/session-registry-dispatch"
 import { OmoRegistryRecordBuffer } from "@/lib/omo/session-registry-lock";
 import { createOmoBindingReady } from "@/lib/omo/session-registry-ready";
 import type {
+  OmoRegistryEvent,
   OmoSessionBinding,
   OmoSessionRegistryWorkspace,
 } from "@/lib/omo/session-registry-types";
@@ -263,6 +264,73 @@ describe("OmoRegistryDispatcher", () => {
       {
         type: "session.status",
         properties: { sessionID: "omo_worker-1", status: { type: "idle" } },
+      },
+    ]);
+  });
+
+  it("forwards a linked worker's progress after its status", async () => {
+    // Given
+    sqlite
+      .prepare(
+        `INSERT INTO omo_session_index
+          (workspace_id, durable_id, session_path, kind, context,
+           context_authoritative, title, created_ms, updated_ms, updated_at)
+         VALUES ('workspace-1', 'worker-2', NULL, 'worker',
+           '{"role":"child","task_id":"st_task-2"}', 1, 'Untitled', 10, 10, 10)`,
+      )
+      .run();
+    const dispatcher = new Dispatcher({
+      client: createUnconnectedClient(),
+      refreshIndex: async () => undefined,
+    });
+    const events: OmoRegistryEvent[] = [];
+    dispatcher.subscribe(WORKSPACE.id, (event) => events.push(event));
+    let summary = "turn 1 · running";
+    const { binding } = createTestBinding("parent-2", () => ({
+      events: [],
+      effects: [
+        {
+          linkTaskChild: {
+            parentDurableId: "parent-2",
+            taskId: "st_task-2",
+            title: "Run ls",
+            updatedMs: 20,
+            isActive: true,
+            activity: { summary, turns: 1, updatedAt: 20 },
+          },
+        },
+      ],
+    }));
+
+    // When
+    dispatcher.dispatch(binding, { type: "extension_event", name: "x" });
+    await binding.effectTail;
+    summary = "turn 2 · running";
+    dispatcher.dispatch(binding, { type: "extension_event", name: "x" });
+
+    // Then
+    expect(events.filter((event) => event.type !== "session.updated")).toEqual([
+      {
+        type: "session.status",
+        properties: { sessionID: "omo_worker-2", status: { type: "busy" } },
+      },
+      {
+        type: "session.activity",
+        properties: {
+          sessionID: "omo_worker-2",
+          activity: { summary: "turn 1 · running", turns: 1, updatedAt: 20 },
+        },
+      },
+      {
+        type: "session.status",
+        properties: { sessionID: "omo_worker-2", status: { type: "busy" } },
+      },
+      {
+        type: "session.activity",
+        properties: {
+          sessionID: "omo_worker-2",
+          activity: { summary: "turn 2 · running", turns: 1, updatedAt: 20 },
+        },
       },
     ]);
   });

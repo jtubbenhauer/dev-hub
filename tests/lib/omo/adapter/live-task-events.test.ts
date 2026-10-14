@@ -379,6 +379,119 @@ describe("createLiveTaskEventHandler task status with child_session_id", () => {
   });
 });
 
+describe("createLiveTaskEventHandler sub-agent progress", () => {
+  const firstProgress = {
+    activity: "Run ls · category:quick · turn 1 (2 tools) · running",
+    started_at: 1_000,
+    current_tool: "bash",
+    turns: 1,
+    tool_calls: 2,
+    output_tokens: 585,
+  };
+  const laterProgress = {
+    ...firstProgress,
+    activity: "Run ls · category:quick · turn 2 (2 tools) · running",
+    current_tool: undefined,
+    last_assistant_line: "src",
+    turns: 2,
+  };
+
+  function taskUpdate(
+    task: Readonly<Record<string, unknown>>,
+    timestamp: number,
+  ): JsonlRecord {
+    return {
+      type: "extension_event",
+      name: "omo.task.updated",
+      data: { parent_session_id: "parent-1", tasks: [task] },
+      timestamp,
+    };
+  }
+
+  it("reports a running child's progress only when it changes", () => {
+    // Given
+    const adapter = createLiveAdapter(OPTIONS);
+    const child = { task_id: "st_child", child_session_id: "child-1" };
+
+    // When
+    const activityPerUpdate = [
+      { status: "running", live_progress: firstProgress },
+      { status: "running", live_progress: firstProgress },
+      { status: "running", live_progress: laterProgress },
+      { status: "completed", live_progress: laterProgress },
+    ].map((task, index) =>
+      adapter
+        .handle(taskUpdate({ ...child, ...task }, 2_000 + index))
+        .events.filter((event) => event.type === "session.activity"),
+    );
+
+    // Then
+    expect(activityPerUpdate).toEqual([
+      [
+        {
+          type: "session.activity",
+          properties: {
+            sessionID: "omo_child-1",
+            activity: {
+              summary: firstProgress.activity,
+              currentTool: "bash",
+              turns: 1,
+              toolCalls: 2,
+              updatedAt: 2_000,
+            },
+          },
+        },
+      ],
+      [],
+      [
+        {
+          type: "session.activity",
+          properties: {
+            sessionID: "omo_child-1",
+            activity: {
+              summary: laterProgress.activity,
+              lastLine: "src",
+              turns: 2,
+              toolCalls: 2,
+              updatedAt: 2_002,
+            },
+          },
+        },
+      ],
+      [],
+    ]);
+  });
+
+  it("hands changed progress to the worker link when omo omits child_session_id", () => {
+    // Given
+    const adapter = createLiveAdapter(OPTIONS);
+    const task = { task_id: "st_quick", category: "quick" };
+
+    // When
+    const links = [
+      { status: "running", live_progress: firstProgress },
+      { status: "running", live_progress: firstProgress },
+      { status: "completed", live_progress: firstProgress },
+    ].map(
+      (update, index) =>
+        adapter.handle(taskUpdate({ ...task, ...update }, 3_000 + index))
+          .effects[0],
+    );
+
+    // Then
+    expect(links[0]).toMatchObject({
+      linkTaskChild: {
+        isActive: true,
+        activity: { summary: firstProgress.activity, currentTool: "bash" },
+      },
+    });
+    expect(links[1]).toMatchObject({ linkTaskChild: { isActive: true } });
+    expect(links[1]).not.toHaveProperty("linkTaskChild.activity");
+    expect(links[2]).toMatchObject({ linkTaskChild: { isActive: false } });
+    expect(links[2]).not.toHaveProperty("linkTaskChild.activity");
+  });
+});
+
 describe("createLiveTaskEventHandler task status", () => {
   it("marks a finished task inactive so its worker shows idle", () => {
     const adapter = createLiveAdapter(OPTIONS);

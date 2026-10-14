@@ -386,3 +386,148 @@ describe("FilesPage snapshot saves", () => {
     });
   });
 });
+
+describe("FilesPage tabs per workspace", () => {
+  const otherWorkspace: Workspace = { ...workspace, id: "ws-2", name: "Other" };
+
+  function seedWorkspaceOneTabOpen() {
+    useWorkspaceStore.setState({ workspaces: [workspace, otherWorkspace] });
+    useEditorStore.setState({
+      openFiles: [
+        {
+          workspaceId: "ws-1",
+          instanceId: 1,
+          path: "one-only.ts",
+          name: "one-only.ts",
+          content: "one",
+          originalContent: "one",
+          isDirty: false,
+          language: "typescript",
+        },
+      ],
+      activeFilePath: "one-only.ts",
+      workspaceFileStates: {
+        "ws-1": {
+          tabs: [
+            {
+              path: "one-only.ts",
+              name: "one-only.ts",
+              language: "typescript",
+            },
+          ],
+          activeFilePath: "one-only.ts",
+          expandedPaths: [],
+        },
+        "ws-2": {
+          tabs: [
+            {
+              path: "two-only.ts",
+              name: "two-only.ts",
+              language: "typescript",
+            },
+          ],
+          activeFilePath: "two-only.ts",
+          expandedPaths: [],
+        },
+      },
+    });
+  }
+
+  function getOpenTabs() {
+    return useEditorStore
+      .getState()
+      .openFiles.map((file) => `${file.workspaceId}:${file.path}`);
+  }
+
+  function getSavedTabPaths(workspaceId: string) {
+    return useEditorStore
+      .getState()
+      .workspaceFileStates[workspaceId]?.tabs.map((tab) => tab.path);
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ content: "two", language: "typescript" }),
+      ),
+    );
+  });
+
+  it("shows the active workspace's saved tabs when opened after switching elsewhere", async () => {
+    // Given
+    seedWorkspaceOneTabOpen();
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws-2" });
+
+    // When
+    renderFilesPage();
+
+    // Then
+    await waitFor(() => expect(getOpenTabs()).toEqual(["ws-2:two-only.ts"]));
+    expect(useEditorStore.getState().activeFilePath).toBe("two-only.ts");
+    expect(getSavedTabPaths("ws-1")).toEqual(["one-only.ts"]);
+    expect(getSavedTabPaths("ws-2")).toEqual(["two-only.ts"]);
+  });
+
+  it("swaps tabs when the workspace changes while the page is open", async () => {
+    // Given
+    seedWorkspaceOneTabOpen();
+    renderFilesPage();
+
+    // When
+    act(() => useWorkspaceStore.getState().setActiveWorkspaceId("ws-2"));
+
+    // Then
+    await waitFor(() => expect(getOpenTabs()).toEqual(["ws-2:two-only.ts"]));
+    expect(getSavedTabPaths("ws-1")).toEqual(["one-only.ts"]);
+    expect(getSavedTabPaths("ws-2")).toEqual(["two-only.ts"]);
+  });
+
+  it("drops a restore that finishes after switching to another workspace", async () => {
+    // Given
+    seedWorkspaceOneTabOpen();
+    useEditorStore.setState({ openFiles: [], activeFilePath: null });
+    let finishWorkspaceOne: (response: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        url.includes("workspaceId=ws-1")
+          ? new Promise<Response>((resolve) => {
+              finishWorkspaceOne = resolve;
+            })
+          : Promise.resolve(
+              Response.json({ content: "two", language: "typescript" }),
+            ),
+      ),
+    );
+    renderFilesPage();
+    act(() => useWorkspaceStore.getState().setActiveWorkspaceId("ws-2"));
+    await waitFor(() => expect(getOpenTabs()).toEqual(["ws-2:two-only.ts"]));
+
+    // When
+    await act(async () => {
+      finishWorkspaceOne(
+        Response.json({ content: "one", language: "typescript" }),
+      );
+    });
+
+    // Then
+    expect(getOpenTabs()).toEqual(["ws-2:two-only.ts"]);
+  });
+
+  it("keeps the saved tabs while they are still loading", () => {
+    // Given
+    seedWorkspaceOneTabOpen();
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws-2" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+
+    // When
+    renderFilesPage();
+
+    // Then
+    expect(getSavedTabPaths("ws-2")).toEqual(["two-only.ts"]);
+  });
+});

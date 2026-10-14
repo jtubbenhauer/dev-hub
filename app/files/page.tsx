@@ -2,7 +2,6 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useShallow } from "zustand/react/shallow";
 import { useEditorTabMetadataSelector } from "@/hooks/use-editor-tab-metadata";
 import { useSearchParams } from "next/navigation";
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
@@ -26,7 +25,6 @@ import {
   getRawFileUrl,
   IMAGE_LANGUAGE,
   isBinaryPreviewLanguage,
-  isImagePath,
 } from "@/lib/file-preview";
 
 import { useFileTabsSetting, useLspEnabledSetting } from "@/hooks/use-settings";
@@ -56,6 +54,7 @@ import { useLintOnSave } from "@/hooks/use-diagnostics";
 import { ProblemsPanel } from "@/components/editor/problems-panel";
 import { LspStatusToggle } from "@/components/editor/lsp-status-toggle";
 import { useLspOpenFileHandler } from "@/hooks/use-lsp-open-file-handler";
+import { useWorkspaceFileTabs } from "@/hooks/use-workspace-file-tabs";
 import { openFileInFilesPage } from "@/lib/files/open-in-files-page";
 import {
   buildFileSaveBody,
@@ -63,26 +62,10 @@ import {
 } from "@/lib/files/save-request";
 import { completeFileSave } from "@/lib/files/save-completion";
 import { submitFileSave } from "@/lib/files/submit-file-save";
-import { didOpenFile } from "@/lib/files/open-result";
 
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = () => Math.max(500, window.innerWidth * 0.5);
 const DEFAULT_PANEL_WIDTH = 260;
-
-async function readFileForEditor(
-  workspaceId: string,
-  filePath: string,
-): Promise<{ content: string; language: string } | null> {
-  if (isImagePath(filePath)) {
-    return { content: "", language: IMAGE_LANGUAGE };
-  }
-  const response = await fetch(
-    `/api/files/content?workspaceId=${workspaceId}&path=${encodeURIComponent(filePath)}`,
-  );
-  if (!response.ok) return null;
-  const data: { content: string; language: string } = await response.json();
-  return { content: data.content, language: data.language };
-}
 
 export default function FilesPage() {
   return (
@@ -101,18 +84,10 @@ function FilesContent() {
   );
 
   const openFiles = useEditorStore(useEditorTabMetadataSelector());
-  const tabPaths = useEditorStore(
-    useShallow((s) => s.openFiles.map((file) => file.path)),
-  );
   const activeFilePath = useEditorStore((s) => s.activeFilePath);
   const isFileTreeOpen = useEditorStore((s) => s.isFileTreeOpen);
   const toggleFileTree = useEditorStore((s) => s.toggleFileTree);
   const updateFileContent = useEditorStore((s) => s.updateFileContent);
-  const editorOpenFile = useEditorStore((s) => s.openFile);
-  const setActiveFile = useEditorStore((s) => s.setActiveFile);
-  const saveWorkspaceState = useEditorStore((s) => s.saveWorkspaceState);
-  const getSavedTabs = useEditorStore((s) => s.getSavedTabs);
-  const getSavedActiveFile = useEditorStore((s) => s.getSavedActiveFile);
   const expandPathToFile = useEditorStore((s) => s.expandPathToFile);
   const expandFolder = useEditorStore((s) => s.expandFolder);
   const toggleExpandedPath = useEditorStore((s) => s.toggleExpandedPath);
@@ -206,75 +181,11 @@ function FilesContent() {
   }, [gitStatus, activeFilePath]);
   const [isMobileTreeOpen, setIsMobileTreeOpen] = useState(false);
   const [savingPath, setSavingPath] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(false);
-  const restoredForRef = useRef<string | null>(null);
-  const restoreTabsPromiseRef = useRef<Promise<void> | null>(null);
-  const openedFromParamRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!activeWorkspaceId || isRestoring || isFileTabsDisabled) return;
-    if (restoredForRef.current === activeWorkspaceId) return;
-
-    const savedTabs = getSavedTabs(activeWorkspaceId);
-    if (savedTabs.length === 0 || openFiles.length > 0) {
-      restoredForRef.current = activeWorkspaceId;
-      return;
-    }
-
-    restoredForRef.current = activeWorkspaceId;
-    setIsRestoring(true);
-
-    const savedActive = getSavedActiveFile(activeWorkspaceId);
-
-    restoreTabsPromiseRef.current = Promise.all(
-      savedTabs.map(async (tab) => {
-        try {
-          const file = await readFileForEditor(activeWorkspaceId, tab.path);
-          if (!file) return null;
-          return {
-            workspaceId: activeWorkspaceId,
-            path: tab.path,
-            name: tab.name,
-            content: file.content,
-            language: file.language,
-            isDirty: false,
-            originalContent: file.content,
-          };
-        } catch {
-          return null;
-        }
-      }),
-    ).then((results) => {
-      for (const file of results) {
-        if (file) didOpenFile(editorOpenFile(file), file.path);
-      }
-      if (savedActive) {
-        const restored = results.find((f) => f?.path === savedActive);
-        if (restored) setActiveFile(restored.path);
-      }
-      setIsRestoring(false);
-    });
-  }, [
+  const restoreTabsPromiseRef = useWorkspaceFileTabs(
     activeWorkspaceId,
-    openFiles.length,
-    isRestoring,
     isFileTabsDisabled,
-    getSavedTabs,
-    getSavedActiveFile,
-    editorOpenFile,
-    setActiveFile,
-  ]);
-
-  useEffect(() => {
-    if (!activeWorkspaceId || isRestoring) return;
-    saveWorkspaceState(activeWorkspaceId);
-  }, [
-    activeWorkspaceId,
-    tabPaths,
-    activeFilePath,
-    isRestoring,
-    saveWorkspaceState,
-  ]);
+  );
+  const openedFromParamRef = useRef<string | null>(null);
 
   useEffect(() => {
     const openPath = searchParams.get("open");
@@ -295,7 +206,13 @@ function FilesContent() {
         isFileTabsDisabled,
       }),
     );
-  }, [searchParams, activeWorkspaceId, expandPathToFile, isFileTabsDisabled]);
+  }, [
+    searchParams,
+    activeWorkspaceId,
+    expandPathToFile,
+    isFileTabsDisabled,
+    restoreTabsPromiseRef,
+  ]);
 
   const expandedFolderRef = useRef<string | null>(null);
 

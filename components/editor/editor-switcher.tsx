@@ -7,6 +7,7 @@ import type { NeovimEditorHandle } from "@/components/editor/neovim-editor";
 import type { MonacoEditorHandle } from "@/components/editor/monaco-editor";
 import { MarkdownPreviewFrame } from "@/components/editor/markdown-preview";
 import { CsvPreviewFrame } from "@/components/editor/csv-preview";
+import type { EditorRevealRequest } from "@/stores/editor-store";
 
 export type EditorHandle = NeovimEditorHandle | MonacoEditorHandle;
 
@@ -35,6 +36,8 @@ interface EditorSwitcherProps {
   filePath?: string;
   autoFocus?: boolean;
   isLspEligible?: boolean;
+  readonly revealRequest?: EditorRevealRequest | null;
+  readonly onRevealHandled?: (id: number) => void;
 }
 
 export const EditorSwitcher = forwardRef<EditorHandle, EditorSwitcherProps>(

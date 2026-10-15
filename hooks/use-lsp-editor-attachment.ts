@@ -1,15 +1,10 @@
 import { useEffect, useId, useRef, type RefObject } from "react";
 import type { editor } from "monaco-editor";
-import { useLspEnabledSetting } from "@/hooks/use-settings";
+import { useLspCandidateUri } from "@/hooks/use-lsp-candidate-uri";
 import { registerLspMonacoInstance } from "@/lib/lsp/client/lsp-session";
 import { takePendingNavigation } from "@/lib/lsp/client/navigation-registry";
-import {
-  isLspDocumentPath,
-  toLowerCaseUriKey,
-  workspaceRelativePathToFileUri,
-} from "@/lib/lsp/document-scope";
+import { toLowerCaseUriKey } from "@/lib/lsp/document-scope";
 import { useLspStore } from "@/stores/lsp-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 
 // Monaco's debounced word highlighter and async providers keep running on the old model after a switch.
 export const PREVIOUS_MODEL_DISPOSE_DELAY_MS = 5_000;
@@ -35,24 +30,11 @@ export function useLspEditorAttachment({
   readonly isLspEligible: boolean | undefined;
   readonly content: string;
 }): string | undefined {
-  const { isLspEnabled } = useLspEnabledSetting();
-  const activeWorkspaceId = useWorkspaceStore(
-    (state) => state.activeWorkspaceId,
-  );
-  const workspace = useWorkspaceStore(
-    (state) =>
-      state.workspaces.find((entry) => entry.id === workspaceId) ?? null,
-  );
-  const candidateUri =
-    isLspEligible &&
-    isLspEnabled &&
-    workspace &&
-    workspace.backend === "local" &&
-    workspaceId === activeWorkspaceId &&
-    filePath &&
-    isLspDocumentPath(filePath)
-      ? workspaceRelativePathToFileUri(workspace.path, filePath)
-      : undefined;
+  const candidateUri = useLspCandidateUri({
+    workspaceId,
+    filePath,
+    isLspEligible,
+  });
   const ownerId = useId();
   const uriKey = candidateUri ? toLowerCaseUriKey(candidateUri) : undefined;
   const currentOwner = useLspStore((state) =>

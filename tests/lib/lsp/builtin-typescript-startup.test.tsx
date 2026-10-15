@@ -83,6 +83,9 @@ vi.mock("@/hooks/use-monaco-diagnostic-markers", () => ({
 vi.mock("@/hooks/use-lsp-editor-attachment", () => ({
   useLspEditorAttachment: () => undefined,
 }));
+vi.mock("@/hooks/use-lsp-candidate-uri", () => ({
+  useLspCandidateUri: () => undefined,
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();

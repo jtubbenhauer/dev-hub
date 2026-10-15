@@ -1,5 +1,7 @@
 "use client";
 
+// allow: SIZE_OK — Todo 13 requires ordered reveal effects alongside both existing PTY switch writes.
+
 import {
   useEffect,
   useState,
@@ -19,6 +21,8 @@ import {
   terminalFontFamily,
 } from "@/hooks/use-settings";
 import { Loader2, AlertCircle } from "lucide-react";
+import type { EditorRevealRequest } from "@/stores/editor-store";
+import { buildNeovimRevealCommand } from "@/components/editor/neovim-reveal-command";
 
 export interface NeovimEditorHandle {
   focus: () => void;
@@ -34,6 +38,8 @@ interface NeovimEditorProps {
   workspaceId?: string;
   filePath?: string;
   autoFocus?: boolean;
+  readonly revealRequest?: EditorRevealRequest | null;
+  readonly onRevealHandled?: (id: number) => void;
 }
 
 interface TerminalConfig {
@@ -66,7 +72,10 @@ function escapeShellSingleQuote(str: string): string {
 }
 
 export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
-  function NeovimEditor({ workspaceId, filePath, autoFocus = true }, ref) {
+  function NeovimEditor(
+    { workspaceId, filePath, autoFocus = true, revealRequest, onRevealHandled },
+    ref,
+  ) {
     const { nvimAppName } = useNvimAppNameSetting();
     const { scrollback } = useTerminalScrollbackSetting();
     const { terminalFont } = useTerminalFontSetting();
@@ -81,6 +90,15 @@ export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
       null,
     );
     const desiredFileRef = useRef<string | null>(null);
+    const isSwitchPendingRef = useRef(false);
+    const revealRequestRef = useRef(revealRequest);
+    const onRevealHandledRef = useRef(onRevealHandled);
+    useEffect(() => {
+      revealRequestRef.current = revealRequest;
+    }, [revealRequest]);
+    useEffect(() => {
+      onRevealHandledRef.current = onRevealHandled;
+    }, [onRevealHandled]);
 
     useImperativeHandle(
       ref,
@@ -182,11 +200,40 @@ export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
       currentFileRef.current = filePath;
       // Escape to normal mode, then open the new file after a brief delay
       terminalHandle.write("\x1b");
+      isSwitchPendingRef.current = true;
       setTimeout(() => {
-        terminalHandle.write(`:e ${filePath}\r`);
+        const request = revealRequestRef.current;
+        if (request?.path === filePath) {
+          const command = buildNeovimRevealCommand(request);
+          terminalHandle.write(
+            command !== null ? `:${command}\r` : `:e ${filePath}\r`,
+          );
+          onRevealHandledRef.current?.(request.id);
+        } else {
+          terminalHandle.write(`:e ${filePath}\r`);
+        }
+        isSwitchPendingRef.current = false;
         terminalHandle.focus();
       }, 50);
     }, [filePath, terminalConfig, isResolving, terminalHandle]);
+
+    useEffect(() => {
+      if (
+        !revealRequest ||
+        revealRequest.path !== filePath ||
+        !terminalHandle ||
+        currentFileRef.current !== filePath ||
+        isSwitchPendingRef.current
+      )
+        return;
+      terminalHandle.write("\x1b");
+      const timer = setTimeout(() => {
+        const command = buildNeovimRevealCommand(revealRequest);
+        if (command !== null) terminalHandle.write(`:${command}\r`);
+        onRevealHandledRef.current?.(revealRequest.id);
+      }, 50);
+      return () => clearTimeout(timer);
+    }, [revealRequest, terminalHandle, filePath]);
 
     const handleTerminalReady = useCallback((handle: TerminalHandle) => {
       setTerminalHandle(handle);
@@ -196,8 +243,19 @@ export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
       if (desired && desired !== currentFileRef.current) {
         currentFileRef.current = desired;
         handle.write("\x1b");
+        isSwitchPendingRef.current = true;
         setTimeout(() => {
-          handle.write(`:e ${desired}\r`);
+          const request = revealRequestRef.current;
+          if (request?.path === desired) {
+            const command = buildNeovimRevealCommand(request);
+            handle.write(
+              command !== null ? `:${command}\r` : `:e ${desired}\r`,
+            );
+            onRevealHandledRef.current?.(request.id);
+          } else {
+            handle.write(`:e ${desired}\r`);
+          }
+          isSwitchPendingRef.current = false;
           handle.focus();
         }, 50);
       }

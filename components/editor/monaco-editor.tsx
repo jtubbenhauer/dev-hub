@@ -1,5 +1,7 @@
 "use client";
 
+// allow: SIZE_OK — Todo 13 keeps the reveal lifecycle beside this editor's model ownership effects.
+
 import {
   useRef,
   useCallback,
@@ -39,6 +41,9 @@ import type { FileComment } from "@/types";
 import { MessageCircle } from "lucide-react";
 import { useMonacoDiagnosticMarkers } from "@/hooks/use-monaco-diagnostic-markers";
 import { useLspEditorAttachment } from "@/hooks/use-lsp-editor-attachment";
+import { useLspCandidateUri } from "@/hooks/use-lsp-candidate-uri";
+import { toLowerCaseUriKey } from "@/lib/lsp/document-scope";
+import type { EditorRevealRequest } from "@/stores/editor-store";
 import { useBuiltinTypeScriptGate } from "@/lib/lsp/client/use-builtin-typescript-gate";
 import { loadMonacoReact } from "@/lib/editor/monaco-bootstrap";
 import { registerEditorSaveAction } from "@/components/editor/editor-save-action";
@@ -103,12 +108,14 @@ interface MonacoEditorProps {
   workspaceId?: string;
   filePath?: string;
   isLspEligible?: boolean;
+  readonly revealRequest?: EditorRevealRequest | null;
+  readonly onRevealHandled?: (id: number) => void;
 }
 
 export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
   function MonacoEditor(
     // prettier-ignore
-    { content, language, onChange, onSave, workspaceId, filePath, isLspEligible },
+    { content, language, onChange, onSave, workspaceId, filePath, isLspEligible, revealRequest, onRevealHandled },
     ref,
   ) {
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -180,6 +187,11 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       onSaveRef.current = onSave;
     });
 
+    const onRevealHandledRef = useRef(onRevealHandled);
+    useEffect(() => {
+      onRevealHandledRef.current = onRevealHandled;
+    }, [onRevealHandled]);
+
     const onChangeRef = useRef(onChange);
     useEffect(() => {
       onChangeRef.current = onChange;
@@ -221,6 +233,66 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     }, [commentInput]);
 
     const [isEditorReady, setIsEditorReady] = useState(false);
+
+    const lspCandidateUri = useLspCandidateUri({
+      workspaceId,
+      filePath,
+      isLspEligible,
+    });
+    useEffect(() => {
+      if (!revealRequest || !isEditorReady) return;
+      const instance = editorRef.current;
+      if (!instance) return;
+      let isFinished = false;
+      let frame: number | null = null;
+      const { lineNumber, startColumn, endColumn } = revealRequest;
+      const isOnFinalModel = () =>
+        lspCandidateUri === undefined ||
+        toLowerCaseUriKey(instance.getModel()?.uri.toString() ?? "") ===
+          toLowerCaseUriKey(lspCandidateUri);
+      const apply = () => {
+        const model = instance.getModel();
+        if (!model) return;
+        const range = model.validateRange({
+          startLineNumber: lineNumber,
+          startColumn,
+          endLineNumber: lineNumber,
+          endColumn,
+        });
+        instance.setSelection(range);
+        instance.revealRangeInCenter(range);
+        instance.focus();
+      };
+      const finish = () => {
+        if (isFinished) return;
+        isFinished = true;
+        modelSubscription.dispose();
+        cursorSubscription.dispose();
+        if (frame !== null) cancelAnimationFrame(frame);
+        onRevealHandledRef.current?.(revealRequest.id);
+      };
+      const modelSubscription = instance.onDidChangeModel(() => {
+        if (frame !== null) cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+          frame = null;
+          apply();
+          if (isOnFinalModel()) finish();
+        });
+      });
+      const cursorSubscription = instance.onDidChangeCursorSelection(
+        (event) => {
+          if (event.source === "keyboard" || event.source === "mouse") finish();
+        },
+      );
+      apply();
+      if (isOnFinalModel()) finish();
+      return () => {
+        isFinished = true;
+        modelSubscription.dispose();
+        cursorSubscription.dispose();
+        if (frame !== null) cancelAnimationFrame(frame);
+      };
+    }, [revealRequest, isEditorReady, lspCandidateUri]);
 
     useMonacoDiagnosticMarkers(
       monacoRef,

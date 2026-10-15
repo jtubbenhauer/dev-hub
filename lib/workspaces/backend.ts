@@ -16,6 +16,12 @@ import type {
 import type { workspaces } from "@/drizzle/schema";
 import simpleGit from "simple-git";
 import { isRemoteHostReachable } from "@/lib/workspaces/remote-reachability";
+import {
+  buildContentSearchParams,
+  parseContentSearchOutcome,
+} from "@devhub/shared";
+import type { ContentSearchOutcome, ContentSearchQuery } from "@devhub/shared";
+import { searchWorkspaceContent } from "@devhub/shared/content-search";
 
 type WorkspaceRow = typeof workspaces.$inferSelect;
 
@@ -78,6 +84,12 @@ export interface WorkspaceBackend {
   writeFile(filePath: string, content: string): Promise<void>;
   listDirectory(dirPath: string, depth?: number): Promise<FileTreeEntry[]>;
   getFileStatuses(): Promise<Map<string, FileGitStatus>>;
+
+  // Search
+  searchContent(
+    query: ContentSearchQuery,
+    signal?: AbortSignal,
+  ): Promise<ContentSearchOutcome>;
 
   // Git core
   getGitStatus(): Promise<GitStatusResult>;
@@ -164,6 +176,14 @@ export class LocalBackend implements WorkspaceBackend {
 
   getFileStatuses() {
     return getFileStatuses(this.workspacePath);
+  }
+
+  searchContent(query: ContentSearchQuery, signal?: AbortSignal) {
+    return searchWorkspaceContent({
+      workspacePath: this.workspacePath,
+      query,
+      signal,
+    });
   }
 
   getGitStatus() {
@@ -359,6 +379,30 @@ export class LocalBackend implements WorkspaceBackend {
   }
 }
 
+// The agent answers /files/grep with an outcome body for 200/400/500/503;
+// a 404 means the agent predates content search.
+async function toRemoteSearchOutcome(
+  response: Response,
+): Promise<ContentSearchOutcome> {
+  if (response.status === 404) {
+    return {
+      kind: "unavailable",
+      message:
+        "The remote agent does not support content search yet - update it",
+    };
+  }
+  const failedOutcome: ContentSearchOutcome = {
+    kind: "failed",
+    message: `Agent request failed: ${response.status}`,
+  };
+  try {
+    const body: unknown = await response.json();
+    return parseContentSearchOutcome(body) ?? failedOutcome;
+  } catch {
+    return failedOutcome;
+  }
+}
+
 export class RemoteBackend implements WorkspaceBackend {
   constructor(
     private agentUrl: string,
@@ -429,6 +473,27 @@ export class RemoteBackend implements WorkspaceBackend {
     const result =
       await this.agentGet<Record<string, FileGitStatus>>("/files/status");
     return new Map(Object.entries(result));
+  }
+
+  async searchContent(
+    query: ContentSearchQuery,
+    signal?: AbortSignal,
+  ): Promise<ContentSearchOutcome> {
+    const url = new URL("/files/grep", this.agentUrl);
+    url.search = buildContentSearchParams(query).toString();
+    try {
+      const response = await globalThis.fetch(url, { signal });
+      return await toRemoteSearchOutcome(response);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return { kind: "failed", message: "Search cancelled" };
+      }
+      const reason = error instanceof Error ? error.message : String(error);
+      return {
+        kind: "failed",
+        message: `Could not reach the remote agent: ${reason}`,
+      };
+    }
   }
 
   async getGitStatus() {

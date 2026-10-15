@@ -1,4 +1,5 @@
 // @vitest-environment node
+// allow: SIZE_OK — The mandated 22-case safety table shares one isolated Neovim harness with width regressions.
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -18,9 +19,9 @@ describe("buildNeovimRevealCommand", () => {
   it("builds the exact guarded command when the request is valid", () => {
     // Given / When
     const command = buildNeovimRevealCommand(request);
-    // Then — copied from the plan's verified command.
+    // Then
     expect(command).toBe(
-      "if expand('%:p') ==# fnamemodify('a.txt', ':p') && &modified | echohl WarningMsg | echomsg 'dev-hub: a.txt has unsaved changes, so the search match was not selected' | echohl None | else | execute 'edit' fnameescape('a.txt') | if expand('%:p') !=# fnamemodify('a.txt', ':p') | echohl WarningMsg | echomsg 'dev-hub: could not open a.txt for the search result' | echohl None | elseif &modified | echohl WarningMsg | echomsg 'dev-hub: a.txt has unsaved changes, so the search match was not selected' | echohl None | else | edit | if 2 > line('$') || sha256(getline(2)) !=# '795c238dcce900c0131e710c25229cc164f8c22b48bb0d5ea3343ad340d91bc4' | echohl WarningMsg | echomsg 'dev-hub: a.txt changed since the search ran. Search again.' | echohl None | else | call cursor(2, 3) | execute 'normal! zz' | endif | endif | endif",
+      "if expand('%:p') ==# fnamemodify('a.txt', ':p') && &modified | redraw | echohl WarningMsg | echomsg (strdisplaywidth('dev-hub: a.txt has unsaved changes, so the search match was not selected') <= v:echospace ? 'dev-hub: a.txt has unsaved changes, so the search match was not selected' : printf('%.*S', v:echospace, 'dev-hub: has unsaved changes (' . fnamemodify('a.txt', ':t') . ')')) | echohl None | else | execute 'edit' fnameescape('a.txt') | if expand('%:p') !=# fnamemodify('a.txt', ':p') | redraw | echohl WarningMsg | echomsg (strdisplaywidth('dev-hub: could not open a.txt for the search result') <= v:echospace ? 'dev-hub: could not open a.txt for the search result' : printf('%.*S', v:echospace, 'dev-hub: could not open (' . fnamemodify('a.txt', ':t') . ')')) | echohl None | elseif &modified | redraw | echohl WarningMsg | echomsg (strdisplaywidth('dev-hub: a.txt has unsaved changes, so the search match was not selected') <= v:echospace ? 'dev-hub: a.txt has unsaved changes, so the search match was not selected' : printf('%.*S', v:echospace, 'dev-hub: has unsaved changes (' . fnamemodify('a.txt', ':t') . ')')) | echohl None | else | edit | if 2 > line('$') || sha256(getline(2)) !=# '795c238dcce900c0131e710c25229cc164f8c22b48bb0d5ea3343ad340d91bc4' | redraw | echohl WarningMsg | echomsg (strdisplaywidth('dev-hub: a.txt changed since the search ran. Search again.') <= v:echospace ? 'dev-hub: a.txt changed since the search ran. Search again.' : printf('%.*S', v:echospace, 'dev-hub: changed since the search ran. Search again. (' . fnamemodify('a.txt', ':t') . ')')) | echohl None | else | call cursor(2, 3) | execute 'normal! zz' | endif | endif | endif",
     );
   });
 
@@ -68,6 +69,44 @@ describe.skipIf(spawnSync("nvim", ["--version"]).status !== 0)(
       "it's | odd.txt": "first\na needle here\n",
       "crlf.txt": "first\r\na needle here\r\n",
     };
+    it.each([80, 97])(
+      "fits a Unicode basename warning into %i columns",
+      (columns) => {
+        // Given
+        const target = `${"nested/".repeat(15)}${"界".repeat(60)}.txt`;
+        const command = buildNeovimRevealCommand({ ...request, path: target });
+        if (command === null)
+          throw new Error("Expected a valid reveal command");
+        const scriptPath = path.join(dir, "width.vim");
+        fs.writeFileSync(
+          scriptPath,
+          [
+            `set columns=${columns} ruler`,
+            `execute 'file' fnameescape('${target}')`,
+            "call setline(1, 'modified')",
+            `call feedkeys(':' . '${command.replaceAll("'", "''")}' . "\r", 'ntx')`,
+            "let warning = split(execute('messages'), \"\\n\")[-1]",
+            "call writefile([warning, string(strdisplaywidth(warning)), string(v:echospace)], 'width.txt')",
+            "qa!",
+            "",
+          ].join("\n"),
+        );
+        // When
+        const result = spawnSync(
+          "nvim",
+          ["--headless", "--clean", "-n", "-S", scriptPath],
+          { cwd: dir, timeout: 15000 },
+        );
+        // Then
+        expect(result.status).toBe(0);
+        const [message, width, available] = fs
+          .readFileSync(path.join(dir, "width.txt"), "utf8")
+          .split("\n");
+        expect(Number(width)).toBeLessThanOrEqual(Number(available));
+        expect(message).toContain("dev-hub: has unsaved changes");
+        expect(message).toContain("界");
+      },
+    );
     const scenarios = [
       {
         id: 1,
@@ -94,8 +133,7 @@ describe.skipIf(spawnSync("nvim", ["--version"]).status !== 0)(
         target: "a.txt",
         cursor: "[1, 1]",
         modified: "modified",
-        message:
-          "dev-hub: a.txt has unsaved changes, so the search match was not selected",
+        message: "dev-hub: has unsaved changes (a.txt)",
         preserved: "a.txt",
       },
       {
@@ -140,8 +178,7 @@ describe.skipIf(spawnSync("nvim", ["--version"]).status !== 0)(
         target: "a.txt",
         cursor: "[1, 1]",
         modified: "modified",
-        message:
-          "dev-hub: a.txt has unsaved changes, so the search match was not selected",
+        message: "dev-hub: has unsaved changes (a.txt)",
         preserved: "a.txt",
       },
       {

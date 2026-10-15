@@ -76,7 +76,9 @@ export function runLineProcess(
         if (isWindows) child.kill(killSignal);
         else process.kill(-pid, killSignal);
       } catch (error) {
-        if (error instanceof Error && readErrorCode(error) === "ESRCH") return;
+        // ESRCH: group gone. EPERM: macOS, when the leader is an unreaped zombie.
+        const code = error instanceof Error ? readErrorCode(error) : null;
+        if (code === "ESRCH" || code === "EPERM") return;
         throw error;
       }
     }

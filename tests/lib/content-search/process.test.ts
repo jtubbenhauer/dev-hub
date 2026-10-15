@@ -1,4 +1,8 @@
 // @vitest-environment node
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runLineProcess } from "@/packages/shared/src/content-search/process";
 
@@ -9,6 +13,7 @@ const GRANDCHILD_SCRIPT = [
 ].join(" ");
 
 const startedPids: number[] = [];
+const createdDirs: string[] = [];
 
 afterEach(() => {
   while (startedPids.length > 0) {
@@ -20,7 +25,26 @@ afterEach(() => {
       // Already gone.
     }
   }
+  while (createdDirs.length > 0) {
+    const dir = createdDirs.pop();
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
+
+// Blocks the event loop so an exited child stays an unreaped zombie when
+// runLineProcess signals its process group.
+function stopAfterBlockingEventLoop(): "stop" {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+  return "stop";
+}
+
+function makeGitRepoWithTwoMatchingLines(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "content-search-process-"));
+  createdDirs.push(dir);
+  execFileSync("git", ["init", "--quiet"], { cwd: dir });
+  fs.writeFileSync(path.join(dir, "a.txt"), "a needle\nanother needle\n");
+  return dir;
+}
 
 function runNodeScript(
   script: string,
@@ -247,5 +271,31 @@ describe("runLineProcess", () => {
     expect(result.isAborted).toBe(true);
     const grandchildPid = recordGrandchildPid(lines);
     expect(await waitUntilProcessGone(grandchildPid, 2000)).toBe(true);
+  });
+
+  it("resolves when stopping a short-lived node process that already exited", async () => {
+    for (let iteration = 0; iteration < 5; iteration++) {
+      const result = await runNodeScript("console.log('a'); console.log('b')", {
+        onLine: stopAfterBlockingEventLoop,
+      });
+
+      expect(result.isStopped).toBe(true);
+    }
+  });
+
+  it("resolves when stopping a short-lived git grep that already exited", async () => {
+    const repoDir = makeGitRepoWithTwoMatchingLines();
+
+    for (let iteration = 0; iteration < 5; iteration++) {
+      const result = await runLineProcess({
+        command: "git",
+        args: ["grep", "--untracked", "needle"],
+        cwd: repoDir,
+        timeoutMs: 15_000,
+        onLine: stopAfterBlockingEventLoop,
+      });
+
+      expect(result.isStopped).toBe(true);
+    }
   });
 });

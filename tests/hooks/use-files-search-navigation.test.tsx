@@ -31,6 +31,14 @@ const input = {
   isMobile: false,
 };
 const fetchMock = vi.fn<typeof fetch>();
+const previewCases = [
+  {
+    path: "docs/a.md",
+    previewKey: "markdownPreviewPath",
+    language: "markdown",
+  },
+  { path: "data/a.csv", previewKey: "csvPreviewPath", language: "csv" },
+] as const;
 
 function seedTab(overrides: Partial<OpenFile> = {}) {
   const tab: OpenFile = {
@@ -118,6 +126,66 @@ describe("useFilesSearchNavigation", () => {
       expect.objectContaining({ path: "b.ts" }),
     );
   });
+
+  it.each(previewCases)(
+    "preserves $previewKey and its folder when a slow preview click loses",
+    async ({ path, previewKey, language }) => {
+      // Given
+      useEditorStore.setState({ [previewKey]: path });
+      const first = deferred<Response>();
+      fetchMock.mockImplementation(async (url) =>
+        String(url).endsWith(`path=${encodeURIComponent(path)}`)
+          ? first.promise
+          : diskResponse(),
+      );
+      const reveal = vi.spyOn(useEditorStore.getState(), "requestReveal");
+      const { result } = renderHook(() => useFilesSearchNavigation(input));
+      // When
+      const openingA = result.current.handleOpenMatch(path, match);
+      await act(() => result.current.handleOpenMatch("src/b.ts", match));
+      const stateAfterB = useEditorStore.getState();
+      await act(async () => {
+        first.resolve(Response.json({ content, language }));
+        await openingA;
+      });
+      // Then
+      const state = useEditorStore.getState();
+      expect(state[previewKey]).toBe(path);
+      expect(state.getExpandedPaths("ws-1")).toEqual(new Set(["src"]));
+      expect(state).toBe(stateAfterB);
+      expect(state.activeFilePath).toBe("src/b.ts");
+      expect(reveal).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ path: "src/b.ts" }),
+      );
+    },
+  );
+
+  it.each(previewCases)(
+    "clears $previewKey and expands its folder only after a winning open",
+    async ({ path, previewKey, language }) => {
+      // Given
+      useEditorStore.setState({ [previewKey]: path });
+      const pending = deferred<Response>();
+      fetchMock.mockImplementationOnce(() => pending.promise);
+      const { result } = renderHook(() => useFilesSearchNavigation(input));
+      const initialState = useEditorStore.getState();
+      // When
+      const opening = result.current.handleOpenMatch(path, match);
+      const stateWhileOpening = useEditorStore.getState();
+      await act(async () => {
+        pending.resolve(Response.json({ content, language }));
+        await opening;
+      });
+      // Then
+      expect(stateWhileOpening).toBe(initialState);
+      const state = useEditorStore.getState();
+      expect(state[previewKey]).toBeNull();
+      expect(state.getExpandedPaths("ws-1")).toEqual(
+        new Set([path.split("/")[0]]),
+      );
+      expect(state.pendingReveal).toMatchObject({ path, lineNumber: 2 });
+    },
+  );
 
   it.each([false, true])(
     "drops an in-flight read after a workspace switch (verification=%s)",

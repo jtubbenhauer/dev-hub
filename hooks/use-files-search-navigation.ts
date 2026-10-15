@@ -30,12 +30,6 @@ export function useFilesSearchNavigation(input: {
       const isCurrent = () =>
         token === navigationTokenRef.current &&
         useWorkspaceStore.getState().activeWorkspaceId === workspaceId;
-      const state = useEditorStore.getState();
-      if (state.markdownPreviewPath === path)
-        state.setMarkdownPreviewPath(null);
-      if (state.csvPreviewPath === path) state.setCsvPreviewPath(null);
-      state.expandPathToFile(workspaceId, path);
-
       const isOpened = await openFileInFilesPage({
         workspaceId,
         path,
@@ -43,6 +37,12 @@ export function useFilesSearchNavigation(input: {
         shouldCommit: isCurrent,
       });
       if (!isOpened || !isCurrent()) return;
+      const state = useEditorStore.getState();
+      if (state.markdownPreviewPath === path)
+        state.setMarkdownPreviewPath(null);
+      if (state.csvPreviewPath === path) state.setCsvPreviewPath(null);
+      state.expandPathToFile(workspaceId, path);
+
       const getTab = () =>
         useEditorStore
           .getState()

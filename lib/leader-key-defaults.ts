@@ -18,6 +18,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
     page: "global",
   },
   { id: "global:file-picker", label: "Open file picker", page: "global" },
+  { id: "global:find-in-files", label: "Find in files", page: "global" },
   { id: "global:session-picker", label: "Open session picker", page: "global" },
   {
     id: "global:switch-workspace",
@@ -131,6 +132,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "nav:terminal": "g m",
   "global:command-palette": ",",
   "global:file-picker": "f",
+  "global:find-in-files": "/",
   "global:session-picker": "e",
   "global:switch-workspace": "w",
   "global:task-picker": "t",

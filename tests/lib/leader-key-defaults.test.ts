@@ -43,3 +43,23 @@ describe("leader-key-defaults chat:toggle-collapse-finished-thinking", () => {
     expect(collisions).toEqual([]);
   });
 });
+
+describe("leader-key-defaults global:find-in-files", () => {
+  it("binds global:find-in-files to '/'", () => {
+    expect(DEFAULT_LEADER_BINDINGS["global:find-in-files"]).toBe("/");
+  });
+
+  it("does not map any other action to '/'", () => {
+    const collisions = Object.entries(DEFAULT_LEADER_BINDINGS).filter(
+      ([id, keys]) => keys === "/" && id !== "global:find-in-files",
+    );
+    expect(collisions).toEqual([]);
+  });
+
+  it("includes a global find-in-files builtin action", () => {
+    const findAction = BUILTIN_ACTIONS.find(
+      (a) => a.id === "global:find-in-files",
+    );
+    expect(findAction?.page).toBe("global");
+  });
+});

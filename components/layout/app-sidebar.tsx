@@ -23,6 +23,7 @@ import { useSessionPicker } from "@/components/session-picker/session-picker";
 import { useTaskPicker } from "@/components/task-picker/task-picker";
 import { useGitPicker } from "@/components/git-picker/git-picker";
 import { useWorkspacePicker } from "@/components/workspace-picker/workspace-picker";
+import { openFindInFiles } from "@/lib/files/open-find-in-files";
 import {
   Sidebar,
   SidebarContent,
@@ -91,6 +92,8 @@ export function AppSidebar() {
   // Stable refs so the leader action useMemo stays stable
   const routerRef = useRef(router);
   routerRef.current = router;
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const openCommandPaletteRef = useRef(openCommandPalette);
   openCommandPaletteRef.current = openCommandPalette;
   const openFilePickerRef = useRef(openFilePicker);
@@ -177,6 +180,18 @@ export function AppSidebar() {
           page: "global" as const,
         },
         handler: () => openFilePickerRef.current(),
+      },
+      {
+        action: {
+          id: "global:find-in-files",
+          label: "Find in files",
+          page: "global" as const,
+        },
+        handler: () =>
+          openFindInFiles({
+            pathname: pathnameRef.current,
+            push: (href) => routerRef.current.push(href),
+          }),
       },
       {
         action: {

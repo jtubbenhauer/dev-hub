@@ -14,6 +14,7 @@ import {
   FilePickerProvider,
   FilePickerDialog,
 } from "@/components/file-picker/file-picker";
+import { FindInFilesShortcut } from "@/components/editor/find-in-files-shortcut";
 import {
   SessionPickerProvider,
   SessionPickerDialog,
@@ -90,6 +91,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                           {children}
                           <CommandPalette />
                           <FilePickerDialog />
+                          <FindInFilesShortcut />
                           <SessionPickerDialog />
                           <TaskPickerDialog />
                           <GitPickerDialog />

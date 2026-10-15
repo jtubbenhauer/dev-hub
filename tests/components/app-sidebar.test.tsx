@@ -50,6 +50,10 @@ vi.mock("@/components/git-picker/git-picker", () => ({
 vi.mock("@/components/workspace-picker/workspace-picker", () => ({
   useWorkspacePicker: vi.fn(() => ({ open: vi.fn() })),
 }));
+const mockOpenFindInFiles = vi.fn();
+vi.mock("@/lib/files/open-find-in-files", () => ({
+  openFindInFiles: (...args: unknown[]) => mockOpenFindInFiles(...args),
+}));
 
 globalThis.ResizeObserver = class {
   observe() {}
@@ -131,6 +135,25 @@ describe("AppSidebar", () => {
 
     prsAction?.handler();
     expect(pushMock).toHaveBeenCalledWith("/prs");
+  });
+
+  it("registers a global:find-in-files leader action with the current pathname", () => {
+    mockPathname.mockReturnValue("/chat");
+    mockOpenFindInFiles.mockClear();
+    renderSidebar();
+
+    const registrations: {
+      action: { id: string };
+      handler: () => void;
+    }[] = mockUseLeaderAction.mock.calls[0][0];
+    const findAction = registrations.find(
+      (r) => r.action.id === "global:find-in-files",
+    );
+    findAction?.handler();
+
+    expect(mockOpenFindInFiles).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: "/chat" }),
+    );
   });
 
   it("renders Sidebar with collapsible='offcanvas' (data-collapsible attribute)", () => {

@@ -8,6 +8,25 @@ import { SearchPanel } from "@/components/editor/search-panel";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useContentSearchStore } from "@/stores/content-search-store";
 
+// Counts HighlightedText renders per preview text so the memo test can assert
+// that moving the selection re-renders only the affected rows.
+const highlightRenderCounts = vi.hoisted(() => new Map<string, number>());
+
+vi.mock("@/components/ui/highlighted-text", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/components/ui/highlighted-text")>();
+  function CountingHighlightedText(
+    props: Parameters<typeof actual.HighlightedText>[0],
+  ) {
+    highlightRenderCounts.set(
+      props.text,
+      (highlightRenderCounts.get(props.text) ?? 0) + 1,
+    );
+    return actual.HighlightedText(props);
+  }
+  return { HighlightedText: CountingHighlightedText };
+});
+
 type OkOutcome = Extract<ContentSearchOutcome, { kind: "ok" }>;
 
 const LINE_SHA = "0".repeat(64);
@@ -109,6 +128,7 @@ beforeEach(() => {
     sidebarView: "explorer",
     pendingFocus: false,
   });
+  highlightRenderCounts.clear();
 });
 
 afterEach(() => {
@@ -350,13 +370,14 @@ describe("SearchPanel layout and truncation (jsdom class assertions)", () => {
     renderPanel();
     await screen.findByText("3 results in 2 files", {}, { timeout: 3000 });
 
+    // shrink-0 keeps the basename at its natural width; max-w-full + truncate
+    // ellipsizes it only when the basename ALONE exceeds the container.
     const basename = screen.getByText("alpha.ts");
-    expect(basename).toHaveClass("min-w-0", "truncate");
-    expect(basename).not.toHaveClass("shrink-0");
+    expect(basename).toHaveClass("shrink-0", "max-w-full", "truncate");
 
-    // The dirname gives way first (higher shrink factor) and truncates.
+    // The dirname takes only the leftover space and gives way first.
     const dirname = screen.getByText("src");
-    expect(dirname).toHaveClass("min-w-0", "shrink-[3]", "truncate");
+    expect(dirname).toHaveClass("min-w-0", "flex-1", "truncate");
 
     const header = basename.closest("button");
     if (header === null) throw new Error("file header button not found");
@@ -366,6 +387,37 @@ describe("SearchPanel layout and truncation (jsdom class assertions)", () => {
     // alpha.ts has 2 matches; its count badge never shrinks away.
     const badge = screen.getByText("2");
     expect(badge).toHaveClass("shrink-0");
+  });
+
+  it("re-renders only the affected match rows when the selection moves", async () => {
+    stubFetch(makeOkOutcome());
+    useContentSearchStore.setState({ pattern: "alpha" });
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText("3 results in 2 files", {}, { timeout: 3000 });
+
+    await user.click(searchInput());
+    highlightRenderCounts.clear();
+    await user.keyboard("{ArrowDown}");
+
+    // Selecting row 0 must not re-render the other rows.
+    expect(
+      highlightRenderCounts.get("const alphaOne = 1;") ?? 0,
+    ).toBeGreaterThanOrEqual(1);
+    expect(highlightRenderCounts.get("const alphaTwo = 2;") ?? 0).toBe(0);
+    expect(highlightRenderCounts.get("const betaOne = 3;") ?? 0).toBe(0);
+
+    highlightRenderCounts.clear();
+    await user.keyboard("{ArrowDown}");
+
+    // Moving 0 -> 1 re-renders the deselected and newly-selected rows only.
+    expect(
+      highlightRenderCounts.get("const alphaOne = 1;") ?? 0,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      highlightRenderCounts.get("const alphaTwo = 2;") ?? 0,
+    ).toBeGreaterThanOrEqual(1);
+    expect(highlightRenderCounts.get("const betaOne = 3;") ?? 0).toBe(0);
   });
 
   it("renders a multi-line error message verbatim, pre-wrapped and monospace", async () => {

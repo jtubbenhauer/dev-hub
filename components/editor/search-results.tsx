@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { ChevronRight, File } from "lucide-react";
 import type { ContentSearchFile, ContentSearchMatch } from "@devhub/shared";
 
@@ -40,6 +41,41 @@ function previewPositions(match: ContentSearchMatch): Set<number> {
   return positions;
 }
 
+interface SearchMatchRowProps {
+  path: string;
+  match: ContentSearchMatch;
+  matchKey: string;
+  isSelected: boolean;
+  onSelect: (path: string, match: ContentSearchMatch, key: string) => void;
+}
+
+// Memoized so moving the selection re-renders only the two affected rows,
+// not all (up to 2000) result rows.
+const SearchMatchRow = memo(function SearchMatchRow({
+  path,
+  match,
+  matchKey: rowKey,
+  isSelected,
+  onSelect,
+}: SearchMatchRowProps) {
+  const positions = useMemo(() => previewPositions(match), [match]);
+  return (
+    <button
+      type="button"
+      data-match-key={rowKey}
+      className={cn(
+        "flex w-full min-w-0 items-center rounded-sm py-0.5 pr-2 pl-8 text-xs",
+        isSelected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
+      )}
+      onClick={() => onSelect(path, match, rowKey)}
+    >
+      <span className="min-w-0 flex-1 overflow-hidden text-left font-mono text-ellipsis whitespace-pre">
+        <HighlightedText text={match.preview} positions={positions} />
+      </span>
+    </button>
+  );
+});
+
 interface SearchResultFileProps {
   file: ContentSearchFile;
   isCollapsed: boolean;
@@ -76,9 +112,11 @@ function SearchResultFile({
         />
         <File className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
         <div className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden text-left">
-          <span className="min-w-0 truncate font-mono text-xs">{basename}</span>
+          <span className="max-w-full shrink-0 truncate font-mono text-xs">
+            {basename}
+          </span>
           {dirname && (
-            <span className="text-muted-foreground min-w-0 shrink-[3] truncate text-[11px]">
+            <span className="text-muted-foreground min-w-0 flex-1 truncate text-[11px]">
               {dirname}
             </span>
           )}
@@ -90,27 +128,15 @@ function SearchResultFile({
       {!isCollapsed &&
         file.matches.map((match, index) => {
           const key = matchKey(file.path, index);
-          const isSelected = key === selectedKey;
           return (
-            <button
+            <SearchMatchRow
               key={key}
-              type="button"
-              data-match-key={key}
-              className={cn(
-                "flex w-full min-w-0 items-center rounded-sm py-0.5 pr-2 pl-8 text-xs",
-                isSelected
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-accent/50",
-              )}
-              onClick={() => onSelect(file.path, match, key)}
-            >
-              <span className="min-w-0 flex-1 overflow-hidden text-left font-mono text-ellipsis whitespace-pre">
-                <HighlightedText
-                  text={match.preview}
-                  positions={previewPositions(match)}
-                />
-              </span>
-            </button>
+              path={file.path}
+              match={match}
+              matchKey={key}
+              isSelected={key === selectedKey}
+              onSelect={onSelect}
+            />
           );
         })}
     </div>

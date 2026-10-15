@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import {
   CaseSensitive,
@@ -121,18 +121,19 @@ export function SearchPanel({ workspaceId, onOpenMatch }: SearchPanelProps) {
     }
   };
 
-  const handleSelectMatch = (
-    path: string,
-    match: ContentSearchMatch,
-    key: string,
-  ) => {
-    setSelectedIndex(
-      visibleMatches.findIndex((visible) => visible.key === key),
-    );
-    onOpenMatch(path, match);
-  };
+  // Stable across selection changes so memoized match rows skip re-rendering;
+  // visibleMatches only changes with files/collapsedPaths, not selectedIndex.
+  const handleSelectMatch = useCallback(
+    (path: string, match: ContentSearchMatch, key: string) => {
+      setSelectedIndex(
+        visibleMatches.findIndex((visible) => visible.key === key),
+      );
+      onOpenMatch(path, match);
+    },
+    [visibleMatches, onOpenMatch],
+  );
 
-  const toggleFile = (path: string) => {
+  const toggleFile = useCallback((path: string) => {
     setCollapsedPaths((previous) => {
       const next = new Set(previous);
       if (next.has(path)) {
@@ -142,7 +143,7 @@ export function SearchPanel({ workspaceId, onOpenMatch }: SearchPanelProps) {
       }
       return next;
     });
-  };
+  }, []);
 
   const collapseAll = () => {
     setCollapsedPaths(new Set(files.map((file) => file.path)));

@@ -1,3 +1,4 @@
+// allow: SIZE_OK — Todo 14 extends this existing page acceptance suite without moving its assertions.
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -12,6 +13,10 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { useEditorStore } from "@/stores/editor-store";
+import type { EditorRevealRequest } from "@/stores/editor-store";
+import { useContentSearchStore } from "@/stores/content-search-store";
+import { buildMatch } from "@/packages/shared/src/content-search/preview";
+import type { SearchPanelProps } from "@/components/editor/search-panel";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { FileTreeEntry, Workspace } from "@/types";
 
@@ -24,7 +29,7 @@ let searchParams = new URLSearchParams();
 let isLspEnabled = false;
 const lintFile = vi.fn();
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 let leaderRegistrations: LeaderRegistration[] = [];
 
@@ -64,8 +69,39 @@ vi.mock("@/components/editor/file-tabs", () => ({
 }));
 
 vi.mock("@/components/editor/editor-switcher", () => ({
-  EditorSwitcher: ({ isLspEligible }: { isLspEligible: boolean }) => (
-    <div data-testid="editor-switcher" data-eligible={String(isLspEligible)} />
+  EditorSwitcher: ({
+    isLspEligible,
+    revealRequest,
+  }: {
+    isLspEligible: boolean;
+    revealRequest?: EditorRevealRequest | null;
+  }) => (
+    <div
+      data-testid="editor-switcher"
+      data-eligible={String(isLspEligible)}
+      data-reveal-line={revealRequest?.lineNumber}
+    />
+  ),
+}));
+
+const searchLine = "const needle = true;";
+const searchMatch = buildMatch({
+  line: searchLine,
+  lineNumber: 2,
+  start: 6,
+  end: 12,
+  lineSha256: "0".repeat(64),
+});
+vi.mock("@/components/editor/search-panel", () => ({
+  SearchPanel: ({ onOpenMatch }: SearchPanelProps) => (
+    <div data-testid="search-panel">
+      <button onClick={() => onOpenMatch("src/a.ts", searchMatch)}>
+        Open match
+      </button>
+      <button onClick={() => onOpenMatch("notes.md", searchMatch)}>
+        Open markdown match
+      </button>
+    </div>
   ),
 }));
 
@@ -157,6 +193,10 @@ beforeEach(() => {
   vi.unstubAllGlobals();
   searchParams = new URLSearchParams();
   leaderRegistrations = [];
+  useContentSearchStore.setState({
+    sidebarView: "explorer",
+    pendingFocus: false,
+  });
   useWorkspaceStore.setState({
     workspaces: [workspace],
     activeWorkspaceId: workspace.id,
@@ -166,6 +206,113 @@ beforeEach(() => {
     activeFilePath: null,
     isFileTreeOpen: true,
     workspaceFileStates: {},
+    pendingReveal: null,
+    markdownPreviewPath: null,
+    csvPreviewPath: null,
+  });
+});
+
+describe("FilesPage content search", () => {
+  it("switches back to the tree when Explorer is clicked after Search", async () => {
+    // Given
+    renderFilesPage();
+    const user = userEvent.setup();
+    // When
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    // Then
+    expect(screen.getByTestId("search-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("tree-image")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    // When
+    await user.click(screen.getByRole("button", { name: "Explorer" }));
+    // Then
+    expect(screen.getByTestId("tree-image")).toBeInTheDocument();
+    expect(screen.queryByTestId("search-panel")).not.toBeInTheDocument();
+  });
+
+  it("passes the match line to the editor when a search result opens", async () => {
+    // Given
+    useContentSearchStore.setState({ sidebarView: "search" });
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        content: `first\n${searchLine}`,
+        language: "typescript",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderFilesPage();
+    // When
+    await userEvent.click(screen.getByRole("button", { name: "Open match" }));
+    // Then
+    await waitFor(() =>
+      expect(screen.getByTestId("editor-switcher")).toHaveAttribute(
+        "data-reveal-line",
+        "2",
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/files/content?workspaceId=ws-1&path=src%2Fa.ts",
+    );
+  });
+
+  it("clears markdown preview when opening a markdown search match", async () => {
+    // Given
+    useContentSearchStore.setState({ sidebarView: "search" });
+    useEditorStore.setState({ markdownPreviewPath: "notes.md" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          content: `first\n${searchLine}`,
+          language: "markdown",
+        }),
+      ),
+    );
+    renderFilesPage();
+    // When
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open markdown match" }),
+    );
+    // Then
+    await waitFor(() =>
+      expect(screen.getByTestId("editor-switcher")).toHaveAttribute(
+        "data-reveal-line",
+        "2",
+      ),
+    );
+    expect(useEditorStore.getState().markdownPreviewPath).toBeNull();
+  });
+
+  it("leaves no pending reveal when the content endpoint returns 404", async () => {
+    // Given
+    useContentSearchStore.setState({ sidebarView: "search" });
+    const fetchMock = vi.fn(async () => new Response(null, { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    renderFilesPage();
+    // When
+    await userEvent.click(screen.getByRole("button", { name: "Open match" }));
+    // Then
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(useEditorStore.getState().pendingReveal).toBeNull();
+    expect(screen.queryByTestId("editor-switcher")).not.toBeInTheDocument();
+  });
+
+  it("restores Explorer when the filename-search leader action runs", () => {
+    // Given
+    useContentSearchStore.setState({ sidebarView: "search" });
+    renderFilesPage();
+    expect(screen.getByTestId("search-panel")).toBeInTheDocument();
+    // When
+    act(() =>
+      leaderRegistrations
+        .find(({ action }) => action.id === "files:focus-search")
+        ?.handler(),
+    );
+    // Then
+    expect(screen.getByTestId("tree-image")).toBeInTheDocument();
   });
 });
 

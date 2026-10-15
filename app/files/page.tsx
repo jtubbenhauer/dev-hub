@@ -1,13 +1,13 @@
 "use client";
+// allow: SIZE_OK — Todo 14 caps this page at 648 lines and forbids moving unrelated logic.
 
 import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEditorTabMetadataSelector } from "@/hooks/use-editor-tab-metadata";
 import { useSearchParams } from "next/navigation";
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
-import { FileTree } from "@/components/editor/file-tree";
+import { FilesSidebar } from "@/components/editor/files-sidebar";
 import type { FileTreeEntry } from "@/types";
-import { OpenEditors } from "@/components/editor/open-editors";
 import { FileTabs } from "@/components/editor/file-tabs";
 import { FilesActiveEditor } from "@/components/editor/files-active-editor";
 import { FileDiagnosticCounts } from "@/components/editor/file-diagnostic-counts";
@@ -17,6 +17,8 @@ import { ImageViewer } from "@/components/editor/image-viewer";
 import type { EditorHandle } from "@/components/editor/editor-switcher";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useContentSearchStore } from "@/stores/content-search-store";
+import { useFilesSearchNavigation } from "@/hooks/use-files-search-navigation";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLeaderAction } from "@/hooks/use-leader-action";
@@ -179,7 +181,12 @@ function FilesContent() {
     if (!gitStatus || !activeFilePath) return false;
     return gitStatus.unstaged.some((f) => f.path === activeFilePath);
   }, [gitStatus, activeFilePath]);
-  const [isMobileTreeOpen, setIsMobileTreeOpen] = useState(false);
+  const { handleOpenMatch, isMobileSheetOpen, setIsMobileSheetOpen } =
+    useFilesSearchNavigation({
+      workspaceId: activeWorkspaceId,
+      isFileTabsDisabled,
+      isMobile,
+    });
   const [savingPath, setSavingPath] = useState<string | null>(null);
   const restoreTabsPromiseRef = useWorkspaceFileTabs(
     activeWorkspaceId,
@@ -310,7 +317,10 @@ function FilesContent() {
           label: "Focus file search",
           page: "files" as const,
         },
-        handler: () => searchInputRef.current?.focus(),
+        handler: () => {
+          useContentSearchStore.getState().setSidebarView("explorer");
+          searchInputRef.current?.focus();
+        },
       },
       {
         action: {
@@ -365,35 +375,38 @@ function FilesContent() {
 
   const isSaving = savingPath === activeFile?.path;
   const isActiveFileImage = activeFile?.language === IMAGE_LANGUAGE;
-
+  const sidebarProps = {
+    workspaceId: activeWorkspaceId,
+    isFileTabsDisabled,
+    onOpenMatch: handleOpenMatch,
+    fileTreeProps: {
+      workspaceId: activeWorkspaceId,
+      expandedPaths,
+      activeFilePath,
+      onToggleExpand: handleToggleExpand,
+      onExpandPathToFile: handleExpandPathToFile,
+      onFileClick: handleFileTreeFileClick,
+      onSearchResultClick: handleFileTreeSearchResultClick,
+      searchInputRef,
+    },
+  };
   return (
     <AuthenticatedLayout>
       <div className="flex h-full min-h-0 min-w-0">
-        {/* Mobile file tree sheet */}
         {isMobile && (
-          <Sheet open={isMobileTreeOpen} onOpenChange={setIsMobileTreeOpen}>
-            <SheetContent side="left" className="w-[300px] p-0">
+          <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
+            <SheetContent
+              side="left"
+              className="w-[300px] p-0"
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
               <SheetHeader className="border-b px-3 py-2">
                 <SheetTitle className="text-sm">Files</SheetTitle>
               </SheetHeader>
-              <div className="h-[calc(100%-41px)]">
-                {!isFileTabsDisabled && <OpenEditors />}
-                <FileTree
-                  workspaceId={activeWorkspaceId}
-                  expandedPaths={expandedPaths}
-                  activeFilePath={activeFilePath}
-                  onToggleExpand={handleToggleExpand}
-                  onExpandPathToFile={handleExpandPathToFile}
-                  onFileClick={handleFileTreeFileClick}
-                  onSearchResultClick={handleFileTreeSearchResultClick}
-                  searchInputRef={searchInputRef}
-                />
-              </div>
+              <FilesSidebar {...sidebarProps} />
             </SheetContent>
           </Sheet>
         )}
-
-        {/* Desktop file tree panel */}
         {!isMobile && isFileTreeOpen && (
           <div
             ref={(el) => {
@@ -403,33 +416,21 @@ function FilesContent() {
             className="relative flex min-h-0 shrink-0 flex-col border-r outline-none"
             style={{ width: panelWidth }}
           >
-            <div className="flex shrink-0 items-center justify-between border-b px-2 py-1">
-              <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
-                Explorer
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={toggleFileTree}
-              >
-                <PanelLeftClose className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            {!isFileTabsDisabled && <OpenEditors />}
-            <FileTree
-              workspaceId={activeWorkspaceId}
-              expandedPaths={expandedPaths}
-              activeFilePath={activeFilePath}
-              onToggleExpand={handleToggleExpand}
-              onExpandPathToFile={handleExpandPathToFile}
-              onFileClick={handleFileTreeFileClick}
-              onSearchResultClick={handleFileTreeSearchResultClick}
-              searchInputRef={searchInputRef}
+            <FilesSidebar
+              {...sidebarProps}
+              headerActions={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={toggleFileTree}
+                >
+                  <PanelLeftClose className="h-3.5 w-3.5" />
+                </Button>
+              }
             />
           </div>
         )}
-
         {/* Drag handle - desktop only */}
         {!isMobile && isFileTreeOpen && (
           <div
@@ -439,7 +440,6 @@ function FilesContent() {
             <GripVertical className="text-muted-foreground/30 size-3.5" />
           </div>
         )}
-
         {/* Editor panel (right) */}
         <div
           ref={(el) => {
@@ -468,7 +468,7 @@ function FilesContent() {
                 variant="ghost"
                 size="sm"
                 className="h-7 w-7 p-0"
-                onClick={() => setIsMobileTreeOpen(true)}
+                onClick={() => setIsMobileSheetOpen(true)}
               >
                 <PanelLeft className="h-3.5 w-3.5" />
               </Button>

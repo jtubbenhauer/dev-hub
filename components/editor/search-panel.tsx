@@ -236,7 +236,7 @@ export function SearchPanel({ workspaceId, onOpenMatch }: SearchPanelProps) {
         </div>
       </div>
       <SearchStatus outcome={outcome} isSearching={isSearching} />
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block">
         <div className="p-1">
           <SearchResults
             files={files}

@@ -308,3 +308,69 @@ describe("SearchPanel focus", () => {
     expect(useContentSearchStore.getState().pendingFocus).toBe(false);
   });
 });
+
+describe("SearchPanel layout and truncation (jsdom class assertions)", () => {
+  it("constrains result rows to the pane and truncates previews", async () => {
+    stubFetch(makeOkOutcome());
+    useContentSearchStore.setState({ pattern: "alpha" });
+    renderPanel();
+    await screen.findByText("3 results in 2 files", {}, { timeout: 3000 });
+
+    // Radix ScrollArea's viewport wraps children in a `display: table;
+    // min-width: 100%` div; the override forces it back to block so w-full
+    // and truncate can constrain rows to the pane width.
+    const scrollArea = document.querySelector("[data-slot=scroll-area]");
+    if (scrollArea === null) throw new Error("scroll area not found");
+    expect(scrollArea).toHaveClass(
+      "[&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden",
+      "[&>[data-slot=scroll-area-viewport]>div]:!block",
+    );
+
+    const row = document.querySelector('[data-match-key="src/alpha.ts:0"]');
+    if (row === null) throw new Error("match row not found");
+    expect(row).toHaveClass("w-full", "min-w-0");
+
+    const preview = row.querySelector("span");
+    if (preview === null) throw new Error("preview span not found");
+    expect(preview).toHaveClass(
+      "min-w-0",
+      "flex-1",
+      "overflow-hidden",
+      "text-ellipsis",
+      "whitespace-pre",
+    );
+
+    // File header dirname also truncates.
+    expect(screen.getByText("src")).toHaveClass("truncate");
+  });
+
+  it("renders a multi-line error message verbatim, pre-wrapped and monospace", async () => {
+    const message =
+      "regex parse error:\n    (alpha\n    ^\nerror: unclosed group";
+    stubFetch({ kind: "invalid-pattern", message });
+    useContentSearchStore.setState({ pattern: "(alpha" });
+    renderPanel();
+
+    await waitFor(
+      () => expect(screen.getByRole("status").textContent).toBe(message),
+      { timeout: 3000 },
+    );
+    const line = screen.getByRole("status").querySelector("p");
+    if (line === null) throw new Error("status line not found");
+    expect(line).toHaveClass("whitespace-pre-wrap", "break-words", "font-mono");
+  });
+
+  it("renders a single-line error pre-wrapped but not monospace", async () => {
+    stubFetch({ kind: "failed", message: "Search failed (500)" });
+    useContentSearchStore.setState({ pattern: "alpha" });
+    renderPanel();
+
+    const line = await screen.findByText(
+      "Search failed (500)",
+      {},
+      { timeout: 3000 },
+    );
+    expect(line).toHaveClass("whitespace-pre-wrap", "break-words");
+    expect(line).not.toHaveClass("font-mono");
+  });
+});

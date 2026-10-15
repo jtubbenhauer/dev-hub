@@ -96,14 +96,14 @@ function SearchResultFile({
               type="button"
               data-match-key={key}
               className={cn(
-                "flex w-full items-center rounded-sm py-0.5 pr-2 pl-8 text-xs",
+                "flex w-full min-w-0 items-center rounded-sm py-0.5 pr-2 pl-8 text-xs",
                 isSelected
                   ? "bg-accent text-accent-foreground"
                   : "hover:bg-accent/50",
               )}
               onClick={() => onSelect(file.path, match, key)}
             >
-              <span className="truncate font-mono whitespace-pre">
+              <span className="min-w-0 flex-1 overflow-hidden text-left font-mono text-ellipsis whitespace-pre">
                 <HighlightedText
                   text={match.preview}
                   positions={previewPositions(match)}

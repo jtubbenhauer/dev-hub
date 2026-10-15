@@ -89,6 +89,10 @@ function buildStatusContent(
   }
 }
 
+function hasNewline(text: string): boolean {
+  return text.includes("\n");
+}
+
 interface SearchStatusProps {
   outcome: ContentSearchOutcome | null;
   isSearching: boolean;
@@ -105,9 +109,23 @@ export function SearchStatus({ outcome, isSearching }: SearchStatusProps) {
         status.lines.length > 0 && "py-1",
       )}
     >
-      {status.lines.map((line) => (
-        <p key={line}>{line}</p>
-      ))}
+      {status.lines.map((line) => {
+        // Computed OUTSIDE cn(): prettier-plugin-tailwindcss rewrites every
+        // string literal inside cn() as a class list, mangling "\n" to " ".
+        const isMultilineError = status.isError && hasNewline(line);
+        return (
+          <p
+            key={line}
+            className={cn(
+              // Multi-line engine errors carry a caret line; keep it aligned.
+              status.isError && "break-words whitespace-pre-wrap",
+              isMultilineError && "font-mono",
+            )}
+          >
+            {line}
+          </p>
+        );
+      })}
     </div>
   );
 }

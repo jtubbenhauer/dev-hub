@@ -1,5 +1,6 @@
 import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
+import { findGitIgnoredPaths } from "./ignored-paths";
 import { sha256Utf8Hex } from "./line-hash";
 import { buildMatch, stripLineEnding, utf8ByteOffsetToUtf16 } from "./preview";
 import { runLineProcess, type LineDecision } from "./process";
@@ -18,6 +19,11 @@ const FALLBACK_RIPGREP_PATHS = [
   "/usr/bin/rg",
 ] as const;
 const MAX_ERROR_MESSAGE_CHARS = 500;
+const MIN_IGNORE_CHECK_TIMEOUT_MS = 1000;
+const SEARCH_CANCELLED = {
+  kind: "failed",
+  message: "Search cancelled",
+} as const satisfies ContentSearchOutcome;
 
 export interface SearchWithRipgrepInput {
   readonly binary: string;
@@ -148,6 +154,32 @@ function truncateMessage(text: string): string {
   return text.trim().slice(0, MAX_ERROR_MESSAGE_CHARS);
 }
 
+interface DropGitIgnoredFilesInput {
+  readonly files: readonly ContentSearchFile[];
+  readonly input: SearchWithRipgrepInput;
+  readonly timeoutMs: number;
+}
+
+// rg's --glob includes are overrides that beat .gitignore, so with includes
+// set, git-ignored files are dropped afterwards. Kept as-is when git can't
+// tell (not a repository, git missing, timeout).
+async function dropGitIgnoredFiles(
+  dropInput: DropGitIgnoredFilesInput,
+): Promise<readonly ContentSearchFile[]> {
+  const { files, input, timeoutMs } = dropInput;
+  if (input.query.includeGlobs.length === 0 || files.length === 0) {
+    return files;
+  }
+  const ignoredPaths = await findGitIgnoredPaths({
+    cwd: input.workspacePath,
+    paths: files.map((file) => file.path),
+    timeoutMs,
+    signal: input.signal,
+  });
+  if (ignoredPaths === null) return files;
+  return files.filter((file) => !ignoredPaths.has(file.path));
+}
+
 export async function searchWithRipgrep(
   input: SearchWithRipgrepInput,
 ): Promise<ContentSearchOutcome> {
@@ -196,12 +228,18 @@ export async function searchWithRipgrep(
     onLine: handleLine,
   });
 
-  function buildOkOutcome(): ContentSearchOutcome {
-    const files = groupFiles(matchesByPath);
+  async function buildOkOutcome(): Promise<ContentSearchOutcome> {
+    const remainingMs = timeoutMs - (performance.now() - startedAt);
+    const files = await dropGitIgnoredFiles({
+      files: groupFiles(matchesByPath),
+      input,
+      timeoutMs: Math.max(MIN_IGNORE_CHECK_TIMEOUT_MS, remainingMs),
+    });
+    if (signal?.aborted) return SEARCH_CANCELLED;
     return {
       kind: "ok",
       files,
-      matchCount,
+      matchCount: files.reduce((total, file) => total + file.matches.length, 0),
       fileCount: files.length,
       isLimitHit,
       isTimedOut: result.isTimedOut,
@@ -211,7 +249,7 @@ export async function searchWithRipgrep(
   }
 
   if (result.isStopped || result.isTimedOut) return buildOkOutcome();
-  if (result.isAborted) return { kind: "failed", message: "Search cancelled" };
+  if (result.isAborted) return SEARCH_CANCELLED;
   if (result.spawnErrorCode !== null) {
     return { kind: "unavailable", message: "ripgrep could not be started" };
   }

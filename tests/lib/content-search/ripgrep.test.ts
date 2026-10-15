@@ -39,6 +39,7 @@ const MINIFIED_LINE = "a".repeat(1000) + "needle" + "b".repeat(994);
 let rootDir = "";
 let repoDir = "";
 let fakeBinDir = "";
+let plainDir = "";
 
 function writeFixture(relativePath: string, content: string | Buffer): void {
   const fullPath = path.join(repoDir, relativePath);
@@ -71,6 +72,10 @@ beforeAll(async () => {
   fs.mkdirSync(repoDir);
   fs.mkdirSync(fakeBinDir);
   await simpleGit(repoDir).init();
+  plainDir = path.join(rootDir, "plain");
+  fs.mkdirSync(plainDir);
+  fs.writeFileSync(path.join(plainDir, ".gitignore"), "a.ts\n");
+  fs.writeFileSync(path.join(plainDir, "a.ts"), "haystack\n");
 
   writeFixture(
     "src/a.ts",
@@ -81,10 +86,14 @@ beforeAll(async () => {
   writeFixture("src/crlf.ts", "first needle\r\nsecond needle\r\n");
   writeFixture("root.ts", "export const needle = true;\n");
   writeFixture(".config/settings.json", '{ "needle": true }\n');
-  writeFixture(".gitignore", "ignored/\n");
-  writeFixture("ignored/x.ts", "needle\n");
-  writeFixture("node_modules/pkg/index.js", "needle\n");
-  writeFixture(".git/needle-note.txt", "needle\n");
+  writeFixture(".gitignore", "ignored/\n*.generated.ts\n");
+  writeFixture("ignored/x.ts", "needle haystack\n");
+  writeFixture("node_modules/pkg/index.js", "needle haystack\n");
+  writeFixture(".git/needle-note.txt", "needle haystack\n");
+  writeFixture("src/haystack.ts", "const haystack = 1;\n");
+  writeFixture("docs/sp ace: ñ.ts", "// haystack\n");
+  writeFixture("src/main.generated.ts", "haystack();\n");
+  writeFixture("docs/sp ace: ñ.generated.ts", "// haystack\n");
   writeFixture("bin.dat", Buffer.from("needle\u0000needle\n", "utf8"));
   writeFixture("big.txt", "needle\n" + "x".repeat(1_100_000) + "\n");
   writeFixture("min.js", MINIFIED_LINE + "\n");
@@ -255,6 +264,55 @@ describe.skipIf(ripgrepBinary === null)("searchWithRipgrep (real rg)", () => {
     expect(paths.some((filePath) => filePath.startsWith("node_modules/"))).toBe(
       false,
     );
+  });
+
+  it("drops gitignored files that match an include glob", async () => {
+    const outcome = expectOk(
+      await search({ pattern: "haystack", includeGlobs: ["*.ts"] }),
+    );
+
+    expect(filePaths(outcome)).toEqual([
+      "docs/sp ace: ñ.ts",
+      "src/haystack.ts",
+    ]);
+    expect(outcome.matchCount).toBe(2);
+    expect(outcome.fileCount).toBe(2);
+    expect(outcome.isLimitHit).toBe(false);
+  });
+
+  it("drops gitignored, .git and node_modules files when the include glob is *", async () => {
+    const outcome = expectOk(
+      await search({ pattern: "haystack", includeGlobs: ["*"] }),
+    );
+
+    expect(filePaths(outcome)).toEqual([
+      "docs/sp ace: ñ.ts",
+      "src/haystack.ts",
+    ]);
+  });
+
+  it("keeps matchCount equal to the matches left after dropping ignored files", async () => {
+    const outcome = expectOk(
+      await search({ pattern: "haystack", includeGlobs: ["*.ts", "*.js"] }),
+    );
+    const keptMatches = outcome.files.reduce(
+      (total, file) => total + file.matches.length,
+      0,
+    );
+
+    expect(outcome.matchCount).toBe(keptMatches);
+    expect(outcome.fileCount).toBe(outcome.files.length);
+  });
+
+  it("returns include-glob results unfiltered outside a git repository", async () => {
+    const outcome = await searchWithRipgrep({
+      binary: ripgrepBinary ?? "rg",
+      workspacePath: plainDir,
+      query: { ...DEFAULT_QUERY, pattern: "haystack", includeGlobs: ["*.ts"] },
+      timeoutMs: 15_000,
+    });
+
+    expect(filePaths(expectOk(outcome))).toEqual(["a.ts"]);
   });
 
   it("stops at maxResults and reports the limit", async () => {

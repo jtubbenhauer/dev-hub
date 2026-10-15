@@ -124,3 +124,26 @@ export {
   toLiteralPathspecs,
 } from "./git-discard";
 export type { DiscardBuckets, DiscardPartition } from "./git-discard";
+
+// Content search (find-in-files) contract (shared by app + agent)
+
+export {
+  CONTENT_SEARCH_DEFAULT_MAX_RESULTS,
+  CONTENT_SEARCH_MAX_GLOB_LENGTH,
+  CONTENT_SEARCH_MAX_GLOBS,
+  CONTENT_SEARCH_MAX_PATTERN_LENGTH,
+  CONTENT_SEARCH_MAX_RESULTS_LIMIT,
+  buildContentSearchParams,
+  parseContentSearchParams,
+  splitGlobList,
+} from "./content-search/params";
+export type { ContentSearchParamsResult } from "./content-search/params";
+export { parseContentSearchOutcome } from "./content-search/outcome";
+export { fingerprintText, isSearchMatchCurrent } from "./content-search/verify";
+export type {
+  ContentSearchQuery,
+  ContentSearchMatch,
+  ContentSearchFile,
+  ContentSearchEngine,
+  ContentSearchOutcome,
+} from "./content-search/types";

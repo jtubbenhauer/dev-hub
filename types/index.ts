@@ -12,6 +12,13 @@ export type {
   AllBranch,
   WorktreeInfo,
 } from "@devhub/shared";
+export type {
+  ContentSearchQuery,
+  ContentSearchMatch,
+  ContentSearchFile,
+  ContentSearchEngine,
+  ContentSearchOutcome,
+} from "@devhub/shared";
 
 import type { fileComments } from "@/drizzle/schema";
 

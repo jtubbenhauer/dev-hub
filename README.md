@@ -16,6 +16,7 @@ Personal development command center — a self-hosted web app for managing works
 - **ClickUp Integration** — browse tasks by view, search, view task details and comments, link tasks to workspaces
 - **GitHub Integration** — PR review via GitHub API proxy with personal access token
 - **Command Palette** — `Ctrl+K` for fuzzy-search navigation across the app
+- **Find in Files** — `Cmd+Shift+F` / `Ctrl+Shift+F` searches file contents across the current repo (match case, whole word, regex, include/exclude globs); click a result to jump to it
 - **Leader Key** — Vim-style `<leader>` key sequences with a which-key overlay showing available bindings. 40+ built-in actions, customizable via settings.
 - **Settings** — General preferences, AI model config, keybinding customization, per-workspace settings, integration tokens (GitHub, ClickUp), workspace provider management
 - **Auth** — password login with a first-run setup flow. Single-user design for self-hosted use.
@@ -28,6 +29,7 @@ Personal development command center — a self-hosted web app for managing works
 - [Git](https://git-scm.com/)
 - [OpenCode CLI](https://opencode.ai) — install with `curl -fsSL https://opencode.ai/install | bash`
 - OmO Native (optional): `bun add -g omo-ai`, run `omo setup` once; dev-hub attaches to the shared `omo daemon`
+- [ripgrep](https://github.com/BurntSushi/ripgrep) (optional, recommended) — fast find-in-files; without it dev-hub falls back to `git grep`
 
 ## Getting Started
 
@@ -153,6 +155,8 @@ npx tsx src/index.ts
 ```
 
 For omo (OmO Native) remote workspaces, dev-hub sends `DEVHUB_AGENT_TOKEN` only to trusted agent origins: loopback, or an exact origin listed in `DEVHUB_AGENT_ALLOWED_ORIGINS` (comma-separated). Non-loopback agent URLs must use `https`/`wss`.
+
+The agent uses `rg` for Find in Files if it's installed in the container, otherwise `git grep`.
 
 ### OmO Native engine
 

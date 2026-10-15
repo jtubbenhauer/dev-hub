@@ -2,7 +2,13 @@ import { Hono } from "hono";
 import fs from "node:fs";
 import path from "node:path";
 import simpleGit from "simple-git";
-import type { FileTreeEntry, FileGitStatus } from "@devhub/shared";
+import {
+  parseContentSearchParams,
+  type ContentSearchOutcome,
+  type FileTreeEntry,
+  type FileGitStatus,
+} from "@devhub/shared";
+import { searchWorkspaceContent } from "@devhub/shared/content-search";
 
 const IGNORED_NAMES = new Set([
   "node_modules",
@@ -195,6 +201,25 @@ async function getFileStatuses(
   return statuses;
 }
 
+function contentSearchStatus(
+  outcome: ContentSearchOutcome,
+): 200 | 400 | 500 | 503 {
+  switch (outcome.kind) {
+    case "ok":
+      return 200;
+    case "invalid-pattern":
+      return 400;
+    case "unavailable":
+      return 503;
+    case "failed":
+      return 500;
+    default: {
+      const unreachable: never = outcome;
+      return unreachable;
+    }
+  }
+}
+
 export function fileRoutes(workspacePath: string): Hono {
   const app = new Hono();
 
@@ -300,6 +325,20 @@ export function fileRoutes(workspacePath: string): Hono {
   app.get("/status", async (c) => {
     const statuses = await getFileStatuses(workspacePath);
     return c.json(statuses);
+  });
+
+  // GET /files/grep?pattern=&regex=1&caseSensitive=1&wholeWord=1&include=&exclude=&max=
+  app.get("/grep", async (c) => {
+    const parsed = parseContentSearchParams(new URL(c.req.url).searchParams);
+    if (parsed.kind === "invalid") {
+      return c.json({ kind: "invalid-pattern", message: parsed.message }, 400);
+    }
+    const outcome = await searchWorkspaceContent({
+      workspacePath,
+      query: parsed.query,
+      signal: c.req.raw.signal,
+    });
+    return c.json(outcome, contentSearchStatus(outcome));
   });
 
   return app;

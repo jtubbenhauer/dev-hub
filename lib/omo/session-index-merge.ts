@@ -1,10 +1,8 @@
+import { and, eq, ne } from "drizzle-orm";
 import { omoSessionIndex } from "@/drizzle/schema";
 import { db } from "@/lib/db";
 import { parseOmoSessionContext } from "@/lib/omo/session-context";
-import {
-  assertOmoSessionPathAvailable,
-  sessionIndexScope,
-} from "@/lib/omo/session-index-database";
+import { sessionIndexScope } from "@/lib/omo/session-index-database";
 import { translateOmoSessionIndexError } from "@/lib/omo/session-index-errors";
 import type {
   OmoAuthoritativeSessionRow,
@@ -27,12 +25,21 @@ export async function upsertOmoSessionIndexAuthoritative(
           });
           continue;
         }
-        assertOmoSessionPathAvailable(
-          transaction,
-          workspaceId,
-          row.durableId,
-          row.sessionPath,
-        );
+        if (row.sessionPath !== null) {
+          // The host is authoritative for the sessions it lists: when omo
+          // reuses a file, the row that still claims it is stale.
+          transaction
+            .update(omoSessionIndex)
+            .set({ sessionPath: null, updatedAt: Date.now() })
+            .where(
+              and(
+                eq(omoSessionIndex.workspaceId, workspaceId),
+                eq(omoSessionIndex.sessionPath, row.sessionPath),
+                ne(omoSessionIndex.durableId, row.durableId),
+              ),
+            )
+            .run();
+        }
         const existing = transaction
           .select()
           .from(omoSessionIndex)

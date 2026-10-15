@@ -177,25 +177,60 @@ describe("OMO session index", () => {
     });
   });
 
-  it("rejects path identity conflicts without changing the provisional row", async () => {
+  it("moves a reused session file to the session its transcript now names", async () => {
     const index = await import("@/lib/omo/session-index");
     await index.touchOmoSessionIndex(
       "workspace-1",
-      "a",
-      "/sessions/shared.jsonl",
-      { ...touchRow, title: "A" },
+      "stale",
+      "/sessions/reused.jsonl",
+      { ...touchRow, title: "Stale" },
     );
-    await index.mergeOmoSessionIndexFromTaskEvent("workspace-1", [
-      { durableId: "b", title: "B", createdMs: 100, updatedMs: 100 },
+
+    await index.touchOmoSessionIndexMany("workspace-1", [
+      {
+        ...touchRow,
+        durableId: "current",
+        sessionPath: "/sessions/reused.jsonl",
+        title: "Current",
+      },
     ]);
 
-    await expect(
-      index.touchOmoSessionIndex("workspace-1", "b", "/sessions/shared.jsonl", {
-        ...touchRow,
-        title: "B",
-      }),
-    ).rejects.toBeInstanceOf(index.OmoSessionIdentityConflictError);
-    expect(readRow("workspace-1", "b")).toMatchObject({ session_path: null });
+    expect(readRow("workspace-1", "stale")).toMatchObject({
+      session_path: null,
+      title: "Stale",
+    });
+    expect(readRow("workspace-1", "current")).toMatchObject({
+      session_path: "/sessions/reused.jsonl",
+    });
+  });
+
+  it("moves a reused session file to the session the host now reports", async () => {
+    const index = await import("@/lib/omo/session-index");
+    await index.touchOmoSessionIndex(
+      "workspace-1",
+      "stale",
+      "/sessions/reused.jsonl",
+      { ...touchRow, title: "Stale" },
+    );
+
+    await index.upsertOmoSessionIndexAuthoritative("workspace-1", [
+      {
+        durableId: "live",
+        sessionPath: "/sessions/reused.jsonl",
+        kind: "worker",
+        context: { owner: "dev-hub-probe" },
+        title: "Live",
+        createdMs: 300,
+        updatedMs: 300,
+      },
+    ]);
+
+    expect(readRow("workspace-1", "stale")).toMatchObject({
+      session_path: null,
+    });
+    expect(readRow("workspace-1", "live")).toMatchObject({
+      session_path: "/sessions/reused.jsonl",
+    });
   });
 
   it("validates context shape, names, counts, and UTF-8 byte caps", async () => {

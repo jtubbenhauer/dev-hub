@@ -1,7 +1,7 @@
 import { omoSessionIndex } from "@/drizzle/schema";
 import { db } from "@/lib/db";
 import {
-  assertOmoSessionPathAvailable,
+  releaseOmoSessionPathFromOtherRows,
   sessionIndexScope,
   type SessionIndexTransaction,
 } from "@/lib/omo/session-index-database";
@@ -16,7 +16,7 @@ function touchInTransaction(
   workspaceId: string,
   row: OmoSessionTouchRow,
 ): number {
-  assertOmoSessionPathAvailable(
+  releaseOmoSessionPathFromOtherRows(
     transaction,
     workspaceId,
     row.durableId,

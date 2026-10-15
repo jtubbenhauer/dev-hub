@@ -46,13 +46,18 @@ describe("handleOmoWrite session mutation routes", () => {
     expect(fixture.source.remove).not.toHaveBeenCalled();
   });
 
-  it("rejects delete when refresh cannot resolve a provisional path", async () => {
+  it("deletes a provisional chat the host never persisted", async () => {
     // Given
     const fixture = await useWriteFixture();
+    const { OmoNotFoundError } = await import("@/lib/omo/session-source");
     insertWriteIndexRow(fixture.sqlite, {
       durableId: "provisional",
       sessionPath: null,
     });
+    fixture.source.remove.mockRejectedValueOnce(
+      new OmoNotFoundError("provisional"),
+    );
+    fixture.client.request.mockResolvedValue({ data: { sessions: [] } });
 
     // When
     const response = await fixture.request("/session/omo_provisional", {
@@ -60,11 +65,38 @@ describe("handleOmoWrite session mutation routes", () => {
     });
 
     // Then
-    expect(response.status).toBe(409);
-    expect(await writeJson(response)).toEqual({
-      error: "session_not_resolvable",
-    });
+    expect(response.status).toBe(204);
     expect(fixture.registry.refreshIndexFromHost).toHaveBeenCalledOnce();
+    expect(fixture.source.remove).toHaveBeenCalledWith("provisional");
+    const remaining = fixture.sqlite
+      .prepare("SELECT durable_id FROM omo_session_index")
+      .all();
+    expect(remaining).toEqual([]);
+  });
+
+  it("reconnects a disconnected client before deleting", async () => {
+    // Given
+    const fixture = await useWriteFixture();
+    const { OmoTransportGoneError } = await import("@/lib/omo/errors");
+    insertWriteIndexRow(fixture.sqlite, { durableId: "root" });
+    let isHostConnected = false;
+    fixture.client.connect.mockImplementation(async () => {
+      isHostConnected = true;
+      return { protocolVersion: 1, capabilities: [] };
+    });
+    fixture.client.request.mockImplementation(async () => {
+      if (!isHostConnected) throw new OmoTransportGoneError();
+      return { data: { sessions: [] } };
+    });
+
+    // When
+    const response = await fixture.request("/session/omo_root", {
+      method: "DELETE",
+    });
+
+    // Then
+    expect(response.status).toBe(204);
+    expect(fixture.source.remove).toHaveBeenCalledWith("root");
   });
 
   it("refuses to delete an indexed worker", async () => {
@@ -83,6 +115,29 @@ describe("handleOmoWrite session mutation routes", () => {
     // Then
     expect(response.status).toBe(403);
     expect(await writeJson(response)).toEqual({ error: "worker_session" });
+  });
+
+  it("deletes a leftover dev-hub catalog probe worker", async () => {
+    // Given
+    const fixture = await useWriteFixture();
+    insertWriteIndexRow(fixture.sqlite, {
+      durableId: "probe",
+      kind: "worker",
+      context: '{"owner":"dev-hub-probe"}',
+    });
+    fixture.client.request.mockResolvedValue({ data: { sessions: [] } });
+
+    // When
+    const response = await fixture.request("/session/omo_probe", {
+      method: "DELETE",
+    });
+
+    // Then
+    expect(response.status).toBe(204);
+    const remaining = fixture.sqlite
+      .prepare("SELECT durable_id FROM omo_session_index")
+      .all();
+    expect(remaining).toEqual([]);
   });
 
   it("rejects encoded traversal ids before source access", async () => {

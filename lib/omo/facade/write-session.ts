@@ -49,6 +49,19 @@ function sessionAttachmentCount(response: JsonlRecord, rawId: string): number {
   return 0;
 }
 
+// dev-hub opens its own throwaway worker sessions to read the model catalog;
+// a leftover one is not a sub-agent of any chat, so the user may delete it.
+function isDevHubProbeRow(row: OmoSessionIndexRow): boolean {
+  if (row.context === null) return false;
+  try {
+    const context: unknown = JSON.parse(row.context);
+    return isJsonObject(context) && context["owner"] === "dev-hub-probe";
+  } catch (error) {
+    if (error instanceof SyntaxError) return false;
+    throw error;
+  }
+}
+
 export async function createOmoSession(
   context: OmoWriteContext,
 ): Promise<Response> {
@@ -76,15 +89,18 @@ export async function deleteOmoSession(
 ): Promise<Response> {
   let row = await getOmoWriteIndexRow(context, rawId);
   if (row === null) return sessionNotFoundResponse();
-  if (row.kind === "worker") {
+  if (row.kind === "worker" && !isDevHubProbeRow(row)) {
     return jsonResponse({ error: "worker_session" }, { status: 403 });
   }
+  // Delete never attaches, so nothing else reconnects a client that is
+  // disconnected or retrying before the raw host requests below.
+  await context.runtime.client.connect();
   if (row.sessionPath === null) {
+    // A chat deleted before its first persisted turn may never get a path;
+    // it is still deleted, the file removal below just finds nothing.
     await context.runtime.registry.refreshIndexFromHost(context.workspace);
     row = await getOmoWriteIndexRow(context, rawId);
-    if (row === null || row.sessionPath === null) {
-      return jsonResponse({ error: "session_not_resolvable" }, { status: 409 });
-    }
+    if (row === null) return sessionNotFoundResponse();
   }
   const listed = await context.runtime.client.request({
     type: "list_sessions",

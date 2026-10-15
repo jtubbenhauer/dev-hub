@@ -6,12 +6,24 @@ export interface FindGitIgnoredPathsInput {
   // Directory the paths are relative to; anywhere inside the work tree.
   readonly cwd: string;
   readonly paths: readonly string[];
+  // Remaining search budget; <= 0 skips the check as timed out.
   readonly timeoutMs: number;
   readonly signal?: AbortSignal;
 }
 
+export type GitIgnoreCheck =
+  | { readonly kind: "ignored"; readonly paths: ReadonlySet<string> }
+  | { readonly kind: "not-a-repository" }
+  | { readonly kind: "unavailable" }
+  | { readonly kind: "timed-out" }
+  | { readonly kind: "aborted" };
+
+type TerminationReason = "timed-out" | "aborted";
+
 const EXIT_SOME_IGNORED = 0;
 const EXIT_NONE_IGNORED = 1;
+const MAX_STDERR_CHARS = 1000;
+const NOT_A_REPOSITORY_MESSAGE = "not a git repository";
 
 function readErrorCode(error: Error): string | null {
   return "code" in error && typeof error.code === "string" ? error.code : null;
@@ -24,29 +36,37 @@ function splitNulSeparated(output: Buffer): string[] {
     .filter((entry) => entry !== "");
 }
 
-// Resolves the subset of `paths` git would ignore (.gitignore, info/exclude,
-// core.excludesFile). Resolves null when that can't be determined: not a git
-// repository, git missing, timeout or abort.
+// Asks git which of `paths` it ignores (.gitignore, info/exclude,
+// core.excludesFile). --no-index also reports tracked files matching an
+// ignore pattern, which is what rg does when it applies .gitignore.
 export function findGitIgnoredPaths(
   input: FindGitIgnoredPathsInput,
-): Promise<ReadonlySet<string> | null> {
+): Promise<GitIgnoreCheck> {
   const { cwd, paths, timeoutMs, signal } = input;
-  if (paths.length === 0) return Promise.resolve(new Set());
-  if (signal?.aborted) return Promise.resolve(null);
+  if (signal?.aborted) return Promise.resolve({ kind: "aborted" });
+  if (timeoutMs <= 0) return Promise.resolve({ kind: "timed-out" });
+  if (paths.length === 0) {
+    return Promise.resolve({ kind: "ignored", paths: new Set() });
+  }
 
   return new Promise((resolve) => {
     const isWindows = process.platform === "win32";
-    const child = spawn("git", ["check-ignore", "-z", "--stdin"], {
-      cwd,
-      shell: false,
-      detached: !isWindows,
-      stdio: ["pipe", "pipe", "ignore"],
-    });
+    const child = spawn(
+      "git",
+      ["check-ignore", "--no-index", "-z", "--stdin"],
+      {
+        cwd,
+        shell: false,
+        detached: !isWindows,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
     const stdoutChunks: Buffer[] = [];
+    let stderr = "";
     let isSettled = false;
-    let isTerminated = false;
+    let terminationReason: TerminationReason | null = null;
 
-    const timeoutTimer = setTimeout(terminate, timeoutMs);
+    const timeoutTimer = setTimeout(() => terminate("timed-out"), timeoutMs);
 
     function signalTree(): void {
       const pid = child.pid;
@@ -62,45 +82,62 @@ export function findGitIgnoredPaths(
       }
     }
 
-    function terminate(): void {
-      if (isTerminated) return;
-      isTerminated = true;
+    function terminate(reason: TerminationReason): void {
+      if (terminationReason !== null) return;
+      terminationReason = reason;
       signalTree();
       child.stdin.destroy();
       child.stdout.destroy();
+      child.stderr.destroy();
     }
 
-    function settle(ignoredPaths: ReadonlySet<string> | null): void {
+    function handleAbort(): void {
+      terminate("aborted");
+    }
+
+    function settle(check: GitIgnoreCheck): void {
       if (isSettled) return;
       isSettled = true;
       clearTimeout(timeoutTimer);
-      signal?.removeEventListener("abort", terminate);
-      resolve(ignoredPaths);
+      signal?.removeEventListener("abort", handleAbort);
+      resolve(check);
     }
 
-    signal?.addEventListener("abort", terminate, { once: true });
+    signal?.addEventListener("abort", handleAbort, { once: true });
 
     child.stdout.on("data", (chunk: Buffer) => {
       stdoutChunks.push(chunk);
+    });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      if (stderr.length < MAX_STDERR_CHARS) {
+        stderr += chunk.slice(0, MAX_STDERR_CHARS - stderr.length);
+      }
     });
     // git may exit (e.g. not a repository) before reading all of stdin; the
     // resulting EPIPE is expected and the exit code decides the outcome.
     child.stdin.on("error", () => undefined);
 
     child.on("error", () => {
-      settle(null);
+      settle({ kind: "unavailable" });
     });
     child.on("close", (exitCode) => {
-      if (isTerminated) return settle(null);
+      if (terminationReason !== null)
+        return settle({ kind: terminationReason });
       switch (exitCode) {
         case EXIT_SOME_IGNORED:
-          return settle(
-            new Set(splitNulSeparated(Buffer.concat(stdoutChunks))),
-          );
+          return settle({
+            kind: "ignored",
+            paths: new Set(splitNulSeparated(Buffer.concat(stdoutChunks))),
+          });
         case EXIT_NONE_IGNORED:
-          return settle(new Set());
+          return settle({ kind: "ignored", paths: new Set() });
         default:
-          return settle(null);
+          return settle(
+            stderr.includes(NOT_A_REPOSITORY_MESSAGE)
+              ? { kind: "not-a-repository" }
+              : { kind: "unavailable" },
+          );
       }
     });
 

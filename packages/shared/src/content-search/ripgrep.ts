@@ -1,9 +1,10 @@
 import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import { findGitIgnoredPaths } from "./ignored-paths";
+import { findGitIgnoredPaths, type GitIgnoreCheck } from "./ignored-paths";
 import { sha256Utf8Hex } from "./line-hash";
 import { buildMatch, stripLineEnding, utf8ByteOffsetToUtf16 } from "./preview";
 import { runLineProcess, type LineDecision } from "./process";
+import { finalizeSearchResults, internalMaxResults } from "./result-filter";
 import type {
   ContentSearchFile,
   ContentSearchMatch,
@@ -19,7 +20,6 @@ const FALLBACK_RIPGREP_PATHS = [
   "/usr/bin/rg",
 ] as const;
 const MAX_ERROR_MESSAGE_CHARS = 500;
-const MIN_IGNORE_CHECK_TIMEOUT_MS = 1000;
 const SEARCH_CANCELLED = {
   kind: "failed",
   message: "Search cancelled",
@@ -154,30 +154,22 @@ function truncateMessage(text: string): string {
   return text.trim().slice(0, MAX_ERROR_MESSAGE_CHARS);
 }
 
-interface DropGitIgnoredFilesInput {
-  readonly files: readonly ContentSearchFile[];
-  readonly input: SearchWithRipgrepInput;
-  readonly timeoutMs: number;
-}
-
 // rg's --glob includes are overrides that beat .gitignore, so with includes
-// set, git-ignored files are dropped afterwards. Kept as-is when git can't
-// tell (not a repository, git missing, timeout).
-async function dropGitIgnoredFiles(
-  dropInput: DropGitIgnoredFilesInput,
-): Promise<readonly ContentSearchFile[]> {
-  const { files, input, timeoutMs } = dropInput;
+// set git is asked which matched files are ignored. null: nothing to check.
+function checkGitIgnoredFiles(
+  files: readonly ContentSearchFile[],
+  input: SearchWithRipgrepInput,
+  remainingMs: number,
+): Promise<GitIgnoreCheck | null> {
   if (input.query.includeGlobs.length === 0 || files.length === 0) {
-    return files;
+    return Promise.resolve(null);
   }
-  const ignoredPaths = await findGitIgnoredPaths({
+  return findGitIgnoredPaths({
     cwd: input.workspacePath,
     paths: files.map((file) => file.path),
-    timeoutMs,
+    timeoutMs: remainingMs,
     signal: input.signal,
   });
-  if (ignoredPaths === null) return files;
-  return files.filter((file) => !ignoredPaths.has(file.path));
 }
 
 export async function searchWithRipgrep(
@@ -188,6 +180,7 @@ export async function searchWithRipgrep(
   const matchesByPath = new Map<string, ContentSearchMatch[]>();
   let matchCount = 0;
   let isLimitHit = false;
+  const maxCollectedMatches = internalMaxResults(query);
 
   function handleLine(rawLine: string): LineDecision {
     const event = parseMatchEvent(rawLine);
@@ -195,7 +188,7 @@ export async function searchWithRipgrep(
     const line = stripLineEnding(event.lineText);
     const lineSha256 = sha256Utf8Hex(line);
     for (const submatch of event.submatches) {
-      if (matchCount >= query.maxResults) {
+      if (matchCount >= maxCollectedMatches) {
         isLimitHit = true;
         return "stop";
       }
@@ -229,20 +222,21 @@ export async function searchWithRipgrep(
   });
 
   async function buildOkOutcome(): Promise<ContentSearchOutcome> {
+    const files = groupFiles(matchesByPath);
     const remainingMs = timeoutMs - (performance.now() - startedAt);
-    const files = await dropGitIgnoredFiles({
-      files: groupFiles(matchesByPath),
-      input,
-      timeoutMs: Math.max(MIN_IGNORE_CHECK_TIMEOUT_MS, remainingMs),
+    const finalized = finalizeSearchResults({
+      raw: { files, isLimitHit, isTimedOut: result.isTimedOut },
+      ignoreCheck: await checkGitIgnoredFiles(files, input, remainingMs),
+      maxResults: query.maxResults,
     });
-    if (signal?.aborted) return SEARCH_CANCELLED;
+    if (finalized.kind === "aborted") return SEARCH_CANCELLED;
     return {
       kind: "ok",
-      files,
-      matchCount: files.reduce((total, file) => total + file.matches.length, 0),
-      fileCount: files.length,
-      isLimitHit,
-      isTimedOut: result.isTimedOut,
+      files: finalized.files,
+      matchCount: finalized.matchCount,
+      fileCount: finalized.fileCount,
+      isLimitHit: finalized.isLimitHit,
+      isTimedOut: finalized.isTimedOut,
       engine: "ripgrep",
       durationMs: performance.now() - startedAt,
     };

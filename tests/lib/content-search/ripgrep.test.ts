@@ -71,7 +71,11 @@ beforeAll(async () => {
   fakeBinDir = path.join(rootDir, "bin");
   fs.mkdirSync(repoDir);
   fs.mkdirSync(fakeBinDir);
-  await simpleGit(repoDir).init();
+  const git = simpleGit(repoDir);
+  await git.init();
+  await git.addConfig("user.email", "test@devhub.local");
+  await git.addConfig("user.name", "DevHub Test");
+  await git.addConfig("commit.gpgsign", "false");
   plainDir = path.join(rootDir, "plain");
   fs.mkdirSync(plainDir);
   fs.writeFileSync(path.join(plainDir, ".gitignore"), "a.ts\n");
@@ -97,6 +101,11 @@ beforeAll(async () => {
   writeFixture("bin.dat", Buffer.from("needle\u0000needle\n", "utf8"));
   writeFixture("big.txt", "needle\n" + "x".repeat(1_100_000) + "\n");
   writeFixture("min.js", MINIFIED_LINE + "\n");
+  writeFixture("src/tracked.generated.ts", "const trackedword = 1;\n");
+  writeFixture("cap/ignored.generated.ts", "capword capword\n");
+  writeFixture("cap/normal.ts", "capword\ncapword\ncapword\n");
+  await git.raw(["add", "-f", ".gitignore", "src/tracked.generated.ts"]);
+  await git.commit("tracked file matching .gitignore");
 });
 
 afterAll(() => {
@@ -327,6 +336,57 @@ describe.skipIf(ripgrepBinary === null)("searchWithRipgrep (real rg)", () => {
     expect(collected).toBe(2);
     expect(outcome.fileCount).toBe(outcome.files.length);
   });
+
+  it("hides a tracked file matching .gitignore without include globs", async () => {
+    const outcome = expectOk(await search({ pattern: "trackedword" }));
+
+    expect(outcome.matchCount).toBe(0);
+  });
+
+  it("hides a tracked file matching .gitignore with include globs too", async () => {
+    const outcome = expectOk(
+      await search({ pattern: "trackedword", includeGlobs: ["*.ts"] }),
+    );
+
+    expect(filePaths(outcome)).toEqual([]);
+    expect(outcome.matchCount).toBe(0);
+  });
+
+  // 2 ignored + 3 kept matches fit the doubled internal cap (6), so the 3 kept
+  // matches all survive and the limit is not reported.
+  it("does not let ignored matches use up maxResults", async () => {
+    const outcome = expectOk(
+      await search({
+        pattern: "capword",
+        includeGlobs: ["*.ts"],
+        maxResults: 3,
+      }),
+    );
+
+    expect(filePaths(outcome)).toEqual(["cap/normal.ts"]);
+    expect(outcome.matchCount).toBe(3);
+    expect(outcome.isLimitHit).toBe(false);
+  });
+
+  it("trims to exactly maxResults after dropping ignored files", async () => {
+    const outcome = expectOk(
+      await search({
+        pattern: "capword",
+        includeGlobs: ["*.ts"],
+        maxResults: 2,
+      }),
+    );
+    const collected = outcome.files.reduce(
+      (total, file) => total + file.matches.length,
+      0,
+    );
+
+    expect(filePaths(outcome)).toEqual(["cap/normal.ts"]);
+    expect(outcome.matchCount).toBe(2);
+    expect(collected).toBe(2);
+    expect(outcome.fileCount).toBe(1);
+    expect(outcome.isLimitHit).toBe(true);
+  });
 });
 
 describe("searchWithRipgrep (fake binaries)", () => {
@@ -508,6 +568,61 @@ describe("searchWithRipgrep (fake binaries)", () => {
       startColumn: 1,
       endColumn: 7,
     });
+  });
+
+  function haystackEvent(filePath: string): string {
+    return JSON.stringify({
+      type: "match",
+      data: {
+        path: { text: `./${filePath}` },
+        lines: { text: "haystack\n" },
+        line_number: 1,
+        submatches: [{ match: { text: "haystack" }, start: 0, end: 8 }],
+      },
+    });
+  }
+
+  const EMIT_IGNORED_AND_KEPT = [
+    `printf '%s\\n' '${haystackEvent("src/main.generated.ts")}'`,
+    `printf '%s\\n' '${haystackEvent("src/haystack.ts")}'`,
+  ].join("\n");
+
+  it("drops ignored files reported by rg when include globs are set", async () => {
+    const binary = writeFakeBinary("emit-rg", EMIT_IGNORED_AND_KEPT);
+
+    const outcome = expectOk(
+      await searchWith(binary, { includeGlobs: ["*.ts"] }),
+    );
+
+    expect(filePaths(outcome)).toEqual(["src/haystack.ts"]);
+    expect(outcome.isTimedOut).toBe(false);
+  });
+
+  // rg's own timeout always leaves no budget for the ignore check, whatever
+  // timeoutMs is. timeoutMs only has to outlast the fake's startup + printf:
+  // 200ms did not under CPU load (the events arrived after the kill, giving
+  // []), so it is generous here; the tiny-budget timeout is covered above.
+  it("returns unfiltered results marked timed out when no budget is left for the ignore check", async () => {
+    const binary = writeFakeBinary(
+      "emit-then-hang-rg",
+      `${EMIT_IGNORED_AND_KEPT}\nexec sleep 30`,
+    );
+
+    const outcome = expectOk(
+      await searchWithRipgrep({
+        binary,
+        workspacePath: repoDir,
+        query: { ...DEFAULT_QUERY, includeGlobs: ["*.ts"] },
+        timeoutMs: 2_000,
+      }),
+    );
+
+    expect(filePaths(outcome)).toEqual([
+      "src/haystack.ts",
+      "src/main.generated.ts",
+    ]);
+    expect(outcome.isTimedOut).toBe(true);
+    expect(outcome.matchCount).toBe(2);
   });
 });
 

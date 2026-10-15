@@ -1,10 +1,16 @@
 import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import { findGitIgnoredPaths, type GitIgnoreCheck } from "./ignored-paths";
+import { escapeGlobLiteral } from "./glob-escape";
 import { sha256Utf8Hex } from "./line-hash";
 import { buildMatch, stripLineEnding, utf8ByteOffsetToUtf16 } from "./preview";
 import { runLineProcess, type LineDecision } from "./process";
-import { finalizeSearchResults, internalMaxResults } from "./result-filter";
+import { countMatches } from "./result-filter";
+import { parseMatchEvent } from "./ripgrep-events";
+import {
+  SEARCH_CANCELLED,
+  collectWithIgnoreRounds,
+  type RipgrepPassResult,
+} from "./ripgrep-rounds";
 import type {
   ContentSearchFile,
   ContentSearchMatch,
@@ -20,10 +26,6 @@ const FALLBACK_RIPGREP_PATHS = [
   "/usr/bin/rg",
 ] as const;
 const MAX_ERROR_MESSAGE_CHARS = 500;
-const SEARCH_CANCELLED = {
-  kind: "failed",
-  message: "Search cancelled",
-} as const satisfies ContentSearchOutcome;
 
 export interface SearchWithRipgrepInput {
   readonly binary: string;
@@ -31,18 +33,6 @@ export interface SearchWithRipgrepInput {
   readonly query: ContentSearchQuery;
   readonly timeoutMs: number;
   readonly signal?: AbortSignal;
-}
-
-interface RipgrepSubmatch {
-  readonly start: number;
-  readonly end: number;
-}
-
-interface RipgrepMatchEvent {
-  readonly path: string;
-  readonly lineText: string;
-  readonly lineNumber: number;
-  readonly submatches: readonly RipgrepSubmatch[];
 }
 
 function isExecutableFile(candidate: string): boolean {
@@ -63,7 +53,10 @@ export function resolveRipgrepBinary(): string | null {
   return candidates.find(isExecutableFile) ?? null;
 }
 
-function buildRipgrepArgs(query: ContentSearchQuery): string[] {
+function buildRipgrepArgs(
+  query: ContentSearchQuery,
+  excludedPaths: readonly string[],
+): string[] {
   const args = [
     "--json",
     "--no-config",
@@ -76,61 +69,14 @@ function buildRipgrepArgs(query: ContentSearchQuery): string[] {
   if (!query.isRegex) args.push("--fixed-strings");
   for (const glob of query.includeGlobs) args.push(`--glob=${glob}`);
   for (const glob of query.excludeGlobs) args.push(`--glob=!${glob}`);
+  // Anchored and escaped, so each one excludes exactly that file.
+  for (const excludedPath of excludedPaths) {
+    args.push(`--glob=!/${escapeGlobLiteral(excludedPath)}`);
+  }
   // Last, so user include globs can never re-include these.
   args.push("--glob=!.git", "--glob=!node_modules");
   args.push(`--regexp=${query.pattern}`, "--", ".");
   return args;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-// rg reports non-UTF-8 paths and lines as { bytes } instead of { text }.
-function readText(value: unknown): string | null {
-  return isRecord(value) && typeof value.text === "string" ? value.text : null;
-}
-
-function parseSubmatch(value: unknown): RipgrepSubmatch | null {
-  if (!isRecord(value)) return null;
-  const { start, end } = value;
-  if (typeof start !== "number" || typeof end !== "number") return null;
-  return { start, end };
-}
-
-function parseJsonLine(rawLine: string): unknown {
-  try {
-    return JSON.parse(rawLine);
-  } catch (error) {
-    if (error instanceof SyntaxError) return null;
-    throw error;
-  }
-}
-
-function parseMatchEvent(rawLine: string): RipgrepMatchEvent | null {
-  const event = parseJsonLine(rawLine);
-  if (!isRecord(event) || event.type !== "match" || !isRecord(event.data)) {
-    return null;
-  }
-  const { path, lines, line_number: lineNumber, submatches } = event.data;
-  const pathText = readText(path);
-  const lineText = readText(lines);
-  if (
-    pathText === null ||
-    lineText === null ||
-    typeof lineNumber !== "number" ||
-    !Array.isArray(submatches)
-  ) {
-    return null;
-  }
-  return {
-    path: pathText.startsWith("./") ? pathText.slice(2) : pathText,
-    lineText,
-    lineNumber,
-    submatches: submatches
-      .map(parseSubmatch)
-      .filter((submatch) => submatch !== null),
-  };
 }
 
 function compareMatches(
@@ -154,33 +100,21 @@ function truncateMessage(text: string): string {
   return text.trim().slice(0, MAX_ERROR_MESSAGE_CHARS);
 }
 
-// rg's --glob includes are overrides that beat .gitignore, so with includes
-// set git is asked which matched files are ignored. null: nothing to check.
-function checkGitIgnoredFiles(
-  files: readonly ContentSearchFile[],
-  input: SearchWithRipgrepInput,
-  remainingMs: number,
-): Promise<GitIgnoreCheck | null> {
-  if (input.query.includeGlobs.length === 0 || files.length === 0) {
-    return Promise.resolve(null);
-  }
-  return findGitIgnoredPaths({
-    cwd: input.workspacePath,
-    paths: files.map((file) => file.path),
-    timeoutMs: remainingMs,
-    signal: input.signal,
-  });
+interface RipgrepPassInput {
+  readonly search: SearchWithRipgrepInput;
+  // Matched paths found to be git-ignored by earlier ignore rounds.
+  readonly excludedPaths: readonly string[];
+  readonly timeoutMs: number;
 }
 
-export async function searchWithRipgrep(
-  input: SearchWithRipgrepInput,
-): Promise<ContentSearchOutcome> {
-  const { binary, workspacePath, query, timeoutMs, signal } = input;
-  const startedAt = performance.now();
+async function runRipgrepPass(
+  passInput: RipgrepPassInput,
+): Promise<RipgrepPassResult> {
+  const { search, excludedPaths, timeoutMs } = passInput;
+  const { binary, workspacePath, query, signal } = search;
   const matchesByPath = new Map<string, ContentSearchMatch[]>();
   let matchCount = 0;
   let isLimitHit = false;
-  const maxCollectedMatches = internalMaxResults(query);
 
   function handleLine(rawLine: string): LineDecision {
     const event = parseMatchEvent(rawLine);
@@ -188,7 +122,7 @@ export async function searchWithRipgrep(
     const line = stripLineEnding(event.lineText);
     const lineSha256 = sha256Utf8Hex(line);
     for (const submatch of event.submatches) {
-      if (matchCount >= maxCollectedMatches) {
+      if (matchCount >= query.maxResults) {
         isLimitHit = true;
         return "stop";
       }
@@ -214,48 +148,74 @@ export async function searchWithRipgrep(
 
   const result = await runLineProcess({
     command: binary,
-    args: buildRipgrepArgs(query),
+    args: buildRipgrepArgs(query, excludedPaths),
     cwd: workspacePath,
     timeoutMs,
     signal,
     onLine: handleLine,
   });
 
-  async function buildOkOutcome(): Promise<ContentSearchOutcome> {
+  function collected(): RipgrepPassResult {
     const files = groupFiles(matchesByPath);
-    const remainingMs = timeoutMs - (performance.now() - startedAt);
-    const finalized = finalizeSearchResults({
-      raw: { files, isLimitHit, isTimedOut: result.isTimedOut },
-      ignoreCheck: await checkGitIgnoredFiles(files, input, remainingMs),
-      maxResults: query.maxResults,
-    });
-    if (finalized.kind === "aborted") return SEARCH_CANCELLED;
-    return {
-      kind: "ok",
-      files: finalized.files,
-      matchCount: finalized.matchCount,
-      fileCount: finalized.fileCount,
-      isLimitHit: finalized.isLimitHit,
-      isTimedOut: finalized.isTimedOut,
-      engine: "ripgrep",
-      durationMs: performance.now() - startedAt,
-    };
+    const results = { files, isLimitHit, isTimedOut: result.isTimedOut };
+    return { kind: "collected", results };
   }
 
-  if (result.isStopped || result.isTimedOut) return buildOkOutcome();
-  if (result.isAborted) return SEARCH_CANCELLED;
+  function outcome(searchOutcome: ContentSearchOutcome): RipgrepPassResult {
+    return { kind: "outcome", outcome: searchOutcome };
+  }
+
+  if (result.isStopped || result.isTimedOut) return collected();
+  if (result.isAborted) return outcome(SEARCH_CANCELLED);
   if (result.spawnErrorCode !== null) {
-    return { kind: "unavailable", message: "ripgrep could not be started" };
+    return outcome({
+      kind: "unavailable",
+      message: "ripgrep could not be started",
+    });
   }
-  if (result.exitCode === 0 || result.exitCode === 1) return buildOkOutcome();
+  if (result.exitCode === 0 || result.exitCode === 1) return collected();
   if (result.exitCode === 2 && result.stderr.includes("regex parse error")) {
-    return { kind: "invalid-pattern", message: truncateMessage(result.stderr) };
+    const message = truncateMessage(result.stderr);
+    return outcome({ kind: "invalid-pattern", message });
   }
-  if (matchCount > 0) return buildOkOutcome();
-  return {
+  if (matchCount > 0) return collected();
+  return outcome({
     kind: "failed",
     message:
       truncateMessage(result.stderr) ||
       `ripgrep exited with code ${String(result.exitCode)}`,
+  });
+}
+
+export async function searchWithRipgrep(
+  input: SearchWithRipgrepInput,
+): Promise<ContentSearchOutcome> {
+  const { workspacePath, query, timeoutMs, signal } = input;
+  const startedAt = performance.now();
+  const pass =
+    query.includeGlobs.length === 0
+      ? await runRipgrepPass({ search: input, excludedPaths: [], timeoutMs })
+      : await collectWithIgnoreRounds({
+          workspacePath,
+          signal,
+          getRemainingMs: () => timeoutMs - (performance.now() - startedAt),
+          runPass: (excludedPaths, passTimeoutMs) =>
+            runRipgrepPass({
+              search: input,
+              excludedPaths,
+              timeoutMs: passTimeoutMs,
+            }),
+        });
+  if (pass.kind === "outcome") return pass.outcome;
+  const { files, isLimitHit, isTimedOut } = pass.results;
+  return {
+    kind: "ok",
+    files,
+    matchCount: countMatches(files),
+    fileCount: files.length,
+    isLimitHit,
+    isTimedOut,
+    engine: "ripgrep",
+    durationMs: performance.now() - startedAt,
   };
 }

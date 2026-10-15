@@ -352,8 +352,9 @@ describe.skipIf(ripgrepBinary === null)("searchWithRipgrep (real rg)", () => {
     expect(outcome.matchCount).toBe(0);
   });
 
-  // 2 ignored + 3 kept matches fit the doubled internal cap (6), so the 3 kept
-  // matches all survive and the limit is not reported.
+  // The 3 kept matches all survive however rg orders the files. isLimitHit is
+  // not asserted: if the ignored file comes after the kept ones, rg is cut at
+  // the cap and can't know the rest is ignored, so the limit is reported.
   it("does not let ignored matches use up maxResults", async () => {
     const outcome = expectOk(
       await search({
@@ -365,7 +366,6 @@ describe.skipIf(ripgrepBinary === null)("searchWithRipgrep (real rg)", () => {
 
     expect(filePaths(outcome)).toEqual(["cap/normal.ts"]);
     expect(outcome.matchCount).toBe(3);
-    expect(outcome.isLimitHit).toBe(false);
   });
 
   it("trims to exactly maxResults after dropping ignored files", async () => {
@@ -599,10 +599,9 @@ describe("searchWithRipgrep (fake binaries)", () => {
   });
 
   // rg's own timeout always leaves no budget for the ignore check, whatever
-  // timeoutMs is. timeoutMs only has to outlast the fake's startup + printf:
-  // 200ms did not under CPU load (the events arrived after the kill, giving
-  // []), so it is generous here; the tiny-budget timeout is covered above.
-  it("returns unfiltered results marked timed out when no budget is left for the ignore check", async () => {
+  // timeoutMs is. timeoutMs only has to outlast the fake's startup + printf
+  // (200ms did not under CPU load), so it is generous here.
+  it("returns no unverified files, marked timed out, when no budget is left for the ignore check", async () => {
     const binary = writeFakeBinary(
       "emit-then-hang-rg",
       `${EMIT_IGNORED_AND_KEPT}\nexec sleep 30`,
@@ -617,12 +616,10 @@ describe("searchWithRipgrep (fake binaries)", () => {
       }),
     );
 
-    expect(filePaths(outcome)).toEqual([
-      "src/haystack.ts",
-      "src/main.generated.ts",
-    ]);
+    expect(outcome.files).toEqual([]);
+    expect(outcome.matchCount).toBe(0);
+    expect(outcome.fileCount).toBe(0);
     expect(outcome.isTimedOut).toBe(true);
-    expect(outcome.matchCount).toBe(2);
   });
 });
 

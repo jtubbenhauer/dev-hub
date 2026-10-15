@@ -1,23 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
-  finalizeSearchResults,
-  internalMaxResults,
+  EMPTY_IGNORE_ROUND_STATE,
+  MAX_IGNORE_ROUNDS,
+  countMatches,
+  decideAfterRound,
+  findUncheckedPaths,
+  keepVerifiedFiles,
+  recordIgnoreCheck,
 } from "@/packages/shared/src/content-search/result-filter";
 import type {
   ContentSearchFile,
   ContentSearchMatch,
-  ContentSearchQuery,
 } from "@/packages/shared/src/content-search/types";
-
-const BASE_QUERY: ContentSearchQuery = {
-  pattern: "x",
-  isRegex: false,
-  isCaseSensitive: false,
-  isWholeWord: false,
-  includeGlobs: [],
-  excludeGlobs: [],
-  maxResults: 100,
-};
 
 function makeMatch(lineNumber: number): ContentSearchMatch {
   return {
@@ -48,150 +42,114 @@ const FILES: readonly ContentSearchFile[] = [
   makeFile("c.ts", 3),
 ];
 
-function shape(files: readonly ContentSearchFile[]): [string, number][] {
-  return files.map((file) => [file.path, file.matches.length]);
-}
+const CAPPED_PASS = { files: FILES, isLimitHit: true, isTimedOut: false };
 
-describe("internalMaxResults", () => {
-  it("equals maxResults without include globs", () => {
-    expect(internalMaxResults({ ...BASE_QUERY, maxResults: 300 })).toBe(300);
+describe("ignore round state", () => {
+  it("treats every path as unchecked at the start", () => {
+    expect(findUncheckedPaths(FILES, EMPTY_IGNORE_ROUND_STATE)).toEqual([
+      "a.generated.ts",
+      "b.ts",
+      "c.ts",
+    ]);
   });
 
-  it("doubles maxResults with include globs", () => {
-    expect(
-      internalMaxResults({
-        ...BASE_QUERY,
-        maxResults: 300,
-        includeGlobs: ["*.ts"],
-      }),
-    ).toBe(600);
+  it("records ignored and verified paths from a check", () => {
+    const state = recordIgnoreCheck({
+      state: EMPTY_IGNORE_ROUND_STATE,
+      checkedPaths: ["a.generated.ts", "b.ts"],
+      ignoredPaths: new Set(["a.generated.ts"]),
+    });
+
+    expect([...state.ignoredPaths]).toEqual(["a.generated.ts"]);
+    expect([...state.verifiedPaths]).toEqual(["b.ts"]);
+    expect(findUncheckedPaths(FILES, state)).toEqual(["c.ts"]);
   });
 
-  it("caps the doubled value at twice the request limit", () => {
-    expect(
-      internalMaxResults({
-        ...BASE_QUERY,
-        maxResults: 9000,
-        includeGlobs: ["*.ts"],
-      }),
-    ).toBe(10_000);
+  it("keeps only verified files, so unchecked and ignored files are never exposed", () => {
+    const state = recordIgnoreCheck({
+      state: EMPTY_IGNORE_ROUND_STATE,
+      checkedPaths: ["a.generated.ts", "b.ts"],
+      ignoredPaths: new Set(["a.generated.ts"]),
+    });
+
+    expect(keepVerifiedFiles(FILES, state).map((file) => file.path)).toEqual([
+      "b.ts",
+    ]);
+  });
+
+  it("returns no files before anything was verified", () => {
+    expect(keepVerifiedFiles(FILES, EMPTY_IGNORE_ROUND_STATE)).toEqual([]);
+  });
+
+  it("counts matches across files", () => {
+    expect(countMatches(FILES)).toBe(9);
   });
 });
 
-describe("finalizeSearchResults", () => {
-  const raw = { files: FILES, isLimitHit: false, isTimedOut: false };
-
-  it("keeps everything when no ignore check ran and the cap is not exceeded", () => {
-    const finalized = finalizeSearchResults({
-      raw,
-      ignoreCheck: null,
-      maxResults: 100,
-    });
-
-    expect(finalized).toMatchObject({
-      kind: "results",
-      matchCount: 9,
-      fileCount: 3,
-      isLimitHit: false,
-      isTimedOut: false,
-    });
+describe("decideAfterRound", () => {
+  it("is done when the pass was not cut by the cap", () => {
+    expect(
+      decideAfterRound({
+        pass: { ...CAPPED_PASS, isLimitHit: false },
+        newIgnoredCount: 2,
+        round: 1,
+        remainingMs: 1000,
+      }),
+    ).toBe("done");
   });
 
-  it("drops ignored files before trimming, so ignored matches do not use the cap", () => {
-    const finalized = finalizeSearchResults({
-      raw,
-      ignoreCheck: { kind: "ignored", paths: new Set(["a.generated.ts"]) },
-      maxResults: 5,
-    });
-
-    if (finalized.kind !== "results") throw new Error("expected results");
-    expect(shape(finalized.files)).toEqual([
-      ["b.ts", 2],
-      ["c.ts", 3],
-    ]);
-    expect(finalized.matchCount).toBe(5);
-    expect(finalized.isLimitHit).toBe(false);
+  it("is done when a capped pass found no new ignored files", () => {
+    expect(
+      decideAfterRound({
+        pass: CAPPED_PASS,
+        newIgnoredCount: 0,
+        round: 1,
+        remainingMs: 1000,
+      }),
+    ).toBe("done");
   });
 
-  it("trims from the end of the sorted order and reports the limit", () => {
-    const finalized = finalizeSearchResults({
-      raw,
-      ignoreCheck: { kind: "ignored", paths: new Set(["a.generated.ts"]) },
-      maxResults: 3,
-    });
-
-    if (finalized.kind !== "results") throw new Error("expected results");
-    expect(shape(finalized.files)).toEqual([
-      ["b.ts", 2],
-      ["c.ts", 1],
-    ]);
-    expect(finalized.files[1]?.matches[0]?.lineNumber).toBe(1);
-    expect(finalized.matchCount).toBe(3);
-    expect(finalized.fileCount).toBe(2);
-    expect(finalized.isLimitHit).toBe(true);
+  it("is done when the pass itself timed out", () => {
+    expect(
+      decideAfterRound({
+        pass: { ...CAPPED_PASS, isTimedOut: true },
+        newIgnoredCount: 1,
+        round: 1,
+        remainingMs: 1000,
+      }),
+    ).toBe("done");
   });
 
-  it("drops files left empty by trimming", () => {
-    const finalized = finalizeSearchResults({
-      raw,
-      ignoreCheck: null,
-      maxResults: 4,
-    });
-
-    if (finalized.kind !== "results") throw new Error("expected results");
-    expect(shape(finalized.files)).toEqual([["a.generated.ts", 4]]);
-    expect(finalized.fileCount).toBe(1);
+  it("runs another round when ignored files used up the cap", () => {
+    expect(
+      decideAfterRound({
+        pass: CAPPED_PASS,
+        newIgnoredCount: 1,
+        round: 1,
+        remainingMs: 1000,
+      }),
+    ).toBe("next-round");
   });
 
-  it("keeps the limit flag when the internal cap was hit even without trimming", () => {
-    const finalized = finalizeSearchResults({
-      raw: { ...raw, isLimitHit: true },
-      ignoreCheck: { kind: "ignored", paths: new Set(["a.generated.ts"]) },
-      maxResults: 100,
-    });
-
-    expect(finalized).toMatchObject({ matchCount: 5, isLimitHit: true });
+  it("stops after the last allowed round", () => {
+    expect(
+      decideAfterRound({
+        pass: CAPPED_PASS,
+        newIgnoredCount: 1,
+        round: MAX_IGNORE_ROUNDS,
+        remainingMs: 1000,
+      }),
+    ).toBe("rounds-exhausted");
   });
 
-  it.each(["not-a-repository", "unavailable"] as const)(
-    "keeps results unfiltered when git reports %s",
-    (kind) => {
-      const finalized = finalizeSearchResults({
-        raw,
-        ignoreCheck: { kind },
-        maxResults: 100,
-      });
-
-      expect(finalized).toMatchObject({
-        kind: "results",
-        matchCount: 9,
-        isTimedOut: false,
-      });
-    },
-  );
-
-  it("keeps results unfiltered but marks them timed out when the check timed out", () => {
-    const finalized = finalizeSearchResults({
-      raw,
-      ignoreCheck: { kind: "timed-out" },
-      maxResults: 100,
-    });
-
-    expect(finalized).toMatchObject({
-      kind: "results",
-      matchCount: 9,
-      fileCount: 3,
-      isTimedOut: true,
-    });
-  });
-
-  it("reports aborted when the check was aborted", () => {
-    const finalized = finalizeSearchResults({
-      raw,
-      ignoreCheck: { kind: "aborted" },
-      maxResults: 100,
-    });
-
-    expect(finalized).toEqual({ kind: "aborted" });
+  it("stops when no time is left for another round", () => {
+    expect(
+      decideAfterRound({
+        pass: CAPPED_PASS,
+        newIgnoredCount: 1,
+        round: 1,
+        remainingMs: 0,
+      }),
+    ).toBe("out-of-time");
   });
 });

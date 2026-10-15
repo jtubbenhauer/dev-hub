@@ -1,6 +1,6 @@
 "use client";
 
-// allow: SIZE_OK — Todo 13 requires ordered reveal effects alongside both existing PTY switch writes.
+// allow: SIZE_OK — Terminal resolution and workspace-owned delivery share this editor lifecycle.
 
 import {
   useEffect,
@@ -22,7 +22,10 @@ import {
 } from "@/hooks/use-settings";
 import { Loader2, AlertCircle } from "lucide-react";
 import type { EditorRevealRequest } from "@/stores/editor-store";
-import { buildNeovimRevealCommand } from "@/components/editor/neovim-reveal-command";
+import {
+  buildNeovimRevealCommand,
+  hasControlCharacter,
+} from "@/components/editor/neovim-reveal-command";
 
 export interface NeovimEditorHandle {
   focus: () => void;
@@ -86,11 +89,22 @@ export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
     const [isResolving, setIsResolving] = useState(false);
     const [depsChecked, setDepsChecked] = useState(false);
     const currentFileRef = useRef<string | null>(null);
-    const [terminalHandle, setTerminalHandle] = useState<TerminalHandle | null>(
-      null,
-    );
-    const desiredFileRef = useRef<string | null>(null);
-    const isSwitchPendingRef = useRef(false);
+    // Identity also rejects an old onReady callback after switching away and back.
+    const [terminal, setTerminal] = useState<{
+      readonly session: { readonly workspaceId: string | undefined };
+      readonly handle: TerminalHandle | null;
+    }>(() => ({ session: { workspaceId }, handle: null }));
+    if (terminal.session.workspaceId !== workspaceId) {
+      setTerminal({ session: { workspaceId }, handle: null });
+    }
+    const workspaceSession = terminal.session;
+    const terminalHandle =
+      !isResolving && workspaceSession.workspaceId === workspaceId
+        ? terminal.handle
+        : null;
+    const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const revealRequestRef = useRef(revealRequest);
     const onRevealHandledRef = useRef(onRevealHandled);
     useEffect(() => {
@@ -100,6 +114,16 @@ export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
       onRevealHandledRef.current = onRevealHandled;
     }, [onRevealHandled]);
 
+    useEffect(() => {
+      return () => {
+        currentFileRef.current = null;
+        for (const timerRef of [switchTimerRef, revealTimerRef, lineTimerRef]) {
+          if (timerRef.current !== null) clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+      };
+    }, [workspaceSession, isResolving, terminalHandle]);
+
     useImperativeHandle(
       ref,
       () => ({
@@ -108,8 +132,12 @@ export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
         revealLine: (line: number) => {
           if (!terminalHandle) return;
           if (!Number.isInteger(line) || line < 1) return;
+          if (lineTimerRef.current !== null) clearTimeout(lineTimerRef.current);
           terminalHandle.write("\x1b");
-          setTimeout(() => terminalHandle.write(`:${line}\r`), 50);
+          lineTimerRef.current = setTimeout(() => {
+            lineTimerRef.current = null;
+            terminalHandle.write(`:${line}\r`);
+          }, 50);
         },
       }),
       [terminalHandle],
@@ -188,78 +216,78 @@ export const NeovimEditor = forwardRef<NeovimEditorHandle, NeovimEditorProps>(
 
     // Switch files by writing nvim commands directly through the PTY
     useEffect(() => {
-      if (!filePath || !terminalConfig || isResolving) return;
-
-      // Always track what file we want, even if handle isn't ready yet
-      desiredFileRef.current = filePath;
-
+      if (
+        !filePath ||
+        !terminalConfig ||
+        isResolving ||
+        !workspaceId ||
+        !terminalHandle
+      )
+        return;
       if (currentFileRef.current === filePath) return;
-
-      if (!terminalHandle) return;
-
-      currentFileRef.current = filePath;
       // Escape to normal mode, then open the new file after a brief delay
-      terminalHandle.write("\x1b");
-      isSwitchPendingRef.current = true;
-      setTimeout(() => {
+      const canWritePath = !hasControlCharacter(filePath);
+      if (canWritePath) terminalHandle.write("\x1b");
+      switchTimerRef.current = setTimeout(() => {
+        switchTimerRef.current = null;
+        currentFileRef.current = filePath;
         const request = revealRequestRef.current;
-        if (request?.path === filePath) {
+        if (request?.path === filePath && request.workspaceId === workspaceId) {
           const command = buildNeovimRevealCommand(request);
-          terminalHandle.write(
-            command !== null ? `:${command}\r` : `:e ${filePath}\r`,
-          );
+          if (canWritePath)
+            terminalHandle.write(
+              command !== null ? `:${command}\r` : `:e ${filePath}\r`,
+            );
           onRevealHandledRef.current?.(request.id);
-        } else {
+        } else if (canWritePath) {
           terminalHandle.write(`:e ${filePath}\r`);
         }
-        isSwitchPendingRef.current = false;
-        terminalHandle.focus();
+        if (canWritePath) terminalHandle.focus();
       }, 50);
-    }, [filePath, terminalConfig, isResolving, terminalHandle]);
+      return () => {
+        if (switchTimerRef.current !== null)
+          clearTimeout(switchTimerRef.current);
+        switchTimerRef.current = null;
+      };
+    }, [filePath, terminalConfig, isResolving, terminalHandle, workspaceId]);
 
     useEffect(() => {
       if (
         !revealRequest ||
         revealRequest.path !== filePath ||
+        revealRequest.workspaceId !== workspaceId ||
+        isResolving ||
         !terminalHandle ||
         currentFileRef.current !== filePath ||
-        isSwitchPendingRef.current
+        switchTimerRef.current !== null
       )
         return;
-      terminalHandle.write("\x1b");
-      const timer = setTimeout(() => {
+      if (!hasControlCharacter(revealRequest.path))
+        terminalHandle.write("\x1b");
+      revealTimerRef.current = setTimeout(() => {
+        revealTimerRef.current = null;
         const command = buildNeovimRevealCommand(revealRequest);
         if (command !== null) terminalHandle.write(`:${command}\r`);
         onRevealHandledRef.current?.(revealRequest.id);
       }, 50);
-      return () => clearTimeout(timer);
-    }, [revealRequest, terminalHandle, filePath]);
+      return () => {
+        if (revealTimerRef.current !== null)
+          clearTimeout(revealTimerRef.current);
+        revealTimerRef.current = null;
+      };
+    }, [revealRequest, terminalHandle, filePath, workspaceId, isResolving]);
 
-    const handleTerminalReady = useCallback((handle: TerminalHandle) => {
-      setTerminalHandle(handle);
-
-      // If a file switch was requested before the handle was ready, apply it now
-      const desired = desiredFileRef.current;
-      if (desired && desired !== currentFileRef.current) {
-        currentFileRef.current = desired;
-        handle.write("\x1b");
-        isSwitchPendingRef.current = true;
-        setTimeout(() => {
-          const request = revealRequestRef.current;
-          if (request?.path === desired) {
-            const command = buildNeovimRevealCommand(request);
-            handle.write(
-              command !== null ? `:${command}\r` : `:e ${desired}\r`,
-            );
-            onRevealHandledRef.current?.(request.id);
-          } else {
-            handle.write(`:e ${desired}\r`);
-          }
-          isSwitchPendingRef.current = false;
-          handle.focus();
-        }, 50);
-      }
-    }, []);
+    const handleTerminalReady = useCallback(
+      (handle: TerminalHandle) => {
+        if (isResolving) return;
+        setTerminal((current) =>
+          current.session === workspaceSession
+            ? { ...current, handle }
+            : current,
+        );
+      },
+      [workspaceSession, isResolving],
+    );
 
     if (!workspaceId || !filePath) {
       return (

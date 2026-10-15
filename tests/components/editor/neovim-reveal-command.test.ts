@@ -5,7 +5,10 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { buildNeovimRevealCommand } from "@/components/editor/neovim-reveal-command";
+import {
+  buildNeovimRevealCommand,
+  hasControlCharacter,
+} from "@/components/editor/neovim-reveal-command";
 
 const request = {
   path: "a.txt",
@@ -14,6 +17,25 @@ const request = {
   lineSha256:
     "795c238dcce900c0131e710c25229cc164f8c22b48bb0d5ea3343ad340d91bc4",
 };
+
+describe("hasControlCharacter", () => {
+  it.each([...Array.from({ length: 32 }, (_, code) => code), 127])(
+    "rejects terminal control code %i",
+    (code) => {
+      // Given / When / Then
+      expect(hasControlCharacter(`a${String.fromCharCode(code)}.txt`)).toBe(
+        true,
+      );
+    },
+  );
+  it.each(["a.txt", "it's | odd.txt", "nested/界.txt", ""])(
+    "permits ordinary path %j",
+    (path) => {
+      // Given / When / Then
+      expect(hasControlCharacter(path)).toBe(false);
+    },
+  );
+});
 
 describe("buildNeovimRevealCommand", () => {
   it("builds the exact guarded command when the request is valid", () => {

@@ -1,5 +1,12 @@
 import type { EditorRevealRequest } from "@/stores/editor-store";
 
+export function hasControlCharacter(path: string): boolean {
+  return Array.from(path).some(
+    (character) =>
+      character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+  );
+}
+
 export function buildNeovimRevealCommand(
   request: Pick<
     EditorRevealRequest,
@@ -7,10 +14,7 @@ export function buildNeovimRevealCommand(
   >,
 ): string | null {
   if (
-    Array.from(request.path).some(
-      (character) =>
-        character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
-    ) ||
+    hasControlCharacter(request.path) ||
     !/^[0-9a-f]{64}$/.test(request.lineSha256) ||
     !Number.isInteger(request.lineNumber) ||
     request.lineNumber < 1 ||

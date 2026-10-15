@@ -1,3 +1,4 @@
+import { escapeGlobLiteral } from "./glob-escape";
 import type { ContentSearchFile } from "./types";
 
 // Pure bookkeeping for the include-glob ignore rounds: which matched paths git
@@ -7,6 +8,12 @@ import type { ContentSearchFile } from "./types";
 // rg include globs override .gitignore, so ignored files can fill the cap; each
 // extra round re-runs rg with the ignored files found so far excluded.
 export const MAX_IGNORE_ROUNDS = 4;
+// Re-runs pass one --glob per ignored path; bound their total argv size well
+// below ARG_MAX (1 MiB on macOS, often 2 MiB on Linux) to never hit E2BIG.
+export const MAX_EXCLUSION_ARGV_BYTES = 64 * 1024;
+export const MAX_EXCLUSION_ARG_BYTES = 4096;
+
+const utf8Encoder = new TextEncoder();
 
 export interface CollectedSearchResults {
   // Sorted by path, matches by line/column.
@@ -37,14 +44,15 @@ export type RoundDecision =
   | "done"
   | "next-round"
   | "rounds-exhausted"
-  | "out-of-time";
+  | "exclusions-too-large";
 
 export interface DecideAfterRoundInput {
   readonly pass: CollectedSearchResults;
   readonly newIgnoredCount: number;
   // 1-based.
   readonly round: number;
-  readonly remainingMs: number;
+  // measureExclusionArgvBytes of every ignored path known so far.
+  readonly exclusionArgvBytes: number;
 }
 
 export function countMatches(files: readonly ContentSearchFile[]): number {
@@ -83,11 +91,34 @@ export function keepVerifiedFiles(
   return files.filter((file) => state.verifiedPaths.has(file.path));
 }
 
+export function buildExclusionGlobArg(ignoredPath: string): string {
+  // Anchored and escaped, so it excludes exactly that file.
+  return `--glob=!/${escapeGlobLiteral(ignoredPath)}`;
+}
+
+// argv bytes the exclusions would add (each arg plus its NUL terminator);
+// infinite when a single argument is longer than any OS should accept.
+export function measureExclusionArgvBytes(
+  ignoredPaths: Iterable<string>,
+): number {
+  let totalBytes = 0;
+  for (const ignoredPath of ignoredPaths) {
+    const argBytes = utf8Encoder.encode(
+      buildExclusionGlobArg(ignoredPath),
+    ).length;
+    if (argBytes > MAX_EXCLUSION_ARG_BYTES) return Number.POSITIVE_INFINITY;
+    totalBytes += argBytes + 1;
+  }
+  return totalBytes;
+}
+
 export function decideAfterRound(input: DecideAfterRoundInput): RoundDecision {
-  const { pass, newIgnoredCount, round, remainingMs } = input;
+  const { pass, newIgnoredCount, round, exclusionArgvBytes } = input;
   const isCapUsedByIgnored = pass.isLimitHit && newIgnoredCount > 0;
   if (!isCapUsedByIgnored || pass.isTimedOut) return "done";
   if (round >= MAX_IGNORE_ROUNDS) return "rounds-exhausted";
-  if (remainingMs <= 0) return "out-of-time";
+  if (exclusionArgvBytes > MAX_EXCLUSION_ARGV_BYTES) {
+    return "exclusions-too-large";
+  }
   return "next-round";
 }

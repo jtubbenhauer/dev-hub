@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_IGNORE_ROUND_STATE,
+  MAX_EXCLUSION_ARGV_BYTES,
+  MAX_EXCLUSION_ARG_BYTES,
   MAX_IGNORE_ROUNDS,
+  buildExclusionGlobArg,
   countMatches,
   decideAfterRound,
   findUncheckedPaths,
   keepVerifiedFiles,
+  measureExclusionArgvBytes,
   recordIgnoreCheck,
 } from "@/packages/shared/src/content-search/result-filter";
 import type {
@@ -86,70 +90,87 @@ describe("ignore round state", () => {
   });
 });
 
+describe("measureExclusionArgvBytes", () => {
+  it("sums the UTF-8 bytes of each exclusion argument plus its terminator", () => {
+    // "--glob=!/a" is 10 bytes; "--glob=!/ñ" is 11 (ñ is 2 bytes).
+    expect(measureExclusionArgvBytes(["a", "ñ"])).toBe(11 + 12);
+  });
+
+  it("measures the escaped glob, not the raw path", () => {
+    expect(buildExclusionGlobArg("a b")).toBe("--glob=!/a\\ b");
+    expect(measureExclusionArgvBytes(["a b"])).toBe(14);
+  });
+
+  it("treats a single argument over the per-argument limit as unbounded", () => {
+    const longPath = "x".repeat(MAX_EXCLUSION_ARG_BYTES);
+
+    expect(measureExclusionArgvBytes(["a", longPath])).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+  });
+
+  it("is zero without exclusions", () => {
+    expect(measureExclusionArgvBytes([])).toBe(0);
+  });
+});
+
 describe("decideAfterRound", () => {
+  const BASE_INPUT = {
+    pass: CAPPED_PASS,
+    newIgnoredCount: 1,
+    round: 1,
+    exclusionArgvBytes: 100,
+  };
+
   it("is done when the pass was not cut by the cap", () => {
     expect(
       decideAfterRound({
+        ...BASE_INPUT,
         pass: { ...CAPPED_PASS, isLimitHit: false },
-        newIgnoredCount: 2,
-        round: 1,
-        remainingMs: 1000,
       }),
     ).toBe("done");
   });
 
   it("is done when a capped pass found no new ignored files", () => {
-    expect(
-      decideAfterRound({
-        pass: CAPPED_PASS,
-        newIgnoredCount: 0,
-        round: 1,
-        remainingMs: 1000,
-      }),
-    ).toBe("done");
+    expect(decideAfterRound({ ...BASE_INPUT, newIgnoredCount: 0 })).toBe(
+      "done",
+    );
   });
 
   it("is done when the pass itself timed out", () => {
     expect(
       decideAfterRound({
+        ...BASE_INPUT,
         pass: { ...CAPPED_PASS, isTimedOut: true },
-        newIgnoredCount: 1,
-        round: 1,
-        remainingMs: 1000,
       }),
     ).toBe("done");
   });
 
   it("runs another round when ignored files used up the cap", () => {
+    expect(decideAfterRound(BASE_INPUT)).toBe("next-round");
+  });
+
+  it("runs another round when the exclusions are exactly at the byte bound", () => {
     expect(
       decideAfterRound({
-        pass: CAPPED_PASS,
-        newIgnoredCount: 1,
-        round: 1,
-        remainingMs: 1000,
+        ...BASE_INPUT,
+        exclusionArgvBytes: MAX_EXCLUSION_ARGV_BYTES,
       }),
     ).toBe("next-round");
   });
 
   it("stops after the last allowed round", () => {
-    expect(
-      decideAfterRound({
-        pass: CAPPED_PASS,
-        newIgnoredCount: 1,
-        round: MAX_IGNORE_ROUNDS,
-        remainingMs: 1000,
-      }),
-    ).toBe("rounds-exhausted");
+    expect(decideAfterRound({ ...BASE_INPUT, round: MAX_IGNORE_ROUNDS })).toBe(
+      "rounds-exhausted",
+    );
   });
 
-  it("stops when no time is left for another round", () => {
+  it("stops when the accumulated exclusions exceed the argv byte bound", () => {
     expect(
       decideAfterRound({
-        pass: CAPPED_PASS,
-        newIgnoredCount: 1,
-        round: 1,
-        remainingMs: 0,
+        ...BASE_INPUT,
+        exclusionArgvBytes: MAX_EXCLUSION_ARGV_BYTES + 1,
       }),
-    ).toBe("out-of-time");
+    ).toBe("exclusions-too-large");
   });
 });

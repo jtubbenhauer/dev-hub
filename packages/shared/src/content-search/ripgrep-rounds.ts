@@ -1,15 +1,17 @@
-import { findGitIgnoredPaths } from "./ignored-paths";
+import type { GitIgnoreCheck } from "./ignored-paths";
 import {
   EMPTY_IGNORE_ROUND_STATE,
   decideAfterRound,
   findUncheckedPaths,
   keepVerifiedFiles,
+  measureExclusionArgvBytes,
   recordIgnoreCheck,
   type CollectedSearchResults,
 } from "./result-filter";
-import type { ContentSearchOutcome } from "./types";
+import type { ContentSearchFile, ContentSearchOutcome } from "./types";
 
-// Node-only (spawns git): never export from the @devhub/shared barrel.
+// Round orchestration only; rg and git are injected by ripgrep.ts. Not
+// exported from the @devhub/shared barrel.
 
 export const SEARCH_CANCELLED = {
   kind: "failed",
@@ -27,14 +29,16 @@ export type RipgrepPassResult =
   | { readonly kind: "outcome"; readonly outcome: ContentSearchOutcome };
 
 export interface IgnoreRoundsInput {
-  readonly workspacePath: string;
-  readonly signal?: AbortSignal;
   // Time left of the whole search's budget.
   readonly getRemainingMs: () => number;
   readonly runPass: (
     excludedPaths: readonly string[],
     timeoutMs: number,
   ) => Promise<RipgrepPassResult>;
+  readonly checkIgnoredPaths: (
+    paths: readonly string[],
+    timeoutMs: number,
+  ) => Promise<GitIgnoreCheck>;
 }
 
 function collected(results: CollectedSearchResults): RipgrepPassResult {
@@ -47,19 +51,24 @@ function collected(results: CollectedSearchResults): RipgrepPassResult {
 export async function collectWithIgnoreRounds(
   input: IgnoreRoundsInput,
 ): Promise<RipgrepPassResult> {
-  const { workspacePath, signal, getRemainingMs, runPass } = input;
+  const { getRemainingMs, runPass, checkIgnoredPaths } = input;
   let state = EMPTY_IGNORE_ROUND_STATE;
+  let verifiedFiles: readonly ContentSearchFile[] = [];
   for (let round = 1; ; round += 1) {
-    const pass = await runPass([...state.ignoredPaths], getRemainingMs());
+    const passTimeoutMs = getRemainingMs();
+    // Never spawn a re-run that would be killed at once.
+    if (round > 1 && passTimeoutMs <= 0) {
+      return collected({
+        files: verifiedFiles,
+        isLimitHit: true,
+        isTimedOut: true,
+      });
+    }
+    const pass = await runPass([...state.ignoredPaths], passTimeoutMs);
     if (pass.kind === "outcome") return pass;
     const { files, isLimitHit, isTimedOut } = pass.results;
     const checkedPaths = findUncheckedPaths(files, state);
-    const check = await findGitIgnoredPaths({
-      cwd: workspacePath,
-      paths: checkedPaths,
-      timeoutMs: getRemainingMs(),
-      signal,
-    });
+    const check = await checkIgnoredPaths(checkedPaths, getRemainingMs());
     switch (check.kind) {
       case "ignored":
         break;
@@ -86,12 +95,12 @@ export async function collectWithIgnoreRounds(
       checkedPaths,
       ignoredPaths: check.paths,
     });
-    const verifiedFiles = keepVerifiedFiles(files, state);
+    verifiedFiles = keepVerifiedFiles(files, state);
     const decision = decideAfterRound({
       pass: pass.results,
       newIgnoredCount: check.paths.size,
       round,
-      remainingMs: getRemainingMs(),
+      exclusionArgvBytes: measureExclusionArgvBytes(state.ignoredPaths),
     });
     switch (decision) {
       case "next-round":
@@ -99,16 +108,11 @@ export async function collectWithIgnoreRounds(
       case "done":
         return collected({ files: verifiedFiles, isLimitHit, isTimedOut });
       case "rounds-exhausted":
+      case "exclusions-too-large":
         return collected({
           files: verifiedFiles,
           isLimitHit: true,
           isTimedOut: false,
-        });
-      case "out-of-time":
-        return collected({
-          files: verifiedFiles,
-          isLimitHit: true,
-          isTimedOut: true,
         });
       default: {
         const unreachable: never = decision;

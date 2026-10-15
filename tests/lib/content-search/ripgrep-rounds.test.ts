@@ -131,6 +131,9 @@ beforeAll(async () => {
       "*.generated.ts",
       "!meta/a1.generated.ts",
       "!meta/x-y.generated.ts",
+      "!esc1/a.generated.ts",
+      "!esc1/backslash.generated.ts",
+      "!esc3/newXline.generated.ts",
       "",
     ].join("\n"),
   );
@@ -142,6 +145,20 @@ beforeAll(async () => {
   writeRepoFile("meta/a1.generated.ts", "metaword\n");
   writeRepoFile("meta/x-y.generated.ts", "metaword\n");
   writeRepoFile("meta/ok.ts", "metaword\n");
+  writeRepoFile("esc1/-dash.generated.ts", "esconeword\n".repeat(2));
+  writeRepoFile("esc1/back\\slash.generated.ts", "esconeword\n".repeat(2));
+  writeRepoFile("esc1/{a,b}.generated.ts", "esconeword\n".repeat(2));
+  writeRepoFile("esc1/a.generated.ts", "esconeword\n");
+  writeRepoFile("esc1/backslash.generated.ts", "esconeword\n");
+  writeRepoFile("esc1/ok.ts", "esconeword\n");
+  writeRepoFile("esc2/#hash.generated.ts", "esctwoword\n".repeat(2));
+  writeRepoFile("esc2/!bang.generated.ts", "esctwoword\n".repeat(2));
+  writeRepoFile("esc2/ lead space.generated.ts", "esctwoword\n".repeat(2));
+  writeRepoFile("esc2/ok.ts", "esctwoword\n");
+  writeRepoFile("esc2/also.ts", "esctwoword\n");
+  writeRepoFile("esc2/third.ts", "esctwoword\n");
+  writeRepoFile("esc3/new\nline.generated.ts", "escthreeword\n".repeat(4));
+  writeRepoFile("esc3/newXline.generated.ts", "escthreeword\n");
   fs.writeFileSync(path.join(plainDir, ".gitignore"), "*.generated.ts\n");
 });
 
@@ -221,6 +238,40 @@ describe("searchWithRipgrep ignore rounds (fake rg)", () => {
     expect(outcome.isLimitHit).toBe(true);
     expect(outcome.isTimedOut).toBe(false);
     expect(fake.readInvocations()).toHaveLength(4);
+  });
+
+  it("returns no files, limit hit, when every round's cap goes to a different ignored file", async () => {
+    const fake = writeFakeRipgrep(
+      [1, 2, 3, 4, 5, 6].map((index) =>
+        plainFile(`r/only${index}.generated.ts`, 4),
+      ),
+    );
+
+    const outcome = expectOk(await search(fake.binary, {}));
+
+    expect(outcome.files).toEqual([]);
+    expect(outcome.matchCount).toBe(0);
+    expect(outcome.fileCount).toBe(0);
+    expect(outcome.isLimitHit).toBe(true);
+    expect(outcome.isTimedOut).toBe(false);
+    expect(fake.readInvocations()).toHaveLength(4);
+  });
+
+  it("stops after one pass when the ignored paths would exceed the argv byte bound", async () => {
+    const longName = "n".repeat(200);
+    const fake = writeFakeRipgrep([
+      plainFile("r/eligible.ts", 1),
+      ...Array.from({ length: 450 }, (_, index) =>
+        plainFile(`r/${longName}${index}.generated.ts`, 1),
+      ),
+    ]);
+
+    const outcome = expectOk(await search(fake.binary, { maxResults: 400 }));
+
+    expect(fake.readInvocations()).toHaveLength(1);
+    expect(filePaths(outcome)).toEqual(["r/eligible.ts"]);
+    expect(outcome.isLimitHit).toBe(true);
+    expect(outcome.isTimedOut).toBe(false);
   });
 
   it("fails with an explicit message when git is not available", async () => {
@@ -341,4 +392,42 @@ describe.skipIf(ripgrepBinary === null)("ignore rounds (real rg)", () => {
     ]);
     expect(outcome.matchCount).toBe(3);
   });
+
+  // maxResults is one more than the eligible matches, so every capped pass
+  // holds a not-yet-known ignored file: within 4 rounds all 3 are excluded and
+  // the last pass holds only eligible matches (no limit). A broken escape keeps
+  // an ignored file coming back (limit hit) or drops a look-alike (missing file).
+  it.each([
+    {
+      label: "leading dash, backslash and braces",
+      pattern: "esconeword",
+      eligible: [
+        "esc1/a.generated.ts",
+        "esc1/backslash.generated.ts",
+        "esc1/ok.ts",
+      ],
+      maxResults: 4,
+    },
+    {
+      label: "hash, bang and leading space",
+      pattern: "esctwoword",
+      eligible: ["esc2/also.ts", "esc2/ok.ts", "esc2/third.ts"],
+      maxResults: 4,
+    },
+    {
+      label: "newline",
+      pattern: "escthreeword",
+      eligible: ["esc3/newXline.generated.ts"],
+      maxResults: 2,
+    },
+  ])(
+    "excludes exactly the ignored file on re-runs: $label",
+    async ({ pattern, eligible, maxResults }) => {
+      const outcome = expectOk(await search({ pattern, maxResults }));
+
+      expect(filePaths(outcome)).toEqual(eligible);
+      expect(outcome.matchCount).toBe(eligible.length);
+      expect(outcome.isLimitHit).toBe(false);
+    },
+  );
 });

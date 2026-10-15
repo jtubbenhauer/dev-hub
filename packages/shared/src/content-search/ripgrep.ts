@@ -1,10 +1,10 @@
 import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import { escapeGlobLiteral } from "./glob-escape";
+import { findGitIgnoredPaths } from "./ignored-paths";
 import { sha256Utf8Hex } from "./line-hash";
 import { buildMatch, stripLineEnding, utf8ByteOffsetToUtf16 } from "./preview";
 import { runLineProcess, type LineDecision } from "./process";
-import { countMatches } from "./result-filter";
+import { buildExclusionGlobArg, countMatches } from "./result-filter";
 import { parseMatchEvent } from "./ripgrep-events";
 import {
   SEARCH_CANCELLED,
@@ -69,9 +69,8 @@ function buildRipgrepArgs(
   if (!query.isRegex) args.push("--fixed-strings");
   for (const glob of query.includeGlobs) args.push(`--glob=${glob}`);
   for (const glob of query.excludeGlobs) args.push(`--glob=!${glob}`);
-  // Anchored and escaped, so each one excludes exactly that file.
   for (const excludedPath of excludedPaths) {
-    args.push(`--glob=!/${escapeGlobLiteral(excludedPath)}`);
+    args.push(buildExclusionGlobArg(excludedPath));
   }
   // Last, so user include globs can never re-include these.
   args.push("--glob=!.git", "--glob=!node_modules");
@@ -196,14 +195,19 @@ export async function searchWithRipgrep(
     query.includeGlobs.length === 0
       ? await runRipgrepPass({ search: input, excludedPaths: [], timeoutMs })
       : await collectWithIgnoreRounds({
-          workspacePath,
-          signal,
           getRemainingMs: () => timeoutMs - (performance.now() - startedAt),
           runPass: (excludedPaths, passTimeoutMs) =>
             runRipgrepPass({
               search: input,
               excludedPaths,
               timeoutMs: passTimeoutMs,
+            }),
+          checkIgnoredPaths: (paths, checkTimeoutMs) =>
+            findGitIgnoredPaths({
+              cwd: workspacePath,
+              paths,
+              timeoutMs: checkTimeoutMs,
+              signal,
             }),
         });
   if (pass.kind === "outcome") return pass.outcome;

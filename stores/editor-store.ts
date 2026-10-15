@@ -10,8 +10,26 @@ import {
 import { resolveTabWorkspaceId } from "@/lib/files/save-request";
 
 let tabInstanceCounter = 0;
+let revealCounter = 0;
 
 export type DiffViewMode = "unified" | "side-by-side";
+
+export interface EditorRevealRequest {
+  readonly id: number;
+  readonly workspaceId: string;
+  readonly path: string;
+  readonly lineNumber: number;
+  readonly startColumn: number;
+  readonly endColumn: number;
+  readonly startByteColumn: number;
+  readonly lineSha256: string;
+}
+
+export type CleanTabRefresh =
+  | "replaced"
+  | "unchanged"
+  | "dirty-skipped"
+  | "not-open";
 
 interface SavedTab {
   path: string;
@@ -33,6 +51,7 @@ interface EditorState extends ReturnType<typeof createFileContentActions> {
   markdownPreviewPath: string | null;
   csvPreviewPath: string | null;
   workspaceFileStates: Record<string, WorkspaceFileState>;
+  pendingReveal: EditorRevealRequest | null;
 
   openFile: (file: OpenFile) => OpenFileResult;
   closeFile: (path: string) => void;
@@ -46,6 +65,14 @@ interface EditorState extends ReturnType<typeof createFileContentActions> {
   setMarkdownPreviewPath: (path: string | null) => void;
   setCsvPreviewPath: (path: string | null) => void;
   closeAllFiles: () => void;
+
+  requestReveal: (input: Omit<EditorRevealRequest, "id">) => void;
+  clearReveal: (id: number) => void;
+  refreshCleanTabFromDisk: (
+    workspaceId: string,
+    path: string,
+    content: string,
+  ) => CleanTabRefresh;
 
   getExpandedPaths: (workspaceId: string) => Set<string>;
   toggleExpandedPath: (workspaceId: string, path: string) => void;
@@ -81,6 +108,7 @@ export const useEditorStore = create<EditorState>()(
       markdownPreviewPath: null,
       csvPreviewPath: null,
       workspaceFileStates: {},
+      pendingReveal: null,
 
       openFile: (file) => {
         const existing = get().openFiles.find((f) => f.path === file.path);
@@ -162,6 +190,46 @@ export const useEditorStore = create<EditorState>()(
       setCsvPreviewPath: (path) => set({ csvPreviewPath: path }),
 
       closeAllFiles: () => set({ openFiles: [], activeFilePath: null }),
+
+      requestReveal: (input) =>
+        set({ pendingReveal: { ...input, id: ++revealCounter } }),
+
+      clearReveal: (id) => {
+        if (get().pendingReveal?.id === id) set({ pendingReveal: null });
+      },
+
+      // Unlike replaceFileContentFromDisk, a legacy tab without a workspaceId
+      // counts as the given workspace's and is adopted by it.
+      refreshCleanTabFromDisk: (workspaceId, path, content) => {
+        const { openFiles } = get();
+        const tab = openFiles.find(
+          (f) =>
+            f.path === path &&
+            resolveTabWorkspaceId(f, workspaceId) === workspaceId,
+        );
+        if (!tab) return "not-open";
+        if (tab.isDirty) return "dirty-skipped";
+        if (
+          tab.content === content &&
+          tab.originalContent === content &&
+          tab.workspaceId === workspaceId
+        )
+          return "unchanged";
+        set({
+          openFiles: openFiles.map((f) =>
+            f === tab
+              ? {
+                  ...f,
+                  content,
+                  originalContent: content,
+                  isDirty: false,
+                  workspaceId,
+                }
+              : f,
+          ),
+        });
+        return "replaced";
+      },
 
       getExpandedPaths: (workspaceId) => {
         const ws = getWsState(get().workspaceFileStates, workspaceId);

@@ -340,3 +340,173 @@ describe("releaseOtherWorkspaceTabs", () => {
     expect(useEditorStore.getState()).toBe(before);
   });
 });
+
+const revealInput = {
+  workspaceId: "ws-A",
+  path: "src/a.ts",
+  lineNumber: 12,
+  startColumn: 5,
+  endColumn: 11,
+  startByteColumn: 7,
+  lineSha256: "abc123",
+} as const;
+
+describe("requestReveal / clearReveal", () => {
+  beforeEach(() => useEditorStore.setState({ pendingReveal: null }));
+
+  it("assigns increasing ids and keeps the request fields", () => {
+    // Given
+    useEditorStore.getState().requestReveal(revealInput);
+    const firstId = useEditorStore.getState().pendingReveal?.id ?? 0;
+
+    // When
+    useEditorStore
+      .getState()
+      .requestReveal({ ...revealInput, lineSha256: "def456" });
+
+    // Then
+    expect(useEditorStore.getState().pendingReveal).toEqual({
+      ...revealInput,
+      lineSha256: "def456",
+      id: firstId + 1,
+    });
+  });
+
+  it("ignores a stale id and keeps the newer request", () => {
+    // Given
+    useEditorStore.getState().requestReveal(revealInput);
+    const staleId = useEditorStore.getState().pendingReveal?.id ?? 0;
+    useEditorStore.getState().requestReveal({ ...revealInput, lineNumber: 3 });
+    const newer = useEditorStore.getState().pendingReveal;
+
+    // When
+    useEditorStore.getState().clearReveal(staleId);
+
+    // Then
+    expect(useEditorStore.getState().pendingReveal).toBe(newer);
+    expect(newer?.lineNumber).toBe(3);
+  });
+
+  it("clears the request when the id matches", () => {
+    // Given
+    useEditorStore.getState().requestReveal(revealInput);
+    const currentId = useEditorStore.getState().pendingReveal?.id ?? 0;
+
+    // When
+    useEditorStore.getState().clearReveal(currentId);
+
+    // Then
+    expect(useEditorStore.getState().pendingReveal).toBeNull();
+  });
+
+  it("never persists the pending reveal", () => {
+    // Given
+    useEditorStore.getState().requestReveal(revealInput);
+    const partialize = useEditorStore.persist.getOptions().partialize;
+    expect(partialize).toBeDefined();
+
+    // When
+    const persisted = partialize?.(useEditorStore.getState());
+
+    // Then
+    expect(persisted).toBeDefined();
+    expect(persisted).not.toHaveProperty("pendingReveal");
+  });
+});
+
+describe("refreshCleanTabFromDisk", () => {
+  beforeEach(resetWorkspaceTabs);
+
+  it("replaces the content of a clean tab", () => {
+    // Given
+    useEditorStore.getState().openFile(makeOwnedFile("a.ts", "ws-A"));
+
+    // When
+    const result = useEditorStore
+      .getState()
+      .refreshCleanTabFromDisk("ws-A", "a.ts", "from disk");
+
+    // Then
+    expect(result).toBe("replaced");
+    expect(useEditorStore.getState().openFiles[0]).toMatchObject({
+      content: "from disk",
+      originalContent: "from disk",
+      isDirty: false,
+      workspaceId: "ws-A",
+    });
+  });
+
+  it("adopts a clean legacy tab without a workspaceId", () => {
+    // Given
+    useEditorStore.getState().openFile(makeFile("a.ts"));
+
+    // When
+    const result = useEditorStore
+      .getState()
+      .refreshCleanTabFromDisk("ws-A", "a.ts", "original");
+
+    // Then
+    expect(result).toBe("replaced");
+    expect(useEditorStore.getState().openFiles[0].workspaceId).toBe("ws-A");
+  });
+
+  it("returns unchanged without touching the store when content already matches", () => {
+    // Given
+    useEditorStore.getState().openFile(makeOwnedFile("a.ts", "ws-A"));
+    const openFilesBefore = useEditorStore.getState().openFiles;
+
+    // When
+    const result = useEditorStore
+      .getState()
+      .refreshCleanTabFromDisk("ws-A", "a.ts", "original");
+
+    // Then
+    expect(result).toBe("unchanged");
+    expect(useEditorStore.getState().openFiles).toBe(openFilesBefore);
+  });
+
+  it("skips a dirty tab", () => {
+    // Given
+    useEditorStore.getState().openFile(makeOwnedFile("a.ts", "ws-A"));
+    useEditorStore.getState().updateFileContent("a.ts", "unsaved edit");
+
+    // When
+    const result = useEditorStore
+      .getState()
+      .refreshCleanTabFromDisk("ws-A", "a.ts", "from disk");
+
+    // Then
+    expect(result).toBe("dirty-skipped");
+    expect(useEditorStore.getState().openFiles[0].content).toBe("unsaved edit");
+  });
+
+  it("ignores a tab owned by another workspace", () => {
+    // Given
+    useEditorStore.getState().openFile(makeOwnedFile("a.ts", "ws-B"));
+
+    // When
+    const result = useEditorStore
+      .getState()
+      .refreshCleanTabFromDisk("ws-A", "a.ts", "from disk");
+
+    // Then
+    expect(result).toBe("not-open");
+    expect(useEditorStore.getState().openFiles[0]).toMatchObject({
+      content: "original",
+      workspaceId: "ws-B",
+    });
+  });
+
+  it("returns not-open for a path that is not open", () => {
+    // Given
+    useEditorStore.getState().openFile(makeOwnedFile("a.ts", "ws-A"));
+
+    // When
+    const result = useEditorStore
+      .getState()
+      .refreshCleanTabFromDisk("ws-A", "missing.ts", "from disk");
+
+    // Then
+    expect(result).toBe("not-open");
+  });
+});

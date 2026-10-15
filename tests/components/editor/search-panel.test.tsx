@@ -344,6 +344,30 @@ describe("SearchPanel layout and truncation (jsdom class assertions)", () => {
     expect(screen.getByText("src")).toHaveClass("truncate");
   });
 
+  it("truncates long basenames in file headers and keeps the badge visible", async () => {
+    stubFetch(makeOkOutcome());
+    useContentSearchStore.setState({ pattern: "alpha" });
+    renderPanel();
+    await screen.findByText("3 results in 2 files", {}, { timeout: 3000 });
+
+    const basename = screen.getByText("alpha.ts");
+    expect(basename).toHaveClass("min-w-0", "truncate");
+    expect(basename).not.toHaveClass("shrink-0");
+
+    // The dirname gives way first (higher shrink factor) and truncates.
+    const dirname = screen.getByText("src");
+    expect(dirname).toHaveClass("min-w-0", "shrink-[3]", "truncate");
+
+    const header = basename.closest("button");
+    if (header === null) throw new Error("file header button not found");
+    expect(header).toHaveClass("min-w-0");
+    expect(header).toHaveAttribute("title", "src/alpha.ts");
+
+    // alpha.ts has 2 matches; its count badge never shrinks away.
+    const badge = screen.getByText("2");
+    expect(badge).toHaveClass("shrink-0");
+  });
+
   it("renders a multi-line error message verbatim, pre-wrapped and monospace", async () => {
     const message =
       "regex parse error:\n    (alpha\n    ^\nerror: unclosed group";

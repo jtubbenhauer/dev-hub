@@ -64,7 +64,8 @@ function SearchResultFile({
     <div>
       <button
         type="button"
-        className="hover:bg-accent/50 flex w-full items-center gap-1.5 rounded-sm px-2 py-1 text-sm"
+        title={file.path}
+        className="hover:bg-accent/50 flex w-full min-w-0 items-center gap-1.5 rounded-sm px-2 py-1 text-sm"
         onClick={() => onToggleFile(file.path)}
       >
         <ChevronRight
@@ -74,10 +75,10 @@ function SearchResultFile({
           )}
         />
         <File className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-        <div className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left">
-          <span className="shrink-0 font-mono text-xs">{basename}</span>
+        <div className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden text-left">
+          <span className="min-w-0 truncate font-mono text-xs">{basename}</span>
           {dirname && (
-            <span className="text-muted-foreground truncate text-[11px]">
+            <span className="text-muted-foreground min-w-0 shrink-[3] truncate text-[11px]">
               {dirname}
             </span>
           )}

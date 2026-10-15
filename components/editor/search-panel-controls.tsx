@@ -59,12 +59,16 @@ function buildStatusContent(
   switch (outcome.kind) {
     case "ok": {
       const lines: string[] = [];
-      if (outcome.matchCount === 0) {
-        lines.push("No results found.");
-      } else if (outcome.isLimitHit) {
+      // The limit notice wins over "No results found.": a cut-off search with
+      // zero verified matches is inconclusive, not empty.
+      if (outcome.isLimitHit) {
         lines.push(
-          `Showing the first ${outcome.matchCount} results. Narrow your search to see more.`,
+          outcome.matchCount === 0
+            ? "No results among the first matches. Narrow your search to see more."
+            : `Showing the first ${outcome.matchCount} results. Narrow your search to see more.`,
         );
+      } else if (outcome.matchCount === 0) {
+        lines.push("No results found.");
       } else {
         const resultsWord = outcome.matchCount === 1 ? "result" : "results";
         const filesWord = outcome.fileCount === 1 ? "file" : "files";

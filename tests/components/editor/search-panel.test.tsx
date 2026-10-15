@@ -270,6 +270,60 @@ describe("SearchPanel status line", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the zero-match limit notice instead of 'No results found.' when the limit is hit with no verified matches", async () => {
+    stubFetch(
+      makeOkOutcome({
+        files: [],
+        matchCount: 0,
+        fileCount: 0,
+        isLimitHit: true,
+      }),
+    );
+    useContentSearchStore.setState({ pattern: "alpha" });
+    renderPanel();
+
+    expect(
+      await screen.findByText(
+        "No results among the first matches. Narrow your search to see more.",
+        {},
+        { timeout: 3000 },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No results found.")).not.toBeInTheDocument();
+  });
+
+  it("shows 'No results found.' for zero matches without a limit hit", async () => {
+    stubFetch(makeOkOutcome({ files: [], matchCount: 0, fileCount: 0 }));
+    useContentSearchStore.setState({ pattern: "alpha" });
+    renderPanel();
+
+    expect(
+      await screen.findByText("No results found.", {}, { timeout: 3000 }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps 'No results found.' plus the timeout notice for a zero-match timeout", async () => {
+    stubFetch(
+      makeOkOutcome({
+        files: [],
+        matchCount: 0,
+        fileCount: 0,
+        isTimedOut: true,
+      }),
+    );
+    useContentSearchStore.setState({ pattern: "alpha" });
+    renderPanel();
+
+    expect(
+      await screen.findByText("No results found.", {}, { timeout: 3000 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Search timed out after 15 seconds. Showing partial results.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("shows the timeout notice when the search timed out", async () => {
     stubFetch(makeOkOutcome({ isTimedOut: true }));
     useContentSearchStore.setState({ pattern: "alpha" });

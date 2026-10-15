@@ -1,0 +1,45 @@
+lib/omo/daemon.ts
+  s_9b616f005b7655::t_bb4001c3c85aaf 49-51,55
+  s_9b616f005b7655::t_f5715dbd30ac90 198-201
+  s_9b616f005b7655::t_e103b4ea462952 170-171,175-197,202-206
+tests/api/omo-dispatch.test.ts
+  s_9b616f005b7655::t_7fbd42d9ddccec 206
+  s_9b616f005b7655::t_5f0dad84831b24 630-661
+  s_9b616f005b7655::t_0a943d51c3d275 662-663
+tests/lib/omo/daemon.test.ts
+  s_9b616f005b7655::t_aaf0dfd3529760 171-263
+  s_9b616f005b7655::t_7f5452eae0ac3b 51
+  s_9b616f005b7655::t_c9d38945bc559c 35
+  s_9b616f005b7655::t_491b988498915a 264-265
+tests/lib/omo/facade/read-ensure-daemon.test.ts
+  s_9b616f005b7655::t_d89185d14a7a39 62
+  s_9b616f005b7655::t_66d9210c576e8f 114-154
+  s_9b616f005b7655::t_f7b4059eb47d20 155-157
+lib/omo/runtime.ts
+  s_9b616f005b7655::t_035ed29a3d85fd 111
+  s_9b616f005b7655::t_1287482c212b69 2
+lib/omo/route-dispatch.ts
+  s_9b616f005b7655::t_f301e679728ae8 105
+  s_9b616f005b7655::t_68489313e66022 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "631db15fec4d3e9f2b0843b3f826c8fca170c982",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

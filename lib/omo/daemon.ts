@@ -46,12 +46,13 @@ type OmoDaemonCommandResult = {
   readonly error: Error | null;
 };
 
-type SharedOmoDaemon = {
-  readonly ensurePromise: Promise<OmoDaemonInfo>;
+type OmoDaemonStart = {
+  readonly promise: Promise<OmoDaemonInfo>;
+  startedAt: number | undefined;
 };
 
 declare global {
-  var __devhubOmoDaemon: SharedOmoDaemon | undefined;
+  var __devhubOmoDaemonStart: OmoDaemonStart | undefined;
 }
 
 function readExitCode(error: unknown): number | undefined {
@@ -166,25 +167,43 @@ async function startOmoDaemon(
 export function ensureOmoDaemon(
   options: EnsureOmoDaemonOptions = {},
 ): Promise<OmoDaemonInfo> {
-  const sharedDaemon = globalThis.__devhubOmoDaemon;
-  if (sharedDaemon) return sharedDaemon.ensurePromise;
+  const currentStart = globalThis.__devhubOmoDaemonStart;
+  if (currentStart) return currentStart.promise;
 
   const bin = options.bin ?? findOmoBinary();
   const agentDir = options.agentDir ?? resolveOmoAgentDir();
-  const ensurePromise = startOmoDaemon(bin, agentDir);
-  const nextSharedDaemon = { ensurePromise };
-  globalThis.__devhubOmoDaemon = nextSharedDaemon;
-  void ensurePromise.catch(() => {
-    if (globalThis.__devhubOmoDaemon !== nextSharedDaemon) return;
-    // Throttle: keep serving this rejection instead of allowing an immediate re-spawn.
-    const timer = setTimeout(() => {
-      if (globalThis.__devhubOmoDaemon === nextSharedDaemon) {
-        globalThis.__devhubOmoDaemon = undefined;
-      }
-    }, DAEMON_ENSURE_RETRY_THROTTLE_MS);
-    timer.unref?.();
-  });
-  return ensurePromise;
+  const start: OmoDaemonStart = {
+    promise: startOmoDaemon(bin, agentDir),
+    startedAt: undefined,
+  };
+  globalThis.__devhubOmoDaemonStart = start;
+  void start.promise.then(
+    () => {
+      start.startedAt = Date.now();
+    },
+    () => {
+      if (globalThis.__devhubOmoDaemonStart !== start) return;
+      // Throttle: keep serving this rejection instead of allowing an immediate re-spawn.
+      const timer = setTimeout(() => {
+        if (globalThis.__devhubOmoDaemonStart === start) {
+          globalThis.__devhubOmoDaemonStart = undefined;
+        }
+      }, DAEMON_ENSURE_RETRY_THROTTLE_MS);
+      timer.unref?.();
+    },
+  );
+  return start.promise;
+}
+
+// omo stops its daemon after a period without sessions, so a remembered start
+// can outlive the daemon. Forgetting it makes the next ensureOmoDaemon() run
+// `omo daemon run` again. Starts in progress, throttled failures and starts
+// from the last 30 seconds are kept.
+export function forgetStartedOmoDaemon(): void {
+  const start = globalThis.__devhubOmoDaemonStart;
+  if (start?.startedAt === undefined) return;
+  if (Date.now() - start.startedAt < DAEMON_ENSURE_RETRY_THROTTLE_MS) return;
+  globalThis.__devhubOmoDaemonStart = undefined;
 }
 
 export async function getOmoDaemonStatus(): Promise<OmoDaemonStatus> {

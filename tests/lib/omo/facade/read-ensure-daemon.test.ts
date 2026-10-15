@@ -59,7 +59,7 @@ function disconnectedRuntime() {
 
 beforeEach(() => {
   vi.resetModules();
-  globalThis.__devhubOmoDaemon = undefined;
+  globalThis.__devhubOmoDaemonStart = undefined;
   mockExecFile.mockClear();
 });
 
@@ -108,6 +108,50 @@ describe("first-request omo daemon ensure", () => {
     for (const call of mockExecFile.mock.calls) {
       expect(call[1]).not.toContain("stop");
       expect(call[1]).not.toContain("handoff");
+    }
+  });
+
+  it("runs the daemon command again for a disconnected read once the earlier start is 30s old, since omo stops an idle daemon", async () => {
+    // Given
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.doMock("@/lib/omo/agent-dir", () => ({
+        resolveOmoAgentDir: () => "/agent",
+        resolveOmoSocketPath: () => "/agent/rpc/rpc.sock",
+      }));
+      const runtime = disconnectedRuntime();
+      vi.doMock("@/lib/omo/session-registry", () => ({
+        getOmoRuntime: () => runtime,
+      }));
+      const { handleOmoRead } = await import("@/lib/omo/facade/read");
+      const healthRead = () =>
+        handleOmoRead({
+          method: "GET",
+          path: "/global/health",
+          query: new URLSearchParams(),
+          workspace: {
+            id: "workspace-1",
+            path: "/workspace",
+            backend: "local",
+          },
+          userId: "user-1",
+        });
+      await healthRead();
+      await healthRead();
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
+
+      // When
+      vi.setSystemTime(Date.now() + 30_000);
+      const response = await healthRead();
+
+      // Then
+      expect(response.status).toBe(200);
+      expect(mockExecFile).toHaveBeenCalledTimes(2);
+      for (const call of mockExecFile.mock.calls) {
+        expect(call[1]).toEqual(["daemon", "run", "--json"]);
+      }
+    } finally {
+      vi.useRealTimers();
     }
   });
 

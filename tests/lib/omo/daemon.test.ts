@@ -32,6 +32,7 @@ vi.mock("node:child_process", async (importOriginal) => ({
 
 import {
   ensureOmoDaemon,
+  forgetStartedOmoDaemon,
   getOmoDaemonStatus,
   pingOmoDaemon,
 } from "@/lib/omo/daemon";
@@ -47,7 +48,7 @@ function exitError(code: number): ExecFileException {
 }
 
 beforeEach(() => {
-  globalThis.__devhubOmoDaemon = undefined;
+  globalThis.__devhubOmoDaemonStart = undefined;
   vi.stubEnv("OMO_BIN", "/opt/omo/bin/omo");
   vi.stubEnv("OMO_CODING_AGENT_DIR", "/state/omo");
 });
@@ -164,6 +165,101 @@ describe("ensureOmoDaemon", () => {
 
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
     expect(mockExecFile.mock.calls).toHaveLength(callsBeforeEnsure + 1);
+  });
+});
+
+describe("forgetStartedOmoDaemon", () => {
+  const daemonOptions = { bin: "/opt/omo", agentDir: "/state/omo" };
+
+  function daemonRunSucceedsOnce(instanceId: string): void {
+    mockExecFile.mockImplementationOnce((_bin, _args, _options, callback) => {
+      callback(
+        null,
+        `{"socket":"/state/omo/rpc/rpc.sock","pid":42,"instanceId":"${instanceId}","engineVersion":"2026.9.27","action":"start"}\n`,
+        "",
+      );
+    });
+  }
+
+  it("runs the daemon command again once the remembered start is 30s old", async () => {
+    vi.useFakeTimers();
+    try {
+      daemonRunSucceedsOnce("instance-1");
+      await ensureOmoDaemon(daemonOptions);
+      const callsAfterStart = mockExecFile.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(30_000);
+      daemonRunSucceedsOnce("instance-2");
+
+      forgetStartedOmoDaemon();
+
+      await expect(ensureOmoDaemon(daemonOptions)).resolves.toMatchObject({
+        instanceId: "instance-2",
+      });
+      expect(mockExecFile.mock.calls).toHaveLength(callsAfterStart + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a start from the last 30s", async () => {
+    vi.useFakeTimers();
+    try {
+      daemonRunSucceedsOnce("instance-1");
+      await ensureOmoDaemon(daemonOptions);
+      const callsAfterStart = mockExecFile.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(29_999);
+
+      forgetStartedOmoDaemon();
+
+      await expect(ensureOmoDaemon(daemonOptions)).resolves.toMatchObject({
+        instanceId: "instance-1",
+      });
+      expect(mockExecFile.mock.calls).toHaveLength(callsAfterStart);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a start that is still running", async () => {
+    const pendingRun: { finish?: ExecFileCallback } = {};
+    mockExecFile.mockImplementationOnce((_bin, _args, _options, callback) => {
+      pendingRun.finish = callback;
+    });
+    const callsBeforeStart = mockExecFile.mock.calls.length;
+    const first = ensureOmoDaemon(daemonOptions);
+
+    forgetStartedOmoDaemon();
+    const second = ensureOmoDaemon(daemonOptions);
+    pendingRun.finish?.(
+      null,
+      '{"socket":"/state/omo/rpc/rpc.sock","pid":42,"instanceId":"instance-1","engineVersion":"2026.9.27","action":"start"}\n',
+      "",
+    );
+
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(mockExecFile.mock.calls).toHaveLength(callsBeforeStart + 1);
+  });
+
+  it("keeps the 30s throttle after a failed start", async () => {
+    vi.useFakeTimers();
+    try {
+      mockExecFile.mockImplementationOnce((_bin, _args, _options, callback) => {
+        callback(exitError(3), "", "");
+      });
+      await expect(ensureOmoDaemon(daemonOptions)).rejects.toBeInstanceOf(
+        OmoDaemonNotRunningError,
+      );
+      const callsAfterFailure = mockExecFile.mock.calls.length;
+
+      forgetStartedOmoDaemon();
+
+      await expect(ensureOmoDaemon(daemonOptions)).rejects.toBeInstanceOf(
+        OmoDaemonNotRunningError,
+      );
+      expect(mockExecFile.mock.calls).toHaveLength(callsAfterFailure);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

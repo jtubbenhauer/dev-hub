@@ -203,7 +203,7 @@ beforeEach(() => {
   mockHandleOmoWrite.mockImplementation(
     async () => new Response(null, { status: 204 }),
   );
-  globalThis.__devhubOmoDaemon = undefined;
+  globalThis.__devhubOmoDaemonStart = undefined;
 });
 
 afterEach(async () => {
@@ -625,6 +625,40 @@ describe("restart dispatch", () => {
     );
     for (const call of mockExecFile.mock.calls) {
       expect(call[1]).not.toContain("stop");
+    }
+  });
+
+  it("runs the daemon command again on a restart once the earlier start is 30s old", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { getOmoReadRuntime } =
+        await import("@/lib/omo/facade/read-runtime");
+      vi.spyOn(getOmoReadRuntime().client, "reconnect").mockResolvedValue({
+        protocolVersion: 1,
+        mode: "multi",
+        capabilities: [],
+      });
+      const { POST } = await import("@/app/api/opencode/restart/route");
+      const restart = () =>
+        POST(
+          request(`/api/opencode/restart?workspaceId=${OMO_WS}`, {
+            method: "POST",
+          }),
+        );
+      const callsBeforeRestarts = mockExecFile.mock.calls.length;
+
+      expect((await restart()).status).toBe(200);
+      expect((await restart()).status).toBe(200);
+      expect(mockExecFile.mock.calls).toHaveLength(callsBeforeRestarts + 1);
+
+      vi.setSystemTime(Date.now() + 30_000);
+      expect((await restart()).status).toBe(200);
+      expect(mockExecFile.mock.calls).toHaveLength(callsBeforeRestarts + 2);
+      for (const call of mockExecFile.mock.calls.slice(callsBeforeRestarts)) {
+        expect(call[1]).toEqual(["daemon", "run", "--json"]);
+      }
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

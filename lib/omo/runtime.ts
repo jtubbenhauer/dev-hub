@@ -1,5 +1,5 @@
 import { resolveOmoAgentDir, resolveOmoSocketPath } from "@/lib/omo/agent-dir";
-import { ensureOmoDaemon } from "@/lib/omo/daemon";
+import { ensureOmoDaemon, forgetStartedOmoDaemon } from "@/lib/omo/daemon";
 import { OmoTransportGoneError } from "@/lib/omo/errors";
 import { RemoteAgentSessionSource } from "@/lib/omo/remote-session-source";
 import { OmoRpcClient, WebSocketTransport } from "@/lib/omo/rpc-client";
@@ -108,5 +108,6 @@ export async function ensureOmoConnectionIfNeeded(
 ): Promise<void> {
   if (workspace.backend === "remote") return;
   if (runtime.client.isConnected) return;
+  forgetStartedOmoDaemon();
   await ensureOmoDaemon().catch(() => undefined);
 }

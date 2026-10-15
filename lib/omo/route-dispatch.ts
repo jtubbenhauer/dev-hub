@@ -1,4 +1,4 @@
-import { ensureOmoDaemon } from "@/lib/omo/daemon";
+import { ensureOmoDaemon, forgetStartedOmoDaemon } from "@/lib/omo/daemon";
 import { handleOmoRead } from "@/lib/omo/facade/read";
 import { getOmoReadRuntime } from "@/lib/omo/facade/read-runtime";
 import type { OmoReadWorkspace } from "@/lib/omo/facade/read-types";
@@ -102,6 +102,7 @@ export async function restartOmoEngine(
     if (resolved instanceof Response) return resolved;
   }
   try {
+    forgetStartedOmoDaemon();
     await ensureOmoDaemon();
     await getOmoReadRuntime().client.reconnect();
   } catch (error) {

@@ -12,6 +12,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./content-search": {
+      "types": "./src/content-search/runner.ts",
+      "default": "./src/content-search/runner.ts"
     }
   },
   "devDependencies": {

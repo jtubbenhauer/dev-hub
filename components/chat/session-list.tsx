@@ -58,6 +58,7 @@ import {
   SessionSubAgentCountIndicator,
   type SessionSubAgentCount,
 } from "@/components/chat/session-sub-agent-count";
+import { SessionBackgroundIndicator } from "@/components/chat/session-background-indicator";
 
 const AGE_FILTER_LABEL: Record<SessionAgeFilter, string> = {
   "1d": "1d",
@@ -974,6 +975,7 @@ function SessionItem({
           {subAgentCount && (
             <SessionSubAgentCountIndicator count={subAgentCount} />
           )}
+          <SessionBackgroundIndicator sessionId={session.id} />
           {workspaceBranch && (
             <Badge
               variant="outline"

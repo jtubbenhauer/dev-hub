@@ -1,4 +1,5 @@
 import type { SessionStatus } from "@opencode-ai/sdk";
+import type { SessionBackgroundStatus } from "@/lib/opencode/types";
 import { DialogLedger } from "@/lib/omo/dialog-ledger";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoRpcClient } from "@/lib/omo/rpc-client";
@@ -280,6 +281,10 @@ export class OmoSessionRegistry {
       binding.state === "hydrating" || binding.state === "cutover";
     binding.state = "detached";
     binding.failure = undefined;
+    this.dispatcher.clearBackgroundStatus(
+      binding.workspaceId,
+      `omo_${binding.durableId}`,
+    );
     if (wasHydrating) {
       binding.rejectReady(new OmoHydrationAbortedError(binding.durableId));
     }
@@ -309,6 +314,12 @@ export class OmoSessionRegistry {
     return this.dispatcher.sessionStatusesForWorkspace(workspaceId);
   }
 
+  backgroundStatusesForWorkspace(
+    workspaceId: string,
+  ): Record<string, SessionBackgroundStatus> {
+    return this.dispatcher.backgroundStatusesForWorkspace(workspaceId);
+  }
+
   subscribe(workspaceId: string, sink: OmoRegistryEventSink): () => void {
     return this.dispatcher.subscribe(workspaceId, sink);
   }
@@ -333,6 +344,10 @@ export class OmoSessionRegistry {
     binding.unregisterSession();
     if (binding.state !== "replaced") binding.state = "closed";
     this.dispatcher.deleteSessionStatus(
+      binding.workspaceId,
+      `omo_${binding.durableId}`,
+    );
+    this.dispatcher.clearBackgroundStatus(
       binding.workspaceId,
       `omo_${binding.durableId}`,
     );

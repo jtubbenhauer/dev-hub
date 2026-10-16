@@ -1,6 +1,12 @@
 import type { SessionStatus } from "@opencode-ai/sdk";
+import {
+  toSessionBackgroundStatus,
+  type OmoBackgroundStatusKey,
+  type OmoBackgroundStatusUpdate,
+} from "@/lib/omo/adapter/background-status";
 import type { Effect } from "@/lib/omo/adapter/live-adapter-types";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
+import type { SessionBackgroundStatus } from "@/lib/opencode/types";
 import type { OmoRpcClient } from "@/lib/omo/rpc-client";
 import { buildOmoSession } from "@/lib/omo/adapter/shapes";
 import {
@@ -37,7 +43,21 @@ type LinkTaskChildEffect = Extract<Effect, { readonly linkTaskChild: unknown }>;
 
 type TaskChildLink = LinkTaskChildEffect["linkTaskChild"];
 
+type BackgroundStatusEffect = Extract<
+  Effect,
+  { readonly backgroundStatus: unknown }
+>;
+
+type BackgroundStatusTexts = Map<OmoBackgroundStatusKey, string>;
+
 const MAX_LINKED_TASKS = 1_000;
+
+function backgroundStatusEvent(
+  sessionID: string,
+  status: SessionBackgroundStatus | null,
+): OmoRegistryEvent {
+  return { type: "session.background", properties: { sessionID, status } };
+}
 
 // Workers run out of process, so their busy/idle state comes from omo task
 // events rather than from a session dev-hub is attached to.
@@ -84,6 +104,10 @@ export class OmoRegistryDispatcher {
   private readonly sessionStatuses = new Map<
     string,
     Map<string, SessionStatus>
+  >();
+  private readonly backgroundTexts = new Map<
+    string,
+    Map<string, BackgroundStatusTexts>
   >();
 
   constructor(options: OmoRegistryDispatcherOptions) {
@@ -136,6 +160,28 @@ export class OmoRegistryDispatcher {
     this.sessionStatuses.get(workspaceId)?.delete(sessionID);
   }
 
+  backgroundStatusesForWorkspace(
+    workspaceId: string,
+  ): Record<string, SessionBackgroundStatus> {
+    const sessions = this.backgroundTexts.get(workspaceId);
+    if (sessions === undefined) return {};
+    return Object.fromEntries(
+      [...sessions].flatMap(([sessionID, texts]) => {
+        const status = toSessionBackgroundStatus(texts);
+        return status === null ? [] : [[sessionID, status]];
+      }),
+    );
+  }
+
+  // A session dev-hub stops receiving records for can no longer vouch for its
+  // goal or monitors, so its status is withdrawn rather than left to go stale.
+  clearBackgroundStatus(workspaceId: string, sessionID: string): void {
+    const sessions = this.backgroundTexts.get(workspaceId);
+    if (sessions === undefined || !sessions.delete(sessionID)) return;
+    if (sessions.size === 0) this.backgroundTexts.delete(workspaceId);
+    this.emit(workspaceId, [backgroundStatusEvent(sessionID, null)]);
+  }
+
   subscribe(workspaceId: string, sink: OmoRegistryEventSink): () => void {
     let workspaceSinks = this.sinks.get(workspaceId);
     if (workspaceSinks === undefined) {
@@ -166,6 +212,7 @@ export class OmoRegistryDispatcher {
     }
     this.sinks.clear();
     this.sessionStatuses.clear();
+    this.backgroundTexts.clear();
   }
 
   private queueLeaf(binding: OmoSessionBinding, record: JsonlRecord): void {
@@ -193,6 +240,10 @@ export class OmoRegistryDispatcher {
   }
 
   private applyEffect(binding: OmoSessionBinding, effect: Effect): void {
+    if (this.isBackgroundStatusEffect(effect)) {
+      this.applyBackgroundStatus(binding, effect.backgroundStatus);
+      return;
+    }
     if (this.isLinkEffect(effect)) {
       this.linkTaskChild(binding, effect.linkTaskChild);
       return;
@@ -262,6 +313,36 @@ export class OmoRegistryDispatcher {
     });
   }
 
+  private applyBackgroundStatus(
+    binding: OmoSessionBinding,
+    update: OmoBackgroundStatusUpdate,
+  ): void {
+    const sessionID = `omo_${binding.durableId}`;
+    const sessions =
+      this.backgroundTexts.get(binding.workspaceId) ??
+      new Map<string, BackgroundStatusTexts>();
+    const texts = sessions.get(sessionID) ?? new Map();
+    if (texts.get(update.key) === update.text) return;
+    if (update.text === undefined) {
+      texts.delete(update.key);
+    } else {
+      texts.set(update.key, update.text);
+    }
+    if (texts.size === 0) {
+      sessions.delete(sessionID);
+    } else {
+      sessions.set(sessionID, texts);
+    }
+    if (sessions.size === 0) {
+      this.backgroundTexts.delete(binding.workspaceId);
+    } else {
+      this.backgroundTexts.set(binding.workspaceId, sessions);
+    }
+    this.emit(binding.workspaceId, [
+      backgroundStatusEvent(sessionID, toSessionBackgroundStatus(texts)),
+    ]);
+  }
+
   private rememberLinkedTask(key: string, workerDurableId: string): void {
     this.linkedTaskWorkers.set(key, workerDurableId);
     if (this.linkedTaskWorkers.size <= MAX_LINKED_TASKS) return;
@@ -292,6 +373,14 @@ export class OmoRegistryDispatcher {
       "refreshIndex" in effect &&
       effect.refreshIndex === true
     );
+  }
+
+  private isBackgroundStatusEffect(
+    effect: Effect,
+  ): effect is BackgroundStatusEffect {
+    const update =
+      "backgroundStatus" in effect ? effect.backgroundStatus : undefined;
+    return isJsonObject(update) && typeof update["key"] === "string";
   }
 
   private isLinkEffect(effect: Effect): effect is LinkTaskChildEffect {

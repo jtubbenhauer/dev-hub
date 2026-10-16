@@ -97,6 +97,31 @@ export interface SessionActivityEvent {
   };
 }
 
+export type SessionGoalState =
+  | "active"
+  | "paused"
+  | "stopped"
+  | "blocked"
+  | "achieved";
+
+export interface SessionBackgroundStatus {
+  readonly goal?: string;
+  readonly goalState?: SessionGoalState;
+  readonly goalWait?: string;
+  readonly goalCheckIn?: string;
+  readonly goalWaitProgress?: number;
+  readonly monitors?: string;
+  readonly monitorCount?: number;
+}
+
+export interface SessionBackgroundEvent {
+  readonly type: "session.background";
+  readonly properties: {
+    readonly sessionID: string;
+    readonly status: SessionBackgroundStatus | null;
+  };
+}
+
 export type Event =
   | SdkEvent
   | EventQuestionAsked
@@ -107,6 +132,7 @@ export type Event =
   | MessagePartDeltaEvent
   | MessageRekeyedEvent
   | SessionActivityEvent
+  | SessionBackgroundEvent
   | SessionResyncRequiredEvent
   | SessionMetadataMovedEvent;
 export type {

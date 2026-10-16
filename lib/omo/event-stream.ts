@@ -107,6 +107,19 @@ export function createOmoWorkspaceEventStream(
       for (const request of ledger.permissionsForWorkspace(workspace.id)) {
         enqueueEvent({ type: "permission.asked", properties: request });
       }
+      // A dev server keeps its omo runtime across hot reloads, and a runtime
+      // created by older code has no background statuses to replay.
+      const registry: Partial<
+        Pick<OmoRuntime["registry"], "backgroundStatusesForWorkspace">
+      > = runtime.registry;
+      const backgroundStatuses =
+        registry.backgroundStatusesForWorkspace?.(workspace.id) ?? {};
+      for (const [sessionID, status] of Object.entries(backgroundStatuses)) {
+        enqueueEvent({
+          type: "session.background",
+          properties: { sessionID, status },
+        });
+      }
     },
     cancel() {
       dispose();

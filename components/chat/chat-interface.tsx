@@ -30,6 +30,8 @@ import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { RunningSubAgentsBanner } from "@/components/chat/running-sub-agents-banner";
 import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
 import { ActiveChatEngineBadge } from "@/components/chat/chat-engine-badge";
+import { SessionBackgroundChip } from "@/components/chat/session-background-chip";
+import { SessionBackgroundBanner } from "@/components/chat/session-background-banner";
 import { NewChatMenu } from "@/components/chat/new-chat-menu";
 import { SidePanel } from "@/components/chat/side-panel";
 import { useSidePanelStore } from "@/stores/side-panel-store";
@@ -1402,6 +1404,7 @@ export function ChatInterface() {
             {/* Session info */}
             <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
               <ActiveChatEngineBadge workspaceId={activeWorkspaceId} />
+              <SessionBackgroundChip sessionId={activeSessionId} />
               {activeSessionTitle ? (
                 <span
                   className="text-foreground truncate text-sm font-medium"
@@ -1585,6 +1588,9 @@ export function ChatInterface() {
               parentSessionId={activeSessionId}
               workspaceId={activeWorkspaceId}
             />
+          )}
+          {activeSessionId && (
+            <SessionBackgroundBanner sessionId={activeSessionId} />
           )}
 
           {/* Messages area or plan panel — mutually exclusive */}

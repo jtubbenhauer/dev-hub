@@ -1,3 +1,4 @@
+import type { OmoBackgroundStatusUpdate } from "@/lib/omo/adapter/background-status";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { Event, SubAgentActivity } from "@/lib/opencode/types";
 
@@ -31,6 +32,9 @@ export type Effect =
         readonly isActive: boolean;
         readonly activity?: SubAgentActivity;
       };
+    }
+  | {
+      readonly backgroundStatus: OmoBackgroundStatusUpdate;
     };
 
 export interface LiveAdapterSeed {

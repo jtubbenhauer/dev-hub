@@ -29,6 +29,7 @@ import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { getOmoPermissionPreset } from "@/stores/omo-permission-preset-store";
 import { useSubAgentActivityStore } from "@/stores/sub-agent-activity-store";
+import { useSessionBackgroundStore } from "@/stores/session-background-store";
 import { createAttachmentPromptPart } from "@/lib/attachment-utils";
 import {
   applyMessagePartDelta,
@@ -3417,6 +3418,7 @@ export const useChatStore = create<ChatState>()(
           }
           if (safetyTimeout) clearTimeout(safetyTimeout);
           if (!isCurrentSource()) return;
+          useSessionBackgroundStore.getState().reset();
 
           console.log(
             `[chat] Global SSE connected for ${workspaceIds.length} workspace(s)`,
@@ -3725,6 +3727,7 @@ export const useChatStore = create<ChatState>()(
 
       handleEvent: (event, sourceWorkspaceId) => {
         useSubAgentActivityStore.getState().handleEvent(event);
+        useSessionBackgroundStore.getState().handleEvent(event);
         const eventType = event.type as string;
         const properties = event.properties as
           | Record<string, unknown>

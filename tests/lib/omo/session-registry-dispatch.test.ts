@@ -397,4 +397,43 @@ describe("OmoRegistryDispatcher", () => {
       },
     ]);
   });
+
+  it("sends a background status only when a line changes and withdraws it once", () => {
+    // Given
+    const dispatcher = new Dispatcher({
+      client: createUnconnectedClient(),
+      refreshIndex: async () => undefined,
+      findSubAgentSessionIds: async () => [],
+    });
+    let text: string | undefined = "Pursuing goal (1m)";
+    const { binding } = createTestBinding("goal-1", () => ({
+      events: [],
+      effects: [{ backgroundStatus: { key: "goal", text } }],
+    }));
+    const events: OmoRegistryEvent[] = [];
+    dispatcher.subscribe(WORKSPACE.id, (event) => events.push(event));
+
+    // When
+    dispatcher.dispatch(binding, { type: "extension_ui_request" });
+    dispatcher.dispatch(binding, { type: "extension_ui_request" });
+    text = undefined;
+    dispatcher.dispatch(binding, { type: "extension_ui_request" });
+    dispatcher.clearBackgroundStatus(WORKSPACE.id, "omo_goal-1");
+
+    // Then
+    expect(events).toEqual([
+      {
+        type: "session.background",
+        properties: {
+          sessionID: "omo_goal-1",
+          status: { goal: "Pursuing goal (1m)", goalState: "active" },
+        },
+      },
+      {
+        type: "session.background",
+        properties: { sessionID: "omo_goal-1", status: null },
+      },
+    ]);
+    expect(dispatcher.backgroundStatusesForWorkspace(WORKSPACE.id)).toEqual({});
+  });
 });

@@ -9,6 +9,7 @@ import {
   buildOmoAssistantMessage,
   buildOmoUserMessage,
 } from "@/lib/omo/adapter/shapes";
+import { readBackgroundStatusUpdate } from "@/lib/omo/adapter/background-status";
 import { buildUserContent } from "@/lib/omo/adapter/entry-content";
 import {
   messageString,
@@ -243,6 +244,13 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
           return toolHandlers.handleEnd(record);
         case "extension_event":
           return toolHandlers.handleExtension(record);
+        case "extension_ui_request": {
+          const update = readBackgroundStatusUpdate(record);
+          return {
+            events: [],
+            effects: update === undefined ? [] : [{ backgroundStatus: update }],
+          };
+        }
         case "agent_start":
           return statusHandlers.handleAgentStart();
         case "agent_settled":

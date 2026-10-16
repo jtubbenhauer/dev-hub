@@ -1,0 +1,148 @@
+components/chat/session-background-chip.tsx
+  s_9b616f005b7655::t_27d43f98a4398c 11-14,17-23,29-34,36
+  s_9b616f005b7655::t_8c4bf2fa3c26f1 141-145
+  s_9b616f005b7655::t_f29c4377f4959d 1-10,15-16,24-28,35,37-140,146-150
+tests/lib/omo/adapter/background-status.test.ts
+  s_9b616f005b7655::t_b400203c5650b7 127,132-152
+  s_9b616f005b7655::t_0f42e573022385 48-50,84-90,111
+  s_9b616f005b7655::t_2c723692cfbecf 1-47,51-83,91-110,112-126,128-131,153-178
+tests/lib/omo/session-registry-dispatch.test.ts
+  s_9b616f005b7655::t_91a9f95be401ff 406
+  s_9b616f005b7655::t_0f42e573022385 437
+  s_9b616f005b7655::t_0d750287918d0a 429
+  s_9b616f005b7655::t_05121ce9d27b51 400-405,407-428,431-435
+  s_9b616f005b7655::t_70c81a421563f9 430
+  s_9b616f005b7655::t_79d8540d64ea2f 436
+  s_9b616f005b7655::t_60102b3217f2e9 438
+tests/components/chat/session-background-indicator.test.tsx
+  s_3f397944549936::t_f81cb619f66156 53-56,60-63,65,68-69,128-130
+  s_3f397944549936::t_3b95510dff821d 170
+  s_3f397944549936::t_dfb355851d7f74 41,67,79,83-85,88,97-98,102,114,127,131,158-159,167-168
+  s_3f397944549936::t_e2b0032bd99979 1-40,42-52,57-59,64,66,70-78,80-82,86-87,89-96,99-101,103-113,115-126,132-157,160-166,169,171-172
+lib/omo/adapter/background-status.ts
+  s_9b616f005b7655::t_724aeb1ebd7cc7 26-33
+  s_9b616f005b7655::t_f9f048901afe1c 79-87
+  s_9b616f005b7655::t_e9a79e8123aa9c 2-5
+  s_9b616f005b7655::t_af5a1a4131b229 109
+  s_9b616f005b7655::t_25f8acb5e1c1dd 1,6-13,19-25,34-78,88-108,110-113
+  s_9b616f005b7655::t_9a81a4f8ea4e21 14-18
+components/chat/session-background-banner.tsx
+  s_3f397944549936::t_2650824d704ca4 29
+  s_3f397944549936::t_278229fbfebe5c 23
+  s_3f397944549936::t_07dab5db146c89 67-71
+  s_3f397944549936::t_f81cb619f66156 60
+  s_3f397944549936::t_d0c7005d800a77 1-22,24-28,30-59,62-66,72-148
+  s_3f397944549936::t_7d6a53c8fcf8d4 61
+tests/components/chat/session-background-chip.test.tsx
+  s_de5df90055ece2::t_60c9cf8ed56fbc 75-77,179-181
+  s_de5df90055ece2::t_89790578e6db88 188
+  s_de5df90055ece2::t_d97796707d8b21 42
+  s_de5df90055ece2::t_d7b4f403263e3e 1-41,43-74,78-92,103-178,182-187,189-195
+  s_9b616f005b7655::t_cdb1f537d2cb99 93-102
+stores/session-background-store.ts
+  s_9b616f005b7655::t_d2ca545ffd041e 3-6,9-15,31-42,48
+  s_9b616f005b7655::t_7fa74ad62a71c8 59-61
+  s_9b616f005b7655::t_4e5122ddcc9a80 1-2,7-8,16,18-19,21-30,43-47,49-58,62-77,80,84-86,89-90,96,102-109,112,120-123,125-126,131,141,145-146
+  s_9b616f005b7655::t_b5b383391854e3 17,20,78-79,81-83,87-88,91-95,97-101,110-111,113-119,124,127-130,132-140,142-144
+components/chat/session-background-indicator.tsx
+  s_3f397944549936::t_8e02db393cd992 37-40
+  s_3f397944549936::t_e405048e56230c 53
+  s_3f397944549936::t_76b117b35937e5 1-36,41-52,54-87
+components/chat/session-list.tsx
+  s_3f397944549936::t_1f93092d70fe29 61
+  s_3f397944549936::t_095501de84c66f 978
+components/chat/chat-interface.tsx
+  s_3f397944549936::t_e3129cec0432c6 34
+  s_de5df90055ece2::t_44cc0d723c4fc4 33
+  s_3f397944549936::t_a851e79c5629ac 1407,1592-1594
+tests/stores/session-background-store.test.ts
+  s_9b616f005b7655::t_f0e80bd0e19d57 75-101
+  s_9b616f005b7655::t_d61cd367c34df7 2-5
+  s_9b616f005b7655::t_82123e69e01a31 126-159
+  s_9b616f005b7655::t_45bbaa72787827 6-46,51-74,102-125
+  s_9b616f005b7655::t_04a2137ad894b8 1
+  s_9b616f005b7655::t_0f42e573022385 47-50
+tests/components/chat/session-background-banner.test.tsx
+  s_3f397944549936::t_f38320351d5f12 210,220
+  s_3f397944549936::t_c7c33b8eab71a9 160
+  s_3f397944549936::t_f81cb619f66156 167-171
+  s_3f397944549936::t_de1e68db26c580 62,71,81,90-93,97-98,101,116-118,127-130,143-144,154,156,158,177-178,188-190,207-208,211,218
+  s_3f397944549936::t_0a5dbae50e6ce9 1-61,63-70,72-80,82-89,94-96,99-100,102-115,119-126,131-142,145-153,155,157,159,161-166,172-176,179-187,191-206,209,212-217,219,221-222
+lib/omo/session-registry-dispatch.ts
+  s_9b616f005b7655::t_3fbc38e7aca833 46-52,55-60
+  s_9b616f005b7655::t_7f2cd6ba9cf0bb 108-110
+  s_9b616f005b7655::t_a660935c3756f8 316-343
+  s_9b616f005b7655::t_4ea57fe28b5bdf 2-6,9
+  s_9b616f005b7655::t_3612f2f7b8497a 215
+  s_9b616f005b7655::t_6bb72c3c9713f4 378-383
+  s_9b616f005b7655::t_2efb4c855a7334 163-183,344,384
+  s_9b616f005b7655::t_694013dfa19573 243-246
+  s_9b616f005b7655::t_3fcbc513b00f15 61
+  s_9b616f005b7655::t_5be87d8a63825e 111
+  s_9b616f005b7655::t_539e74972c8f6b 184
+  s_9b616f005b7655::t_308752ad5acd8e 345
+  s_9b616f005b7655::t_f34635de385283 385
+lib/omo/adapter/live-adapter-types.ts
+  s_9b616f005b7655::t_653170e320f9a5 1
+  s_9b616f005b7655::t_16f81ffc21c7d5 35-37
+stores/chat-store.ts
+  s_9b616f005b7655::t_6a4ad6ba8826d4 32
+  s_9b616f005b7655::t_434cdfd5660c01 3421,3730
+lib/omo/adapter/live-events.ts
+  s_9b616f005b7655::t_d4f1250f3b1dce 247-253
+  s_9b616f005b7655::t_a7a2ef73f76525 12
+lib/omo/session-registry-core.ts
+  s_9b616f005b7655::t_c70aadddaa48d2 2
+  s_9b616f005b7655::t_7a37f66cafe915 317-320
+  s_9b616f005b7655::t_a59d2388c986a6 350
+  s_9b616f005b7655::t_acb1420c9b54d4 284-287,351-353
+  s_9b616f005b7655::t_1c7fdda322a49b 321-322
+tests/lib/omo/event-stream-background-status.test.ts
+  s_9b616f005b7655::t_144513207d62cd 1-78,80-83,85-102,104-146
+  s_9b616f005b7655::t_5569933a8972e1 103
+  s_9b616f005b7655::t_871fab9a2b44cf 79,84
+lib/omo/event-stream.ts
+  s_9b616f005b7655::t_874e06d3f16ed7 117-122
+  s_9b616f005b7655::t_4dc44cecfad0d6 110-114,116
+  s_9b616f005b7655::t_9a81a4f8ea4e21 115
+lib/opencode/types.ts
+  s_9b616f005b7655::t_d446515242aac9 100-106,109
+  s_9b616f005b7655::t_d881ccf2fc5ab0 107-108,110-124,135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6b711c8d91a468223724cb453b761a20f4ef9ef4",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_3f397944549936": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ec28f15bcffe2gcauMmhtbvr3L",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_de5df90055ece2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ec2bb68d2ffeLdSzyGChgJr7Fq",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

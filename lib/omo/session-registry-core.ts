@@ -22,6 +22,7 @@ import {
   refreshOmoIndexFromHost,
 } from "@/lib/omo/session-registry-index";
 import { parseOpenedState } from "@/lib/omo/session-registry-records";
+import { findOmoSubAgentSessionIds } from "@/lib/omo/sessions-on-disk";
 import {
   handleOmoLifecycleRecord,
   requestOmoSession,
@@ -62,6 +63,8 @@ export class OmoSessionRegistry {
     this.dispatcher = new OmoRegistryDispatcher({
       client,
       refreshIndex: (workspace) => this.refreshIndexFromHost(workspace),
+      findSubAgentSessionIds: (workspace, taskId) =>
+        this.findSubAgentSessionIds(workspace, taskId),
     });
     this.getSubscriberCount =
       options.getSubscriberCount ??
@@ -103,6 +106,13 @@ export class OmoSessionRegistry {
 
   canonicalWorkspacePath(workspace: OmoSessionRegistryWorkspace) {
     return canonicalWorkspacePath(workspace);
+  }
+
+  findSubAgentSessionIds(
+    workspace: OmoSessionRegistryWorkspace,
+    taskId: string,
+  ): Promise<readonly string[]> {
+    return findOmoSubAgentSessionIds(workspace.path, taskId);
   }
 
   findBinding(

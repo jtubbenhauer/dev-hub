@@ -22,6 +22,10 @@ type OmoRegistryDispatcherOptions = {
   readonly refreshIndex: (
     workspace: OmoSessionRegistryWorkspace,
   ) => Promise<void>;
+  readonly findSubAgentSessionIds: (
+    workspace: OmoSessionRegistryWorkspace,
+    taskId: string,
+  ) => Promise<readonly string[]>;
 };
 
 type MergeFromTaskEventEffect = Extract<
@@ -72,6 +76,7 @@ export class OmoRegistryDispatcher {
   readonly leafQueue = new Map<string, Promise<void>>();
   private readonly client: OmoRpcClient;
   private readonly refreshIndex: OmoRegistryDispatcherOptions["refreshIndex"];
+  private readonly findSubAgentSessionIds: OmoRegistryDispatcherOptions["findSubAgentSessionIds"];
   private readonly sinks = new Map<string, Set<OmoRegistryEventSink>>();
   private readonly linkedTaskWorkers = new Map<string, string>();
   // Per-session latest status only (busy/idle/retry) — bounded by session
@@ -84,6 +89,7 @@ export class OmoRegistryDispatcher {
   constructor(options: OmoRegistryDispatcherOptions) {
     this.client = options.client;
     this.refreshIndex = options.refreshIndex;
+    this.findSubAgentSessionIds = options.findSubAgentSessionIds;
   }
 
   dispatch(
@@ -218,10 +224,15 @@ export class OmoRegistryDispatcher {
         binding.workspaceId,
         link.taskId,
       );
-      if (worker === null) return;
+      // Out-of-process workers are never listed by omo, so the index cannot
+      // name them; their transcript on disk still can.
+      const workerDurableId =
+        worker?.durableId ??
+        (await this.findSubAgentSessionIds(binding.workspace, link.taskId))[0];
+      if (workerDurableId === undefined) return;
       await mergeOmoSessionIndexFromTaskEvent(binding.workspaceId, [
         {
-          durableId: worker.durableId,
+          durableId: workerDurableId,
           parentDurableId: link.parentDurableId,
           agent: link.agent,
           category: link.category,
@@ -229,27 +240,24 @@ export class OmoRegistryDispatcher {
           updatedMs: link.updatedMs,
         },
       ]);
-      this.rememberLinkedTask(key, worker.durableId);
+      this.rememberLinkedTask(key, workerDurableId);
       this.emit(binding.workspaceId, [
         {
           type: "session.updated",
           properties: {
             info: buildOmoSession({
-              rawId: worker.durableId,
+              rawId: workerDurableId,
               workspaceId: binding.workspaceId,
               directory: binding.workspace.path,
               title: link.title,
-              created: worker.createdMs,
+              created: worker?.createdMs ?? link.updatedMs,
               updated: link.updatedMs,
               parentRawId: link.parentDurableId,
             }),
           },
         },
-        ...workerTaskEvents(worker.durableId, link),
-        ...binding.adapter.linkTaskChild(
-          link.taskId,
-          `omo_${worker.durableId}`,
-        ),
+        ...workerTaskEvents(workerDurableId, link),
+        ...binding.adapter.linkTaskChild(link.taskId, `omo_${workerDurableId}`),
       ]);
     });
   }

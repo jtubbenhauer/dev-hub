@@ -1,6 +1,8 @@
 import { open, realpath, rm } from "node:fs/promises";
 import { join, sep } from "node:path";
 import {
+  findOmoSubAgentSessionIds,
+  findOmoSubAgentTranscript,
   listOmoSessionsForCwd,
   readOmoSessionEntries,
   type OmoSessionHeader,
@@ -20,6 +22,8 @@ export interface SessionSource {
   ): Promise<void>;
   canonicalWorkspacePath(): Promise<string>;
   authorizeSession(rawId: string): Promise<boolean>;
+  findSubAgentSessionIds(taskId: string): Promise<readonly string[]>;
+  readSubAgentEntries(rawId: string): Promise<readonly SessionEntry[] | null>;
 }
 
 export class OmoNotFoundError extends Error {
@@ -135,6 +139,20 @@ export class LocalFsSessionSource implements SessionSource {
 
   canonicalWorkspacePath(): Promise<string> {
     return realpath(this.workspacePath);
+  }
+
+  findSubAgentSessionIds(taskId: string): Promise<readonly string[]> {
+    return findOmoSubAgentSessionIds(this.workspacePath, taskId);
+  }
+
+  async readSubAgentEntries(
+    rawId: string,
+  ): Promise<readonly SessionEntry[] | null> {
+    const transcript = await findOmoSubAgentTranscript(
+      this.workspacePath,
+      rawId,
+    );
+    return transcript === null ? null : readOmoSessionEntries(transcript);
   }
 
   async authorizeSession(rawId: string): Promise<boolean> {

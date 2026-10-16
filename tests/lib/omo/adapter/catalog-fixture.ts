@@ -152,6 +152,8 @@ export function createStubSessionSource(workspacePath: string) {
     removeProbeSession,
     canonicalWorkspacePath: async () => workspacePath,
     authorizeSession: async () => true,
+    findSubAgentSessionIds: async () => [],
+    readSubAgentEntries: async () => null,
   };
   return { source, removeProbeSession };
 }

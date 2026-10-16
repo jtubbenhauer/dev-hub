@@ -307,6 +307,132 @@ describe("handleOmoRead message history", () => {
     });
   });
 
+  it("links every child of a batch from its details through their transcripts on disk", async () => {
+    const fixture = await useReadFixture();
+    fixture.source.authorized.add("parent");
+    fixture.source.subAgentIdsByTask.set("st_a", ["worker-a"]);
+    fixture.source.subAgentIdsByTask.set("st_b", ["worker-b"]);
+    const entries = [
+      messageEntry("user-1", null, "user", "fan out", 1),
+      {
+        type: "message",
+        id: "assistant-1",
+        parentId: "user-1",
+        timestamp: 2,
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "call-1", name: "task", arguments: {} },
+          ],
+          timestamp: 2,
+        },
+      },
+      {
+        type: "message",
+        id: "result-1",
+        parentId: "assistant-1",
+        timestamp: 3,
+        message: {
+          role: "toolResult",
+          toolCallId: "call-1",
+          toolName: "task",
+          isError: false,
+          content: [{ type: "text", text: "Batch running." }],
+          details: {
+            task_id: "st_a",
+            status: "running",
+            items: [{ task_id: "st_a" }, { task_id: "st_b" }],
+          },
+          timestamp: 3,
+        },
+      },
+    ];
+    fixture.registry.attach.mockResolvedValue(createBinding("parent"));
+    fixture.registry.request.mockResolvedValue({
+      data: { entries, leafId: "result-1" },
+    });
+
+    const response = await fixture.request("/session/omo_parent/message", {});
+    const messages = (await readJson(response)) as Array<{
+      parts: Array<{
+        type: string;
+        state?: { metadata?: Record<string, unknown> };
+      }>;
+    }>;
+    const taskPart = messages
+      .flatMap((message) => message.parts)
+      .find((part) => part.type === "tool");
+
+    expect(taskPart?.state?.metadata).toMatchObject({
+      sessionId: "omo_worker-a",
+      sessionIds: ["omo_worker-a", "omo_worker-b"],
+    });
+  });
+
+  it.each([
+    { label: "has no index row", hasWorkerRow: false },
+    { label: "has a worker row omo never described", hasWorkerRow: true },
+  ])(
+    "reads a sub-agent that $label from its transcript without attaching",
+    async ({ hasWorkerRow }) => {
+      const fixture = await useReadFixture();
+      if (hasWorkerRow) {
+        fixture.sqlite
+          .prepare(
+            `INSERT INTO omo_session_index
+              (workspace_id, durable_id, session_path, parent_durable_id, kind,
+               title, created_ms, updated_ms, updated_at)
+             VALUES ('workspace-1', 'sub-agent', NULL, 'parent', 'worker',
+               'explore', 1, 1, 1)`,
+          )
+          .run();
+      }
+      fixture.source.subAgentEntries.set("sub-agent", [
+        messageEntry("prompt", null, "user", "explore it", 1),
+        messageEntry("answer", "prompt", "assistant", "found it", 2),
+      ]);
+
+      const response = await fixture.request("/session/omo_sub-agent/message");
+
+      expect(response.status).toBe(200);
+      expect(messageIds(await readJson(response))).toEqual([
+        "omo_prompt",
+        "omo_answer",
+      ]);
+      expect(fixture.registry.attach).not.toHaveBeenCalled();
+      expect(fixture.source.authorizeSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still attaches a worker omo described instead of reading its transcript", async () => {
+    const fixture = await useReadFixture();
+    fixture.sqlite
+      .prepare(
+        `INSERT INTO omo_session_index
+          (workspace_id, durable_id, session_path, kind, context,
+           context_authoritative, title, created_ms, updated_ms, updated_at)
+         VALUES ('workspace-1', 'listed-worker', '/children/listed.jsonl',
+           'worker', '{"role":"child","task_id":"st_listed"}', 1, 'Untitled',
+           1, 1, 1)`,
+      )
+      .run();
+    fixture.registry.attach.mockResolvedValue(createBinding("listed-worker"));
+    fixture.registry.request.mockResolvedValue({
+      data: {
+        entries: [messageEntry("live", null, "user", "live", 1)],
+        leafId: "live",
+      },
+    });
+
+    const response = await fixture.request(
+      "/session/omo_listed-worker/message",
+    );
+
+    expect(messageIds(await readJson(response))).toEqual(["omo_live"]);
+    expect(fixture.registry.attach).toHaveBeenCalledOnce();
+    expect(fixture.source.readSubAgentEntries).not.toHaveBeenCalled();
+  });
+
   it("replays pending questions into the workspace dialog ledger", async () => {
     const fixture = await useReadFixture();
     fixture.source.authorized.add("question-session");

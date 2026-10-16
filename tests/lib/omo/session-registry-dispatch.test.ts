@@ -107,6 +107,7 @@ describe("OmoRegistryDispatcher", () => {
     const dispatcher = new Dispatcher({
       client: createUnconnectedClient(),
       refreshIndex: async () => undefined,
+      findSubAgentSessionIds: async () => [],
     });
     const { binding, setHandle } = createTestBinding("s1", () => ({
       events: [],
@@ -160,6 +161,7 @@ describe("OmoRegistryDispatcher", () => {
     const dispatcher = new Dispatcher({
       client: createUnconnectedClient(),
       refreshIndex,
+      findSubAgentSessionIds: async () => [],
     });
     const { binding, setHandle } = createTestBinding("s2", () => ({
       events: [],
@@ -210,6 +212,7 @@ describe("OmoRegistryDispatcher", () => {
     const dispatcher = new Dispatcher({
       client: createUnconnectedClient(),
       refreshIndex,
+      findSubAgentSessionIds: async () => [],
     });
     const events: unknown[] = [];
     dispatcher.subscribe(WORKSPACE.id, (event) => events.push(event));
@@ -268,6 +271,65 @@ describe("OmoRegistryDispatcher", () => {
     ]);
   });
 
+  it("links an out-of-process worker that only its transcript on disk names", async () => {
+    const findSubAgentSessionIds = vi.fn(
+      async (_workspace: OmoSessionRegistryWorkspace, taskId: string) =>
+        taskId === "st_task-3" ? ["worker-3"] : [],
+    );
+    const dispatcher = new Dispatcher({
+      client: createUnconnectedClient(),
+      refreshIndex: async () => undefined,
+      findSubAgentSessionIds,
+    });
+    const events: OmoRegistryEvent[] = [];
+    dispatcher.subscribe(WORKSPACE.id, (event) => events.push(event));
+    const { binding } = createTestBinding("parent-3", () => ({
+      events: [],
+      effects: [
+        {
+          linkTaskChild: {
+            parentDurableId: "parent-3",
+            taskId: "st_task-3",
+            title: "Gate deposits UI",
+            category: "deep-low",
+            updatedMs: 30,
+            isActive: true,
+          },
+        },
+      ],
+    }));
+    const linkTaskChild = vi.spyOn(binding.adapter, "linkTaskChild");
+
+    dispatcher.dispatch(binding, { type: "extension_event", name: "x" });
+    await binding.effectTail;
+    dispatcher.dispatch(binding, { type: "extension_event", name: "x" });
+    await binding.effectTail;
+
+    expect(findSubAgentSessionIds).toHaveBeenCalledOnce();
+    expect(findSubAgentSessionIds).toHaveBeenCalledWith(WORKSPACE, "st_task-3");
+    expect(
+      sqlite
+        .prepare(
+          "SELECT kind, parent_durable_id, title FROM omo_session_index WHERE durable_id = 'worker-3'",
+        )
+        .get(),
+    ).toEqual({
+      kind: "worker",
+      parent_durable_id: "parent-3",
+      title: "Gate deposits UI",
+    });
+    expect(linkTaskChild).toHaveBeenCalledWith("st_task-3", "omo_worker-3");
+    expect(dispatcher.sessionStatusesForWorkspace(WORKSPACE.id)).toEqual({
+      "omo_worker-3": { type: "busy" },
+    });
+    expect(events[0]).toMatchObject({
+      type: "session.updated",
+      properties: {
+        info: { id: "omo_worker-3", parentID: "omo_parent-3" },
+      },
+    });
+  });
+
   it("forwards a linked worker's progress after its status", async () => {
     // Given
     sqlite
@@ -282,6 +344,7 @@ describe("OmoRegistryDispatcher", () => {
     const dispatcher = new Dispatcher({
       client: createUnconnectedClient(),
       refreshIndex: async () => undefined,
+      findSubAgentSessionIds: async () => [],
     });
     const events: OmoRegistryEvent[] = [];
     dispatcher.subscribe(WORKSPACE.id, (event) => events.push(event));

@@ -13,6 +13,7 @@ import {
   findOmoWorkerByTaskId,
   getOmoIndexRow,
   mergeOmoSessionIndexFromTaskEvent,
+  type OmoSessionIndexRow,
 } from "@/lib/omo/session-index";
 import { activeBranch, type SessionEntry } from "@/lib/omo/sessions-on-disk";
 import {
@@ -53,7 +54,14 @@ async function childSessionIdsForTaskPart(
   const childSessionIds: string[] = [];
   for (const taskId of taskIdsFromToolPart(part)) {
     const worker = await findOmoWorkerByTaskId(context.workspace.id, taskId);
-    if (worker === null) continue;
+    if (worker === null) {
+      for (const durableId of await context.source.findSubAgentSessionIds(
+        taskId,
+      )) {
+        childSessionIds.push(`omo_${durableId}`);
+      }
+      continue;
+    }
     if (worker.parentDurableId === null) {
       await mergeOmoSessionIndexFromTaskEvent(context.workspace.id, [
         { durableId: worker.durableId, parentDurableId: parentRawId },
@@ -146,12 +154,36 @@ function ingestPendingQuestions(
   );
 }
 
+// omo describes a worker (transcript path and task id) only while it lists it,
+// and it never lists one that has finished or runs out of process.
+function shouldReadSubAgentTranscript(row: OmoSessionIndexRow | null): boolean {
+  return (
+    row === null || (row.kind === "worker" && row.contextAuthoritative !== 1)
+  );
+}
+
 export async function readOmoMessages(
   context: OmoReadContext,
   rawId: string,
   query: URLSearchParams,
 ): Promise<Response> {
   const row = await getOmoIndexRow(context.workspace.id, rawId);
+  if (shouldReadSubAgentTranscript(row)) {
+    // Read-only view of the sub-agent's transcript; reopening it would start
+    // a session on the shared daemon.
+    const subAgentEntries = await context.source.readSubAgentEntries(rawId);
+    if (subAgentEntries !== null) {
+      return await responseForMessages(
+        branchForLeaf(
+          subAgentEntries,
+          row?.leafEntryId ?? subAgentEntries.at(-1)?.id,
+        ),
+        rawId,
+        context,
+        query,
+      );
+    }
+  }
   if (row === null && !(await context.source.authorizeSession(rawId))) {
     return sessionNotFoundResponse();
   }

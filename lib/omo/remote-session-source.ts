@@ -164,6 +164,15 @@ export class RemoteAgentSessionSource implements SessionSource {
     return sessions.some((session) => session.durableId === rawId);
   }
 
+  // The agent sidecar does not serve omo sub-agent transcripts yet.
+  findSubAgentSessionIds(_taskId: string): Promise<readonly string[]> {
+    return Promise.resolve([]);
+  }
+
+  readSubAgentEntries(_rawId: string): Promise<readonly SessionEntry[] | null> {
+    return Promise.resolve(null);
+  }
+
   private sessionUrl(rawId: string): string {
     return new URL(
       encodeURIComponent(rawId),

@@ -4,9 +4,11 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 
 const HEADER_SCAN_CAP_BYTES = 1_048_576;
+const SUB_AGENT_HEADER_SCAN_BYTES = 4_096;
 const ENTRIES_TOTAL_CAP_BYTES = 67_108_864;
 const TITLE_MAX_CHARS = 80;
 const EPOCH_SECONDS_HEURISTIC_THRESHOLD = 1e12;
+const SUB_AGENT_TASK_ID = /^[A-Za-z0-9_-]+$/;
 
 export interface OmoSessionHeader {
   readonly type: "session";
@@ -336,6 +338,119 @@ export async function listOmoSessionsForCwd(options: {
   }
 
   return summaries.sort((a, b) => b.updatedMs - a.updatedMs);
+}
+
+async function realpathOrNull(path: string): Promise<string | null> {
+  try {
+    return await realpath(path);
+  } catch {
+    return null;
+  }
+}
+
+async function readDirEntriesIfPresent(dirPath: string): Promise<Dirent[]> {
+  try {
+    return await readdir(dirPath, { withFileTypes: true });
+  } catch (error) {
+    if (
+      isNodeErrnoException(error) &&
+      (error.code === "ENOENT" || error.code === "ENOTDIR")
+    ) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+// omo keeps each task sub-agent's transcript inside the workspace, under
+// .omo/senpi-task/children/<task id>/sessions/<task id>/.
+function subAgentSessionsDir(workspacePath: string, taskId: string): string {
+  return join(
+    workspacePath,
+    ".omo",
+    "senpi-task",
+    "children",
+    taskId,
+    "sessions",
+    taskId,
+  );
+}
+
+async function subAgentTranscriptsForTask(
+  workspacePath: string,
+  taskId: string,
+): Promise<string[]> {
+  const sessionsDir = subAgentSessionsDir(workspacePath, taskId);
+  return (await readDirEntriesIfPresent(sessionsDir))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))
+    .map((entry) => join(sessionsDir, entry.name))
+    .sort();
+}
+
+// The file name does not always carry the session id, so the header decides.
+async function readSubAgentHeader(
+  filePath: string,
+  workspaceRealPath: string,
+): Promise<OmoSessionHeader | null> {
+  let window: string;
+  try {
+    window = await readLeadingWindow(filePath, SUB_AGENT_HEADER_SCAN_BYTES);
+  } catch (error) {
+    if (isNodeErrnoException(error) && error.code === "ENOENT") return null;
+    throw error;
+  }
+  const headerLine = window.split("\n", 1)[0];
+  if (!headerLine) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(headerLine);
+  } catch {
+    return null;
+  }
+  if (!isSessionHeader(parsed)) return null;
+  return (await realpathOrNull(parsed.cwd)) === workspaceRealPath
+    ? parsed
+    : null;
+}
+
+export async function findOmoSubAgentSessionIds(
+  workspacePath: string,
+  taskId: string,
+): Promise<string[]> {
+  if (!SUB_AGENT_TASK_ID.test(taskId)) return [];
+  const workspaceRealPath = await realpathOrNull(workspacePath);
+  if (workspaceRealPath === null) return [];
+  const sessionIds: string[] = [];
+  for (const filePath of await subAgentTranscriptsForTask(
+    workspacePath,
+    taskId,
+  )) {
+    const header = await readSubAgentHeader(filePath, workspaceRealPath);
+    if (header !== null) sessionIds.push(header.id);
+  }
+  return sessionIds;
+}
+
+export async function findOmoSubAgentTranscript(
+  workspacePath: string,
+  sessionId: string,
+): Promise<string | null> {
+  const workspaceRealPath = await realpathOrNull(workspacePath);
+  if (workspaceRealPath === null) return null;
+  const childrenDir = join(workspacePath, ".omo", "senpi-task", "children");
+  for (const taskDir of await readDirEntriesIfPresent(childrenDir)) {
+    if (!taskDir.isDirectory() || !SUB_AGENT_TASK_ID.test(taskDir.name)) {
+      continue;
+    }
+    for (const filePath of await subAgentTranscriptsForTask(
+      workspacePath,
+      taskDir.name,
+    )) {
+      const header = await readSubAgentHeader(filePath, workspaceRealPath);
+      if (header?.id === sessionId) return filePath;
+    }
+  }
+  return null;
 }
 
 export async function readOmoSessionEntries(

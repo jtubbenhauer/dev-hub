@@ -72,14 +72,28 @@ const ACTIVE_TASK_STATUSES = new Set(["pending", "queued", "running"]);
 
 const TASK_ID_IN_OUTPUT = /\[task_id: ([^\s\]]+)/g;
 
+function batchTaskIds(metadata: Record<string, unknown>): string[] {
+  if (!Array.isArray(metadata.items)) return [];
+  return metadata.items.flatMap((item) =>
+    isRecord(item) && typeof item.task_id === "string" && item.task_id
+      ? [item.task_id]
+      : [],
+  );
+}
+
 export function taskIdsFromToolPart(part: ToolPart): string[] {
   const state = part.state;
   if (isRecord(state.input) && typeof state.input.task_id === "string") {
     return [state.input.task_id];
   }
   const metadata = "metadata" in state ? state.metadata : undefined;
-  if (isRecord(metadata) && typeof metadata.task_id === "string") {
-    return [metadata.task_id];
+  if (isRecord(metadata)) {
+    // A batch's task_id names only its first task; items lists every one.
+    const itemTaskIds = batchTaskIds(metadata);
+    if (itemTaskIds.length > 0) return [...new Set(itemTaskIds)];
+    if (typeof metadata.task_id === "string" && metadata.task_id) {
+      return [metadata.task_id];
+    }
   }
   const output = "output" in state ? state.output : undefined;
   if (typeof output !== "string") return [];

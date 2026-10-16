@@ -24,6 +24,10 @@ export class WriteMemorySessionSource implements SessionSource {
   readonly authorizeSession = vi.fn(async (rawId: string) => {
     return this.authorized.has(rawId);
   });
+  readonly findSubAgentSessionIds = vi.fn(async (): Promise<string[]> => []);
+  readonly readSubAgentEntries = vi.fn(
+    async (): Promise<readonly SessionEntry[] | null> => null,
+  );
 }
 
 export type WriteTestBinding = {

@@ -36,6 +36,13 @@ class RemoteOmoSessionRegistry extends OmoSessionRegistry {
   ): Promise<string> {
     return this.source.canonicalWorkspacePath();
   }
+
+  override findSubAgentSessionIds(
+    _workspace: OmoSessionRegistryWorkspace,
+    taskId: string,
+  ): Promise<readonly string[]> {
+    return this.source.findSubAgentSessionIds(taskId);
+  }
 }
 
 function getRemoteOmoRuntime(

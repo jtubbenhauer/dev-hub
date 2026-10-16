@@ -24,6 +24,14 @@ export class MemorySessionSource implements SessionSource {
   readonly authorizeSession = vi.fn(async (rawId: string) => {
     return this.authorized.has(rawId);
   });
+  readonly subAgentIdsByTask = new Map<string, readonly string[]>();
+  readonly subAgentEntries = new Map<string, readonly SessionEntry[]>();
+  readonly findSubAgentSessionIds = vi.fn(async (taskId: string) => {
+    return this.subAgentIdsByTask.get(taskId) ?? [];
+  });
+  readonly readSubAgentEntries = vi.fn(async (rawId: string) => {
+    return this.subAgentEntries.get(rawId) ?? null;
+  });
 }
 
 export type TestBinding = {

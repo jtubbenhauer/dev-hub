@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   activeBranch,
   encodeCwdDir,
+  findOmoSubAgentSessionIds,
+  findOmoSubAgentTranscript,
   listOmoSessionsForCwd,
   normalizeTimestampMs,
   readOmoSessionEntries,
@@ -396,5 +398,72 @@ describe("activeBranch", () => {
       userMessageEntry("root", null, "root") as SessionEntry,
     ];
     expect(activeBranch(entries, "missing")).toEqual([]);
+  });
+});
+
+describe("omo sub-agent transcripts", () => {
+  function subAgentSessionsDir(workspace: string, taskId: string): string {
+    return join(
+      workspace,
+      ".omo",
+      "senpi-task",
+      "children",
+      taskId,
+      "sessions",
+      taskId,
+    );
+  }
+
+  async function createWorkspace(): Promise<string> {
+    const workspace = join(tempRoot, "repo");
+    await mkdir(workspace, { recursive: true });
+    return workspace;
+  }
+
+  it("finds a task's sub-agent by the session id in its header, whatever the file is called", async () => {
+    const workspace = await createWorkspace();
+    const transcript = await writeSessionFile(
+      subAgentSessionsDir(workspace, "st_01a13ed1"),
+      "2026-10-15T09-08-06.282Z_7ef5e249-e790-4842-a9cf-52c41f0b33b2.jsonl",
+      [
+        header({ id: "01a13ed1-9a17", cwd: workspace }),
+        userMessageEntry("prompt", null, "gate the deposits UI"),
+      ],
+    );
+    await writeFile(`${transcript}.claude-sdk-oauth-binding.json`, "{}");
+
+    expect(await findOmoSubAgentSessionIds(workspace, "st_01a13ed1")).toEqual([
+      "01a13ed1-9a17",
+    ]);
+    expect(await findOmoSubAgentTranscript(workspace, "01a13ed1-9a17")).toBe(
+      transcript,
+    );
+    expect(await findOmoSubAgentTranscript(workspace, "7ef5e249")).toBeNull();
+  });
+
+  it("ignores another workspace's transcripts, unknown tasks and unsafe task ids", async () => {
+    const workspace = await createWorkspace();
+    await writeSessionFile(
+      subAgentSessionsDir(workspace, "st_other"),
+      "other.jsonl",
+      [header({ id: "worker-other", cwd: tempRoot })],
+    );
+    await writeSessionFile(join(tempRoot, "outside"), "escaped.jsonl", [
+      header({ id: "worker-escaped", cwd: workspace }),
+    ]);
+
+    expect(await findOmoSubAgentSessionIds(workspace, "st_other")).toEqual([]);
+    expect(
+      await findOmoSubAgentTranscript(workspace, "worker-other"),
+    ).toBeNull();
+    expect(await findOmoSubAgentSessionIds(workspace, "st_missing")).toEqual(
+      [],
+    );
+    expect(
+      await findOmoSubAgentSessionIds(workspace, "../../../../outside"),
+    ).toEqual([]);
+    expect(
+      await findOmoSubAgentSessionIds(join(tempRoot, "no-repo"), "st_other"),
+    ).toEqual([]);
   });
 });

@@ -1,0 +1,78 @@
+tests/lib/omo/facade/read-message-cases.ts
+  s_9b616f005b7655::t_990bb66d6a7cf2 310-435
+lib/omo/runtime.ts
+  s_9b616f005b7655::t_462b875e2f0620 39-45
+tests/lib/omo/sessions-on-disk.test.ts
+  s_9b616f005b7655::t_83341f2fbca462 17-18
+  s_9b616f005b7655::t_fdab133a89f8bc 456-461
+  s_9b616f005b7655::t_39d4c13014241a 403-455,462-468
+  s_a14af25ea19db4::t_db25640a482bc8 469
+tests/lib/omo/adapter/catalog-fixture.ts
+  s_9b616f005b7655::t_d79f519a8c2d71 155-156
+lib/omo/session-source.ts
+  s_9b616f005b7655::t_2af09d60a44211 144-156
+  s_9b616f005b7655::t_dc180fb4714477 4-5
+  s_9b616f005b7655::t_735dce3de50df8 25-26
+  s_9b616f005b7655::t_883ddfc58425f3 143
+lib/omo/sessions-on-disk.ts
+  s_9b616f005b7655::t_be80923ed91c5b 343-454
+  s_9b616f005b7655::t_ea3cc910092a57 7,11
+  s_9b616f005b7655::t_78c02ddfa71314 455
+lib/omo/adapter/live-task-events.ts
+  s_9b616f005b7655::t_c9fc9bead2729f 75-83,90-96
+lib/omo/remote-session-source.ts
+  s_9b616f005b7655::t_b9ae8efe8c4e44 167,169-171,173-175
+  s_9b616f005b7655::t_1853408769e4ea 168,172
+tests/lib/omo/facade/write-fixture.ts
+  s_9b616f005b7655::t_e0b092315df421 27-30
+tests/lib/omo/facade/read-fixture.ts
+  s_9b616f005b7655::t_e4a3535a09ea30 27-34
+tests/lib/omo/session-registry-dispatch.test.ts
+  s_9b616f005b7655::t_91a9f95be401ff 110,347
+  s_9b616f005b7655::t_209fc9e58eb7fc 164,215
+  s_9b616f005b7655::t_acf55a7416d478 274-300,302-332
+  s_9b616f005b7655::t_c59f4d51c3e8c7 301
+lib/omo/session-registry-dispatch.ts
+  s_9b616f005b7655::t_63438609907998 25-28,79
+  s_9b616f005b7655::t_901f159fd4fcc8 227-232,235,243,249,253,259-260
+  s_9b616f005b7655::t_91dcc2b6fa4583 92
+lib/omo/session-registry-core.ts
+  s_9b616f005b7655::t_edf4e3d31a93f8 66-67
+  s_9b616f005b7655::t_582eb0774bf4d3 111-117
+  s_9b616f005b7655::t_d204d8e48f5f9c 25
+lib/omo/facade/read-messages.ts
+  s_9b616f005b7655::t_45963f04e9f674 16
+  s_9b616f005b7655::t_507f5a76272f98 171
+  s_9b616f005b7655::t_9732a5a79df43b 172-186
+  s_9b616f005b7655::t_764f2d58aac2b6 57-64
+  s_9b616f005b7655::t_78a2fed3b31c88 157-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8397f617717a5a6df80b549b3af84a0e0406b344",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

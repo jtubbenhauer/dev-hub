@@ -519,6 +519,9 @@ const reloadDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 // Newest-message window sizes — windowing keeps mobile payloads small.
 const INITIAL_MESSAGE_LIMIT = 100;
 const OLDER_MESSAGE_LIMIT = 100;
+// Remote sessions with large inline attachments take ~55s to load the
+// message list (the server pulls the whole tail window from the remote).
+const MESSAGE_LIST_LOAD_TIMEOUT_MS = 120_000;
 
 function sessionKey(workspaceId: string, sessionId: string): string {
   return `${workspaceId}:${sessionId}`;
@@ -2410,7 +2413,7 @@ export const useChatStore = create<ChatState>()(
             if (isReplaceMode) params.set("replace", "1");
 
             const response = await fetch(`/api/sessions/messages?${params}`, {
-              signal: AbortSignal.timeout(30_000),
+              signal: AbortSignal.timeout(MESSAGE_LIST_LOAD_TIMEOUT_MS),
             });
 
             // Keep whatever is already loaded and surface the error — never
@@ -2621,7 +2624,7 @@ export const useChatStore = create<ChatState>()(
             limit: String(OLDER_MESSAGE_LIMIT),
           });
           const response = await fetch(`/api/sessions/messages?${params}`, {
-            signal: AbortSignal.timeout(30_000),
+            signal: AbortSignal.timeout(MESSAGE_LIST_LOAD_TIMEOUT_MS),
           });
 
           // Anchor was compacted/reverted away — stop paginating; the next

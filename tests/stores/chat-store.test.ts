@@ -12,7 +12,15 @@
  *    to reset to a known baseline instead.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  onTestFinished,
+} from "vitest";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -4175,6 +4183,50 @@ describe("fetchMessages — windowed loading", () => {
     const url = (global.fetch as ReturnType<typeof vi.fn>).mock
       .calls[0][0] as string;
     expect(url).toContain("/message/m-1");
+  });
+
+  it("gives message-list loads more than a minute before timing out", async () => {
+    const timeoutBySignal = new Map<AbortSignal, number>();
+    const timeoutSpy = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockImplementation((milliseconds: number) => {
+        const signal = new AbortController().signal;
+        timeoutBySignal.set(signal, milliseconds);
+        return signal;
+      });
+    onTestFinished(() => timeoutSpy.mockRestore());
+    const existing = [{ info: makeUserMessage("c", "sess-a"), parts: [] }];
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        messages: existing,
+        hasMore: true,
+        total: existing.length,
+        source: "remote",
+        recoveredMessageIds: [],
+      }),
+    });
+    seedSession({ "sess-a": existing });
+
+    await useChatStore.getState()._refreshMessagesFromRemote("sess-a", "ws-a");
+    await useChatStore.getState().loadOlderMessages("sess-a", "ws-a");
+
+    const messageListTimeouts = (
+      global.fetch as ReturnType<typeof vi.fn>
+    ).mock.calls
+      .filter(
+        ([url, init]) =>
+          String(url).startsWith("/api/sessions/messages") &&
+          (init as RequestInit | undefined)?.method !== "DELETE",
+      )
+      .map(([, init]) => {
+        const signal = (init as RequestInit).signal;
+        return signal ? timeoutBySignal.get(signal) : undefined;
+      });
+    expect(messageListTimeouts).toHaveLength(2);
+    for (const timeout of messageListTimeouts) {
+      expect(timeout).toBeGreaterThan(60_000);
+    }
   });
 });
 

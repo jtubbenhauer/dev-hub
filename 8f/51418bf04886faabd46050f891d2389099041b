@@ -1,0 +1,45 @@
+lib/workspaces/backend.ts
+  s_9b616f005b7655::t_d1f76ac9861f80 18,368-375,380
+tests/api/health.test.ts
+  s_9b616f005b7655::t_d1f76ac9861f80 15,24,56-59,222,344-389
+  s_a14af25ea19db4::t_ce6f3c4c2c48e2 390
+app/api/workspaces/[id]/health/route.ts
+  s_9b616f005b7655::t_d1f76ac9861f80 8,46-48
+tests/lib/backend.test.ts
+  s_9b616f005b7655::t_d1f76ac9861f80 2,10-17,174-186,188-200,219-238
+  s_9b616f005b7655::t_90437be4fc9212 187,201-218
+  s_9b616f005b7655::t_095f13ca55026d 239
+lib/workspaces/remote-reachability.ts
+  s_9b616f005b7655::t_d1f76ac9861f80 1-74
+tests/lib/workspaces/remote-reachability.test.ts
+  s_9b616f005b7655::t_d1f76ac9861f80 1-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8f51418bf04886faabd46050f891d2389099041b",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,75 @@
+tests/lib/leader-key-defaults.test.ts
+  s_657c0287a9f326::t_1f9ac9ca856abb 25-45
+tests/components/chat/use-chat-commands.test.tsx
+  s_657c0287a9f326::t_fb318f2a7c55ef 1-119
+components/chat/chat-display-context.tsx
+  s_657c0287a9f326::t_332f9086fe8bfb 10,18
+components/chat/sub-agent-dialog.tsx
+  s_657c0287a9f326::t_1ada16b1049fde 173,180,182
+  s_657c0287a9f326::t_b2ede2acafb9a0 13-16
+components/chat/message.tsx
+  s_657c0287a9f326::t_7ee810e6a4037f 201-206
+  s_657c0287a9f326::t_d9a31d1fa90e4a 529
+  s_657c0287a9f326::t_c38a510f1731d4 413-416
+  s_8f542da4deebc2::t_c73379bb59e072 207,417,523-528,531-533,549-550,596-597
+tests/components/chat-message-thinking-collapse.test.tsx
+  s_657c0287a9f326::t_fdd64fd13063c7 1-117
+lib/leader-key-defaults.ts
+  s_657c0287a9f326::t_f06a811b8ccfc9 155
+  s_657c0287a9f326::t_831519bd7de630 41-44
+  s_657c0287a9f326::t_2791347d7b3779 40
+components/chat/use-chat-commands.ts
+  s_657c0287a9f326::t_050029318e3a5f 145-151
+  s_657c0287a9f326::t_a44ef519d81565 370
+  s_657c0287a9f326::t_fa3b8bc1381a4b 14
+  s_657c0287a9f326::t_8dc0dab8171cb3 79-89
+  s_657c0287a9f326::t_a064e052820133 287-291
+  s_657c0287a9f326::t_fb393ece946f91 205,210
+  s_8f542da4deebc2::t_8f2a37c905b2be 44,52
+  s_657c0287a9f326::t_9050cfff23bd00 144
+  s_657c0287a9f326::t_7415393b0b161b 152
+  s_657c0287a9f326::t_e616023768c1a0 285-286
+  s_657c0287a9f326::t_a871b27d16b672 292
+  s_657c0287a9f326::t_944ac70758aabc 67
+components/chat/chat-interface.tsx
+  s_657c0287a9f326::t_37b2cd2255b37d 1187,1194
+  s_657c0287a9f326::t_a4a93bf9da1862 198-211
+  s_3f397944549936::t_897281dc4962e9 176-183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2135f01d7e63c7499d2b17ff0dc71c529c7af1ea",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_3f397944549936": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ec28f15bcffe2gcauMmhtbvr3L",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_657c0287a9f326": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ecd410cc1ffexFKRUR9pRnlImQ",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_8f542da4deebc2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ecd410cc1ffexFKRUR9pRnlImQ",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

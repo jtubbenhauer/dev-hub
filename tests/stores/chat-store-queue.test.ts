@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatStore } from "@/stores/chat-store";
 
 const toastMock = vi.fn();
@@ -751,5 +751,116 @@ describe("chat store queued message handling", () => {
       "survived refresh",
     );
     expect(merged.queuedWorkspaceIds.has("ws-recovered")).toBe(true);
+  });
+});
+
+describe("chat store resending queued messages when a workspace reconnects", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetStore();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function queueMessages(messages: Array<{ text: string; queuedAt: number }>) {
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-1": {
+          sessions: { "sess-1": makeSession("sess-1") },
+          sessionsLoaded: true,
+          messages: { "sess-1": [] },
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionVariants: {},
+          sessionNotes: {},
+        },
+      },
+      queuedMessages: new Map([
+        [
+          "ws-1",
+          messages.map(({ text, queuedAt }) => ({
+            sessionId: "sess-1",
+            text,
+            workspaceId: "ws-1",
+            optimisticMessageId: `optimistic-${queuedAt}`,
+            queuedAt,
+          })),
+        ],
+      ]),
+      queuedWorkspaceIds: new Set(["ws-1"]),
+    });
+  }
+
+  function sentPromptBodies(): string[] {
+    return vi
+      .mocked(fetch)
+      .mock.calls.filter((call) => String(call[0]).includes("prompt_async"))
+      .map((call) => String(call[1]?.body));
+  }
+
+  it.each([0, 3])(
+    "resends messages queued in the last 10 minutes but keeps older ones queued when the workspace's event stream connects (attempt %i)",
+    async (attempt) => {
+      const now = Date.now();
+      queueMessages([
+        { text: "stale message", queuedAt: now - 11 * 60_000 },
+        { text: "recent message", queuedAt: now - 5_000 },
+      ]);
+
+      useChatStore.getState().handleEvent(
+        {
+          type: "workspace.connection",
+          properties: { state: "connected", attempt },
+        },
+        "ws-1",
+      );
+
+      await vi.waitFor(() => expect(sentPromptBodies()).toHaveLength(1));
+      expect(sentPromptBodies()[0]).toContain("recent message");
+      await vi.waitFor(() =>
+        expect(
+          useChatStore
+            .getState()
+            .queuedMessages.get("ws-1")
+            ?.map((message) => message.text),
+        ).toEqual(["stale message"]),
+      );
+      expect(useChatStore.getState().queuedWorkspaceIds.has("ws-1")).toBe(true);
+    },
+  );
+
+  it("keeps messages queued while the workspace's event stream is still retrying", async () => {
+    queueMessages([{ text: "recent message", queuedAt: Date.now() - 5_000 }]);
+
+    useChatStore.getState().handleEvent(
+      {
+        type: "workspace.connection",
+        properties: { state: "retrying", attempt: 2, retryInMs: 2000 },
+      },
+      "ws-1",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(sentPromptBodies()).toHaveLength(0);
+    expect(useChatStore.getState().queuedMessages.get("ws-1")).toHaveLength(1);
   });
 });

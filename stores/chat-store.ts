@@ -510,6 +510,9 @@ export function _resetModuleCaches() {
   reconcileOmoIdentitiesTrailing.clear();
 }
 const flushingQueuedWorkspaces = new Set<string>();
+// A message queued longer ago than this has usually been re-sent, edited or
+// abandoned since, so a reconnect leaves it queued instead of sending it.
+const RECONNECT_RESEND_MAX_AGE_MS = 10 * 60_000;
 
 const reloadDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -1053,7 +1056,10 @@ interface ChatState {
     variant?: string,
     attachments?: Array<{ mime: string; dataUrl: string; filename: string }>,
   ) => Promise<void>;
-  flushQueuedMessages: (workspaceId: string) => Promise<void>;
+  flushQueuedMessages: (
+    workspaceId: string,
+    options?: { maxQueuedAgeMs?: number },
+  ) => Promise<void>;
   hasQueuedMessages: (workspaceId: string) => boolean;
   executeCommand: (
     sessionId: string,
@@ -1554,6 +1560,13 @@ async function purgeCachedSessionMetadata(
   return mutation;
 }
 
+function getQueuedAt(queued: QueuedMessage): number {
+  return (
+    queued.queuedAt ??
+    Number.parseInt(queued.optimisticMessageId.slice("optimistic-".length), 10)
+  );
+}
+
 function isMessageAlreadyOnServer(
   state: Pick<ChatState, "workspaceStates" | "recoveredMessageIdsBySession">,
   workspaceId: string,
@@ -1565,9 +1578,7 @@ function isMessageAlreadyOnServer(
     state.recoveredMessageIdsBySession[
       sessionKey(workspaceId, queued.sessionId)
     ] ?? new Set<string>();
-  const queuedAt =
-    queued.queuedAt ??
-    Number.parseInt(queued.optimisticMessageId.slice("optimistic-".length), 10);
+  const queuedAt = getQueuedAt(queued);
   return messages.some((entry) => {
     if (entry.info.role !== "user") return false;
     if (entry.info.id.startsWith("optimistic-")) return false;
@@ -2990,11 +3001,23 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      flushQueuedMessages: async (workspaceId) => {
+      flushQueuedMessages: async (workspaceId, options) => {
         if (flushingQueuedWorkspaces.has(workspaceId)) return;
 
-        const queued = get().queuedMessages.get(workspaceId) ?? [];
+        const allQueued = get().queuedMessages.get(workspaceId) ?? [];
+        const maxQueuedAgeMs = options?.maxQueuedAgeMs;
+        const queued =
+          maxQueuedAgeMs === undefined
+            ? allQueued
+            : allQueued.filter(
+                (message) =>
+                  Date.now() - getQueuedAt(message) <= maxQueuedAgeMs,
+              );
+        const keptQueued = allQueued.filter(
+          (message) => !queued.includes(message),
+        );
         if (queued.length === 0) {
+          if (keptQueued.length > 0) return;
           set((state) => {
             if (!state.queuedWorkspaceIds.has(workspaceId)) return state;
             const nextQueuedWorkspaceIds = new Set(state.queuedWorkspaceIds);
@@ -3007,9 +3030,13 @@ export const useChatStore = create<ChatState>()(
         flushingQueuedWorkspaces.add(workspaceId);
         set((state) => {
           const nextQueuedMessages = new Map(state.queuedMessages);
-          nextQueuedMessages.delete(workspaceId);
           const nextQueuedWorkspaceIds = new Set(state.queuedWorkspaceIds);
-          nextQueuedWorkspaceIds.delete(workspaceId);
+          if (keptQueued.length > 0) {
+            nextQueuedMessages.set(workspaceId, keptQueued);
+          } else {
+            nextQueuedMessages.delete(workspaceId);
+            nextQueuedWorkspaceIds.delete(workspaceId);
+          }
           return {
             queuedMessages: nextQueuedMessages,
             queuedWorkspaceIds: nextQueuedWorkspaceIds,
@@ -3737,6 +3764,16 @@ export const useChatStore = create<ChatState>()(
 
         switch (eventType) {
           case "workspace.connection": {
+            // A connected event stream means the workspace's server is
+            // reachable again, so messages queued while it was down can go.
+            if (
+              properties.state === "connected" &&
+              get().hasQueuedMessages(sourceWorkspaceId)
+            ) {
+              void get().flushQueuedMessages(sourceWorkspaceId, {
+                maxQueuedAgeMs: RECONNECT_RESEND_MAX_AGE_MS,
+              });
+            }
             const { activeWorkspaceId, activeSessionId } = get();
             if (
               properties.state !== "connected" ||

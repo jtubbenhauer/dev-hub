@@ -1,11 +1,19 @@
 // @vitest-environment node
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   toWorkspace,
   getBackend,
   LocalBackend,
   RemoteBackend,
 } from "@/lib/workspaces/backend";
+
+const { mockIsRemoteHostReachable } = vi.hoisted(() => ({
+  mockIsRemoteHostReachable: vi.fn(),
+}));
+
+vi.mock("@/lib/workspaces/remote-reachability", () => ({
+  isRemoteHostReachable: mockIsRemoteHostReachable,
+}));
 
 function makeRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -161,5 +169,71 @@ describe("getBackend", () => {
       }),
     );
     expect(() => getBackend(ws)).toThrow("missing agent or opencode URLs");
+  });
+});
+
+describe("RemoteBackend agent requests", () => {
+  const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+  beforeEach(() => {
+    mockIsRemoteHostReachable.mockReset();
+    fetchSpy.mockReset();
+  });
+
+  afterEach(() => {
+    fetchSpy.mockReset();
+  });
+
+  it("fails a read at once, without calling the agent, when its host is down", async () => {
+    mockIsRemoteHostReachable.mockResolvedValue(false);
+    const backend = new RemoteBackend(
+      "http://dev-rig:10001",
+      "http://dev-rig:15001",
+    );
+
+    await expect(backend.getGitStatus()).rejects.toThrow(
+      "Cannot reach the remote agent at dev-rig:10001",
+    );
+    expect(mockIsRemoteHostReachable).toHaveBeenCalledWith(
+      "http://dev-rig:10001",
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("still sends a write to the agent when the last host check said it was down", async () => {
+    mockIsRemoteHostReachable.mockResolvedValue(false);
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    const backend = new RemoteBackend(
+      "http://dev-rig:10001",
+      "http://dev-rig:15001",
+    );
+
+    await expect(backend.writeFile("a.txt", "x")).resolves.toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://dev-rig:10001/files/write",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(mockIsRemoteHostReachable).not.toHaveBeenCalled();
+  });
+
+  it("calls the agent when its host is reachable", async () => {
+    mockIsRemoteHostReachable.mockResolvedValue(true);
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ branch: "main", files: [] }), {
+        status: 200,
+      }),
+    );
+    const backend = new RemoteBackend(
+      "http://dev-rig:10001",
+      "http://dev-rig:15001",
+    );
+
+    await expect(backend.getGitStatus()).resolves.toEqual({
+      branch: "main",
+      files: [],
+    });
+    expect(fetchSpy).toHaveBeenCalledWith("http://dev-rig:10001/git/status");
   });
 });

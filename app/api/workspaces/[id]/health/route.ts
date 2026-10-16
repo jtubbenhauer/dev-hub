@@ -5,6 +5,7 @@ import { settings, workspaces } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { toWorkspace } from "@/lib/workspaces/backend";
 import { spawn } from "node:child_process";
+import { isRemoteHostReachable } from "@/lib/workspaces/remote-reachability";
 import { interpolateProviderCommand } from "@/lib/workspaces/resume";
 import type { Workspace, WorkspaceProvider } from "@/types";
 
@@ -42,6 +43,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   }
 
   try {
+    if (!(await isRemoteHostReachable(workspace.agentUrl))) {
+      throw new Error("Remote agent host is unreachable");
+    }
     const response = await globalThis.fetch(
       new URL("/health", workspace.agentUrl).toString(),
       { signal: AbortSignal.timeout(5000) },

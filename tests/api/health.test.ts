@@ -12,6 +12,7 @@ const {
   mockToWorkspace,
   mockInterpolateProviderCommand,
   mockSpawn,
+  mockIsRemoteHostReachable,
 } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockWhere: vi.fn(),
@@ -20,6 +21,7 @@ const {
   mockToWorkspace: vi.fn(),
   mockInterpolateProviderCommand: vi.fn(),
   mockSpawn: vi.fn(),
+  mockIsRemoteHostReachable: vi.fn(),
 }));
 
 const mockDbChain = {
@@ -49,6 +51,10 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@/lib/workspaces/backend", () => ({
   toWorkspace: (...args: unknown[]) => mockToWorkspace(...args),
+}));
+
+vi.mock("@/lib/workspaces/remote-reachability", () => ({
+  isRemoteHostReachable: mockIsRemoteHostReachable,
 }));
 
 vi.mock("@/lib/workspaces/resume", () => ({
@@ -213,6 +219,7 @@ beforeEach(() => {
   mockWhere.mockResolvedValue([]);
   mockSelect.mockReturnValue(mockDbChain);
   mockInterpolateProviderCommand.mockReturnValue("rig status --json");
+  mockIsRemoteHostReachable.mockResolvedValue(true);
   fetchSpy.mockReset();
 });
 
@@ -332,6 +339,53 @@ describe("GET /api/workspaces/[id]/health", () => {
     });
     const body = await res.json();
     expect(body.status).toBe("unreachable");
+  });
+
+  it("returns unreachable at once, without calling the agent, when its host is down", async () => {
+    const workspace = makeRemoteWorkspace();
+    workspace.providerMeta = {
+      providerId: "provider-2",
+      providerWorkspaceId: "basic-123",
+    };
+    const row = makeRemoteWorkspaceRow();
+    row.providerMeta = workspace.providerMeta;
+    mockWhere
+      .mockResolvedValueOnce([row])
+      .mockResolvedValueOnce([{ value: [noAutoSuspendProvider] }]);
+    mockToWorkspace.mockReturnValueOnce(workspace);
+    mockIsRemoteHostReachable.mockResolvedValueOnce(false);
+
+    const res = await GET(makeRequest("ws-remote"), {
+      params: Promise.resolve({ id: "ws-remote" }),
+    });
+
+    expect(await res.json()).toEqual({
+      status: "unreachable",
+      reason: "Cannot reach agent",
+    });
+    expect(mockIsRemoteHostReachable).toHaveBeenCalledWith(
+      "http://10.0.0.1:7500",
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("still reports suspended when the host of an auto-suspended workspace is down", async () => {
+    mockWhere
+      .mockResolvedValueOnce([makeRemoteWorkspaceRow()])
+      .mockResolvedValueOnce([{ value: [autoSuspendProvider] }]);
+    mockToWorkspace.mockReturnValueOnce(makeRemoteWorkspace());
+    mockIsRemoteHostReachable.mockResolvedValueOnce(false);
+    const statusJson = JSON.stringify([
+      { name: "my-rig", status: "suspended", region: "ewr" },
+    ]);
+    mockSpawn.mockImplementationOnce(() => makeChildProcess(statusJson, 0));
+
+    const res = await GET(makeRequest("ws-remote"), {
+      params: Promise.resolve({ id: "ws-remote" }),
+    });
+
+    expect(await res.json()).toEqual({ status: "suspended" });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("returns unreachable when status command fails (non-zero exit)", async () => {

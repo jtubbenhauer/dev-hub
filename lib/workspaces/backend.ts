@@ -15,6 +15,7 @@ import type {
 } from "@/types";
 import type { workspaces } from "@/drizzle/schema";
 import simpleGit from "simple-git";
+import { isRemoteHostReachable } from "@/lib/workspaces/remote-reachability";
 
 type WorkspaceRow = typeof workspaces.$inferSelect;
 
@@ -364,10 +365,19 @@ export class RemoteBackend implements WorkspaceBackend {
     private opencodeUrl: string,
   ) {}
 
+  private async assertAgentHostReachable(): Promise<void> {
+    if (!(await isRemoteHostReachable(this.agentUrl))) {
+      throw new Error(
+        `Cannot reach the remote agent at ${new URL(this.agentUrl).host}`,
+      );
+    }
+  }
+
   private async agentGet<T>(
     path: string,
     params?: Record<string, string>,
   ): Promise<T> {
+    await this.assertAgentHostReachable();
     const url = new URL(path, this.agentUrl);
     if (params) {
       for (const [key, value] of Object.entries(params)) {

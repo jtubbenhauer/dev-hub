@@ -7,6 +7,7 @@ export interface ChatDisplaySettings {
   showToolCalls: boolean;
   showTokens: boolean;
   showTimestamps: boolean;
+  shouldCollapseFinishedThinking: boolean;
 }
 
 const defaultSettings: ChatDisplaySettings = {
@@ -14,6 +15,7 @@ const defaultSettings: ChatDisplaySettings = {
   showToolCalls: true,
   showTokens: true,
   showTimestamps: false,
+  shouldCollapseFinishedThinking: false,
 };
 
 export const ChatDisplayContext =

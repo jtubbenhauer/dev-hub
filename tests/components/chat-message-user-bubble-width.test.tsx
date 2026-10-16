@@ -45,6 +45,7 @@ const displaySettings = {
   showToolCalls: false,
   showTokens: false,
   showTimestamps: false,
+  shouldCollapseFinishedThinking: false,
 };
 
 function renderUserMessage(text: string) {

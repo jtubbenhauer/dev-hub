@@ -73,6 +73,7 @@ const displaySettings = {
   showToolCalls: false,
   showTokens: false,
   showTimestamps: false,
+  shouldCollapseFinishedThinking: false,
 };
 
 function renderWithContext(ui: React.ReactElement) {

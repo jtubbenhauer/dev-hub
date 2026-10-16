@@ -22,3 +22,24 @@ describe("leader-key-defaults nav:prs", () => {
     expect(collisions).toEqual([]);
   });
 });
+
+describe("leader-key-defaults chat:toggle-collapse-finished-thinking", () => {
+  const actionId = "chat:toggle-collapse-finished-thinking";
+
+  it("is a chat action bound to 'C'", () => {
+    const action = BUILTIN_ACTIONS.find((a) => a.id === actionId);
+    expect(action?.page).toBe("chat");
+    expect(DEFAULT_LEADER_BINDINGS[actionId]).toBe("C");
+  });
+
+  it("does not share 'C' with another chat or global action", () => {
+    const pageByActionId = new Map(BUILTIN_ACTIONS.map((a) => [a.id, a.page]));
+    const collisions = Object.entries(DEFAULT_LEADER_BINDINGS).filter(
+      ([id, keys]) =>
+        keys === "C" &&
+        id !== actionId &&
+        ["chat", "global"].includes(pageByActionId.get(id) ?? ""),
+    );
+    expect(collisions).toEqual([]);
+  });
+});

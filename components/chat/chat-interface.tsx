@@ -173,6 +173,14 @@ export function ChatInterface() {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("dev-hub:chat-show-timestamps") === "true";
   });
+  const [shouldCollapseFinishedThinking, setShouldCollapseFinishedThinking] =
+    useState(() => {
+      if (typeof window === "undefined") return false;
+      return (
+        localStorage.getItem("dev-hub:chat-collapse-finished-thinking") ===
+        "true"
+      );
+    });
   const [sessionAgeFilter, setSessionAgeFilterState] =
     useState<SessionAgeFilter>(() => {
       if (typeof window === "undefined") return "all";
@@ -187,8 +195,20 @@ export function ChatInterface() {
     }
   }, []);
   const chatDisplaySettings = useMemo(
-    () => ({ showThinking, showToolCalls, showTokens, showTimestamps }),
-    [showThinking, showToolCalls, showTokens, showTimestamps],
+    () => ({
+      showThinking,
+      showToolCalls,
+      showTokens,
+      showTimestamps,
+      shouldCollapseFinishedThinking,
+    }),
+    [
+      showThinking,
+      showToolCalls,
+      showTokens,
+      showTimestamps,
+      shouldCollapseFinishedThinking,
+    ],
   );
   const { width: sidePanelWidth, handleDragStart: handleSidePanelDragStart } =
     useResizablePanel({
@@ -1160,12 +1180,14 @@ export function ChatInterface() {
       showToolCalls,
       showTokens,
       showTimestamps,
+      shouldCollapseFinishedThinking,
     },
     {
       setShowThinking,
       setShowToolCalls,
       setShowTokens,
       setShowTimestamps,
+      setShouldCollapseFinishedThinking,
     },
   );
 

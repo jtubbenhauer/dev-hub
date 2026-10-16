@@ -10,7 +10,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChatDisplayContext } from "@/components/chat/chat-display-context";
+import {
+  ChatDisplayContext,
+  useChatDisplay,
+} from "@/components/chat/chat-display-context";
 import { ChatMessage } from "@/components/chat/message";
 import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { isNearBottom } from "@/lib/chat/scroll-position";
@@ -167,14 +170,16 @@ export function SubAgentDialog({
     return { modelID: info.modelID, providerID: info.providerID };
   }, [messages]);
 
+  const { shouldCollapseFinishedThinking } = useChatDisplay();
   const displaySettings = useMemo(
     () => ({
       showThinking: true,
       showToolCalls: true,
       showTokens: false,
       showTimestamps: true,
+      shouldCollapseFinishedThinking,
     }),
-    [],
+    [shouldCollapseFinishedThinking],
   );
 
   return (

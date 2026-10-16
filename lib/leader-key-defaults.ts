@@ -38,6 +38,11 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "chat:toggle-side-panel", label: "Toggle side panel", page: "chat" },
   { id: "chat:toggle-thinking", label: "Toggle thinking", page: "chat" },
   {
+    id: "chat:toggle-collapse-finished-thinking",
+    label: "Toggle collapsing finished thinking",
+    page: "chat",
+  },
+  {
     id: "chat:toggle-tool-calls",
     label: "Toggle tool calls",
     page: "chat",
@@ -147,6 +152,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "chat:toggle-variant": "v",
   "chat:toggle-side-panel": "B",
   "chat:toggle-thinking": "T",
+  "chat:toggle-collapse-finished-thinking": "C",
   "chat:toggle-tool-calls": "x",
   "chat:toggle-tokens": "$",
   "chat:toggle-timestamps": "z",

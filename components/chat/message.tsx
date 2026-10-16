@@ -192,8 +192,13 @@ export const ChatMessage = memo(
     onRevert,
   }: ChatMessageProps) {
     const { info, parts } = message;
-    const { showThinking, showToolCalls, showTokens, showTimestamps } =
-      useChatDisplay();
+    const {
+      showThinking,
+      showToolCalls,
+      showTokens,
+      showTimestamps,
+      shouldCollapseFinishedThinking,
+    } = useChatDisplay();
     const isUser = info.role === "user";
     const isAssistant = info.role === "assistant";
     // Compaction summary messages have summary=true and/or agent="compaction" on the message info.
@@ -395,7 +400,11 @@ export const ChatMessage = memo(
             <div className="w-full min-w-0 space-y-3 overflow-hidden">
               {showThinking &&
                 reasoningParts.map((part) => (
-                  <ReasoningBlock key={part.id} part={part} />
+                  <ReasoningBlock
+                    key={part.id}
+                    part={part}
+                    shouldCollapseWhenFinished={shouldCollapseFinishedThinking}
+                  />
                 ))}
 
               {showToolCalls &&
@@ -486,9 +495,17 @@ export const ChatMessage = memo(
 );
 
 const ReasoningBlock = memo(
-  function ReasoningBlock({ part }: { part: ReasoningPart }) {
+  function ReasoningBlock({
+    part,
+    shouldCollapseWhenFinished,
+  }: {
+    part: ReasoningPart;
+    shouldCollapseWhenFinished: boolean;
+  }) {
     const isThinking = part.time.end == null;
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [expandedByUser, setExpandedByUser] = useState<boolean | null>(null);
+    const isCollapsedBySetting = shouldCollapseWhenFinished && !isThinking;
+    const isExpanded = expandedByUser ?? !isCollapsedBySetting;
 
     const duration =
       part.time.end != null
@@ -504,7 +521,8 @@ const ReasoningBlock = memo(
       >
         <button
           type="button"
-          onClick={() => setIsExpanded((prev) => !prev)}
+          aria-expanded={isExpanded}
+          onClick={() => setExpandedByUser(!isExpanded)}
           className="hover:bg-muted/30 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors"
         >
           {isThinking ? (
@@ -550,7 +568,8 @@ const ReasoningBlock = memo(
   (prev, next) =>
     prev.part.id === next.part.id &&
     prev.part.text === next.part.text &&
-    prev.part.time === next.part.time,
+    prev.part.time === next.part.time &&
+    prev.shouldCollapseWhenFinished === next.shouldCollapseWhenFinished,
 );
 
 function CopyMarkdownButton({ content }: { content: string }) {

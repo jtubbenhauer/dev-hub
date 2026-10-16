@@ -11,6 +11,7 @@ import {
   ChevronsUp,
   Clock,
   Coins,
+  FoldVertical,
   PanelRight,
   Plus,
   ScrollText,
@@ -40,6 +41,7 @@ interface ChatCommandLabels {
   showToolCalls: boolean;
   showTokens: boolean;
   showTimestamps: boolean;
+  shouldCollapseFinishedThinking: boolean;
 }
 
 interface ChatCommandSetters {
@@ -47,6 +49,7 @@ interface ChatCommandSetters {
   setShowToolCalls: Dispatch<SetStateAction<boolean>>;
   setShowTokens: Dispatch<SetStateAction<boolean>>;
   setShowTimestamps: Dispatch<SetStateAction<boolean>>;
+  setShouldCollapseFinishedThinking: Dispatch<SetStateAction<boolean>>;
 }
 
 export function useChatCommands(
@@ -61,6 +64,7 @@ export function useChatCommands(
     setShowToolCalls,
     setShowTokens,
     setShowTimestamps,
+    setShouldCollapseFinishedThinking,
   } = setters;
 
   // React useState setters are stable — no refs needed
@@ -71,6 +75,17 @@ export function useChatCommands(
       return next;
     });
   }, [setShowThinking]);
+
+  const toggleCollapseFinishedThinking = useCallback(() => {
+    setShouldCollapseFinishedThinking((prev) => {
+      const next = !prev;
+      localStorage.setItem(
+        "dev-hub:chat-collapse-finished-thinking",
+        String(next),
+      );
+      return next;
+    });
+  }, [setShouldCollapseFinishedThinking]);
 
   const toggleToolCalls = useCallback(() => {
     setShowToolCalls((prev) => {
@@ -127,6 +142,15 @@ export function useChatCommands(
         onSelect: toggleThinking,
       },
       {
+        id: "chat:toggle-collapse-finished-thinking",
+        label: labels.shouldCollapseFinishedThinking
+          ? "Expand Finished Thinking"
+          : "Collapse Finished Thinking",
+        group: "Chat",
+        icon: FoldVertical,
+        onSelect: toggleCollapseFinishedThinking,
+      },
+      {
         id: "chat:toggle-tool-calls",
         label: labels.showToolCalls ? "Hide Tool Calls" : "Show Tool Calls",
         group: "Chat",
@@ -178,10 +202,12 @@ export function useChatCommands(
     ],
     [
       toggleThinking,
+      toggleCollapseFinishedThinking,
       toggleToolCalls,
       toggleTokens,
       toggleTimestamps,
       labels.showThinking,
+      labels.shouldCollapseFinishedThinking,
       labels.showToolCalls,
       labels.showTokens,
       labels.showTimestamps,
@@ -255,6 +281,14 @@ export function useChatCommands(
           page: "chat" as const,
         },
         handler: toggleThinking,
+      },
+      {
+        action: {
+          id: "chat:toggle-collapse-finished-thinking",
+          label: "Toggle collapsing finished thinking",
+          page: "chat" as const,
+        },
+        handler: toggleCollapseFinishedThinking,
       },
       {
         action: {
@@ -333,6 +367,7 @@ export function useChatCommands(
     return actions;
   }, [
     toggleThinking,
+    toggleCollapseFinishedThinking,
     toggleToolCalls,
     toggleTokens,
     toggleTimestamps,

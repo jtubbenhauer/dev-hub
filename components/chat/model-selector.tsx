@@ -216,13 +216,18 @@ export function ModelSelector({
 
   const modelOptions = useMemo(() => {
     const allOptions = providers.flatMap((p) =>
-      p.models.map((m) => ({
-        value: `${p.provider.id}::${m.id}`,
-        label: m.name || m.id,
-        providerName: p.provider.name || p.provider.id,
-        providerID: p.provider.id,
-        modelID: m.id,
-      })),
+      p.models.map((m) => {
+        const label = m.name || m.id;
+        const providerName = p.provider.name || p.provider.id;
+        return {
+          value: `${p.provider.id}::${m.id}`,
+          label,
+          providerName,
+          providerID: p.provider.id,
+          modelID: m.id,
+          commandItemValue: `${providerName} ${label}`,
+        };
+      }),
     );
     if (!allowlistSet) return allOptions;
     return allOptions.filter((option) => allowlistSet.has(option.value));
@@ -234,6 +239,9 @@ export function ModelSelector({
 
   const currentOption = modelOptions.find((o) => o.value === currentValue);
 
+  // Re-checks after every render, so there is no dependency list: the chat can
+  // clear the model in the same commit this picks a fallback, and none of the
+  // values read here change when that happens.
   useEffect(() => {
     if (isCurrentWorkspaceLoading || modelOptions.length === 0 || currentOption)
       return;
@@ -249,14 +257,7 @@ export function ModelSelector({
       modelID: fallbackOption.modelID,
     };
     (onFallbackModel ?? onModelChange)(fallback);
-  }, [
-    currentOption,
-    defaultModels,
-    isCurrentWorkspaceLoading,
-    modelOptions,
-    onFallbackModel,
-    onModelChange,
-  ]);
+  });
 
   if (isCurrentWorkspaceLoading || modelOptions.length === 0) {
     return (
@@ -286,7 +287,7 @@ export function ModelSelector({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[320px] p-0" align="start">
-        <Command>
+        <Command defaultValue={currentOption?.commandItemValue}>
           <CommandInput placeholder="Search models..." />
           <CommandList>
             <CommandEmpty>No models found.</CommandEmpty>
@@ -305,7 +306,7 @@ export function ModelSelector({
                     return (
                       <CommandItem
                         key={option.value}
-                        value={`${option.providerName} ${option.label}`}
+                        value={option.commandItemValue}
                         onSelect={() => {
                           const next = {
                             providerID: option.providerID,

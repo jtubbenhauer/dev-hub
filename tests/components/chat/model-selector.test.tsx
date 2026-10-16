@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { ModelSelector } from "@/components/chat/model-selector";
 import { useChatStore } from "@/stores/chat-store";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -47,6 +48,50 @@ function providerResponse(
       default: { [providerID]: modelID },
     }),
     { status: 200 },
+  );
+}
+
+interface SelectedModel {
+  providerID: string;
+  modelID: string;
+}
+
+// Stands in for useAgentModelSync clearing a model the chat did not save. As a
+// parent effect it runs after ModelSelector's effects in the same commit.
+function useClearModelOnRestore(
+  restoreReady: Promise<void>,
+  setSelectedModel: (model: SelectedModel | null) => void,
+) {
+  const [isRestoreReady, setIsRestoreReady] = useState(false);
+
+  useEffect(() => {
+    void restoreReady.then(() => setIsRestoreReady(true));
+  }, [restoreReady]);
+
+  useEffect(() => {
+    if (isRestoreReady) setSelectedModel(null);
+  }, [isRestoreReady, setSelectedModel]);
+}
+
+function ChatComposerHarness({
+  initialModel,
+  restoreReady,
+}: {
+  initialModel: SelectedModel;
+  restoreReady: Promise<void>;
+}) {
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
+    initialModel,
+  );
+  useClearModelOnRestore(restoreReady, setSelectedModel);
+
+  return (
+    <ModelSelector
+      workspaceId="workspace-1"
+      selectedModel={selectedModel}
+      onModelChange={setSelectedModel}
+      onFallbackModel={setSelectedModel}
+    />
   );
 }
 
@@ -262,6 +307,41 @@ describe("ModelSelector", () => {
     expect(onModelChange).not.toHaveBeenCalled();
   });
 
+  it.each(["opencode", "omo"] as const)(
+    "opens the %s model list on the selected model, not the first one",
+    async (engine) => {
+      useWorkspaceEngineMock.mockReturnValue({ engine, isLoading: false });
+      useModelAllowlistMock.mockReturnValue({
+        allowlist: [],
+        isLoading: false,
+      });
+
+      render(
+        <ModelSelector
+          workspaceId="workspace-1"
+          selectedModel={AVAILABLE_MODEL}
+          onModelChange={vi.fn()}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByRole("combobox")).toHaveTextContent("Kimi K3"),
+      );
+      await act(async () => {
+        screen.getByRole("combobox").click();
+      });
+
+      await waitFor(() =>
+        expect(screen.getByRole("option", { name: /Kimi K3/ })).toHaveAttribute(
+          "aria-selected",
+          "true",
+        ),
+      );
+      expect(
+        screen.getByRole("option", { name: /Big Pickle/ }),
+      ).toHaveAttribute("aria-selected", "false");
+    },
+  );
+
   it("shows no models in an OpenCode workspace when the allowlist names none", async () => {
     vi.stubGlobal(
       "fetch",
@@ -349,6 +429,36 @@ describe("ModelSelector", () => {
       modelID: "claude-opus-4-8",
     });
     localStorage.clear();
+  });
+
+  it("picks a model again when the chat clears an unavailable one as the models arrive", async () => {
+    useModelAllowlistMock.mockReturnValue({ allowlist: [], isLoading: false });
+    const providersResponse = deferredResponse();
+    vi.mocked(fetch).mockReset().mockReturnValueOnce(providersResponse.promise);
+    let markRestoreReady = () => {};
+    const restoreReady = new Promise<void>((resolve) => {
+      markRestoreReady = resolve;
+    });
+
+    render(
+      <ChatComposerHarness
+        initialModel={{ providerID: "retired", modelID: "retired-model" }}
+        restoreReady={restoreReady}
+      />,
+    );
+    expect(screen.getByText("Loading models...")).toBeInTheDocument();
+
+    await act(async () => {
+      providersResponse.resolve(
+        providerResponse("provider-a", "Provider A", "model-a", "Model A"),
+      );
+      markRestoreReady();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.getByRole("combobox")).toHaveTextContent(
+      "Provider A / Model A",
+    );
   });
 
   it("remembers a manual pick in an OmO workspace under its own key", async () => {

@@ -1,4 +1,5 @@
 import type { Session, SessionStatus } from "@opencode-ai/sdk";
+import type { OmoSessionSelection } from "@/lib/chat/omo-session-selection";
 import { buildOmoSession } from "@/lib/omo/adapter/shapes";
 import { isJsonObject } from "@/lib/omo/session-registry-records";
 import {
@@ -324,4 +325,45 @@ export async function readOmoSessionStats(
     type: "get_session_stats",
   });
   return jsonResponse(parseOmoSessionStats(response));
+}
+
+function nonEmptyText(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+export function parseOmoSessionSelection(
+  response: unknown,
+): OmoSessionSelection {
+  const data = isJsonObject(response) ? response["data"] : undefined;
+  const model = isJsonObject(data) ? data["model"] : undefined;
+  const providerID = isJsonObject(model)
+    ? nonEmptyText(model["provider"])
+    : null;
+  const modelID = isJsonObject(model) ? nonEmptyText(model["id"]) : null;
+  return {
+    model:
+      providerID !== null && modelID !== null ? { providerID, modelID } : null,
+    variant: isJsonObject(data) ? nonEmptyText(data["thinkingLevel"]) : null,
+  };
+}
+
+// Unlike stats, this attaches: the chat is being opened, and its transcript
+// read attaches it anyway, so answering null here would only race that read.
+export async function readOmoSessionSelection(
+  context: OmoReadContext,
+  rawId: string,
+): Promise<Response> {
+  const row = await getOmoIndexRow(context.workspace.id, rawId);
+  if (row === null && !(await context.source.authorizeSession(rawId))) {
+    return sessionNotFoundResponse();
+  }
+  const binding = await context.runtime.registry.attach({
+    workspace: context.workspace,
+    durableId: rawId,
+  });
+  await binding.ready;
+  const response = await context.runtime.registry.request(binding, {
+    type: "get_state",
+  });
+  return jsonResponse(parseOmoSessionSelection(response));
 }

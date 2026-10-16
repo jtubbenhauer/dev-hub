@@ -1,5 +1,6 @@
 import { useAgents } from "@/components/chat/agent-selector";
 import { useActiveChatEngine } from "@/hooks/use-active-chat-engine";
+import { useOmoSessionSelection } from "@/hooks/use-omo-session-selection";
 import { useModelAgentBindings } from "@/hooks/use-settings";
 import { isOmoSkillAgentName } from "@/lib/engine/omo-mode";
 import type { Agent } from "@/lib/opencode/types";
@@ -65,9 +66,28 @@ export function useAgentModelSync({
 }: UseAgentModelSyncArgs): UseAgentModelSyncResult {
   const { engine, isLoading: isEngineLoading } =
     useActiveChatEngine(activeWorkspaceId);
-  const { primaryAgents } = useAgents(
+  const { primaryAgents, isLoading: isAgentListLoading } = useAgents(
     isEngineLoading ? null : activeWorkspaceId,
     engine,
+  );
+  // An omo workspace without skills has no modes at all, so for omo an empty
+  // list that has finished loading still counts as ready to restore.
+  const isRestoreReady =
+    primaryAgents.length > 0 ||
+    (engine === "omo" && !isEngineLoading && !isAgentListLoading);
+  const omoSelection = useOmoSessionSelection(
+    activeWorkspaceId,
+    activeSessionId,
+  );
+  const omoProviderID = omoSelection?.model?.providerID ?? null;
+  const omoModelID = omoSelection?.model?.modelID ?? null;
+  const omoSessionVariant = omoSelection?.variant ?? null;
+  const omoSessionModel = useMemo(
+    () =>
+      omoProviderID !== null && omoModelID !== null
+        ? { providerID: omoProviderID, modelID: omoModelID }
+        : null,
+    [omoProviderID, omoModelID],
   );
   const orderedAgents = useMemo(() => {
     const utilityNames = new Set(["compaction", "title", "summary"]);
@@ -84,6 +104,10 @@ export function useAgentModelSync({
   // actually changes — not when other deps (primaryAgents, bindings) re-render.
   // This lets the user manually override the model within a session.
   const prevAgentRef = useRef<string | null>(null);
+  const selectedModelRef = useRef(selectedModel);
+  useEffect(() => {
+    selectedModelRef.current = selectedModel;
+  }, [selectedModel]);
 
   const isVariantListCurrent =
     selectedModel !== null &&
@@ -176,7 +200,7 @@ export function useAgentModelSync({
     useChatStore.getState();
 
   useEffect(() => {
-    if (primaryAgents.length === 0) return;
+    if (!isRestoreReady) return;
 
     const storedAgent = activeSessionId
       ? getSessionAgent(activeSessionId)
@@ -198,18 +222,33 @@ export function useAgentModelSync({
       restoredAgentName === null
         ? undefined
         : findAgentModelBinding(agentModelBindings, restoredAgentName);
-    setSelectedModel(storedModel ?? restoredAgent?.model ?? boundModel ?? null);
+    const restoredModel =
+      storedModel ??
+      omoSessionModel ??
+      restoredAgent?.model ??
+      boundModel ??
+      null;
+    // Clearing a model that is already empty would only throw away a fallback
+    // ModelSelector picked earlier in this same commit.
+    if (restoredModel !== null || selectedModelRef.current !== null) {
+      setSelectedModel(restoredModel);
+    }
 
     const storedVariant = activeSessionId
       ? getSessionVariant(activeSessionId)
       : null;
-    setSelectedVariant(storedVariant ?? restoredAgent?.variant ?? null);
+    setSelectedVariant(
+      storedVariant ?? omoSessionVariant ?? restoredAgent?.variant ?? null,
+    );
   }, [
     activeSessionId,
     agentModelBindings,
     getSessionAgent,
     getSessionModel,
     getSessionVariant,
+    isRestoreReady,
+    omoSessionModel,
+    omoSessionVariant,
     primaryAgents,
     setSelectedAgent,
     setSelectedModel,

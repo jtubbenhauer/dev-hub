@@ -13,6 +13,7 @@ import {
   listOmoSessions,
   readOmoChildren,
   readOmoSession,
+  readOmoSessionSelection,
   readOmoSessionStats,
   readOmoSessionStatus,
   readOmoTodos,
@@ -75,9 +76,10 @@ async function readSessionRoute(
   path: string,
   query: URLSearchParams,
 ): Promise<Response> {
-  const match = /^\/session\/([^/]+)(?:\/(message|children|todo|stats))?$/.exec(
-    path,
-  );
+  const match =
+    /^\/session\/([^/]+)(?:\/(message|children|todo|stats|selection))?$/.exec(
+      path,
+    );
   if (match === null) return unsupportedResponse();
   const publicId = match[1];
   const rawId = publicId === undefined ? null : rawOmoId(publicId);
@@ -89,6 +91,8 @@ async function readSessionRoute(
       return readOmoChildren(context, rawId);
     case "stats":
       return readOmoSessionStats(context, rawId);
+    case "selection":
+      return readOmoSessionSelection(context, rawId);
     case "todo":
       if (!(await isOmoIdKnown(context, rawId))) {
         return jsonResponse({ error: "session_not_found" }, { status: 404 });

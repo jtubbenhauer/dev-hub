@@ -10,10 +10,11 @@
  * variant validation must not run against the previous model's variant list.
  */
 
-import { act, renderHook } from "@testing-library/react";
-import { useState } from "react";
+import { act, render, renderHook, screen } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAgentModelSync } from "@/components/chat/use-agent-model-sync";
+import type { OmoSessionSelection } from "@/lib/chat/omo-session-selection";
 import type { Agent } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
 
@@ -38,13 +39,25 @@ const activeEngineState = vi.hoisted(() => ({
   value: { engine: "opencode", isLoading: false },
 }));
 const useAgentsMock = vi.hoisted(() =>
-  vi.fn((_workspaceId: string | null, _engine?: string) => ({
-    primaryAgents,
-  })),
+  vi.fn(
+    (
+      _workspaceId: string | null,
+      _engine?: string,
+    ): { primaryAgents: Agent[]; isLoading?: boolean } => ({
+      primaryAgents,
+    }),
+  ),
 );
+const sessionSelectionState = vi.hoisted(() => ({
+  value: null as OmoSessionSelection | null,
+}));
 
 vi.mock("@/components/chat/agent-selector", () => ({
   useAgents: useAgentsMock,
+}));
+
+vi.mock("@/hooks/use-omo-session-selection", () => ({
+  useOmoSessionSelection: () => sessionSelectionState.value,
 }));
 
 vi.mock("@/hooks/use-active-chat-engine", () => ({
@@ -57,6 +70,7 @@ vi.mock("@/hooks/use-settings", () => ({
 
 const initialStoreState = useChatStore.getState();
 const noVariants: string[] = [];
+const noModes: Agent[] = [];
 const testModel = { providerID: "provider-a", modelID: "model-a" };
 const otherModel = { providerID: "provider-b", modelID: "model-b" };
 
@@ -111,6 +125,60 @@ function useHarness({
   };
 }
 
+const fallbackModel = {
+  providerID: "provider-default",
+  modelID: "model-default",
+};
+const noAvailableVariants = { model: null, values: noVariants };
+
+// Plays a ModelSelector that only re-checks when its inputs change. As a child,
+// its effect runs before the parent's restore effect in the same commit.
+function FallbackModelPicker({
+  isReady,
+  selectedModel,
+  onFallbackModel,
+}: {
+  isReady: boolean;
+  selectedModel: SelectedModel | null;
+  onFallbackModel: (model: SelectedModel) => void;
+}) {
+  useEffect(() => {
+    if (isReady && selectedModel === null) onFallbackModel(fallbackModel);
+  }, [isReady, onFallbackModel, selectedModel]);
+  return null;
+}
+
+function ComposerHarness({ isReady }: { isReady: boolean }) {
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
+    null,
+  );
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+
+  useAgentModelSync({
+    activeWorkspaceId: "ws-a",
+    activeSessionId: "sess-a",
+    selectedAgent,
+    setSelectedAgent,
+    selectedModel,
+    setSelectedModel,
+    selectedVariant,
+    availableVariants: noAvailableVariants,
+    setSelectedVariant,
+  });
+
+  return (
+    <>
+      <span>{selectedModel?.modelID ?? "no model"}</span>
+      <FallbackModelPicker
+        isReady={isReady}
+        selectedModel={selectedModel}
+        onFallbackModel={setSelectedModel}
+      />
+    </>
+  );
+}
+
 function seedWorkspace(input: {
   sessionAgents?: Record<string, string>;
   sessionModels?: Record<string, SelectedModel>;
@@ -146,7 +214,9 @@ describe("useAgentModelSync", () => {
     useChatStore.setState(initialStoreState, true);
     modelBindingState.bindings = {};
     activeEngineState.value = { engine: "opencode", isLoading: false };
+    sessionSelectionState.value = null;
     useAgentsMock.mockClear();
+    useAgentsMock.mockImplementation(() => ({ primaryAgents }));
   });
 
   it("loads the open chat's engine agents and waits while the engine is unknown", () => {
@@ -322,5 +392,124 @@ describe("useAgentModelSync", () => {
 
     expect(result.current.selectedVariant).toBeNull();
     expect(useChatStore.getState().getSessionVariant("sess-a")).toBeNull();
+  });
+
+  describe("an omo chat this browser saved no choice for", () => {
+    const haiku = {
+      providerID: "anthropic-subscription",
+      modelID: "claude-haiku-5-5",
+    };
+
+    beforeEach(() => {
+      activeEngineState.value = { engine: "omo", isLoading: false };
+    });
+
+    it("shows the model and thinking level omo runs the chat with", () => {
+      sessionSelectionState.value = { model: haiku, variant: "high" };
+      seedWorkspace({});
+
+      const { result } = renderHook(
+        (props: HarnessProps) => useHarness(props),
+        { initialProps: { activeSessionId: "sess-a", variants: noVariants } },
+      );
+
+      expect(result.current.selectedModel).toEqual(haiku);
+      expect(result.current.selectedVariant).toBe("high");
+    });
+
+    it("applies omo's answer when it arrives after the chat has opened", () => {
+      seedWorkspace({});
+      const { result, rerender } = renderHook(
+        (props: HarnessProps) => useHarness(props),
+        { initialProps: { activeSessionId: "sess-a", variants: noVariants } },
+      );
+      expect(result.current.selectedModel).toBeNull();
+
+      sessionSelectionState.value = { model: haiku, variant: null };
+      rerender({ activeSessionId: "sess-a", variants: noVariants });
+
+      expect(result.current.selectedModel).toEqual(haiku);
+      expect(result.current.selectedVariant).toBeNull();
+    });
+
+    it("still prefers a model and thinking level chosen in this browser", () => {
+      sessionSelectionState.value = { model: haiku, variant: "high" };
+      seedWorkspace({
+        sessionModels: { "sess-a": otherModel },
+        sessionVariants: { "sess-a": "low" },
+      });
+
+      const { result } = renderHook(
+        (props: HarnessProps) => useHarness(props),
+        { initialProps: { activeSessionId: "sess-a", variants: noVariants } },
+      );
+
+      expect(result.current.selectedModel).toEqual(otherModel);
+      expect(result.current.selectedVariant).toBe("low");
+    });
+
+    it("restores even when the workspace has no skill modes", () => {
+      useAgentsMock.mockImplementation(() => ({
+        primaryAgents: noModes,
+        isLoading: false,
+      }));
+      sessionSelectionState.value = { model: haiku, variant: "medium" };
+      seedWorkspace({});
+
+      const { result } = renderHook(
+        (props: HarnessProps) => useHarness(props),
+        {
+          initialProps: {
+            activeSessionId: "sess-a",
+            initialModel: otherModel,
+            variants: noVariants,
+          },
+        },
+      );
+
+      expect(result.current.selectedAgent).toBeNull();
+      expect(result.current.selectedModel).toEqual(haiku);
+      expect(result.current.selectedVariant).toBe("medium");
+    });
+
+    it("keeps a fallback model picked in the same commit instead of clearing it", () => {
+      useAgentsMock.mockImplementation(() => ({
+        primaryAgents: noModes,
+        isLoading: true,
+      }));
+      seedWorkspace({});
+      const { rerender } = render(<ComposerHarness isReady={false} />);
+      expect(screen.getByText("no model")).toBeInTheDocument();
+
+      useAgentsMock.mockImplementation(() => ({
+        primaryAgents: noModes,
+        isLoading: false,
+      }));
+      rerender(<ComposerHarness isReady />);
+
+      expect(screen.getByText("model-default")).toBeInTheDocument();
+    });
+
+    it("waits while the mode list is still loading", () => {
+      useAgentsMock.mockImplementation(() => ({
+        primaryAgents: noModes,
+        isLoading: true,
+      }));
+      sessionSelectionState.value = { model: haiku, variant: "medium" };
+      seedWorkspace({});
+
+      const { result } = renderHook(
+        (props: HarnessProps) => useHarness(props),
+        {
+          initialProps: {
+            activeSessionId: "sess-a",
+            initialModel: otherModel,
+            variants: noVariants,
+          },
+        },
+      );
+
+      expect(result.current.selectedModel).toEqual(otherModel);
+    });
   });
 });

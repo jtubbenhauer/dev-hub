@@ -358,4 +358,68 @@ describe("handleOmoRead session routes", () => {
     // Then
     expect(response.status).toBe(404);
   });
+
+  it("returns the chat's own model and thinking level, attaching the chat to read them", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    const binding = createBinding("root");
+    insertIndexRow(fixture.sqlite, "root", "interactive");
+    fixture.registry.attach.mockResolvedValue(binding);
+    fixture.registry.request.mockResolvedValue({
+      data: {
+        model: {
+          provider: "anthropic-subscription",
+          id: "claude-haiku-5-5",
+          name: "Claude Haiku 5.5",
+        },
+        thinkingLevel: "high",
+        isStreaming: false,
+      },
+    });
+
+    // When
+    const response = await fixture.request("/session/omo_root/selection");
+
+    // Then
+    expect(await readJson(response)).toEqual({
+      model: {
+        providerID: "anthropic-subscription",
+        modelID: "claude-haiku-5-5",
+      },
+      variant: "high",
+    });
+    expect(fixture.registry.attach).toHaveBeenCalledWith(
+      expect.objectContaining({ durableId: "root" }),
+    );
+    expect(fixture.registry.request).toHaveBeenCalledWith(binding, {
+      type: "get_state",
+    });
+  });
+
+  it("answers no model or thinking level when omo reports none", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    insertIndexRow(fixture.sqlite, "root", "interactive");
+    fixture.registry.request.mockResolvedValue({
+      data: { model: { provider: "", id: "claude-haiku-5-5" } },
+    });
+
+    // When
+    const response = await fixture.request("/session/omo_root/selection");
+
+    // Then
+    expect(await readJson(response)).toEqual({ model: null, variant: null });
+  });
+
+  it("returns 404 selection for an unknown session without attaching it", async () => {
+    // Given
+    const fixture = await useReadFixture();
+
+    // When
+    const response = await fixture.request("/session/omo_nope/selection");
+
+    // Then
+    expect(response.status).toBe(404);
+    expect(fixture.registry.attach).not.toHaveBeenCalled();
+  });
 });

@@ -13,6 +13,7 @@ import {
   Check,
   Minimize2,
   FileText,
+  TriangleAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +63,7 @@ interface ChatMessageProps {
   showAvatar?: boolean;
   isQueued?: boolean;
   onRevert?: (messageId: string) => void;
+  onContinue?: () => void;
 }
 
 export function isMessageVisible(
@@ -90,7 +92,10 @@ export function isMessageVisible(
     parts.some((p) => p.type === "compaction") ||
     ("summary" in info && info.summary === true);
   const hasError = "error" in info && Boolean(info.error);
-  return hasText || hasThinking || hasTools || hasCompaction || hasError;
+  const isCutOff = info.finish === "length";
+  return (
+    hasText || hasThinking || hasTools || hasCompaction || hasError || isCutOff
+  );
 }
 
 function isSystemReminder(messageParts: readonly { type: string }[]): boolean {
@@ -190,6 +195,7 @@ export const ChatMessage = memo(
     showAvatar = true,
     isQueued = false,
     onRevert,
+    onContinue,
   }: ChatMessageProps) {
     const { info, parts } = message;
     const {
@@ -336,6 +342,10 @@ export const ChatMessage = memo(
       THROTTLE_MS,
     );
     const hasError = isAssistant && "error" in info && info.error;
+    const cutOffTokenCount =
+      info.role === "assistant" && info.finish === "length"
+        ? info.tokens.output + info.tokens.reasoning
+        : null;
 
     return (
       <div
@@ -455,6 +465,20 @@ export const ChatMessage = memo(
                 </div>
               )}
 
+              {cutOffTokenCount !== null && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+                  <TriangleAlert className="size-4 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    {`This reply stopped at the output limit (${cutOffTokenCount.toLocaleString()} tokens) before it finished.`}
+                  </span>
+                  {onContinue && (
+                    <Button size="xs" variant="outline" onClick={onContinue}>
+                      Continue
+                    </Button>
+                  )}
+                </div>
+              )}
+
               {showTokens && isAssistant && "tokens" in info && (
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-xs font-normal">
@@ -491,7 +515,8 @@ export const ChatMessage = memo(
     prev.message.info === next.message.info &&
     prev.showAvatar === next.showAvatar &&
     prev.isQueued === next.isQueued &&
-    prev.onRevert === next.onRevert,
+    prev.onRevert === next.onRevert &&
+    prev.onContinue === next.onContinue,
 );
 
 const ReasoningBlock = memo(

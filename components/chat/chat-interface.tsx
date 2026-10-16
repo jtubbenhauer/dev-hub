@@ -936,6 +936,10 @@ export function ChatInterface() {
     ],
   );
 
+  const handleContinue = useCallback(() => {
+    void handleSendMessage("Continue");
+  }, [handleSendMessage]);
+
   const handleCommandDispatch = useCallback(
     async (command: SlashCommand, args: string) => {
       if (!activeWorkspaceId) return;
@@ -1672,6 +1676,10 @@ export function ChatInterface() {
                         streamingStatus !== "streaming" &&
                         msg.info.role === "user" &&
                         dataIndex > 0;
+                      const canContinue =
+                        dataIndex === activeMessages.length - 1 &&
+                        (streamingStatus === "idle" ||
+                          streamingStatus === "error");
                       return (
                         <ChatMessage
                           key={msg.info.id}
@@ -1679,6 +1687,7 @@ export function ChatInterface() {
                           showAvatar={showAvatar}
                           isQueued={queuedUserMessageIds.has(msg.info.id)}
                           onRevert={canRevert ? handleRevert : undefined}
+                          onContinue={canContinue ? handleContinue : undefined}
                         />
                       );
                     }}

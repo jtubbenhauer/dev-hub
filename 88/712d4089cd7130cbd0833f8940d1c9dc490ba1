@@ -1,0 +1,18 @@
+tests/components/chat-message-revert.test.tsx
+  h_c7f8735263030f 76
+tests/components/chat-message-user-bubble-width.test.tsx
+  h_c7f8735263030f 48
+tests/components/chat/sub-agent-dialog.test.tsx
+  h_c7f8735263030f 68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "88712d4089cd7130cbd0833f8940d1c9dc490ba1",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

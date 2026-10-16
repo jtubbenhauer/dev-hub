@@ -1,0 +1,93 @@
+lib/omo/facade/read-sessions.ts
+  s_9b616f005b7655::t_803598494d1b2c 339-341
+  s_9b616f005b7655::t_e8ca09e3c8cc10 2
+  s_9b616f005b7655::t_7dce1ae298d6fd 329-338,342-369
+hooks/use-omo-session-selection.ts
+  s_9b616f005b7655::t_5119cc22387976 1-37
+components/chat/model-selector.tsx
+  s_9b616f005b7655::t_526e580d07db89 242-244
+  s_9b616f005b7655::t_ed95073954cdbe 260
+  s_9b616f005b7655::t_4566ca77441eec 309
+  s_9b616f005b7655::t_52fc8a6c459312 219-230
+  s_9b616f005b7655::t_967b989cccc8c7 290
+tests/components/chat/use-agent-model-sync.test.tsx
+  s_9b616f005b7655::t_9c31834de277e0 217,219
+  s_9b616f005b7655::t_906b98dc56e745 475-492
+  s_9b616f005b7655::t_c749033578ed38 73
+  s_9b616f005b7655::t_1bf0b9d501b07b 17
+  s_9b616f005b7655::t_4c1d2fd92f032f 396-452,454-474,493-494,496-513
+  s_9b616f005b7655::t_8e71cdeb137b06 495
+  s_9b616f005b7655::t_c41b0050f82146 453
+  s_9b616f005b7655::t_efec71438b4e83 13-14
+  s_9b616f005b7655::t_1667de16384ebc 134-135,147
+  s_9b616f005b7655::t_11bf15d7c79b9d 42-49,51-53,59-61
+  s_9b616f005b7655::t_de4f1bd6318ab8 128-133,136-146,148-180,514
+  s_0de4f8403f6149::t_332cef09a08004 62,181
+lib/chat/omo-session-selection.ts
+  s_9b616f005b7655::t_803598494d1b2c 2-5
+  s_9b616f005b7655::t_08036a0c1ec1d0 1,6-29
+components/chat/use-agent-model-sync.ts
+  s_9b616f005b7655::t_8d677ff7594c7d 86,89,91
+  s_9b616f005b7655::t_c77b1fa5d64695 78,82-85,87-88,90,107-110
+  s_9b616f005b7655::t_02b2f07cb904c7 69,73-77,79-81
+  s_9b616f005b7655::t_4a677a2971b2e1 203
+  s_9b616f005b7655::t_2ee12af552cef1 225-235,241,250-251
+  s_9b616f005b7655::t_959c2cd01fd56f 240,242,249
+  s_9b616f005b7655::t_fe52e9af8d7cd8 3
+tests/components/chat/model-selector.test.tsx
+  s_9b616f005b7655::t_26bd2a67bcd3dc 59,61
+  s_9b616f005b7655::t_cb0352b2028cdf 435-442,449-461
+  s_9b616f005b7655::t_8075d1e3c79a7b 314-317
+  s_9b616f005b7655::t_9fa26025e256fb 77,80,84,86
+  s_9b616f005b7655::t_46835459b6e63d 2
+  s_9b616f005b7655::t_706eb4dfe89d2f 54-58,65-72,87-97
+  s_9b616f005b7655::t_29c8ae5ff90e7b 310-313,318-343
+  s_9b616f005b7655::t_29f6de33ee18f1 434,443-448
+  s_9b616f005b7655::t_967a82f934cba2 60,62-64,73-76,78-79,81-83,85
+  s_a14af25ea19db4::t_d6a66919a6887b 344,462-463
+lib/omo/facade/read.ts
+  s_9b616f005b7655::t_b8a3cded0920a4 79-82
+  s_9b616f005b7655::t_5f5a952317609b 94-95
+  s_9b616f005b7655::t_cb1182c42af521 16
+tests/hooks/use-omo-session-selection.test.tsx
+  s_9b616f005b7655::t_72e12ff19ff4d3 1-108
+tests/lib/omo/facade/read-session-cases.ts
+  s_9b616f005b7655::t_d8960b3aed40b4 361-424
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cb926cc808a6d427cfb1720a56db1e071114d946",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0de4f8403f6149": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ec5a4d6daffeely6Z9Rde8er8r",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_9b616f005b7655": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

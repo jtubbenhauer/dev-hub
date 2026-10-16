@@ -1,5 +1,7 @@
 import type { ChildProcess } from "node:child_process";
-import { createServer } from "node:net";
+import { connect, createServer } from "node:net";
+
+const LISTENING_CHECK_TIMEOUT_MS = 1000;
 
 export interface ServerState {
   process: ChildProcess;
@@ -65,6 +67,25 @@ export function clearSharedServerState(state: ServerState): void {
 export function findOpenCodeBinary(): string {
   const homeDir = process.env.HOME || process.env.USERPROFILE || "";
   return process.env.OPENCODE_BIN || `${homeDir}/.opencode/bin/opencode`;
+}
+
+// A stopped server refuses connections. A busy one still accepts them, so
+// heavy load is never mistaken for a stopped server.
+export function hasStoppedListening(url: string): Promise<boolean> {
+  const { hostname, port } = new URL(url);
+  return new Promise((resolve) => {
+    const socket = connect({ host: hostname, port: Number(port) });
+    const finish = (hasStopped: boolean) => {
+      socket.destroy();
+      resolve(hasStopped);
+    };
+    socket.setTimeout(LISTENING_CHECK_TIMEOUT_MS);
+    socket.once("connect", () => finish(false));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", (error: NodeJS.ErrnoException) =>
+      finish(error.code === "ECONNREFUSED"),
+    );
+  });
 }
 
 export function isPortAvailable(port: number): Promise<boolean> {

@@ -6,21 +6,25 @@ import {
   createSharedServer,
   findOpenCodeBinary,
   getSharedServer,
+  hasStoppedListening,
   isPortAvailable,
   markSharedServerReady,
   setSharedServer,
   type ServerState,
+  type SharedServer,
   waitForServerUrl,
 } from "./server-runtime";
 
 const DEFAULT_PORT = 4096;
 const STARTUP_TIMEOUT_MS = 10000;
 const HEALTH_CHECK_INTERVAL_MS = 30000;
-const HEALTH_CHECK_FAILURE_THRESHOLD = 3;
+// OpenCode stops every reply at 32,000 tokens, thinking included, unless told
+// otherwise. Opus at the max thinking level can spend all of it thinking and
+// end with no answer. Each model is still held to its own output limit.
+const DEFAULT_OUTPUT_TOKEN_MAX = "128000";
 
 let serverState: ServerState | null = null;
 let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
-let consecutiveHealthCheckFailures = 0;
 
 async function tryAdoptExistingServer(
   port: number,
@@ -79,7 +83,12 @@ async function startServer(
 
   const proc = spawn(binary, args, {
     signal: abortController.signal,
-    env: { ...process.env },
+    env: {
+      ...process.env,
+      OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX:
+        process.env.OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX ??
+        DEFAULT_OUTPUT_TOKEN_MAX,
+    },
     stdio: ["pipe", "pipe", "pipe"],
   });
 
@@ -164,23 +173,25 @@ function startHealthChecks() {
       if (!response.ok) {
         throw new Error(`Health check returned ${response.status}`);
       }
-      consecutiveHealthCheckFailures = 0;
       checkedState.lastActivity = Date.now();
     } catch (error) {
       if (serverState !== checkedState) return;
-      consecutiveHealthCheckFailures += 1;
       const message = error instanceof Error ? error.message : String(error);
-      console.warn("[opencode] Health check failed", {
-        message,
-        consecutiveFailures: consecutiveHealthCheckFailures,
-      });
-      if (consecutiveHealthCheckFailures < HEALTH_CHECK_FAILURE_THRESHOLD) {
+      // A busy server answers health checks slowly but still accepts
+      // connections, and stopping it would abort every running session.
+      const hasStopped = await hasStoppedListening(checkedState.url);
+      if (serverState !== checkedState) return;
+      if (!hasStopped) {
+        console.warn(
+          "[opencode] Health check failed; server still accepts connections, keeping it",
+          { message, pid: checkedState.pid },
+        );
         return;
       }
-      console.error("[opencode] Health check failure threshold reached", {
-        consecutiveFailures: consecutiveHealthCheckFailures,
-        pid: checkedState.pid,
-      });
+      console.error(
+        "[opencode] Health check failed and server stopped accepting connections",
+        { message, pid: checkedState.pid },
+      );
       if (checkedState.process) {
         checkedState.abortController.abort();
         checkedState.process.kill();
@@ -198,7 +209,32 @@ function stopHealthChecks() {
     clearInterval(healthCheckTimer);
     healthCheckTimer = null;
   }
-  consecutiveHealthCheckFailures = 0;
+}
+
+function handOutServer(state: ServerState): { url: string; port: number } {
+  serverState = state;
+  state.lastActivity = Date.now();
+  return { url: state.url, port: state.port };
+}
+
+// Adopted servers have no exit event, so without this a server that died
+// (for example one adopted from a dev server that was shutting down) was only
+// dropped by the next health check, up to 30 seconds later.
+function forgetStoppedServer(
+  sharedServer: SharedServer,
+  state: ServerState,
+): void {
+  if (getSharedServer() !== sharedServer) return;
+  console.warn("[opencode] Server stopped accepting connections", {
+    url: state.url,
+    pid: state.pid,
+  });
+  clearSharedServer(sharedServer);
+  state.status = "stopped";
+  if (serverState === state) {
+    serverState = null;
+    stopHealthChecks();
+  }
 }
 
 export async function getOrStartServer(): Promise<{
@@ -208,9 +244,11 @@ export async function getOrStartServer(): Promise<{
   const sharedServer = getSharedServer();
   if (sharedServer) {
     const state = await sharedServer.startPromise;
-    serverState = state;
-    state.lastActivity = Date.now();
-    return { url: state.url, port: state.port };
+    if (!(await hasStoppedListening(state.url))) return handOutServer(state);
+    forgetStoppedServer(sharedServer, state);
+    // Another request may already have started the replacement.
+    const replacement = getSharedServer();
+    if (replacement) return handOutServer(await replacement.startPromise);
   }
 
   const serverLifecycle = createSharedServer((abortController) =>

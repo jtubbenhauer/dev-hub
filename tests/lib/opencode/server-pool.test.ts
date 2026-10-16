@@ -4,7 +4,8 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockCreateServer, mockSpawn } = vi.hoisted(() => ({
+const { mockConnect, mockCreateServer, mockSpawn } = vi.hoisted(() => ({
+  mockConnect: vi.fn(),
   mockCreateServer: vi.fn(),
   mockSpawn: vi.fn(),
 }));
@@ -16,6 +17,7 @@ vi.mock("node:child_process", async (importOriginal) => ({
 
 vi.mock("node:net", async (importOriginal) => ({
   ...(await importOriginal()),
+  connect: mockConnect,
   createServer: mockCreateServer,
 }));
 
@@ -51,11 +53,45 @@ class FakePortProbe extends EventEmitter {
   }
 }
 
+type ConnectionOutcome = "connect" | "timeout" | "refused";
+
+class FakeSocket extends EventEmitter {
+  readonly destroy = vi.fn();
+  readonly setTimeout = vi.fn();
+
+  constructor(outcome: ConnectionOutcome) {
+    super();
+    queueMicrotask(() => {
+      if (outcome === "refused") {
+        this.emit(
+          "error",
+          Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:4096"), {
+            code: "ECONNREFUSED",
+          }),
+        );
+        return;
+      }
+      this.emit(outcome);
+    });
+  }
+}
+
+function adoptExistingServerOnce() {
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response("[]", { status: 200 }))
+      .mockRejectedValue(new Error("not running")),
+  );
+}
+
 describe("OpenCode server pool", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("not running")));
     mockCreateServer.mockReturnValue(new FakePortProbe(false));
+    mockConnect.mockImplementation(() => new FakeSocket("connect"));
   });
 
   afterEach(async () => {
@@ -63,6 +99,7 @@ describe("OpenCode server pool", () => {
     stopServer();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
@@ -237,7 +274,7 @@ describe("OpenCode server pool", () => {
     expect(replacementModule.getServerStatus()?.status).toBe("ready");
   });
 
-  it("requires repeated control-plane failures before stopping the server", async () => {
+  it("keeps a busy server whose health checks keep timing out while it still accepts connections", async () => {
     vi.useFakeTimers();
     mockSpawn.mockReset();
     vi.stubGlobal(
@@ -245,12 +282,15 @@ describe("OpenCode server pool", () => {
       vi
         .fn()
         .mockRejectedValueOnce(new Error("not running"))
-        .mockRejectedValue(new Error("health unavailable")),
+        .mockRejectedValue(
+          new DOMException("The operation timed out.", "TimeoutError"),
+        ),
     );
     const process = new FakeOpenCodeProcess();
     mockSpawn.mockReturnValue(process);
 
-    const { getOrStartServer } = await import("@/lib/opencode/server-pool");
+    const { getOrStartServer, getServerStatus } =
+      await import("@/lib/opencode/server-pool");
     const serverPromise = getOrStartServer();
     await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalledOnce());
     process.stdout.write(
@@ -258,16 +298,143 @@ describe("OpenCode server pool", () => {
     );
     await serverPromise;
 
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(120_000);
 
+    expect(process.kill).not.toHaveBeenCalled();
+    expect(getServerStatus()?.status).toBe("ready");
     expect(fetch).toHaveBeenLastCalledWith(
       "http://127.0.0.1:4096/global/health",
       expect.any(Object),
     );
-    expect(process.kill).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(mockConnect).toHaveBeenCalledTimes(4));
+  });
 
-    await vi.advanceTimersByTimeAsync(60_000);
+  it("stops a server that refuses connections when its health check fails", async () => {
+    vi.useFakeTimers();
+    mockSpawn.mockReset();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValueOnce(new Error("not running"))
+        .mockRejectedValue(new TypeError("fetch failed")),
+    );
+    const process = new FakeOpenCodeProcess();
+    mockSpawn.mockReturnValue(process);
 
-    expect(process.kill).toHaveBeenCalledOnce();
+    const { getOrStartServer, getServerStatus } =
+      await import("@/lib/opencode/server-pool");
+    const serverPromise = getOrStartServer();
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalledOnce());
+    process.stdout.write(
+      "opencode server listening on http://127.0.0.1:4096\n",
+    );
+    await serverPromise;
+    mockConnect.mockImplementation(() => new FakeSocket("refused"));
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    await vi.waitFor(() => expect(process.kill).toHaveBeenCalledOnce());
+    expect(getServerStatus()).toBeNull();
+  });
+
+  it("starts OpenCode with a 128,000-token output cap so long thinking doesn't end replies with no answer", async () => {
+    vi.stubEnv("OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX", undefined);
+    const process = new FakeOpenCodeProcess();
+    mockSpawn.mockReturnValue(process);
+    const { getOrStartServer } = await import("@/lib/opencode/server-pool");
+
+    const serverPromise = getOrStartServer();
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalledOnce());
+    process.stdout.write(
+      "opencode server listening on http://127.0.0.1:4096\n",
+    );
+    await serverPromise;
+
+    expect(mockSpawn.mock.calls[0][2].env).toMatchObject({
+      OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX: "128000",
+    });
+  });
+
+  it("keeps an output cap already set in the environment", async () => {
+    vi.stubEnv("OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX", "64000");
+    const process = new FakeOpenCodeProcess();
+    mockSpawn.mockReturnValue(process);
+    const { getOrStartServer } = await import("@/lib/opencode/server-pool");
+
+    const serverPromise = getOrStartServer();
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalledOnce());
+    process.stdout.write(
+      "opencode server listening on http://127.0.0.1:4096\n",
+    );
+    await serverPromise;
+
+    expect(mockSpawn.mock.calls[0][2].env).toMatchObject({
+      OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX: "64000",
+    });
+  });
+
+  it("starts a new server on the next request once an adopted server stops accepting connections", async () => {
+    adoptExistingServerOnce();
+    const replacementProcess = new FakeOpenCodeProcess();
+    mockSpawn.mockReturnValue(replacementProcess);
+    const { getOrStartServer } = await import("@/lib/opencode/server-pool");
+    await expect(getOrStartServer()).resolves.toEqual({
+      url: "http://127.0.0.1:4096",
+      port: 4096,
+    });
+    expect(mockSpawn).not.toHaveBeenCalled();
+
+    mockConnect.mockImplementation(() => new FakeSocket("refused"));
+    const replacementPromise = getOrStartServer();
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalledOnce());
+    replacementProcess.stdout.write(
+      "opencode server listening on http://127.0.0.1:4096\n",
+    );
+
+    await expect(replacementPromise).resolves.toEqual({
+      url: "http://127.0.0.1:4096",
+      port: 4096,
+    });
+  });
+
+  it("starts a single replacement when several requests find the server stopped", async () => {
+    adoptExistingServerOnce();
+    const replacementProcess = new FakeOpenCodeProcess();
+    mockSpawn.mockReturnValue(replacementProcess);
+    const { getOrStartServer } = await import("@/lib/opencode/server-pool");
+    await getOrStartServer();
+
+    mockConnect.mockImplementation(() => new FakeSocket("refused"));
+    const requests = [
+      getOrStartServer(),
+      getOrStartServer(),
+      getOrStartServer(),
+    ];
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalledOnce());
+    replacementProcess.stdout.write(
+      "opencode server listening on http://127.0.0.1:4096\n",
+    );
+
+    await expect(Promise.all(requests)).resolves.toEqual([
+      { url: "http://127.0.0.1:4096", port: 4096 },
+      { url: "http://127.0.0.1:4096", port: 4096 },
+      { url: "http://127.0.0.1:4096", port: 4096 },
+    ]);
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a busy server that accepts connections but responds slowly", async () => {
+    adoptExistingServerOnce();
+    const { getOrStartServer } = await import("@/lib/opencode/server-pool");
+    await getOrStartServer();
+
+    mockConnect.mockImplementation(() => new FakeSocket("timeout"));
+
+    await expect(getOrStartServer()).resolves.toEqual({
+      url: "http://127.0.0.1:4096",
+      port: 4096,
+    });
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });

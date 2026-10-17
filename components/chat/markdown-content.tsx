@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo, useState, useCallback, useContext } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeHighlight from "rehype-highlight";
@@ -9,11 +9,24 @@ import "highlight.js/styles/github.css";
 import { Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { isCodePath, FilePathCode } from "@/components/chat/file-path-code";
+import {
+  isCodePath,
+  FilePathCode,
+  FilePathLink,
+  parseFileLinkHref,
+} from "@/components/chat/file-path-code";
 import { PrBadge } from "@/components/chat/pr-badge";
 import { parsePrReferences } from "@/lib/pr-mention";
 
 const InsideAnchorContext = React.createContext(false);
+
+// The default transform blanks hrefs like file:///... or foo.md:12 (they look
+// like unknown protocols), which made file links point at the current page.
+// FilePathLink re-sanitises any href it does not render as a file link.
+function keepLocalFileHrefs(url: string, key: string): string {
+  if (key === "href" && parseFileLinkHref(url) !== null) return url;
+  return defaultUrlTransform(url);
+}
 
 function renderPrBadges(
   text: string,
@@ -62,6 +75,7 @@ export const MarkdownContent = memo(function MarkdownContent({
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkBreaks]}
       rehypePlugins={isBubble ? [] : [rehypeHighlight]}
+      urlTransform={keepLocalFileHrefs}
       components={{
         pre({ children, ...props }) {
           return (
@@ -108,7 +122,7 @@ export const MarkdownContent = memo(function MarkdownContent({
         a({ children, ...props }) {
           return (
             <InsideAnchorContext.Provider value={true}>
-              <a {...props}>{children}</a>
+              <FilePathLink {...props}>{children}</FilePathLink>
             </InsideAnchorContext.Provider>
           );
         },

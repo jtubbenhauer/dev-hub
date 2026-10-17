@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { defaultUrlTransform } from "react-markdown";
 import { FileCode2, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -150,19 +151,44 @@ function stripPath(text: string): string {
   return p;
 }
 
-interface FilePathCodeProps {
-  children: React.ReactNode;
-  text: string;
+// Normalises a markdown link href (relative path, absolute path, file:// URL,
+// optional :line[:col] or #L12 suffix) into a path, or null if it is not a
+// local file/folder link.
+export function parseFileLinkHref(href: string): string | null {
+  let path = href.trim();
+  if (path.startsWith("file://")) path = path.slice("file://".length);
+  path = path.replace(/[?#].*$/, "").replace(/:\d+(?::\d+)?$/, "");
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    return null;
+  }
+  if (path.includes(":")) return null;
+  return isCodePath(path) ? path : null;
 }
 
-export function FilePathCode({ children, text }: FilePathCodeProps) {
+export function resolveWorkspaceFilePath(
+  path: string,
+  workspaceRoots: string[],
+): string | null {
+  if (!path.startsWith("/")) return path.replace(/^\.\//, "");
+  for (const root of workspaceRoots) {
+    const normalizedRoot = root.replace(/\/+$/, "");
+    if (normalizedRoot && path.startsWith(`${normalizedRoot}/`)) {
+      return path.slice(normalizedRoot.length + 1);
+    }
+  }
+  return null;
+}
+
+function useOpenCodePath(path: string) {
   const router = useRouter();
   const isMobile = useIsMobile();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { fileOpenMode } = useChatFileOpenSetting();
 
-  const cleanPath = stripPath(text);
-  const isFolder = !isFilePath(text) && isFolderPath(text);
+  const cleanPath = stripPath(path);
+  const isFolder = !isFilePath(path) && isFolderPath(path);
   const href = isFolder
     ? `/files?expand=${encodeURIComponent(cleanPath)}`
     : `/files?open=${encodeURIComponent(cleanPath)}`;
@@ -197,6 +223,16 @@ export function FilePathCode({ children, text }: FilePathCodeProps) {
     ],
   );
 
+  return { href, isFolder, handleClick };
+}
+
+interface FilePathCodeProps {
+  children: React.ReactNode;
+  text: string;
+}
+
+export function FilePathCode({ children, text }: FilePathCodeProps) {
+  const { href, isFolder, handleClick } = useOpenCodePath(text);
   const Icon = isFolder ? FolderOpen : FileCode2;
 
   return (
@@ -212,5 +248,62 @@ export function FilePathCode({ children, text }: FilePathCodeProps) {
       <Icon className="inline size-3 shrink-0" />
       {children}
     </a>
+  );
+}
+
+function WorkspacePathLink({
+  children,
+  path,
+}: {
+  children: React.ReactNode;
+  path: string;
+}) {
+  const { href, isFolder, handleClick } = useOpenCodePath(path);
+  const Icon = isFolder ? FolderOpen : FileCode2;
+
+  return (
+    <a
+      href={href}
+      className="inline-flex cursor-pointer items-center gap-1"
+      onClick={handleClick}
+    >
+      <Icon className="inline size-3 shrink-0" />
+      {children}
+    </a>
+  );
+}
+
+// Markdown link renderer: local file links open in the editor, everything else
+// stays a normal (sanitised) link.
+export function FilePathLink({
+  href = "",
+  children,
+  ...anchorProps
+}: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+  const workspacePath = useWorkspaceStore(
+    (s) => s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.path,
+  );
+  const workspaceSshPath = useWorkspaceStore(
+    (s) => s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.sshPath,
+  );
+
+  const parsedPath = parseFileLinkHref(href);
+  const workspaceRoots = [workspacePath, workspaceSshPath].filter(
+    (root): root is string => typeof root === "string" && root.length > 0,
+  );
+  const workspaceFilePath =
+    parsedPath === null
+      ? null
+      : resolveWorkspaceFilePath(parsedPath, workspaceRoots);
+
+  if (workspaceFilePath === null) {
+    return (
+      <a {...anchorProps} href={defaultUrlTransform(href)}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <WorkspacePathLink path={workspaceFilePath}>{children}</WorkspacePathLink>
   );
 }

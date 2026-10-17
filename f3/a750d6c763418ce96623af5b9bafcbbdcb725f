@@ -1,0 +1,18 @@
+components/chat/file-path-code.tsx
+  h_c7f8735263030f 5,154-167,170-184,190-191,226-235,253-309
+components/chat/markdown-content.tsx
+  h_c7f8735263030f 4,12-17,23-30,78,125
+tests/components/markdown-file-links.test.tsx
+  h_c7f8735263030f 1-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f3a750d6c763418ce96623af5b9bafcbbdcb725f",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

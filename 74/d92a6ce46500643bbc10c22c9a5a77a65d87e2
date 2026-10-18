@@ -1,0 +1,26 @@
+components/chat/split-panel-files.tsx
+  h_c7f8735263030f 36-41,79-84,94-95,105,208-211,215,236-237,470,476,482,485,501-508,533,541,553-555,558-562
+lib/side-panel-open-file.ts
+  h_c7f8735263030f 2,14,16,20
+tests/components/chat/split-panel-files-diff-mode.test.tsx
+  h_c7f8735263030f 9
+tests/components/chat/split-panel-files-image.test.tsx
+  h_c7f8735263030f 49-53,56-71,135-161
+tests/components/chat/split-panel-files-pdf.test.tsx
+  h_c7f8735263030f 102-112
+tests/components/file-click-handlers.test.tsx
+  h_c7f8735263030f 98
+tests/lib/side-panel-open-file.test.ts
+  h_c7f8735263030f 4-8,120-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "74d92a6ce46500643bbc10c22c9a5a77a65d87e2",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -6,7 +6,11 @@ import {
   isPendingNavigationCurrent,
   setPendingNavigation,
 } from "@/lib/lsp/client/navigation-registry";
-import { IMAGE_LANGUAGE } from "@/lib/file-preview";
+import {
+  BINARY_FILE_LANGUAGE,
+  IMAGE_LANGUAGE,
+  PDF_LANGUAGE,
+} from "@/lib/file-preview";
 
 vi.mock("sonner", () => ({ toast: { warning: vi.fn() } }));
 const input = {
@@ -188,21 +192,43 @@ describe("openFileInFilesPage", () => {
     },
   );
 
-  it("opens images as a preview tab without fetching text content", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
+  it.each([
+    ["assets/logo.png", "logo.png", IMAGE_LANGUAGE],
+    ["docs/spec.pdf", "spec.pdf", PDF_LANGUAGE],
+  ])(
+    "opens %s as a preview tab without fetching text content",
+    async (path, name, language) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
 
-    expect(
-      await openFileInFilesPage({ ...input, path: "assets/logo.png" }),
-    ).toBe(true);
-    expect(fetchMock).not.toHaveBeenCalled();
+      expect(await openFileInFilesPage({ ...input, path })).toBe(true);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(useEditorStore.getState().openFiles).toEqual([
+        expect.objectContaining({
+          path,
+          name,
+          content: "",
+          language,
+          isDirty: false,
+        }),
+      ]);
+    },
+  );
+
+  it("opens a file the editor refuses as a download tab", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ error: "binary" }, { status: 415 })),
+    );
+
+    expect(await openFileInFilesPage({ ...input, path: "build/app.zip" })).toBe(
+      true,
+    );
     expect(useEditorStore.getState().openFiles).toEqual([
       expect.objectContaining({
-        path: "assets/logo.png",
-        name: "logo.png",
+        path: "build/app.zip",
         content: "",
-        language: IMAGE_LANGUAGE,
-        isDirty: false,
+        language: BINARY_FILE_LANGUAGE,
       }),
     ]);
   });

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { isSearchMatchCurrent, type ContentSearchMatch } from "@devhub/shared";
 import { toast } from "sonner";
-import { isBinaryPreviewLanguage } from "@/lib/file-preview";
+import { isTextEditorLanguage } from "@/lib/file-preview";
 import { openFileInFilesPage } from "@/lib/files/open-in-files-page";
 import { resolveTabWorkspaceId } from "@/lib/files/save-request";
 import { useContentSearchStore } from "@/stores/content-search-store";
@@ -52,7 +52,7 @@ export function useFilesSearchNavigation(input: {
               resolveTabWorkspaceId(file, workspaceId) === workspaceId,
           );
       const tab = getTab();
-      if (!tab || isBinaryPreviewLanguage(tab.language)) return;
+      if (!tab || !isTextEditorLanguage(tab.language)) return;
       const warnDirty = () =>
         toast.warning(
           `${tab.name} has unsaved changes, so the search match can't be selected. Save the file and search again.`,

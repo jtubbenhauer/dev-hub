@@ -44,19 +44,30 @@ vi.mock("@/components/layout/authenticated-layout", () => ({
   ),
 }));
 
+const TREE_FILES = [
+  { testId: "tree-image", name: "logo.png", path: "assets/logo.png" },
+  { testId: "tree-pdf", name: "spec.pdf", path: "docs/spec.pdf" },
+  { testId: "tree-zip", name: "app.zip", path: "build/app.zip" },
+];
+
 vi.mock("@/components/editor/file-tree", () => ({
   FileTree: (props: { onFileClick: (entry: FileTreeEntry) => void }) => (
-    <button
-      type="button"
-      data-testid="tree-image"
-      onClick={() =>
-        props.onFileClick({
-          name: "logo.png",
-          path: "assets/logo.png",
-          type: "file",
-        })
-      }
-    />
+    <>
+      {TREE_FILES.map((file) => (
+        <button
+          key={file.testId}
+          type="button"
+          data-testid={file.testId}
+          onClick={() =>
+            props.onFileClick({
+              name: file.name,
+              path: file.path,
+              type: "file",
+            })
+          }
+        />
+      ))}
+    </>
   ),
 }));
 
@@ -380,6 +391,54 @@ describe("FilesPage image preview", () => {
       "src",
       RAW_LOGO_URL,
     );
+  });
+
+  it("previews a PDF clicked in the explorer instead of loading it as text", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    renderFilesPage();
+
+    await user.click(screen.getByTestId("tree-pdf"));
+
+    const viewer = await screen.findByTestId("pdf-viewer");
+    expect(viewer).toHaveAttribute(
+      "src",
+      "/api/files/raw?workspaceId=ws-1&path=docs%2Fspec.pdf",
+    );
+    expect(getContentApiCalls(fetchMock)).toHaveLength(0);
+    expect(screen.queryByTestId("editor-switcher")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /save/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers a download for a file the editor cannot display", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(Response.json({ error: "binary" }, { status: 415 })),
+    );
+    renderFilesPage();
+
+    await user.click(screen.getByTestId("tree-zip"));
+
+    expect(
+      await screen.findByText("This file can't be displayed in the editor."),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("editor-switcher")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /save/i }),
+    ).not.toBeInTheDocument();
+    const expectedUrl =
+      "/api/files/raw?workspaceId=ws-1&path=build%2Fapp.zip&download=1";
+    for (const name of ["Download", "Download file"]) {
+      const downloadLink = screen.getByRole("link", { name });
+      expect(downloadLink).toHaveAttribute("href", expectedUrl);
+      expect(downloadLink).toHaveAttribute("download", "app.zip");
+    }
   });
 
   it("never writes an image tab back to disk from the save shortcut", async () => {

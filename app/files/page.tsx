@@ -11,9 +11,10 @@ import type { FileTreeEntry } from "@/types";
 import { FileTabs } from "@/components/editor/file-tabs";
 import { FilesActiveEditor } from "@/components/editor/files-active-editor";
 import { FileDiagnosticCounts } from "@/components/editor/file-diagnostic-counts";
+import { FileViewer } from "@/components/editor/file-viewer";
+import { FileDownloadButton } from "@/components/editor/file-download-button";
 import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import { CsvPreviewToggle } from "@/components/editor/csv-preview";
-import { ImageViewer } from "@/components/editor/image-viewer";
 import type { EditorHandle } from "@/components/editor/editor-switcher";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -22,12 +23,7 @@ import { useFilesSearchNavigation } from "@/hooks/use-files-search-navigation";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLeaderAction } from "@/hooks/use-leader-action";
-import { downloadTextFile } from "@/lib/download-file";
-import {
-  getRawFileUrl,
-  IMAGE_LANGUAGE,
-  isBinaryPreviewLanguage,
-} from "@/lib/file-preview";
+import { isTextEditorLanguage } from "@/lib/file-preview";
 
 import { useFileTabsSetting, useLspEnabledSetting } from "@/hooks/use-settings";
 import { Button } from "@/components/ui/button";
@@ -46,7 +42,6 @@ import {
   FolderOpen,
   FileCode2,
   GitCompare,
-  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -68,6 +63,27 @@ import { submitFileSave } from "@/lib/files/submit-file-save";
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = () => Math.max(500, window.innerWidth * 0.5);
 const DEFAULT_PANEL_WIDTH = 260;
+
+// The page only holds tab metadata, so this reads the tab's current text itself.
+function ActiveFileDownloadButton(props: {
+  workspaceId: string;
+  filePath: string;
+  language: string;
+}) {
+  const content = useEditorStore(
+    (state) =>
+      state.openFiles.find((file) => file.path === props.filePath)?.content ??
+      "",
+  );
+  return (
+    <FileDownloadButton
+      {...props}
+      content={content}
+      className="h-7 w-7 p-0"
+      iconClassName="h-3.5 w-3.5"
+    />
+  );
+}
 
 export default function FilesPage() {
   return (
@@ -257,7 +273,7 @@ function FilesContent() {
     );
     if (!activeFile || !activeWorkspaceId) return;
     // Preview tabs hold no text content, so saving would truncate the file.
-    if (isBinaryPreviewLanguage(activeFile.language)) return;
+    if (!isTextEditorLanguage(activeFile.language)) return;
 
     setSavingPath(activeFile.path);
     const snapshot = {
@@ -374,7 +390,8 @@ function FilesContent() {
   }
 
   const isSaving = savingPath === activeFile?.path;
-  const isActiveFileImage = activeFile?.language === IMAGE_LANGUAGE;
+  const isTextFile =
+    activeFile !== null && isTextEditorLanguage(activeFile.language);
   const sidebarProps = {
     workspaceId: activeWorkspaceId,
     isFileTabsDisabled,
@@ -517,12 +534,14 @@ function FilesContent() {
                   size="sm"
                   className="h-7 w-7 p-0"
                 />
-                <CsvPreviewToggle
-                  filePath={activeFile.path}
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                />
-                {!isActiveFileImage && (
+                {isTextFile && (
+                  <CsvPreviewToggle
+                    filePath={activeFile.path}
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                  />
+                )}
+                {isTextFile && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -538,43 +557,11 @@ function FilesContent() {
                     <span className="hidden md:inline">Save</span>
                   </Button>
                 )}
-                {isActiveFileImage ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    asChild
-                  >
-                    <a
-                      href={getRawFileUrl(activeWorkspace.id, activeFile.path)}
-                      download={activeFile.name}
-                      aria-label="Download file"
-                      title="Download file"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </a>
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() =>
-                      downloadTextFile(
-                        activeFile.name,
-                        useEditorStore
-                          .getState()
-                          .openFiles.find(
-                            (file) => file.path === activeFile.path,
-                          )?.content ?? "",
-                      )
-                    }
-                    aria-label="Download file"
-                    title="Download file"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+                <ActiveFileDownloadButton
+                  workspaceId={activeWorkspace.id}
+                  filePath={activeFile.path}
+                  language={activeFile.language}
+                />
               </>
             )}
           </div>
@@ -584,10 +571,13 @@ function FilesContent() {
 
           {/* Editor area */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {activeFile && isActiveFileImage ? (
-              <ImageViewer
+            {activeFile && !isTextFile ? (
+              <FileViewer
                 workspaceId={activeWorkspace.id}
                 filePath={activeFile.path}
+                content=""
+                language={activeFile.language}
+                onChange={handleChange}
               />
             ) : activeFile ? (
               <>

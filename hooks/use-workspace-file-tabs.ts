@@ -1,24 +1,9 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useEditorStore } from "@/stores/editor-store";
-import { IMAGE_LANGUAGE, isImagePath } from "@/lib/file-preview";
+import { loadFileForEditor } from "@/lib/files/load-file-for-editor";
 import { resolveTabWorkspaceId } from "@/lib/files/save-request";
 import { didOpenFile } from "@/lib/files/open-result";
-
-async function readFileForEditor(
-  workspaceId: string,
-  filePath: string,
-): Promise<{ content: string; language: string } | null> {
-  if (isImagePath(filePath)) {
-    return { content: "", language: IMAGE_LANGUAGE };
-  }
-  const response = await fetch(
-    `/api/files/content?workspaceId=${workspaceId}&path=${encodeURIComponent(filePath)}`,
-  );
-  if (!response.ok) return null;
-  const data: { content: string; language: string } = await response.json();
-  return { content: data.content, language: data.language };
-}
 
 // Keeps the files page's tabs per workspace: hands tabs left over from another
 // workspace back to it, restores the active workspace's saved tabs, and saves
@@ -84,7 +69,7 @@ export function useWorkspaceFileTabs(
     restoreTabsPromiseRef.current = Promise.all(
       tabsToRestore.map(async (tab) => {
         try {
-          const file = await readFileForEditor(workspaceId, tab.path);
+          const file = await loadFileForEditor(workspaceId, tab.path);
           if (!file) return null;
           return {
             workspaceId,

@@ -1,0 +1,30 @@
+app/api/files/content/route.ts
+  h_c7f8735263030f 9-17,59-62
+app/api/files/raw/route.ts
+  h_c7f8735263030f 16,23,46,83,87-89,107-111,140,162-167
+components/chat/chat-file-dialog.tsx
+  h_c7f8735263030f 5-12,29,51-53,59-67,125,138,146,153,170,173,203-213
+lib/file-preview.ts
+  h_c7f8735263030f 66-77
+stores/chat-file-dialog-store.ts
+  h_c7f8735263030f 16-18,37-42,48,51,65,69-75,81-88
+tests/api/files-content.test.ts
+  h_c7f8735263030f 1-125
+tests/api/files-raw.test.ts
+  h_c7f8735263030f 117-134,237-252
+tests/components/chat/chat-file-dialog.test.tsx
+  h_c7f8735263030f 75-106
+tests/stores/chat-file-dialog-store.test.ts
+  h_c7f8735263030f 83-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d58aa75db12900e29503c99a2f3cc899f5486183",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

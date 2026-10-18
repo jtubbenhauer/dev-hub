@@ -95,6 +95,7 @@ describe("FilePathCode — desktop file click", () => {
       expect(global.fetch).toHaveBeenCalledOnce();
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("workspaceId=ws-1"),
+        expect.anything(),
       );
     });
 

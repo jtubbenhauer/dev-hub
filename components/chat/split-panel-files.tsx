@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -39,21 +38,12 @@ import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
 import { FileViewToggle } from "@/components/chat/file-view-toggle";
 import { SplitPanelActiveFile } from "@/components/editor/split-panel-active-file";
 import { useEditorTabMetadataSelector } from "@/hooks/use-editor-tab-metadata";
-import { PdfViewer } from "@/components/editor/pdf-viewer";
-import { ImageViewer } from "@/components/editor/image-viewer";
-import {
-  MarkdownPreviewFrame,
-  MarkdownPreviewToggle,
-} from "@/components/editor/markdown-preview";
-import {
-  CsvPreviewFrame,
-  CsvPreviewToggle,
-} from "@/components/editor/csv-preview";
-import {
-  getBinaryPreviewLanguage,
-  IMAGE_LANGUAGE,
-  PDF_LANGUAGE,
-} from "@/lib/file-preview";
+import { FileViewer } from "@/components/editor/file-viewer";
+import { FileDownloadButton } from "@/components/editor/file-download-button";
+import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
+import { CsvPreviewToggle } from "@/components/editor/csv-preview";
+import { isTextEditorLanguage } from "@/lib/file-preview";
+import { loadFileForEditor } from "@/lib/files/load-file-for-editor";
 import { useLspOpenFileHandler } from "@/hooks/use-lsp-open-file-handler";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import { didOpenFile } from "@/lib/files/open-result";
@@ -64,33 +54,10 @@ import {
 import { completeFileSave } from "@/lib/files/save-completion";
 import { submitFileSave } from "@/lib/files/submit-file-save";
 
-const MonacoEditor = dynamic(
-  () => import("@/components/editor/monaco-editor").then((m) => m.MonacoEditor),
-  {
-    ssr: false,
-    loading: () => <div className="bg-muted h-full w-full animate-pulse" />,
-  },
-);
-
 interface SplitPanelFilesProps {
   workspaceId: string;
   workspacePath: string;
 }
-
-const BINARY_EXTENSIONS = [
-  ".svg",
-  ".wasm",
-  ".zip",
-  ".tar",
-  ".gz",
-  ".mp3",
-  ".mp4",
-  ".mov",
-  ".ttf",
-  ".woff",
-  ".woff2",
-  ".eot",
-];
 
 export function SplitPanelFiles({
   workspaceId,
@@ -136,9 +103,8 @@ export function SplitPanelFiles({
   const currentFilePath = activeFile?.path ?? null;
   const currentFileLanguage = activeFile?.language ?? null;
   const isDirty = activeFile?.isDirty ?? false;
-  const isPdf = currentFileLanguage === PDF_LANGUAGE;
-  const isImage = currentFileLanguage === IMAGE_LANGUAGE;
-  const isBinaryPreview = isPdf || isImage;
+  const isTextFile =
+    currentFileLanguage !== null && isTextEditorLanguage(currentFileLanguage);
 
   const queryClient = useQueryClient();
 
@@ -236,16 +202,6 @@ export function SplitPanelFiles({
   const loadFile = useCallback(
     async (path: string) => {
       abortControllerRef.current?.abort();
-      const previewLanguage = getBinaryPreviewLanguage(path);
-      if (previewLanguage) {
-        clearError();
-        didOpenFile(
-          openFileInTab(path, "", previewLanguage, workspaceId),
-          path,
-        );
-        setIsLoading(false);
-        return;
-      }
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
@@ -253,33 +209,18 @@ export function SplitPanelFiles({
       clearError();
 
       try {
-        const res = await fetch(
-          `/api/files/content?workspaceId=${workspaceId}&path=${encodeURIComponent(path)}`,
-          { signal: controller.signal },
-        );
-        if (!res.ok) {
+        const loadedFile = await loadFileForEditor(workspaceId, path, {
+          signal: controller.signal,
+        });
+        if (!loadedFile) {
           setError(`File not found: ${path}`);
           return;
         }
-        const data = await res.json();
-        const content: string = data.content;
-
-        const ext = path.slice(path.lastIndexOf(".")).toLowerCase();
-        if (BINARY_EXTENSIONS.includes(ext) || content.includes("\0")) {
-          setError(`BINARY:${path}`);
-          return;
-        }
-
-        if (content.length > 1_000_000) {
-          setError(`LARGE:${(content.length / 1_000_000).toFixed(1)}MB`);
-          return;
-        }
-
         didOpenFile(
           openFileInTab(
             path,
-            content,
-            data.language ?? "plaintext",
+            loadedFile.content,
+            loadedFile.language,
             workspaceId,
           ),
           path,
@@ -303,21 +244,9 @@ export function SplitPanelFiles({
       isRestoringRef.current = true;
       const results = await Promise.all(
         files.map(async (f) => {
-          const previewLanguage = getBinaryPreviewLanguage(f.path);
-          if (previewLanguage) {
-            return { path: f.path, content: "", language: previewLanguage };
-          }
           try {
-            const res = await fetch(
-              `/api/files/content?workspaceId=${wsId}&path=${encodeURIComponent(f.path)}`,
-            );
-            if (!res.ok) return null;
-            const data = await res.json();
-            return {
-              path: f.path,
-              content: data.content as string,
-              language: (data.language ?? f.language) as string,
-            };
+            const loadedFile = await loadFileForEditor(wsId, f.path);
+            return loadedFile ? { path: f.path, ...loadedFile } : null;
           } catch {
             return null;
           }
@@ -592,22 +521,22 @@ export function SplitPanelFiles({
                 {isDirty && (
                   <span className="bg-warning size-1.5 shrink-0 rounded-full" />
                 )}
-                {canDiff && !isBinaryPreview && (
+                {canDiff && isTextFile && (
                   <FileViewToggle
                     mode={isDiff ? "diff" : "editor"}
                     onChange={setMode}
                   />
                 )}
-                {!isBinaryPreview && !isDiff && (
+                {isTextFile && !isDiff && (
                   <MarkdownPreviewToggle
                     language={currentFileLanguage ?? "plaintext"}
                     filePath={currentFilePath}
                   />
                 )}
-                {!isBinaryPreview && !isDiff && (
+                {isTextFile && !isDiff && (
                   <CsvPreviewToggle filePath={currentFilePath} />
                 )}
-                {!isBinaryPreview && (
+                {isTextFile && (
                   <Button
                     size="icon-xs"
                     variant="ghost"
@@ -623,6 +552,14 @@ export function SplitPanelFiles({
                     )}
                   </Button>
                 )}
+                <FileDownloadButton
+                  workspaceId={workspaceId}
+                  filePath={currentFilePath}
+                  language={currentFileLanguage ?? "plaintext"}
+                  content={currentFileContent ?? ""}
+                  size="icon-xs"
+                  iconClassName="size-3"
+                />
                 <Link
                   href={`/files?open=${encodeURIComponent(currentFilePath)}`}
                   className="text-muted-foreground hover:text-foreground"
@@ -647,36 +584,7 @@ export function SplitPanelFiles({
 
             {error && !isLoading && (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-                {error.startsWith("BINARY:") ? (
-                  <>
-                    <p className="text-muted-foreground text-sm">
-                      Cannot display binary file:{" "}
-                      {error.slice(7).split("/").pop()}
-                    </p>
-                    <Link
-                      href={`/files?open=${encodeURIComponent(error.slice(7))}`}
-                      className="text-primary text-xs underline"
-                    >
-                      Open in full editor
-                    </Link>
-                  </>
-                ) : error.startsWith("LARGE:") ? (
-                  <>
-                    <p className="text-muted-foreground text-sm">
-                      File too large to display ({error.slice(6)})
-                    </p>
-                    {currentFilePath && (
-                      <Link
-                        href={`/files?open=${encodeURIComponent(currentFilePath)}`}
-                        className="text-primary text-xs underline"
-                      >
-                        Open in full editor
-                      </Link>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-muted-foreground text-sm">{error}</p>
-                )}
+                <p className="text-muted-foreground text-sm">{error}</p>
               </div>
             )}
 
@@ -684,21 +592,7 @@ export function SplitPanelFiles({
               !error &&
               !isLoading &&
               currentFileContent !== null &&
-              (isPdf ? (
-                <div className="flex min-h-0 flex-1">
-                  <PdfViewer
-                    workspaceId={workspaceId}
-                    filePath={currentFilePath}
-                  />
-                </div>
-              ) : isImage ? (
-                <div className="flex min-h-0 flex-1">
-                  <ImageViewer
-                    workspaceId={workspaceId}
-                    filePath={currentFilePath}
-                  />
-                </div>
-              ) : isDiff ? (
+              (isDiff && isTextFile ? (
                 <div
                   className="flex min-h-0 flex-1"
                   data-testid="split-panel-diff"
@@ -716,31 +610,20 @@ export function SplitPanelFiles({
                     className="min-w-0 flex-1"
                     data-lsp-surface="split-panel"
                   >
-                    <MarkdownPreviewFrame
+                    <FileViewer
+                      workspaceId={workspaceId}
+                      filePath={currentFilePath}
                       content={currentFileContent}
                       language={currentFileLanguage ?? "plaintext"}
-                      filePath={currentFilePath}
-                    >
-                      <CsvPreviewFrame
-                        content={currentFileContent}
-                        filePath={currentFilePath}
-                        workspaceId={workspaceId}
-                      >
-                        <MonacoEditor
-                          content={currentFileContent}
-                          language={currentFileLanguage ?? "plaintext"}
-                          onChange={setContent}
-                          onSave={handleSave}
-                          filePath={currentFilePath}
-                          workspaceId={workspaceId}
-                          isLspEligible={
-                            !activeFile ||
-                            resolveTabWorkspaceId(activeFile, workspaceId) ===
-                              workspaceId
-                          }
-                        />
-                      </CsvPreviewFrame>
-                    </MarkdownPreviewFrame>
+                      onChange={setContent}
+                      onSave={handleSave}
+                      autoFocus={false}
+                      isLspEligible={
+                        !activeFile ||
+                        resolveTabWorkspaceId(activeFile, workspaceId) ===
+                          workspaceId
+                      }
+                    />
                   </div>
                   {isCommentsOpen && comments.length > 0 && (
                     <div className="w-64 shrink-0 border-l">

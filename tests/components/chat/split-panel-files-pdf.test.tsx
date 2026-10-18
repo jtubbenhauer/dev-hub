@@ -99,4 +99,15 @@ describe("SplitPanelFiles PDF preview", () => {
     expect(screen.queryByTestId("monaco-editor")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-panel-save")).not.toBeInTheDocument();
   });
+
+  it("offers a download of the raw PDF", () => {
+    renderPanel();
+
+    const downloadLink = screen.getByRole("link", { name: "Download file" });
+    expect(downloadLink).toHaveAttribute(
+      "href",
+      "/api/files/raw?workspaceId=ws1&path=docs%2Fspec.pdf",
+    );
+    expect(downloadLink).toHaveAttribute("download", "spec.pdf");
+  });
 });

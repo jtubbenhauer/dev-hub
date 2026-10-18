@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import { useSidePanelStore } from "@/stores/side-panel-store";
-import { IMAGE_LANGUAGE, PDF_LANGUAGE } from "@/lib/file-preview";
+import {
+  BINARY_FILE_LANGUAGE,
+  IMAGE_LANGUAGE,
+  PDF_LANGUAGE,
+} from "@/lib/file-preview";
 import { toast } from "sonner";
 vi.mock("sonner", () => ({ toast: { warning: vi.fn() } }));
 import {
@@ -147,5 +151,21 @@ describe("openFileInSidePanel", () => {
     const tab = state.openFiles.find((f) => f.path === "assets/screenshot.jpg");
     expect(tab?.language).toBe(IMAGE_LANGUAGE);
     expect(state.activePanelTab).toBe("files");
+  });
+
+  it("opens a file the editor refuses as a download tab instead of falling back", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ error: "binary" }, { status: 415 })),
+    );
+    const fallback = vi.fn();
+
+    await openFileInSidePanel("ws-1", "build/app.zip", fallback);
+
+    expect(fallback).not.toHaveBeenCalled();
+    const tab = useSidePanelStore
+      .getState()
+      .openFiles.find((f) => f.path === "build/app.zip");
+    expect(tab?.language).toBe(BINARY_FILE_LANGUAGE);
   });
 });

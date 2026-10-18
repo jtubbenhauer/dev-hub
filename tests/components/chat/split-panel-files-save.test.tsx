@@ -16,6 +16,7 @@ let isLspEnabled = false;
 vi.mock("@/hooks/use-settings", () => ({
   useLspEnabledSetting: () => ({ isLspEnabled }),
   useChatSidebarTabsOpenSetting: () => ({ sidebarTabsOpenMode: "sidebar" }),
+  useEditorTypeSetting: () => ({ editorType: "monaco" }),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), warning: vi.fn() } }));
 vi.mock("next/dynamic", () => ({

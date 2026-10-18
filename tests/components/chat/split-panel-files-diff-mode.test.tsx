@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import type { GitStatusResult, GitFileStatus, OpenFile } from "@/types";
 
-// next/dynamic is only used by SplitPanelFiles for the Monaco editor; render a
+// next/dynamic is only used by the editor SplitPanelFiles renders; render a
 // lightweight stub so we can assert which surface (editor vs diff) is shown.
 vi.mock("next/dynamic", () => ({
   __esModule: true,

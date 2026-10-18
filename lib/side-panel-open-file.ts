@@ -1,5 +1,5 @@
 import { useSidePanelStore } from "@/stores/side-panel-store";
-import { getBinaryPreviewLanguage } from "@/lib/file-preview";
+import { loadFileForEditor } from "@/lib/files/load-file-for-editor";
 import { didOpenFile } from "@/lib/files/open-result";
 
 export async function openFileInSidePanel(
@@ -9,31 +9,19 @@ export async function openFileInSidePanel(
   shouldCommit?: () => boolean,
 ): Promise<boolean> {
   const { setIsLoading, clearError, openFile } = useSidePanelStore.getState();
-  const previewLanguage = getBinaryPreviewLanguage(path);
-  if (previewLanguage) {
-    if (shouldCommit && !shouldCommit()) return false;
-    clearError();
-    const result = openFile(path, "", previewLanguage, workspaceId);
-    useSidePanelStore.getState().setActivePanelTab("files");
-    return didOpenFile(result, path);
-  }
   setIsLoading(true);
   clearError();
   try {
-    const res = await fetch(
-      `/api/files/content?workspaceId=${workspaceId}&path=${encodeURIComponent(path)}`,
-    );
+    const loadedFile = await loadFileForEditor(workspaceId, path);
     if (shouldCommit && !shouldCommit()) return false;
-    if (!res.ok) {
+    if (!loadedFile) {
       fallback();
       return false;
     }
-    const data = (await res.json()) as { content: string; language?: string };
-    if (shouldCommit && !shouldCommit()) return false;
     const result = openFile(
       path,
-      data.content,
-      data.language ?? "plaintext",
+      loadedFile.content,
+      loadedFile.language,
       workspaceId,
     );
     useSidePanelStore.getState().setActivePanelTab("files");

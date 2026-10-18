@@ -46,19 +46,29 @@ vi.mock("@/hooks/use-settings", async (importOriginal) => ({
   }),
 }));
 
+const TREE_FILES = [
+  { testId: "tree-image", name: "logo.png", path: "assets/logo.png" },
+  { testId: "tree-zip", name: "app.zip", path: "build/app.zip" },
+];
+
 vi.mock("@/components/editor/file-tree", () => ({
   FileTree: (props: { onFileClick: (entry: FileTreeEntry) => void }) => (
-    <button
-      type="button"
-      data-testid="tree-image"
-      onClick={() =>
-        props.onFileClick({
-          name: "logo.png",
-          path: "assets/logo.png",
-          type: "file",
-        })
-      }
-    />
+    <>
+      {TREE_FILES.map((file) => (
+        <button
+          key={file.testId}
+          type="button"
+          data-testid={file.testId}
+          onClick={() =>
+            props.onFileClick({
+              name: file.name,
+              path: file.path,
+              type: "file",
+            })
+          }
+        />
+      ))}
+    </>
   ),
 }));
 
@@ -120,5 +130,32 @@ describe("SplitPanelFiles image preview", () => {
       .getState()
       .openFiles.find((f) => f.path === "assets/logo.png");
     expect(tab?.language).toBe(IMAGE_LANGUAGE);
+  });
+});
+
+describe("SplitPanelFiles unsupported files", () => {
+  it("offers a download for a file the editor cannot display", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ error: "binary" }, { status: 415 })),
+    );
+    renderPanel();
+
+    await user.click(screen.getByTestId("tree-zip"));
+
+    expect(
+      await screen.findByText("This file can't be displayed in the editor."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/File not found/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("monaco-editor")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-panel-save")).not.toBeInTheDocument();
+    const expectedUrl =
+      "/api/files/raw?workspaceId=ws1&path=build%2Fapp.zip&download=1";
+    for (const name of ["Download", "Download file"]) {
+      const downloadLink = screen.getByRole("link", { name });
+      expect(downloadLink).toHaveAttribute("href", expectedUrl);
+      expect(downloadLink).toHaveAttribute("download", "app.zip");
+    }
   });
 });

@@ -97,6 +97,55 @@ describe("chat file dialog store", () => {
     });
   });
 
+  it.each([
+    [415, "This file can't be displayed in the editor."],
+    [413, "This file is too large to display in the editor."],
+  ])(
+    "keeps the dialog open for download when content returns %i",
+    async (status, expectedReason) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            Response.json({ error: "unsupported" }, { status }),
+          ),
+      );
+      const fallback = vi.fn();
+
+      await useChatFileDialogStore
+        .getState()
+        .openFile("workspace-1", "build/app.zip", fallback);
+
+      const state = useChatFileDialogStore.getState();
+      expect(fallback).not.toHaveBeenCalled();
+      expect(state.isOpen).toBe(true);
+      expect(state.isLoading).toBe(false);
+      expect(state.unsupportedReason).toBe(expectedReason);
+      expect(state.file?.path).toBe("build/app.zip");
+      expect(state.file?.workspaceId).toBe("workspace-1");
+    },
+  );
+
+  it("clears the unsupported state when another file opens", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(null, { status: 415 }))
+        .mockResolvedValueOnce(
+          Response.json({ content: "text", language: "plaintext" }),
+        ),
+    );
+    const store = useChatFileDialogStore.getState();
+
+    await store.openFile("workspace-1", "build/app.zip", vi.fn());
+    await store.openFile("workspace-1", "notes.txt", vi.fn());
+
+    expect(useChatFileDialogStore.getState().unsupportedReason).toBeNull();
+    expect(useChatFileDialogStore.getState().file?.content).toBe("text");
+  });
+
   it("uses the full editor fallback when the file cannot be loaded", async () => {
     vi.stubGlobal(
       "fetch",

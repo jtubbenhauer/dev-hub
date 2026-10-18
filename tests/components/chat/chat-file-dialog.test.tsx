@@ -86,6 +86,39 @@ describe("ChatFileDialog download button", () => {
     );
   });
 
+  it("offers a download for files the editor cannot display", () => {
+    useChatFileDialogStore.setState({
+      isOpen: true,
+      isLoading: false,
+      file: {
+        path: "build/app.zip",
+        instanceId: 4,
+        content: "",
+        language: "plaintext",
+        workspaceId: "ws-1",
+      },
+      originalContent: "",
+      unsupportedReason: "This file can't be displayed in the editor.",
+    });
+
+    renderDialog();
+
+    expect(
+      screen.getByText("This file can't be displayed in the editor."),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("editor-switcher")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Save file" }),
+    ).not.toBeInTheDocument();
+    const expectedUrl =
+      "/api/files/raw?workspaceId=ws-1&path=build%2Fapp.zip&download=1";
+    for (const name of ["Download", "Download file"]) {
+      const downloadLink = screen.getByRole("link", { name });
+      expect(downloadLink).toHaveAttribute("href", expectedUrl);
+      expect(downloadLink).toHaveAttribute("download", "app.zip");
+    }
+  });
+
   it("previews images instead of opening the editor", () => {
     useChatFileDialogStore.setState({
       isOpen: true,

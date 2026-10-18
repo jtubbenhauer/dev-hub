@@ -63,3 +63,15 @@ export function getRawFileUrl(workspaceId: string, filePath: string): string {
   const params = new URLSearchParams({ workspaceId, path: filePath });
   return `/api/files/raw?${params.toString()}`;
 }
+
+export function getRawFileDownloadUrl(
+  workspaceId: string,
+  filePath: string,
+): string {
+  const params = new URLSearchParams({
+    workspaceId,
+    path: filePath,
+    download: "1",
+  });
+  return `/api/files/raw?${params.toString()}`;
+}

@@ -2,7 +2,14 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { Download, ExternalLink, FileCode2, Loader2, Save } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  FileCode2,
+  FileWarning,
+  Loader2,
+  Save,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -20,6 +27,7 @@ import { ImageViewer } from "@/components/editor/image-viewer";
 import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import { CsvPreviewToggle } from "@/components/editor/csv-preview";
 import {
+  getRawFileDownloadUrl,
   getRawFileUrl,
   IMAGE_LANGUAGE,
   isBinaryPreviewLanguage,
@@ -48,12 +56,24 @@ export function ChatFileDialog() {
   const setContent = useChatFileDialogStore((state) => state.setContent);
   const { isLspEnabled } = useLspEnabledSetting();
   const reset = useChatFileDialogStore((state) => state.reset);
+  const unsupportedReason = useChatFileDialogStore(
+    (state) => state.unsupportedReason,
+  );
   const [isSaving, setIsSaving] = useState(false);
   const queryClient = useQueryClient();
 
   const isDirty = file !== null && file.content !== originalContent;
   const isBinaryPreview =
     file !== null && isBinaryPreviewLanguage(file.language);
+  const isUnsupported = unsupportedReason !== null;
+  const rawDownloadUrl =
+    file === null
+      ? null
+      : isUnsupported
+        ? getRawFileDownloadUrl(file.workspaceId, file.path)
+        : isBinaryPreview
+          ? getRawFileUrl(file.workspaceId, file.path)
+          : null;
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -125,7 +145,7 @@ export function ChatFileDialog() {
               Modified
             </span>
           )}
-          {file && (
+          {file && !isUnsupported && (
             <Button variant="ghost" size="sm" asChild>
               <Link
                 href={`/files?open=${encodeURIComponent(file.path)}`}
@@ -138,7 +158,7 @@ export function ChatFileDialog() {
               </Link>
             </Button>
           )}
-          {file && (
+          {file && !isUnsupported && (
             <MarkdownPreviewToggle
               language={file.language}
               filePath={file.path}
@@ -146,14 +166,14 @@ export function ChatFileDialog() {
               className="size-8 p-0"
             />
           )}
-          {file && (
+          {file && !isUnsupported && (
             <CsvPreviewToggle
               filePath={file.path}
               size="sm"
               className="size-8 p-0"
             />
           )}
-          {!isBinaryPreview && (
+          {!isBinaryPreview && !isUnsupported && (
             <Button
               size="sm"
               onClick={handleSave}
@@ -170,10 +190,10 @@ export function ChatFileDialog() {
             </Button>
           )}
           {file &&
-            (isBinaryPreview ? (
+            (rawDownloadUrl !== null ? (
               <Button variant="ghost" size="sm" className="size-8 p-0" asChild>
                 <a
-                  href={getRawFileUrl(file.workspaceId, file.path)}
+                  href={rawDownloadUrl}
                   download={getFileName(file.path)}
                   aria-label="Download file"
                   title="Download file"
@@ -202,6 +222,17 @@ export function ChatFileDialog() {
             <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
               <Loader2 className="size-4 animate-spin" />
               Opening file...
+            </div>
+          ) : isUnsupported && rawDownloadUrl !== null ? (
+            <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm">
+              <FileWarning className="size-8" />
+              <p>{unsupportedReason}</p>
+              <Button size="sm" asChild>
+                <a href={rawDownloadUrl} download={getFileName(file.path)}>
+                  <Download className="size-3.5" />
+                  Download
+                </a>
+              </Button>
             </div>
           ) : file.language === PDF_LANGUAGE ? (
             <PdfViewer workspaceId={file.workspaceId} filePath={file.path} />

@@ -13,13 +13,14 @@ function rawFileResponse(
   bytes: Uint8Array<ArrayBuffer>,
   filePath: string,
   contentType: string,
+  disposition: "inline" | "attachment",
 ): NextResponse {
   const fileName = filePath.split("/").pop() ?? "file";
   return new NextResponse(bytes, {
     headers: {
       "Content-Type": contentType,
       "Content-Length": String(bytes.byteLength),
-      "Content-Disposition": `inline; filename="${encodeURIComponent(fileName)}"`,
+      "Content-Disposition": `${disposition}; filename="${encodeURIComponent(fileName)}"`,
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "no-store",
     },
@@ -42,6 +43,7 @@ async function fetchRemoteFile(
   agentUrl: string,
   filePath: string,
   contentType: string,
+  disposition: "inline" | "attachment",
 ): Promise<NextResponse> {
   const url = new URL("/files/raw", agentUrl);
   url.searchParams.set("path", filePath);
@@ -78,12 +80,13 @@ async function fetchRemoteFile(
   if (bytes.byteLength > MAX_RAW_FILE_SIZE) {
     return NextResponse.json({ error: "File too large" }, { status: 413 });
   }
-  return rawFileResponse(bytes, filePath, contentType);
+  return rawFileResponse(bytes, filePath, contentType, disposition);
 }
 
 // GET: stream raw bytes of a previewable binary file (PDF or raster image).
-// Restricted to those types so arbitrary workspace files (e.g. HTML, SVG) are
-// never served inline from the app origin.
+// Inline serving is restricted to those types so arbitrary workspace files
+// (e.g. HTML, SVG) are never rendered from the app origin. With download=1 any
+// file is served as an octet-stream attachment, which browsers never render.
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -101,7 +104,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const contentType = getRawFileContentType(filePath);
+  const isDownload = searchParams.get("download") === "1";
+  const disposition = isDownload ? "attachment" : "inline";
+  const contentType = isDownload
+    ? "application/octet-stream"
+    : getRawFileContentType(filePath);
   if (contentType === null) {
     return NextResponse.json(
       { error: "Only PDF and image files can be previewed" },
@@ -130,7 +137,7 @@ export async function GET(request: NextRequest) {
         { status: 500 },
       );
     }
-    return fetchRemoteFile(row.agentUrl, filePath, contentType);
+    return fetchRemoteFile(row.agentUrl, filePath, contentType, disposition);
   }
 
   let resolvedPath: string;
@@ -152,7 +159,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "File too large" }, { status: 413 });
     }
     const bytes = await fs.readFile(resolvedPath);
-    return rawFileResponse(new Uint8Array(bytes), filePath, contentType);
+    return rawFileResponse(
+      new Uint8Array(bytes),
+      filePath,
+      contentType,
+      disposition,
+    );
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       return NextResponse.json({ error: "File not found" }, { status: 404 });

@@ -21,6 +21,9 @@ interface ChatFileDialogState {
   isLoading: boolean;
   file: ChatDialogFile | null;
   originalContent: string;
+  // Set when the file exists but the editor can't display it (binary or too
+  // large); the dialog stays open and offers a download instead.
+  unsupportedReason: string | null;
   openFile: (
     workspaceId: string,
     path: string,
@@ -50,14 +53,21 @@ function isFileContentResponse(
   return !("language" in value) || typeof value.language === "string";
 }
 
+function getUnsupportedReason(status: number): string | null {
+  if (status === 415) return "This file can't be displayed in the editor.";
+  if (status === 413) return "This file is too large to display in the editor.";
+  return null;
+}
+
 const initialState = {
   isOpen: false,
   isLoading: false,
   file: null,
   originalContent: "",
+  unsupportedReason: null,
 } satisfies Pick<
   ChatFileDialogState,
-  "isOpen" | "isLoading" | "file" | "originalContent"
+  "isOpen" | "isLoading" | "file" | "originalContent" | "unsupportedReason"
 >;
 
 export const useChatFileDialogStore = create<ChatFileDialogState>(
@@ -77,15 +87,36 @@ export const useChatFileDialogStore = create<ChatFileDialogState>(
             instanceId: ++tabInstanceCounter,
           },
           originalContent: "",
+          unsupportedReason: null,
         });
         return;
       }
-      set({ isOpen: true, isLoading: true, file: null, originalContent: "" });
+      set({
+        isOpen: true,
+        isLoading: true,
+        file: null,
+        originalContent: "",
+        unsupportedReason: null,
+      });
       try {
         const response = await fetch(
           `/api/files/content?workspaceId=${workspaceId}&path=${encodeURIComponent(path)}`,
         );
         if (!response.ok) {
+          const unsupportedReason = getUnsupportedReason(response.status);
+          if (unsupportedReason !== null) {
+            set({
+              file: {
+                instanceId: ++tabInstanceCounter,
+                path,
+                content: "",
+                language: "plaintext",
+                workspaceId,
+              },
+              unsupportedReason,
+            });
+            return;
+          }
           set(initialState);
           fallback();
           return;

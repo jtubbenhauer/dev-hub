@@ -9,6 +9,15 @@ import {
 } from "@/lib/files/operations";
 import { getBackend, toWorkspace } from "@/lib/workspaces/backend";
 
+// Remote backends wrap the agent's message, so match by substring.
+function getReadErrorStatus(message: string): number {
+  if (message === "Path traversal denied") return 403;
+  if (message === "File not found") return 404;
+  if (message.includes("Binary file cannot be displayed")) return 415;
+  if (message.includes("File too large")) return 413;
+  return 500;
+}
+
 // GET: read file content
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -50,13 +59,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to read file";
-    const status =
-      message === "Path traversal denied"
-        ? 403
-        : message === "File not found"
-          ? 404
-          : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json(
+      { error: message },
+      { status: getReadErrorStatus(message) },
+    );
   }
 }
 

@@ -114,6 +114,24 @@ describe("GET /api/files/raw", () => {
     expect(res.status).toBe(415);
   });
 
+  it("downloads any file as an attachment when download=1", async () => {
+    const res = await GET(
+      request("workspaceId=ws-1&path=index.html&download=1"),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/octet-stream");
+    expect(res.headers.get("content-disposition")).toMatch(/^attachment;/);
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(await res.text()).toBe("<script></script>");
+  });
+
+  it("rejects path traversal in download mode", async () => {
+    const res = await GET(
+      request("workspaceId=ws-1&path=../outside.bin&download=1"),
+    );
+    expect(res.status).toBe(403);
+  });
+
   it("rejects path traversal", async () => {
     const res = await GET(request("workspaceId=ws-1&path=../outside.pdf"));
     expect(res.status).toBe(403);
@@ -214,6 +232,22 @@ describe("GET /api/files/raw for remote workspaces", () => {
     const res = await GET(request("workspaceId=ws-1&path=docs/Report.PDF"));
 
     expect(res.status).toBe(502);
+  });
+
+  it("proxies any file from the agent as an attachment when download=1", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("<html>", { status: 200 })),
+    );
+
+    const res = await GET(
+      request("workspaceId=ws-1&path=index.html&download=1"),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/octet-stream");
+    expect(res.headers.get("content-disposition")).toMatch(/^attachment;/);
+    expect(await res.text()).toBe("<html>");
   });
 
   it("still refuses non-previewable files without contacting the agent", async () => {

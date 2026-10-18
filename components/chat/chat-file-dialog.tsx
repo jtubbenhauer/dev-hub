@@ -2,14 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import {
-  Download,
-  ExternalLink,
-  FileCode2,
-  FileWarning,
-  Loader2,
-  Save,
-} from "lucide-react";
+import { ExternalLink, FileCode2, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -20,20 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EditorSwitcher } from "@/components/editor/editor-switcher";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
-import { PdfViewer } from "@/components/editor/pdf-viewer";
-import { ImageViewer } from "@/components/editor/image-viewer";
+import { FileViewer } from "@/components/editor/file-viewer";
+import { FileDownloadButton } from "@/components/editor/file-download-button";
 import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import { CsvPreviewToggle } from "@/components/editor/csv-preview";
-import {
-  getRawFileDownloadUrl,
-  getRawFileUrl,
-  IMAGE_LANGUAGE,
-  isBinaryPreviewLanguage,
-  PDF_LANGUAGE,
-} from "@/lib/file-preview";
-import { downloadTextFile } from "@/lib/download-file";
+import { isTextEditorLanguage } from "@/lib/file-preview";
 import { useLspEnabledSetting } from "@/hooks/use-settings";
 import {
   buildFileSaveBody,
@@ -41,10 +26,6 @@ import {
 } from "@/lib/files/save-request";
 import { completeFileSave } from "@/lib/files/save-completion";
 import { submitFileSave } from "@/lib/files/submit-file-save";
-
-function getFileName(filePath: string): string {
-  return filePath.split("/").pop() || filePath;
-}
 
 export function ChatFileDialog() {
   const isOpen = useChatFileDialogStore((state) => state.isOpen);
@@ -56,24 +37,11 @@ export function ChatFileDialog() {
   const setContent = useChatFileDialogStore((state) => state.setContent);
   const { isLspEnabled } = useLspEnabledSetting();
   const reset = useChatFileDialogStore((state) => state.reset);
-  const unsupportedReason = useChatFileDialogStore(
-    (state) => state.unsupportedReason,
-  );
   const [isSaving, setIsSaving] = useState(false);
   const queryClient = useQueryClient();
 
   const isDirty = file !== null && file.content !== originalContent;
-  const isBinaryPreview =
-    file !== null && isBinaryPreviewLanguage(file.language);
-  const isUnsupported = unsupportedReason !== null;
-  const rawDownloadUrl =
-    file === null
-      ? null
-      : isUnsupported
-        ? getRawFileDownloadUrl(file.workspaceId, file.path)
-        : isBinaryPreview
-          ? getRawFileUrl(file.workspaceId, file.path)
-          : null;
+  const isTextFile = file !== null && isTextEditorLanguage(file.language);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -145,7 +113,7 @@ export function ChatFileDialog() {
               Modified
             </span>
           )}
-          {file && !isUnsupported && (
+          {file && (
             <Button variant="ghost" size="sm" asChild>
               <Link
                 href={`/files?open=${encodeURIComponent(file.path)}`}
@@ -158,7 +126,7 @@ export function ChatFileDialog() {
               </Link>
             </Button>
           )}
-          {file && !isUnsupported && (
+          {file && isTextFile && (
             <MarkdownPreviewToggle
               language={file.language}
               filePath={file.path}
@@ -166,14 +134,14 @@ export function ChatFileDialog() {
               className="size-8 p-0"
             />
           )}
-          {file && !isUnsupported && (
+          {file && isTextFile && (
             <CsvPreviewToggle
               filePath={file.path}
               size="sm"
               className="size-8 p-0"
             />
           )}
-          {!isBinaryPreview && !isUnsupported && (
+          {isTextFile && (
             <Button
               size="sm"
               onClick={handleSave}
@@ -189,32 +157,15 @@ export function ChatFileDialog() {
               <span className="hidden sm:inline">Save</span>
             </Button>
           )}
-          {file &&
-            (rawDownloadUrl !== null ? (
-              <Button variant="ghost" size="sm" className="size-8 p-0" asChild>
-                <a
-                  href={rawDownloadUrl}
-                  download={getFileName(file.path)}
-                  aria-label="Download file"
-                  title="Download file"
-                >
-                  <Download className="size-3.5" />
-                </a>
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-8 p-0"
-                onClick={() =>
-                  downloadTextFile(getFileName(file.path), file.content)
-                }
-                aria-label="Download file"
-                title="Download file"
-              >
-                <Download className="size-3.5" />
-              </Button>
-            ))}
+          {file && (
+            <FileDownloadButton
+              workspaceId={file.workspaceId}
+              filePath={file.path}
+              language={file.language}
+              content={file.content}
+              className="size-8 p-0"
+            />
+          )}
         </DialogHeader>
 
         <div className="min-h-0 flex-1">
@@ -223,29 +174,14 @@ export function ChatFileDialog() {
               <Loader2 className="size-4 animate-spin" />
               Opening file...
             </div>
-          ) : isUnsupported && rawDownloadUrl !== null ? (
-            <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm">
-              <FileWarning className="size-8" />
-              <p>{unsupportedReason}</p>
-              <Button size="sm" asChild>
-                <a href={rawDownloadUrl} download={getFileName(file.path)}>
-                  <Download className="size-3.5" />
-                  Download
-                </a>
-              </Button>
-            </div>
-          ) : file.language === PDF_LANGUAGE ? (
-            <PdfViewer workspaceId={file.workspaceId} filePath={file.path} />
-          ) : file.language === IMAGE_LANGUAGE ? (
-            <ImageViewer workspaceId={file.workspaceId} filePath={file.path} />
           ) : (
-            <EditorSwitcher
+            <FileViewer
+              workspaceId={file.workspaceId}
+              filePath={file.path}
               content={file.content}
               language={file.language}
               onChange={setContent}
               onSave={handleSave}
-              filePath={file.path}
-              workspaceId={file.workspaceId}
               autoFocus
               isLspEligible
             />

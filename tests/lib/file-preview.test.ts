@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  BINARY_FILE_LANGUAGE,
   getBinaryPreviewLanguage,
+  getFileDownloadUrl,
   getRawFileContentType,
   getRawFileUrl,
+  getUnsupportedFileMessage,
   IMAGE_LANGUAGE,
   isBinaryPreviewLanguage,
   isImagePath,
   isPdfPath,
+  isTextEditorLanguage,
+  LARGE_FILE_LANGUAGE,
   PDF_LANGUAGE,
 } from "@/lib/file-preview";
 
@@ -79,6 +84,45 @@ describe("isBinaryPreviewLanguage", () => {
     expect(isBinaryPreviewLanguage(PDF_LANGUAGE)).toBe(true);
     expect(isBinaryPreviewLanguage(IMAGE_LANGUAGE)).toBe(true);
     expect(isBinaryPreviewLanguage("typescript")).toBe(false);
+  });
+});
+
+describe("isTextEditorLanguage", () => {
+  it("is false for previews and files the editor refused", () => {
+    expect(isTextEditorLanguage("typescript")).toBe(true);
+    expect(isTextEditorLanguage("plaintext")).toBe(true);
+    for (const language of [
+      PDF_LANGUAGE,
+      IMAGE_LANGUAGE,
+      BINARY_FILE_LANGUAGE,
+      LARGE_FILE_LANGUAGE,
+    ]) {
+      expect(isTextEditorLanguage(language)).toBe(false);
+    }
+  });
+});
+
+describe("getUnsupportedFileMessage", () => {
+  it("returns a message only for refused files", () => {
+    expect(getUnsupportedFileMessage(BINARY_FILE_LANGUAGE)).not.toBeNull();
+    expect(getUnsupportedFileMessage(LARGE_FILE_LANGUAGE)).not.toBeNull();
+    expect(getUnsupportedFileMessage(PDF_LANGUAGE)).toBeNull();
+    expect(getUnsupportedFileMessage("typescript")).toBeNull();
+  });
+});
+
+describe("getFileDownloadUrl", () => {
+  it("serves previews raw, refused files as attachments, and text from the buffer", () => {
+    expect(getFileDownloadUrl("ws-1", "a.pdf", PDF_LANGUAGE)).toBe(
+      "/api/files/raw?workspaceId=ws-1&path=a.pdf",
+    );
+    expect(getFileDownloadUrl("ws-1", "a.zip", BINARY_FILE_LANGUAGE)).toBe(
+      "/api/files/raw?workspaceId=ws-1&path=a.zip&download=1",
+    );
+    expect(getFileDownloadUrl("ws-1", "a.log", LARGE_FILE_LANGUAGE)).toBe(
+      "/api/files/raw?workspaceId=ws-1&path=a.log&download=1",
+    );
+    expect(getFileDownloadUrl("ws-1", "a.ts", "typescript")).toBeNull();
   });
 });
 

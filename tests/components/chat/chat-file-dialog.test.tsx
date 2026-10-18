@@ -5,7 +5,11 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ChatFileDialog } from "@/components/chat/chat-file-dialog";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
-import { IMAGE_LANGUAGE, PDF_LANGUAGE } from "@/lib/file-preview";
+import {
+  BINARY_FILE_LANGUAGE,
+  IMAGE_LANGUAGE,
+  PDF_LANGUAGE,
+} from "@/lib/file-preview";
 import { downloadTextFile } from "@/lib/download-file";
 vi.mock("@/hooks/use-settings", () => ({
   useLspEnabledSetting: () => ({ isLspEnabled: false }),
@@ -94,11 +98,10 @@ describe("ChatFileDialog download button", () => {
         path: "build/app.zip",
         instanceId: 4,
         content: "",
-        language: "plaintext",
+        language: BINARY_FILE_LANGUAGE,
         workspaceId: "ws-1",
       },
       originalContent: "",
-      unsupportedReason: "This file can't be displayed in the editor.",
     });
 
     renderDialog();

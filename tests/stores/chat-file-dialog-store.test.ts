@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
+import { BINARY_FILE_LANGUAGE, LARGE_FILE_LANGUAGE } from "@/lib/file-preview";
 
 const store = useChatFileDialogStore;
 const open = (workspaceId = "A", path = "a.ts") =>
@@ -98,11 +99,11 @@ describe("chat file dialog store", () => {
   });
 
   it.each([
-    [415, "This file can't be displayed in the editor."],
-    [413, "This file is too large to display in the editor."],
+    [415, BINARY_FILE_LANGUAGE],
+    [413, LARGE_FILE_LANGUAGE],
   ])(
     "keeps the dialog open for download when content returns %i",
-    async (status, expectedReason) => {
+    async (status, expectedLanguage) => {
       vi.stubGlobal(
         "fetch",
         vi
@@ -121,7 +122,7 @@ describe("chat file dialog store", () => {
       expect(fallback).not.toHaveBeenCalled();
       expect(state.isOpen).toBe(true);
       expect(state.isLoading).toBe(false);
-      expect(state.unsupportedReason).toBe(expectedReason);
+      expect(state.file?.language).toBe(expectedLanguage);
       expect(state.file?.path).toBe("build/app.zip");
       expect(state.file?.workspaceId).toBe("workspace-1");
     },
@@ -142,8 +143,13 @@ describe("chat file dialog store", () => {
     await store.openFile("workspace-1", "build/app.zip", vi.fn());
     await store.openFile("workspace-1", "notes.txt", vi.fn());
 
-    expect(useChatFileDialogStore.getState().unsupportedReason).toBeNull();
-    expect(useChatFileDialogStore.getState().file?.content).toBe("text");
+    expect(useChatFileDialogStore.getState().file).toEqual({
+      instanceId: expect.any(Number),
+      path: "notes.txt",
+      content: "text",
+      language: "plaintext",
+      workspaceId: "workspace-1",
+    });
   });
 
   it("uses the full editor fallback when the file cannot be loaded", async () => {

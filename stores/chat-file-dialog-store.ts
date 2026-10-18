@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { getBinaryPreviewLanguage } from "@/lib/file-preview";
+import { loadFileForEditor } from "@/lib/files/load-file-for-editor";
 import type {
   DiskReplacement,
   FileSaveSnapshot,
@@ -21,9 +21,6 @@ interface ChatFileDialogState {
   isLoading: boolean;
   file: ChatDialogFile | null;
   originalContent: string;
-  // Set when the file exists but the editor can't display it (binary or too
-  // large); the dialog stays open and offers a download instead.
-  unsupportedReason: string | null;
   openFile: (
     workspaceId: string,
     path: string,
@@ -45,98 +42,37 @@ interface ChatFileDialogState {
   reset: () => void;
 }
 
-function isFileContentResponse(
-  value: unknown,
-): value is { content: string; language?: string } {
-  if (typeof value !== "object" || value === null) return false;
-  if (!("content" in value) || typeof value.content !== "string") return false;
-  return !("language" in value) || typeof value.language === "string";
-}
-
-function getUnsupportedReason(status: number): string | null {
-  if (status === 415) return "This file can't be displayed in the editor.";
-  if (status === 413) return "This file is too large to display in the editor.";
-  return null;
-}
-
 const initialState = {
   isOpen: false,
   isLoading: false,
   file: null,
   originalContent: "",
-  unsupportedReason: null,
 } satisfies Pick<
   ChatFileDialogState,
-  "isOpen" | "isLoading" | "file" | "originalContent" | "unsupportedReason"
+  "isOpen" | "isLoading" | "file" | "originalContent"
 >;
 
 export const useChatFileDialogStore = create<ChatFileDialogState>(
   (set, get) => ({
     ...initialState,
     openFile: async (workspaceId, path, fallback) => {
-      const previewLanguage = getBinaryPreviewLanguage(path);
-      if (previewLanguage) {
-        set({
-          isOpen: true,
-          isLoading: false,
-          file: {
-            path,
-            content: "",
-            language: previewLanguage,
-            workspaceId,
-            instanceId: ++tabInstanceCounter,
-          },
-          originalContent: "",
-          unsupportedReason: null,
-        });
-        return;
-      }
-      set({
-        isOpen: true,
-        isLoading: true,
-        file: null,
-        originalContent: "",
-        unsupportedReason: null,
-      });
+      set({ isOpen: true, isLoading: true, file: null, originalContent: "" });
       try {
-        const response = await fetch(
-          `/api/files/content?workspaceId=${workspaceId}&path=${encodeURIComponent(path)}`,
-        );
-        if (!response.ok) {
-          const unsupportedReason = getUnsupportedReason(response.status);
-          if (unsupportedReason !== null) {
-            set({
-              file: {
-                instanceId: ++tabInstanceCounter,
-                path,
-                content: "",
-                language: "plaintext",
-                workspaceId,
-              },
-              unsupportedReason,
-            });
-            return;
-          }
+        const loadedFile = await loadFileForEditor(workspaceId, path);
+        if (!loadedFile) {
           set(initialState);
           fallback();
           return;
         }
-
-        const data: unknown = await response.json();
-        if (!isFileContentResponse(data)) {
-          set(initialState);
-          fallback();
-          return;
-        }
-
-        const file = {
-          instanceId: ++tabInstanceCounter,
-          path,
-          content: data.content,
-          language: data.language ?? "plaintext",
-          workspaceId,
-        } satisfies ChatDialogFile;
-        set({ file, originalContent: data.content });
+        set({
+          file: {
+            instanceId: ++tabInstanceCounter,
+            path,
+            workspaceId,
+            ...loadedFile,
+          },
+          originalContent: loadedFile.content,
+        });
       } catch (error) {
         if (!(error instanceof Error)) throw error;
         set(initialState);

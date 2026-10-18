@@ -43,6 +43,32 @@ export function isBinaryPreviewLanguage(language: string): boolean {
   return language === PDF_LANGUAGE || language === IMAGE_LANGUAGE;
 }
 
+// Files the content API refuses (binary bytes or over its size limit) still
+// open, but as a download notice instead of an editor.
+export const BINARY_FILE_LANGUAGE = "binary-file";
+export const LARGE_FILE_LANGUAGE = "large-file";
+
+export function getUnsupportedFileMessage(language: string): string | null {
+  if (language === BINARY_FILE_LANGUAGE) {
+    return "This file can't be displayed in the editor.";
+  }
+  if (language === LARGE_FILE_LANGUAGE) {
+    return "This file is too large to display in the editor.";
+  }
+  return null;
+}
+
+export function isTextEditorLanguage(language: string): boolean {
+  return (
+    !isBinaryPreviewLanguage(language) &&
+    getUnsupportedFileMessage(language) === null
+  );
+}
+
+export function getFileName(filePath: string): string {
+  return filePath.split("/").pop() || filePath;
+}
+
 export function isCsvPath(filePath: string): boolean {
   return filePath.toLowerCase().endsWith(".csv");
 }
@@ -74,4 +100,21 @@ export function getRawFileDownloadUrl(
     download: "1",
   });
   return `/api/files/raw?${params.toString()}`;
+}
+
+// Previews download their raw bytes and refused files download as an
+// attachment. Text files return null: they download the editor buffer, which
+// may hold unsaved edits.
+export function getFileDownloadUrl(
+  workspaceId: string,
+  filePath: string,
+  language: string,
+): string | null {
+  if (isBinaryPreviewLanguage(language)) {
+    return getRawFileUrl(workspaceId, filePath);
+  }
+  if (getUnsupportedFileMessage(language) !== null) {
+    return getRawFileDownloadUrl(workspaceId, filePath);
+  }
+  return null;
 }

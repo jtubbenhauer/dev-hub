@@ -1,0 +1,21 @@
+components/chat/use-session-list-activity.ts
+  s_83b78fb39520f5::t_66a429662ee47c 1-330
+tests/components/chat/use-session-list-activity.test.ts
+  s_83b78fb39520f5::t_8862c4d2523a3c 1-299
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ab4374dcf99fdbecf62aadd7ba8f49e3a218a3f0",
+  "prompts": {},
+  "sessions": {
+    "s_83b78fb39520f5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ebc754292ffe7YpzBizN18Wfqn",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

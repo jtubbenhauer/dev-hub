@@ -1,0 +1,41 @@
+lib/workspaces/uploads.ts
+  s_8f542da4deebc2::t_46c0e1bed67b81 1-31
+tests/components/chat/prompt-input-attachments.test.tsx
+  s_a14af25ea19db4::t_e06df3a13b5169 1-328
+app/api/files/upload/route.ts
+  s_657c0287a9f326::t_16c5e9a04ab1a1 1-95
+tests/api/files-upload.test.ts
+  s_657c0287a9f326::t_c100a523f28909 1-229
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6191895177cc373e09fb0ce4bf9c2d20d2a0456c",
+  "prompts": {},
+  "sessions": {
+    "s_657c0287a9f326": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ses_ecd410cc1ffexFKRUR9pRnlImQ",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_8f542da4deebc2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ecd410cc1ffexFKRUR9pRnlImQ",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_a14af25ea19db4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1df206a6ffeYbJaSuk1IFLlex",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

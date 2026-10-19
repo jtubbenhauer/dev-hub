@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -127,7 +127,9 @@ interface UnifiedSessionListProps extends BaseSessionListProps {
 
 type SessionListProps = WorkspaceSessionListProps | UnifiedSessionListProps;
 
-export function SessionList(props: SessionListProps) {
+// Memoized because the chat page re-renders on every streamed frame; with
+// stable props the list and its rows skip those renders.
+export const SessionList = memo(function SessionList(props: SessionListProps) {
   const {
     activeSessionId,
     sessionStatuses,
@@ -250,16 +252,20 @@ export function SessionList(props: SessionListProps) {
     setDragOverWorkspaceId(null);
   }, [draggedWorkspaceId, dragOverWorkspaceId, groupedSessions, props]);
 
-  const handleSelect = (session: Session | SessionWithWorkspace) => {
-    if (props.mode === "unified") {
-      props.onSelectSession(
-        session.id,
-        (session as SessionWithWorkspace).workspaceId,
-      );
-    } else {
-      props.onSelectSession(session.id);
-    }
-  };
+  const { mode, onSelectSession } = props;
+  const handleSelect = useCallback(
+    (session: Session | SessionWithWorkspace) => {
+      if (mode === "unified") {
+        onSelectSession(
+          session.id,
+          (session as SessionWithWorkspace).workspaceId,
+        );
+      } else {
+        onSelectSession(session.id);
+      }
+    },
+    [mode, onSelectSession],
+  );
 
   return (
     <div className="bg-muted/30 flex h-full min-h-0 flex-col border-r">
@@ -469,9 +475,7 @@ export function SessionList(props: SessionListProps) {
                     subAgentCountBySessionId={subAgentCountBySessionId}
                     sessionNotes={sessionNotes}
                     onClearSessionNote={onClearSessionNote}
-                    onSelectSession={(
-                      session: Session | SessionWithWorkspace,
-                    ) => handleSelect(session)}
+                    onSelectSession={handleSelect}
                     onDeleteSession={onDeleteSession}
                     onPinSession={onPinSession}
                     onUnpinSession={onUnpinSession}
@@ -506,6 +510,11 @@ export function SessionList(props: SessionListProps) {
                   <SessionItem
                     key={session.id}
                     session={session}
+                    workspaceId={
+                      props.mode === "unified"
+                        ? (session as SessionWithWorkspace).workspaceId
+                        : undefined
+                    }
                     isActive={session.id === activeSessionId}
                     isPinned={pinnedSessionIds?.has(session.id) ?? false}
                     hasQuestion={questionSessionIds?.has(session.id) ?? false}
@@ -542,47 +551,11 @@ export function SessionList(props: SessionListProps) {
                     note={sessionNotes?.[session.id]}
                     taskProgress={taskProgressBySessionId?.[session.id]}
                     subAgentCount={subAgentCountBySessionId?.[session.id]}
-                    onSelect={() => handleSelect(session)}
-                    onDelete={() =>
-                      onDeleteSession(
-                        session.id,
-                        props.mode === "unified"
-                          ? (session as SessionWithWorkspace).workspaceId
-                          : undefined,
-                      )
-                    }
-                    onRename={renameHandlerFor(
-                      props.mode === "unified"
-                        ? (session as SessionWithWorkspace).workspaceId
-                        : undefined,
-                      session.id,
-                    )}
-                    onTogglePin={
-                      onPinSession && onUnpinSession
-                        ? () => {
-                            const wsId =
-                              props.mode === "unified"
-                                ? (session as SessionWithWorkspace).workspaceId
-                                : undefined;
-                            if (pinnedSessionIds?.has(session.id)) {
-                              onUnpinSession(session.id, wsId);
-                            } else {
-                              onPinSession(session.id, wsId);
-                            }
-                          }
-                        : undefined
-                    }
-                    onClearNote={
-                      onClearSessionNote
-                        ? () => {
-                            const wsId =
-                              props.mode === "unified"
-                                ? (session as SessionWithWorkspace).workspaceId
-                                : undefined;
-                            onClearSessionNote(session.id, wsId);
-                          }
-                        : undefined
-                    }
+                    onSelectSession={handleSelect}
+                    onDeleteSession={onDeleteSession}
+                    onPinSession={onPinSession}
+                    onUnpinSession={onUnpinSession}
+                    onClearSessionNote={onClearSessionNote}
                   />
                 ))}
             {props.mode === "unified" &&
@@ -603,7 +576,7 @@ export function SessionList(props: SessionListProps) {
       </ScrollArea>
     </div>
   );
-}
+});
 
 const COLLAPSED_SESSION_LIMIT = 3;
 
@@ -622,7 +595,7 @@ interface WorkspaceGroupProps {
   subAgentCountBySessionId?: Readonly<Record<string, SessionSubAgentCount>>;
   isExpanded: boolean;
   onToggleExpanded?: () => void;
-  onSelectSession: (session: SessionWithWorkspace) => void;
+  onSelectSession: (session: Session) => void;
   onDeleteSession: (sessionId: string, workspaceId?: string) => void;
   onPinSession?: (sessionId: string, workspaceId?: string) => void;
   onUnpinSession?: (sessionId: string, workspaceId?: string) => void;
@@ -758,6 +731,7 @@ function WorkspaceGroup({
           <SessionItem
             key={session.id}
             session={session}
+            workspaceId={workspaceId}
             isActive={session.id === activeSessionId}
             isPinned={pinnedSessionIds?.has(session.id) ?? false}
             hasQuestion={questionSessionIds?.has(session.id) ?? false}
@@ -774,25 +748,11 @@ function WorkspaceGroup({
             note={sessionNotes?.[session.id]}
             taskProgress={taskProgressBySessionId?.[session.id]}
             subAgentCount={subAgentCountBySessionId?.[session.id]}
-            onSelect={() => onSelectSession(session)}
-            onDelete={() => onDeleteSession(session.id, workspaceId)}
-            onRename={renameHandlerFor(workspaceId, session.id)}
-            onTogglePin={
-              onPinSession && onUnpinSession
-                ? () => {
-                    if (pinnedSessionIds?.has(session.id)) {
-                      onUnpinSession(session.id, workspaceId);
-                    } else {
-                      onPinSession(session.id, workspaceId);
-                    }
-                  }
-                : undefined
-            }
-            onClearNote={
-              onClearSessionNote
-                ? () => onClearSessionNote(session.id, workspaceId)
-                : undefined
-            }
+            onSelectSession={onSelectSession}
+            onDeleteSession={onDeleteSession}
+            onPinSession={onPinSession}
+            onUnpinSession={onUnpinSession}
+            onClearSessionNote={onClearSessionNote}
           />
         ))
       )}
@@ -835,6 +795,8 @@ function renameHandlerFor(
 
 interface SessionItemProps {
   session: Session;
+  // Workspace the row's actions target; undefined means the active one.
+  workspaceId?: string;
   isActive: boolean;
   isPinned: boolean;
   hasQuestion: boolean;
@@ -846,16 +808,18 @@ interface SessionItemProps {
   note?: string;
   taskProgress?: SessionTaskProgress;
   subAgentCount?: SessionSubAgentCount;
-  onSelect: () => void;
-  onDelete: () => void;
-  onTogglePin?: () => void;
-  onRename?: (title: string) => Promise<boolean>;
-  onSetNote?: (note: string) => void;
-  onClearNote?: () => void;
+  onSelectSession: (session: Session) => void;
+  onDeleteSession: (sessionId: string, workspaceId?: string) => void;
+  onPinSession?: (sessionId: string, workspaceId?: string) => void;
+  onUnpinSession?: (sessionId: string, workspaceId?: string) => void;
+  onClearSessionNote?: (sessionId: string, workspaceId?: string) => void;
 }
 
-function SessionItem({
+// Rows take the list's shared handlers and build their own closures, so a
+// row re-renders only when its own session data changes.
+const SessionItem = memo(function SessionItem({
   session,
+  workspaceId,
   isActive,
   isPinned,
   hasQuestion,
@@ -867,16 +831,32 @@ function SessionItem({
   note,
   taskProgress,
   subAgentCount,
-  onSelect,
-  onDelete,
-  onTogglePin,
-  onRename,
-  onClearNote,
+  onSelectSession,
+  onDeleteSession,
+  onPinSession,
+  onUnpinSession,
+  onClearSessionNote,
 }: SessionItemProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const formattedTime = useMemo(() => {
     return formatRelativeTime(session.time.updated);
   }, [session.time.updated]);
+  const onSelect = () => onSelectSession(session);
+  const onDelete = () => onDeleteSession(session.id, workspaceId);
+  const onRename = renameHandlerFor(workspaceId, session.id);
+  const onTogglePin =
+    onPinSession && onUnpinSession
+      ? () => {
+          if (isPinned) {
+            onUnpinSession(session.id, workspaceId);
+          } else {
+            onPinSession(session.id, workspaceId);
+          }
+        }
+      : undefined;
+  const onClearNote = onClearSessionNote
+    ? () => onClearSessionNote(session.id, workspaceId)
+    : undefined;
 
   const isWorking =
     status !== null && (status.type === "busy" || status.type === "retry");
@@ -946,7 +926,7 @@ function SessionItem({
         )}
       </div>
       <div className="w-0 min-w-0 flex-1 overflow-hidden">
-        {isRenaming && onRename ? (
+        {isRenaming ? (
           <SessionTitleEditor
             initialTitle={session.title}
             onSave={onRename}
@@ -1007,20 +987,18 @@ function SessionItem({
         )}
       </div>
       <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
-        {onRename && (
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-            onClick={(event) => {
-              event.stopPropagation();
-              setIsRenaming(true);
-            }}
-            title="Rename"
-          >
-            <Pencil className="text-muted-foreground size-3" />
-          </Button>
-        )}
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsRenaming(true);
+          }}
+          title="Rename"
+        >
+          <Pencil className="text-muted-foreground size-3" />
+        </Button>
         {onTogglePin && (
           <Button
             size="icon-xs"
@@ -1065,17 +1043,15 @@ function SessionItem({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {onRename && (
-              <DropdownMenuItem
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setIsRenaming(true);
-                }}
-              >
-                <Pencil className="mr-2 size-3.5" />
-                Rename
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation();
+                setIsRenaming(true);
+              }}
+            >
+              <Pencil className="mr-2 size-3.5" />
+              Rename
+            </DropdownMenuItem>
             {onTogglePin && (
               <DropdownMenuItem
                 onClick={(event) => {
@@ -1111,7 +1087,7 @@ function SessionItem({
       </div>
     </div>
   );
-}
+});
 
 function SessionListSkeleton() {
   return (

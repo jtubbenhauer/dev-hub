@@ -24,6 +24,7 @@ import { useChatEffects } from "@/components/chat/use-chat-effects";
 import { useChatUrlState } from "@/components/chat/use-chat-url-state";
 import { useSessionManagement } from "@/components/chat/use-session-management";
 import { useSessionNavigation } from "@/components/chat/use-session-navigation";
+import { useSessionListActivity } from "@/components/chat/use-session-list-activity";
 import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
@@ -58,9 +59,9 @@ import {
   computePrevUserMessageIndex,
 } from "@/lib/chat-navigation";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
-import { getDescendantActivity } from "@/lib/chat/descendant-activity";
 import { getQueuedUserMessageIds } from "@/lib/chat/queued-messages";
 import {
+  countRootSessions,
   filterSessionsByAge,
   getUnifiedFallbackSession,
   isSessionListLoading,
@@ -100,7 +101,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { Virtuoso } from "react-virtuoso";
 
@@ -122,6 +123,10 @@ interface AvailableVariants {
 
 const EMPTY_LAST_VIEWED: Record<string, number> = {};
 const EMPTY_ID_SET = new Set<string>();
+
+// ChatInterface re-renders on every streamed frame; with stable props the
+// composer skips those renders, so typing stays responsive while replies stream.
+const MemoizedPromptInput = memo(PromptInput);
 
 export function ChatInterface() {
   const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(() =>
@@ -444,7 +449,9 @@ export function ChatInterface() {
     [handleSetSessionAgeFilter, pushChatState],
   );
 
-  const branchQueryResults = useQueries({
+  // combine's result is structurally shared, so the map keeps its identity
+  // until a branch changes; the raw results array is new on every render.
+  const workspaceBranches = useQueries({
     queries: allWorkspaces.map((ws) => ({
       queryKey: ["git-status", ws.id],
       queryFn: async () => {
@@ -457,18 +464,17 @@ export function ChatInterface() {
       staleTime: 30_000,
       retry: false,
     })),
+    combine: (results) => {
+      const branches: Record<string, string> = {};
+      results.forEach((result, index) => {
+        const workspace = allWorkspaces[index];
+        if (workspace && result.data?.branch) {
+          branches[workspace.id] = result.data.branch;
+        }
+      });
+      return branches;
+    },
   });
-
-  const workspaceBranches = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (let i = 0; i < allWorkspaces.length; i++) {
-      const data = branchQueryResults[i]?.data;
-      if (data?.branch) {
-        map[allWorkspaces[i].id] = data.branch;
-      }
-    }
-    return map;
-  }, [allWorkspaces, branchQueryResults]);
 
   const sessions = useChatStore(getActiveWorkspaceSessions);
   const activeSessionDirectory = activeSessionId
@@ -492,15 +498,9 @@ export function ChatInterface() {
     () => allUnifiedSessions.filter((s) => workspaceIds.has(s.workspaceId)),
     [allUnifiedSessions, workspaceIds],
   );
-  const totalUnifiedCount = useChatStore((state) => {
-    let count = 0;
-    for (const ws of Object.values(state.workspaceStates)) {
-      for (const session of Object.values(ws.sessions)) {
-        if (!session.parentID) count++;
-      }
-    }
-    return count;
-  });
+  const totalUnifiedCount = useChatStore((state) =>
+    countRootSessions(state.workspaceStates),
+  );
   const hasMoreUnifiedSessions = totalUnifiedCount > unifiedLimit;
   const commands: Command[] = useChatStore((state) => state.commands);
   // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
@@ -527,119 +527,12 @@ export function ChatInterface() {
     if (!activeSessionId || !activeWorkspaceId) return;
     void fetchSessionTodos(activeSessionId, activeWorkspaceId);
   }, [activeSessionId, activeWorkspaceId, fetchSessionTodos]);
-  const workspaceStates = useChatStore((state) => state.workspaceStates);
-  const taskProgressBySessionId = useMemo(() => {
-    const progress: Record<
-      string,
-      { completed: number; total: number; updatedAt?: number }
-    > = {};
-    const workspacesToSummarize = isUnifiedMode
-      ? Object.values(workspaceStates)
-      : activeWorkspaceId
-        ? [workspaceStates[activeWorkspaceId]]
-        : [];
-
-    for (const workspaceState of workspacesToSummarize) {
-      if (!workspaceState) continue;
-      for (const [sessionId, todos] of Object.entries(workspaceState.todos)) {
-        if (todos.length === 0) continue;
-        progress[sessionId] = {
-          completed: todos.filter((todo) => todo.status === "completed").length,
-          total: todos.length,
-          updatedAt:
-            workspaceState.todoUpdatedAt?.[sessionId] ??
-            workspaceState.sessions[sessionId]?.time.updated,
-        };
-      }
-    }
-
-    return progress;
-  }, [activeWorkspaceId, isUnifiedMode, workspaceStates]);
-  const sessionActivity = useMemo(() => {
-    const activeIds = new Set<string>();
-    const subAgentCounts: Record<
-      string,
-      {
-        active: number;
-        waiting: number;
-        progress?: { completed: number; total: number };
-      }
-    > = {};
-    const subAgentTodoHydration: { sessionId: string; workspaceId: string }[] =
-      [];
-    const workspacesToCheck = isUnifiedMode
-      ? Object.entries(workspaceStates)
-      : activeWorkspaceId
-        ? ([[activeWorkspaceId, workspaceStates[activeWorkspaceId]]] as const)
-        : [];
-
-    for (const [workspaceId, workspaceState] of workspacesToCheck) {
-      if (!workspaceState) continue;
-      for (const session of Object.values(workspaceState.sessions)) {
-        if (session.parentID) continue;
-        const status = workspaceState.sessionStatuses[session.id];
-        const hasDirectActivity =
-          status?.type === "busy" ||
-          status?.type === "retry" ||
-          workspaceState.questions.some(
-            (question) => question.sessionID === session.id,
-          );
-        const descendantActivity = getDescendantActivity({
-          parentSessionId: session.id,
-          sessions: workspaceState.sessions,
-          statuses: workspaceState.sessionStatuses,
-          permissions: workspaceState.permissions,
-          questions: workspaceState.questions,
-          now: Date.now(),
-          recentWindowMs: 0,
-        });
-        if (
-          descendantActivity.activeCount > 0 ||
-          descendantActivity.waitingCount > 0
-        ) {
-          let completed = 0;
-          let total = 0;
-          for (const descendantId of descendantActivity.activeSessionIds) {
-            const descendantTodos = workspaceState.todos[descendantId];
-            if (!descendantTodos) {
-              subAgentTodoHydration.push({
-                sessionId: descendantId,
-                workspaceId,
-              });
-              continue;
-            }
-            total += descendantTodos.length;
-            completed += descendantTodos.filter(
-              (todo) => todo.status === "completed",
-            ).length;
-          }
-          subAgentCounts[session.id] = {
-            active: descendantActivity.activeCount,
-            waiting: descendantActivity.waitingCount,
-            ...(total > 0 ? { progress: { completed, total } } : {}),
-          };
-        }
-        if (
-          hasDirectActivity ||
-          descendantActivity.activeCount > 0 ||
-          descendantActivity.waitingCount > 0
-        ) {
-          activeIds.add(session.id);
-        }
-      }
-    }
-
-    return {
-      taskActiveSessionIds: activeIds,
-      subAgentCountBySessionId: subAgentCounts,
-      subAgentTodoHydration,
-    };
-  }, [activeWorkspaceId, isUnifiedMode, workspaceStates]);
   const {
+    taskProgressBySessionId,
     taskActiveSessionIds,
     subAgentCountBySessionId,
     subAgentTodoHydration,
-  } = sessionActivity;
+  } = useSessionListActivity({ isUnifiedMode, activeWorkspaceId });
   // Hydrate once per session: a todo fetch that keeps failing would otherwise
   // be retried on every store change.
   const hydratedSubAgentTodosRef = useRef(new Set<string>());
@@ -743,6 +636,10 @@ export function ChatInterface() {
       ),
     [activeMessagesRaw, showThinking, showToolCalls],
   );
+  // Commands read messages when they run, so the command handler keeps its
+  // identity while a reply streams and the memoized PromptInput can skip it.
+  const activeMessagesRef = useRef(activeMessages);
+  activeMessagesRef.current = activeMessages;
   const queuedUserMessageIds = useMemo(
     () =>
       streamingStatus === "streaming"
@@ -984,7 +881,7 @@ export function ChatInterface() {
             break;
           }
           case "undo": {
-            const lastAssistant = [...activeMessages]
+            const lastAssistant = [...activeMessagesRef.current]
               .reverse()
               .find(
                 (m) =>
@@ -1016,7 +913,6 @@ export function ChatInterface() {
     [
       activeWorkspaceId,
       activeSessionId,
-      activeMessages,
       recoveredMessageIds,
       primaryAgents,
       createSession,
@@ -1204,6 +1100,32 @@ export function ChatInterface() {
     setSelectedModel,
   });
 
+  const handleAgentChange = useCallback(
+    (agent: string) => {
+      setSelectedAgent(agent);
+      if (activeSessionId && activeWorkspaceId) {
+        setSessionAgent(activeSessionId, activeWorkspaceId, agent);
+        clearSessionModel(activeSessionId, activeWorkspaceId);
+      }
+    },
+    [activeSessionId, activeWorkspaceId, setSessionAgent, clearSessionModel],
+  );
+
+  const handleVariantChange = useCallback(
+    (variant: string | null) => {
+      setSelectedVariant(variant);
+      if (activeSessionId && activeWorkspaceId && variant) {
+        setSessionVariant(activeSessionId, activeWorkspaceId, variant);
+      }
+    },
+    [activeSessionId, activeWorkspaceId, setSessionVariant],
+  );
+
+  const handleLoadMoreUnifiedSessions = useCallback(
+    () => setUnifiedLimit((limit) => limit + 20),
+    [],
+  );
+
   if (!activeWorkspaceId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -1225,7 +1147,7 @@ export function ChatInterface() {
     workspaceBranches,
     workspaceColors,
     hasMore: hasMoreUnifiedSessions,
-    onLoadMore: () => setUnifiedLimit((n) => n + 20),
+    onLoadMore: handleLoadMoreUnifiedSessions,
     workspaces: workspaceOptions,
     activeWorkspaceId,
     onCreateSessionInWorkspace: handleCreateSessionInWorkspace,
@@ -1867,7 +1789,7 @@ export function ChatInterface() {
             </div>
           )}
 
-          <PromptInput
+          <MemoizedPromptInput
             ref={promptInputRef}
             onSubmit={handleSendMessage}
             onCommandSelect={handleCommandDispatch}
@@ -1879,13 +1801,7 @@ export function ChatInterface() {
             commands={commands}
             agents={orderedAgents}
             selectedAgent={selectedAgent}
-            onAgentChange={(agent) => {
-              setSelectedAgent(agent);
-              if (activeSessionId && activeWorkspaceId) {
-                setSessionAgent(activeSessionId, activeWorkspaceId, agent);
-                clearSessionModel(activeSessionId, activeWorkspaceId);
-              }
-            }}
+            onAgentChange={handleAgentChange}
             isAgentSelectorOpen={isAgentSelectorOpen}
             onAgentSelectorOpenChange={setIsAgentSelectorOpen}
             selectedModel={selectedModel}
@@ -1896,18 +1812,7 @@ export function ChatInterface() {
             onModelSelectorOpenChange={setIsModelSelectorOpen}
             availableVariants={availableVariants.values}
             selectedVariant={selectedVariant}
-            onVariantChange={(variant) => {
-              setSelectedVariant(variant);
-              if (activeSessionId && activeWorkspaceId) {
-                if (variant) {
-                  setSessionVariant(
-                    activeSessionId,
-                    activeWorkspaceId,
-                    variant,
-                  );
-                }
-              }
-            }}
+            onVariantChange={handleVariantChange}
             isVariantSelectorOpen={isVariantSelectorOpen}
             onVariantSelectorOpenChange={setIsVariantSelectorOpen}
           />

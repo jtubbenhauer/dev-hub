@@ -85,8 +85,10 @@ export function useChatSuggestion({
     useChatSuggestionsSetting();
   const isEnabled =
     isEnabledByCaller && isChatSuggestionsEnabled && !isLoadingSetting;
+  // The context below ignores messages while a reply streams, and selecting
+  // them then would re-render the prompt input on every streamed token.
   const messages = useChatStore((state) =>
-    workspaceId && sessionId
+    !isStreaming && workspaceId && sessionId
       ? (state.workspaceStates[workspaceId]?.messages[sessionId] ??
         EMPTY_MESSAGES)
       : EMPTY_MESSAGES,

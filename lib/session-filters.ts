@@ -63,3 +63,33 @@ export function getUnifiedFallbackSession<T extends UnifiedFallbackCandidate>(
   if (sessions.length === 0) return null;
   return sessions[0];
 }
+
+interface RootSessionCandidate {
+  readonly parentID?: string;
+}
+
+type SessionsById = Readonly<Record<string, RootSessionCandidate>>;
+
+// Counting runs on every store write, and those stream in many times a
+// second, so each workspace's count is cached on its sessions map.
+const rootSessionCountBySessions = new WeakMap<SessionsById, number>();
+
+export function countRootSessions(
+  workspaceStates: Readonly<
+    Record<string, { readonly sessions: SessionsById }>
+  >,
+): number {
+  let total = 0;
+  for (const { sessions } of Object.values(workspaceStates)) {
+    let count = rootSessionCountBySessions.get(sessions);
+    if (count === undefined) {
+      count = 0;
+      for (const session of Object.values(sessions)) {
+        if (!session.parentID) count += 1;
+      }
+      rootSessionCountBySessions.set(sessions, count);
+    }
+    total += count;
+  }
+  return total;
+}

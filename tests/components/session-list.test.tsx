@@ -630,3 +630,81 @@ describe("SessionList — rename", () => {
     expect(screen.getByText("Keep")).toBeInTheDocument();
   });
 });
+
+describe("SessionList — row actions in unified mode", () => {
+  function renderUnifiedRow(options: { isPinned?: boolean } = {}) {
+    const handlers = {
+      onSelectSession: vi.fn(),
+      onDeleteSession: vi.fn(),
+      onPinSession: vi.fn(),
+      onUnpinSession: vi.fn(),
+      onClearSessionNote: vi.fn(),
+    };
+    render(
+      <SessionList
+        {...baseProps}
+        {...handlers}
+        mode="unified"
+        sessions={[makeUnifiedSession("s1", "ws-b")]}
+        workspaceNames={{}}
+        workspaceBranches={{}}
+        activeWorkspaceId="ws-a"
+        pinnedSessionIds={new Set(options.isPinned ? ["s1"] : [])}
+        sessionNotes={{ s1: "Pick up the review" }}
+      />,
+    );
+    return handlers;
+  }
+
+  it("selects the session in its own workspace", async () => {
+    // Given
+    const handlers = renderUnifiedRow();
+
+    // When
+    await userEvent.click(getSessionRow("s1"));
+
+    // Then
+    expect(handlers.onSelectSession).toHaveBeenCalledWith("s1", "ws-b");
+  });
+
+  it("deletes the session in its own workspace", async () => {
+    // Given
+    const handlers = renderUnifiedRow();
+
+    // When
+    await userEvent.click(within(getSessionRow("s1")).getByTitle("Delete"));
+
+    // Then
+    expect(handlers.onDeleteSession).toHaveBeenCalledWith("s1", "ws-b");
+  });
+
+  it.each([
+    { isPinned: false, button: "Pin", handler: "onPinSession" },
+    { isPinned: true, button: "Unpin", handler: "onUnpinSession" },
+  ] as const)(
+    "$button the session in its own workspace",
+    async ({ isPinned, button, handler }) => {
+      // Given
+      const handlers = renderUnifiedRow({ isPinned });
+
+      // When
+      await userEvent.click(within(getSessionRow("s1")).getByTitle(button));
+
+      // Then
+      expect(handlers[handler]).toHaveBeenCalledWith("s1", "ws-b");
+    },
+  );
+
+  it("dismisses the session's note in its own workspace", async () => {
+    // Given
+    const handlers = renderUnifiedRow();
+
+    // When
+    await userEvent.click(
+      within(getSessionRow("s1")).getByTitle("Dismiss note"),
+    );
+
+    // Then
+    expect(handlers.onClearSessionNote).toHaveBeenCalledWith("s1", "ws-b");
+  });
+});

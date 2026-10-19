@@ -1,4 +1,5 @@
 import {
+  buildChildSessionIndex,
   formatDescendantActivity,
   getDescendantActivity,
 } from "@/lib/chat/descendant-activity";
@@ -95,6 +96,28 @@ describe("getDescendantActivity", () => {
       recentCount: 1,
       activeSessionIds: [],
     });
+  });
+
+  it("finds each parent's own descendants through one shared child index", () => {
+    // Given
+    const childSessionIndex = buildChildSessionIndex(baseOptions.sessions);
+
+    // When
+    const activeIdsByParent = ["parent", "child"].map(
+      (parentSessionId) =>
+        getDescendantActivity({
+          ...baseOptions,
+          parentSessionId,
+          statuses: { child: { type: "busy" }, grandchild: { type: "busy" } },
+          childSessionIndex,
+        }).activeSessionIds,
+    );
+
+    // Then
+    expect(activeIdsByParent).toEqual([
+      ["child", "grandchild"],
+      ["grandchild"],
+    ]);
   });
 });
 

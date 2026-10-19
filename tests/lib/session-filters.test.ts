@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  countRootSessions,
   filterSessionsByAge,
   getUnifiedFallbackSession,
   getSessionAgeCutoff,
@@ -163,5 +164,42 @@ describe("getUnifiedFallbackSession", () => {
     expect(
       getUnifiedFallbackSession(true, null, sessions, "url-session"),
     ).toBeNull();
+  });
+});
+
+describe("countRootSessions", () => {
+  it("counts the root sessions of every workspace and skips sub-agent sessions", () => {
+    // Given
+    const workspaceStates = {
+      "ws-a": { sessions: { root: {}, child: { parentID: "root" } } },
+      "ws-b": { sessions: { other: {} } },
+    };
+
+    // When
+    const count = countRootSessions(workspaceStates);
+
+    // Then
+    expect(count).toBe(2);
+  });
+
+  it("does not re-scan a workspace whose sessions have not changed", () => {
+    // Given
+    let sessionReads = 0;
+    const sessions: Record<string, { parentID?: string }> = {};
+    Object.defineProperty(sessions, "root", {
+      enumerable: true,
+      get: () => {
+        sessionReads += 1;
+        return {};
+      },
+    });
+    countRootSessions({ "ws-a": { sessions } });
+
+    // When
+    const count = countRootSessions({ "ws-a": { sessions } });
+
+    // Then
+    expect(count).toBe(1);
+    expect(sessionReads).toBe(1);
   });
 });

@@ -3519,6 +3519,104 @@ describe("getRecentSessionsAcrossWorkspaces", () => {
       vi.useRealTimers();
     }
   });
+
+  function workspaceWithSessions(
+    sessions: Record<string, ReturnType<typeof makeSession>>,
+  ) {
+    return {
+      sessions,
+      messages: {},
+      optimisticMessageIds: {},
+      sessionStatuses: {},
+      permissions: [],
+      questions: [],
+      todos: {},
+      sessionAgents: {},
+      sessionModels: {},
+      lastViewedAt: {},
+      pinnedSessionIds: new Set<string>(),
+      sessionVariants: {},
+      sessionNotes: {},
+      sessionsLoaded: true,
+    };
+  }
+
+  function replaceSessionInWorkspaceA(session: ReturnType<typeof makeSession>) {
+    useChatStore.setState((state) => ({
+      workspaceStates: {
+        ...state.workspaceStates,
+        "ws-a": {
+          ...state.workspaceStates["ws-a"],
+          sessions: {
+            ...state.workspaceStates["ws-a"].sessions,
+            [session.id]: session,
+          },
+        },
+      },
+    }));
+  }
+
+  it("keeps an unchanged session's object when another session updates", () => {
+    vi.useFakeTimers();
+    try {
+      // Given
+      useChatStore.setState({
+        workspaceStates: {
+          "ws-a": workspaceWithSessions({
+            "sess-1": makeSession("sess-1", { updated: 3000 }),
+            "sess-2": makeSession("sess-2", { updated: 1000 }),
+          }),
+        },
+      });
+      const before = useChatStore
+        .getState()
+        .getRecentSessionsAcrossWorkspaces(10);
+      vi.advanceTimersByTime(600);
+
+      // When
+      replaceSessionInWorkspaceA(makeSession("sess-2", { updated: 2000 }));
+      const after = useChatStore
+        .getState()
+        .getRecentSessionsAcrossWorkspaces(10);
+
+      // Then
+      expect(after.map((s) => s.time.updated)).toEqual([3000, 2000]);
+      expect(after[0]).toBe(before[0]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("returns the same list when only a sub-agent session changes", () => {
+    vi.useFakeTimers();
+    try {
+      // Given
+      useChatStore.setState({
+        workspaceStates: {
+          "ws-a": workspaceWithSessions({
+            "sess-1": makeSession("sess-1"),
+            "sess-child": makeSession("sess-child", { parentID: "sess-1" }),
+          }),
+        },
+      });
+      const before = useChatStore
+        .getState()
+        .getRecentSessionsAcrossWorkspaces(10);
+      vi.advanceTimersByTime(600);
+
+      // When
+      replaceSessionInWorkspaceA(
+        makeSession("sess-child", { updated: 5000, parentID: "sess-1" }),
+      );
+
+      // Then
+      expect(
+        useChatStore.getState().getRecentSessionsAcrossWorkspaces(10),
+      ).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

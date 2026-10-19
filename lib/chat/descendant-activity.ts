@@ -15,6 +15,8 @@ export interface DescendantActivity extends DescendantActivityCounts {
   readonly activeSessionIds: readonly string[];
 }
 
+export type ChildSessionIndex = ReadonlyMap<string, readonly string[]>;
+
 interface DescendantActivityOptions {
   readonly parentSessionId: string;
   readonly sessions: Readonly<Record<string, Session>>;
@@ -23,18 +25,28 @@ interface DescendantActivityOptions {
   readonly questions: readonly QuestionRequest[];
   readonly now: number;
   readonly recentWindowMs: number;
+  // Callers checking many parents in one workspace build this once.
+  readonly childSessionIndex?: ChildSessionIndex;
 }
 
-export function getDescendantActivity(
-  options: DescendantActivityOptions,
-): DescendantActivity {
+export function buildChildSessionIndex(
+  sessions: Readonly<Record<string, Session>>,
+): ChildSessionIndex {
   const childrenByParent = new Map<string, string[]>();
-  for (const session of Object.values(options.sessions)) {
+  for (const session of Object.values(sessions)) {
     if (!session.parentID) continue;
     const children = childrenByParent.get(session.parentID) ?? [];
     children.push(session.id);
     childrenByParent.set(session.parentID, children);
   }
+  return childrenByParent;
+}
+
+export function getDescendantActivity(
+  options: DescendantActivityOptions,
+): DescendantActivity {
+  const childrenByParent =
+    options.childSessionIndex ?? buildChildSessionIndex(options.sessions);
 
   const waitingSessionIds = new Set([
     ...options.permissions.map((permission) => permission.sessionID),

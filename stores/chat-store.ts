@@ -145,6 +145,20 @@ let _unifiedSessionsCacheRefs = new Map<string, Record<string, Session>>();
 let _unifiedSessionsCachePinnedRefs = new Map<string, Set<string>>();
 let _unifiedSessionsCacheLimit = 0;
 let _unifiedSessionsCacheTime = 0;
+// A session keeps its wrapper until the session object itself is replaced, so
+// memoized rows of unchanged sessions skip re-rendering when another updates.
+const _unifiedSessionWrappers = new WeakMap<Session, SessionWithWorkspace>();
+
+function getUnifiedSessionWrapper(
+  session: Session,
+  workspaceId: string,
+): SessionWithWorkspace {
+  const cached = _unifiedSessionWrappers.get(session);
+  if (cached?.workspaceId === workspaceId) return cached;
+  const wrapper = { ...session, workspaceId };
+  _unifiedSessionWrappers.set(session, wrapper);
+  return wrapper;
+}
 
 // Memoization cache for getUnifiedSessionStatuses.
 let _unifiedStatusesCache: Record<string, SessionStatus> =
@@ -4846,7 +4860,7 @@ export const useChatStore = create<ChatState>()(
           newPinnedRefs.set(workspaceId, ws.pinnedSessionIds);
           for (const session of Object.values(ws.sessions)) {
             if (!session.parentID) {
-              result.push({ ...session, workspaceId });
+              result.push(getUnifiedSessionWrapper(session, workspaceId));
             }
           }
         }
@@ -4869,7 +4883,14 @@ export const useChatStore = create<ChatState>()(
           }
         }
 
-        _unifiedSessionsCache = top;
+        // Keeping the old array when every entry is unchanged means a sub-agent
+        // update, which leaves all root sessions as they were, re-renders nothing.
+        const isUnchanged =
+          top.length === _unifiedSessionsCache.length &&
+          top.every(
+            (session, index) => session === _unifiedSessionsCache[index],
+          );
+        if (!isUnchanged) _unifiedSessionsCache = top;
         _unifiedSessionsCacheRefs = newRefs;
         _unifiedSessionsCachePinnedRefs = newPinnedRefs;
         _unifiedSessionsCacheLimit = limit;

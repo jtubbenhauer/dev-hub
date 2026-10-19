@@ -22,6 +22,7 @@ lib/files/load-file-for-editor.ts
   h_c7f8735263030f 1-46
 stores/chat-file-dialog-store.ts
   h_c7f8735263030f 2,52,59,61-62,67,74-75
+  s_d493d536a2362c::t_f4ce42459904a4 64-65
 tests/components/editor/file-download-button.test.tsx
   h_c7f8735263030f 1-53
 tests/components/editor/file-viewer.test.tsx
@@ -39,6 +40,16 @@ tests/lib/files/load-file-for-editor.test.ts
   "humans": {
     "h_c7f8735263030f": {
       "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_d493d536a2362c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_071a30c80ffewunEZdpO0gDhf0",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
     }
   }
 }

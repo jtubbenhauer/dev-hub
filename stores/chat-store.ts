@@ -1,7 +1,11 @@
 "use client";
 
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import {
+  createJSONStorage,
+  persist,
+  type PersistStorage,
+} from "zustand/middleware";
 import type {
   Session,
   Message,
@@ -230,6 +234,14 @@ const pendingMessageUpdates = new Map<
 let messageFlushScheduled = false;
 let messageFlushHandle: number | null = null;
 
+// RAF-batched buffers for session.updated and session.status events, which
+// omo and OpenCode resend for every sub-agent. Keyed: source workspaceId →
+// sessionId → latest value.
+const pendingSessionInfos = new Map<string, Map<string, Session>>();
+const pendingSessionStatuses = new Map<string, Map<string, SessionStatus>>();
+let isSessionFlushScheduled = false;
+let cancelScheduledSessionFlush: () => void = () => undefined;
+
 // Fallback for routing events for child sessions not yet in ws.sessions
 const sessionSourceWorkspace = new Map<string, string>();
 type SessionDeletionStatus = "optimistic" | "confirmed";
@@ -243,6 +255,14 @@ const sessionCacheMutations = new Map<string, Promise<void>>();
 const sessionDeletionMutations = new Map<string, Promise<void>>();
 const sessionCachePurgeMutations = new Map<string, Promise<void>>();
 const purgedSessionCacheKeys = new Set<string>();
+// Session cache writes are coalesced per workspace so a burst of session
+// events becomes one POST. Keyed: workspaceId → sessionId → latest Session.
+const SESSION_CACHE_WRITE_DELAY_MS = 1_000;
+const pendingSessionCacheWrites = new Map<string, Map<string, Session>>();
+const sessionCacheWriteTimers = new Map<
+  string,
+  ReturnType<typeof setTimeout>
+>();
 
 // Switching workspaces can briefly pair the previous active session with the
 // new workspace id; a session already attributed elsewhere would only 404.
@@ -491,6 +511,15 @@ export function _resetModuleCaches() {
   pendingPartUpdates.clear();
   pendingPartDeltas.clear();
   pendingMessageUpdates.clear();
+  cancelScheduledSessionFlush();
+  isSessionFlushScheduled = false;
+  pendingSessionInfos.clear();
+  pendingSessionStatuses.clear();
+  for (const timer of sessionCacheWriteTimers.values()) {
+    clearTimeout(timer);
+  }
+  sessionCacheWriteTimers.clear();
+  pendingSessionCacheWrites.clear();
   sessionSourceWorkspace.clear();
   deletedSessionIdsByWorkspace.clear();
   removedMessageIdsBySession.clear();
@@ -943,6 +972,109 @@ function schedulePendingMessageFlush(
   }
 }
 
+function isSameJson(current: unknown, next: unknown): boolean {
+  return JSON.stringify(current) === JSON.stringify(next);
+}
+
+function queuePendingSessionInfo(workspaceId: string, info: Session): void {
+  const infos =
+    pendingSessionInfos.get(workspaceId) ?? new Map<string, Session>();
+  infos.set(info.id, info);
+  pendingSessionInfos.set(workspaceId, infos);
+}
+
+function queuePendingSessionStatus(
+  sourceWorkspaceId: string,
+  sessionId: string,
+  status: SessionStatus,
+): void {
+  const statuses =
+    pendingSessionStatuses.get(sourceWorkspaceId) ??
+    new Map<string, SessionStatus>();
+  statuses.set(sessionId, status);
+  pendingSessionStatuses.set(sourceWorkspaceId, statuses);
+}
+
+// Applies every buffered session and status in one store write, and skips the
+// write entirely when nothing changed: the persist middleware serializes the
+// store to localStorage on every set().
+function flushPendingSessionUpdates(
+  set: (partial: Partial<ChatState>) => void,
+  get: () => ChatState,
+): void {
+  if (pendingSessionInfos.size === 0 && pendingSessionStatuses.size === 0) {
+    return;
+  }
+  const infosByWorkspace = [...pendingSessionInfos];
+  const statusesBySourceWorkspace = [...pendingSessionStatuses];
+  pendingSessionInfos.clear();
+  pendingSessionStatuses.clear();
+
+  const workspaceStates = { ...get().workspaceStates };
+  const changedSessionsByWorkspace = new Map<string, Session[]>();
+  let hasChanges = false;
+
+  for (const [workspaceId, infos] of infosByWorkspace) {
+    const deletedIds = deletedSessionIdsByWorkspace.get(workspaceId);
+    const ws = workspaceStates[workspaceId] ?? emptyWorkspaceState();
+    const changedSessions = [...infos.values()].filter(
+      (info) =>
+        !deletedIds?.has(info.id) && !isSameJson(ws.sessions[info.id], info),
+    );
+    if (changedSessions.length === 0) continue;
+    workspaceStates[workspaceId] = {
+      ...ws,
+      sessions: {
+        ...ws.sessions,
+        ...Object.fromEntries(changedSessions.map((info) => [info.id, info])),
+      },
+    };
+    changedSessionsByWorkspace.set(workspaceId, changedSessions);
+    hasChanges = true;
+  }
+
+  for (const [sourceWorkspaceId, statuses] of statusesBySourceWorkspace) {
+    for (const [sessionId, status] of statuses) {
+      const wsId =
+        findWorkspaceForSession(workspaceStates, sessionId) ??
+        sourceWorkspaceId;
+      const ws = workspaceStates[wsId] ?? emptyWorkspaceState();
+      if (isSameJson(ws.sessionStatuses[sessionId], status)) continue;
+      workspaceStates[wsId] = {
+        ...ws,
+        sessionStatuses: { ...ws.sessionStatuses, [sessionId]: status },
+      };
+      hasChanges = true;
+    }
+  }
+
+  if (!hasChanges) return;
+  set({ workspaceStates });
+  for (const [workspaceId, sessions] of changedSessionsByWorkspace) {
+    persistSessionMetadata(workspaceId, sessions);
+  }
+}
+
+function schedulePendingSessionFlush(
+  set: (partial: Partial<ChatState>) => void,
+  get: () => ChatState,
+): void {
+  if (isSessionFlushScheduled) return;
+  isSessionFlushScheduled = true;
+  const flush = () => {
+    isSessionFlushScheduled = false;
+    flushPendingSessionUpdates(set, get);
+  };
+  // Hidden tabs suspend animation frames, so they flush on a timer instead.
+  if (typeof document !== "undefined" && document.hidden) {
+    const timer = setTimeout(flush, 500);
+    cancelScheduledSessionFlush = () => clearTimeout(timer);
+    return;
+  }
+  const frame = requestAnimationFrame(flush);
+  cancelScheduledSessionFlush = () => cancelAnimationFrame(frame);
+}
+
 function findWorkspaceForSession(
   workspaceStates: Record<string, WorkspaceState>,
   sessionId: string,
@@ -1370,6 +1502,94 @@ const quotaTolerantLocalStorage: Storage = {
   },
 };
 
+function hasSameItems(
+  previous: readonly unknown[],
+  next: readonly unknown[],
+): boolean {
+  return (
+    previous.length === next.length &&
+    next.every((item, index) => item === previous[index])
+  );
+}
+
+function hasSameValues(
+  previous: Readonly<Record<string, unknown>>,
+  next: Readonly<Record<string, unknown>>,
+): boolean {
+  const keys = Object.keys(next);
+  return (
+    keys.length === Object.keys(previous).length &&
+    keys.every((key) => previous[key] === next[key])
+  );
+}
+
+// Every top-level field of PersistedChatState must be compared here, or a
+// change to only that field would never be saved.
+function isSamePersistedChatState(
+  previous: PersistedChatState,
+  next: PersistedChatState,
+): boolean {
+  const workspaceIds = Object.keys(next.workspaceStates);
+  const isSameWorkspaces =
+    workspaceIds.length === Object.keys(previous.workspaceStates).length &&
+    workspaceIds.every(
+      (workspaceId) =>
+        workspaceId in previous.workspaceStates &&
+        hasSameValues(
+          previous.workspaceStates[workspaceId],
+          next.workspaceStates[workspaceId],
+        ),
+    );
+  const previousQueue = previous.queuedMessages ?? [];
+  const nextQueue = next.queuedMessages ?? [];
+  const isSameQueue =
+    previousQueue.length === nextQueue.length &&
+    nextQueue.every(
+      ([workspaceId, messages], index) =>
+        workspaceId === previousQueue[index][0] &&
+        hasSameItems(previousQueue[index][1], messages),
+    );
+  return (
+    previous.activeSessionId === next.activeSessionId &&
+    isSameWorkspaces &&
+    isSameQueue &&
+    hasSameItems(
+      previous.queuedWorkspaceIds ?? [],
+      next.queuedWorkspaceIds ?? [],
+    )
+  );
+}
+
+// persist serializes the whole saved state after every set(), and most sets
+// are streamed message updates that change nothing saved, so those skip the
+// JSON.stringify and the synchronous localStorage write.
+function createChatPersistStorage():
+  | PersistStorage<PersistedChatState>
+  | undefined {
+  const jsonStorage = createJSONStorage<PersistedChatState>(
+    () => quotaTolerantLocalStorage,
+  );
+  if (!jsonStorage) return undefined;
+  let lastWrittenState: PersistedChatState | null = null;
+  return {
+    getItem: (name) => jsonStorage.getItem(name),
+    setItem: (name, value) => {
+      if (
+        lastWrittenState !== null &&
+        isSamePersistedChatState(lastWrittenState, value.state)
+      ) {
+        return;
+      }
+      lastWrittenState = value.state;
+      return jsonStorage.setItem(name, value);
+    },
+    removeItem: (name) => {
+      lastWrittenState = null;
+      return jsonStorage.removeItem(name);
+    },
+  };
+}
+
 function addQueuedMessage(
   state: Pick<ChatState, "queuedMessages" | "queuedWorkspaceIds">,
   workspaceId: string,
@@ -1468,6 +1688,26 @@ function persistSessionMetadata(
   workspaceId: string,
   sessions: Session[],
 ): void {
+  const pending =
+    pendingSessionCacheWrites.get(workspaceId) ?? new Map<string, Session>();
+  for (const session of sessions) pending.set(session.id, session);
+  pendingSessionCacheWrites.set(workspaceId, pending);
+  if (sessionCacheWriteTimers.has(workspaceId)) return;
+  sessionCacheWriteTimers.set(
+    workspaceId,
+    setTimeout(
+      () => writeSessionCacheBatch(workspaceId),
+      SESSION_CACHE_WRITE_DELAY_MS,
+    ),
+  );
+}
+
+function writeSessionCacheBatch(workspaceId: string): void {
+  sessionCacheWriteTimers.delete(workspaceId);
+  const batch = pendingSessionCacheWrites.get(workspaceId);
+  pendingSessionCacheWrites.delete(workspaceId);
+  if (!batch || batch.size === 0) return;
+  const sessions = [...batch.values()];
   void enqueueWorkspaceMutation(
     sessionCacheMutations,
     workspaceId,
@@ -1517,6 +1757,8 @@ async function purgeCachedSessionMetadata(
   workspaceId: string,
   sessionId: string,
 ): Promise<void> {
+  // A queued write must not re-insert the session after this purge.
+  pendingSessionCacheWrites.get(workspaceId)?.delete(sessionId);
   const key = sessionKey(workspaceId, sessionId);
   if (purgedSessionCacheKeys.has(key)) return;
   const existing = sessionCachePurgeMutations.get(key);
@@ -3728,6 +3970,10 @@ export const useChatStore = create<ChatState>()(
         }
         flushPendingMessageUpdates(set, get);
 
+        cancelScheduledSessionFlush();
+        isSessionFlushScheduled = false;
+        flushPendingSessionUpdates(set, get);
+
         const { activeWorkspaceId, activeSessionId } = get();
 
         // Re-sync session status in case the SSE idle event arrived while backgrounded
@@ -4012,34 +4258,40 @@ export const useChatStore = create<ChatState>()(
             break;
           }
 
-          case "session.created":
-          case "session.updated": {
+          case "session.created": {
             const info = properties.info as Session;
             if (!info) return;
-            if (
-              eventType === "session.updated" &&
-              deletedSessionIdsByWorkspace.get(sourceWorkspaceId)?.has(info.id)
-            ) {
-              break;
-            }
-            if (eventType === "session.created") {
-              clearSessionDeleted(sourceWorkspaceId, info.id, true);
-              purgedSessionCacheKeys.delete(
-                sessionKey(sourceWorkspaceId, info.id),
-              );
-              bumpSessionMutationGen(set, sourceWorkspaceId);
-            }
+            clearSessionDeleted(sourceWorkspaceId, info.id, true);
+            purgedSessionCacheKeys.delete(
+              sessionKey(sourceWorkspaceId, info.id),
+            );
+            bumpSessionMutationGen(set, sourceWorkspaceId);
+            // The created info supersedes an update still waiting for a frame.
+            pendingSessionInfos.get(sourceWorkspaceId)?.delete(info.id);
             persistSessionMetadata(sourceWorkspaceId, [info]);
             set((state) =>
               updateWorkspace(state, sourceWorkspaceId, (ws) => ({
                 sessions: { ...ws.sessions, [info.id]: info },
                 // Pre-initialize messages for child sessions so part updates aren't
                 // dropped before fetchMessages completes.
-                ...(eventType === "session.created" && !(info.id in ws.messages)
+                ...(!(info.id in ws.messages)
                   ? { messages: { ...ws.messages, [info.id]: [] } }
                   : {}),
               })),
             );
+            break;
+          }
+
+          case "session.updated": {
+            const info = properties.info as Session;
+            if (!info) return;
+            if (
+              deletedSessionIdsByWorkspace.get(sourceWorkspaceId)?.has(info.id)
+            ) {
+              break;
+            }
+            queuePendingSessionInfo(sourceWorkspaceId, info);
+            schedulePendingSessionFlush(set, get);
             break;
           }
 
@@ -4057,6 +4309,8 @@ export const useChatStore = create<ChatState>()(
             pendingMessageUpdates.delete(info.id);
             pendingPartUpdates.delete(info.id);
             pendingPartDeltas.clearSession(info.id);
+            pendingSessionInfos.get(sourceWorkspaceId)?.delete(info.id);
+            pendingSessionStatuses.get(sourceWorkspaceId)?.delete(info.id);
             void purgeCachedSessionMetadata(sourceWorkspaceId, info.id).catch(
               (error: unknown) => {
                 if (!(error instanceof Error)) throw error;
@@ -4176,11 +4430,8 @@ export const useChatStore = create<ChatState>()(
               findWorkspaceForSession(get().workspaceStates, sessionID) ??
               sourceWorkspaceId;
 
-            set((state) =>
-              updateWorkspace(state, wsId, (ws) => ({
-                sessionStatuses: { ...ws.sessionStatuses, [sessionID]: status },
-              })),
-            );
+            queuePendingSessionStatus(sourceWorkspaceId, sessionID, status);
+            schedulePendingSessionFlush(set, get);
 
             // Clear optimistic flag when session status arrives — SSE is now the source of truth
             const { activeSessionId, activeWorkspaceId } = get();
@@ -4203,14 +4454,12 @@ export const useChatStore = create<ChatState>()(
               findWorkspaceForSession(get().workspaceStates, sessionID) ??
               sourceWorkspaceId;
 
-            set((state) =>
-              updateWorkspace(state, wsId, (ws) => ({
-                sessionStatuses: {
-                  ...ws.sessionStatuses,
-                  [sessionID]: { type: "idle" },
-                },
-              })),
-            );
+            // Through the same buffer as session.status, so an earlier status
+            // waiting for the frame cannot overwrite this idle.
+            queuePendingSessionStatus(sourceWorkspaceId, sessionID, {
+              type: "idle",
+            });
+            schedulePendingSessionFlush(set, get);
 
             const { activeSessionId, activeWorkspaceId } = get();
             // Clear optimistic flag unconditionally when the session goes idle — even for background workspaces.
@@ -5090,7 +5339,7 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: "dev-hub-chat",
-      storage: createJSONStorage(() => quotaTolerantLocalStorage),
+      storage: createChatPersistStorage(),
       partialize: (state): PersistedChatState => {
         const wsStates: PersistedChatState["workspaceStates"] = {};
         for (const [wsId, ws] of Object.entries(state.workspaceStates)) {

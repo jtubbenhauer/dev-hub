@@ -198,7 +198,7 @@ describe("OmoRegistryDispatcher", () => {
     expect(errorLog).toHaveBeenCalled();
   });
 
-  it("links a task worker once and reports its status on every task update", async () => {
+  it("links a task worker once and reports its status when it changes", async () => {
     sqlite
       .prepare(
         `INSERT INTO omo_session_index
@@ -330,7 +330,7 @@ describe("OmoRegistryDispatcher", () => {
     });
   });
 
-  it("forwards a linked worker's progress after its status", async () => {
+  it("forwards a linked worker's progress after its status, sending an unchanged status once", async () => {
     // Given
     sqlite
       .prepare(
@@ -383,10 +383,6 @@ describe("OmoRegistryDispatcher", () => {
           sessionID: "omo_worker-2",
           activity: { summary: "turn 1 · running", turns: 1, updatedAt: 20 },
         },
-      },
-      {
-        type: "session.status",
-        properties: { sessionID: "omo_worker-2", status: { type: "busy" } },
       },
       {
         type: "session.activity",

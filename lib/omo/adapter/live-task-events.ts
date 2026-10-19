@@ -289,6 +289,17 @@ export function createLiveTaskEventHandler(
       const fingerprint = JSON.stringify([parentRawId, agent, category, title]);
       const previous = childSessions.get(rawChild);
       const created = previous?.created ?? now;
+      const isTerminal =
+        status !== undefined && TERMINAL_TASK_STATUSES.has(status);
+      const statusType = isActive
+        ? "busy"
+        : isTerminal
+          ? "idle"
+          : previous?.statusType;
+      const isStatusChanged =
+        statusType !== undefined && statusType !== previous?.statusType;
+      const isIndexChanged =
+        previous === undefined || previous.indexFingerprint !== fingerprint;
       const session = buildOmoSession({
         rawId: rawChild,
         workspaceId: options.workspaceId,
@@ -298,23 +309,31 @@ export function createLiveTaskEventHandler(
         updated: now,
         parentRawId,
       });
-      events.push({
-        type: previous ? "session.updated" : "session.created",
-        properties: { info: session },
-      });
+      // omo lists every task the session has started in each update, so the
+      // child session is sent only when it is new or its title or status moved.
+      if (isIndexChanged || isStatusChanged) {
+        events.push({
+          type: previous ? "session.updated" : "session.created",
+          properties: { info: session },
+        });
+      }
 
       const taskId =
         typeof task.task_id === "string" ? task.task_id : undefined;
       const taskTool = toolPartForTask(taskToolParts(), taskId, isActive);
-      if (taskTool) {
-        const nextPart = buildOmoToolPart({
-          ...taskTool.part,
-          state: withSessionMetadata(taskTool.part.state, session.id),
-        });
-        events.push(replacePart(taskTool, nextPart));
+      // A pending part has no metadata to hold the link, and a linked part
+      // already names this child, so neither is sent again.
+      if (
+        taskTool !== undefined &&
+        taskTool.part.state.status !== "pending" &&
+        !childSessionIdsFromState(taskTool.part.state).includes(session.id)
+      ) {
+        events.push(
+          replacePart(taskTool, withChildSessionId(taskTool.part, session.id)),
+        );
       }
 
-      if (!previous || previous.indexFingerprint !== fingerprint) {
+      if (isIndexChanged) {
         effects.push({
           mergeFromTaskEvent: {
             durableId: rawChild,
@@ -330,13 +349,6 @@ export function createLiveTaskEventHandler(
           refreshIndex: true,
         });
       }
-      const isTerminal =
-        status !== undefined && TERMINAL_TASK_STATUSES.has(status);
-      const statusType = isActive
-        ? "busy"
-        : isTerminal
-          ? "idle"
-          : previous?.statusType;
       childSessions.set(rawChild, {
         created,
         indexFingerprint: fingerprint,
@@ -344,7 +356,7 @@ export function createLiveTaskEventHandler(
       });
       // Finished tasks repeat in every update: report only changes, and send
       // session.idle (which notifies the user) only for a task seen running.
-      if (statusType !== undefined && statusType !== previous?.statusType) {
+      if (isStatusChanged) {
         events.push(childStatusEvent(session.id, statusType === "busy"));
         if (statusType === "idle" && previous?.statusType === "busy") {
           events.push({

@@ -1095,7 +1095,11 @@ describe("SSE event handling — session lifecycle", () => {
     ).toBeUndefined();
   });
 
-  it("orders session cache deletion after an earlier metadata write", async () => {
+  it("orders session cache deletion after a metadata write already sent", async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const methods: string[] = [];
     let finishPost: (() => void) | null = null;
     global.fetch = vi
@@ -1118,14 +1122,45 @@ describe("SSE event handling — session lifecycle", () => {
       { type: "session.created", properties: { info: makeSession("sess-1") } },
       "ws-a",
     );
+    await vi.advanceTimersByTimeAsync(1_000);
+    await vi.waitFor(() => expect(finishPost).not.toBeNull());
     store.handleEvent(
       { type: "session.deleted", properties: { info: makeSession("sess-1") } },
       "ws-a",
     );
-    await vi.waitFor(() => expect(finishPost).not.toBeNull());
+    await flushMicrotasks();
     expect(methods).toEqual(["POST"]);
     finishPost!();
     await vi.waitFor(() => expect(methods).toEqual(["POST", "DELETE"]));
+  });
+
+  it("drops a queued metadata write when its session is deleted before it is sent", async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const methods: string[] = [];
+    global.fetch = vi
+      .fn()
+      .mockImplementation(
+        (_input: RequestInfo | URL, options?: RequestInit) => {
+          methods.push(options?.method ?? "GET");
+          return Promise.resolve({ ok: true });
+        },
+      );
+    const store = useChatStore.getState();
+    store.handleEvent(
+      { type: "session.created", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+
+    store.handleEvent(
+      { type: "session.deleted", properties: { info: makeSession("sess-1") } },
+      "ws-a",
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(methods).toEqual(["DELETE"]);
   });
 
   it("session.status (busy) transitions streaming status to streaming", () => {

@@ -708,15 +708,17 @@ describe("chat store queued message handling", () => {
         throw new DOMException("quota exceeded", "QuotaExceededError");
       });
 
+    const previousActiveSessionId = useChatStore.getState().activeSessionId;
+
     try {
       expect(() =>
-        useChatStore.setState({ queuedWorkspaceIds: new Set(["ws-quota"]) }),
+        useChatStore.setState({ activeSessionId: "sess-quota" }),
       ).not.toThrow();
-      expect(useChatStore.getState().queuedWorkspaceIds.has("ws-quota")).toBe(
-        true,
-      );
+      expect(setItem).toHaveBeenCalled();
+      expect(useChatStore.getState().activeSessionId).toBe("sess-quota");
     } finally {
       setItem.mockRestore();
+      useChatStore.setState({ activeSessionId: previousActiveSessionId });
     }
   });
 

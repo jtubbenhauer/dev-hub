@@ -74,22 +74,27 @@ function workerStatusEvent(
   };
 }
 
+// omo lists every task in each update, so a worker's status is sent only when
+// it differs from the last status sent for that session.
 function workerTaskEvents(
   workerDurableId: string,
   link: TaskChildLink,
+  lastStatus: SessionStatus | undefined,
 ): OmoRegistryEvent[] {
-  const statusEvent = workerStatusEvent(workerDurableId, link.isActive);
-  if (link.activity === undefined) return [statusEvent];
-  return [
-    statusEvent,
-    {
+  const events: OmoRegistryEvent[] =
+    lastStatus?.type === (link.isActive ? "busy" : "idle")
+      ? []
+      : [workerStatusEvent(workerDurableId, link.isActive)];
+  if (link.activity !== undefined) {
+    events.push({
       type: "session.activity",
       properties: {
         sessionID: `omo_${workerDurableId}`,
         activity: link.activity,
       },
-    },
-  ];
+    });
+  }
+  return events;
 }
 
 export class OmoRegistryDispatcher {
@@ -261,13 +266,27 @@ export class OmoRegistryDispatcher {
     const key = `${binding.workspaceId}:${link.taskId}`;
     const knownWorkerId = this.linkedTaskWorkers.get(key);
     if (knownWorkerId !== undefined) {
-      this.emit(binding.workspaceId, workerTaskEvents(knownWorkerId, link));
+      this.emit(
+        binding.workspaceId,
+        workerTaskEvents(
+          knownWorkerId,
+          link,
+          this.lastWorkerStatus(binding.workspaceId, knownWorkerId),
+        ),
+      );
       return;
     }
     binding.effectTail = this.continueEffectTail(binding, async () => {
       const linkedWorkerId = this.linkedTaskWorkers.get(key);
       if (linkedWorkerId !== undefined) {
-        this.emit(binding.workspaceId, workerTaskEvents(linkedWorkerId, link));
+        this.emit(
+          binding.workspaceId,
+          workerTaskEvents(
+            linkedWorkerId,
+            link,
+            this.lastWorkerStatus(binding.workspaceId, linkedWorkerId),
+          ),
+        );
         return;
       }
       await this.refreshIndex(binding.workspace);
@@ -307,10 +326,21 @@ export class OmoRegistryDispatcher {
             }),
           },
         },
-        ...workerTaskEvents(workerDurableId, link),
+        ...workerTaskEvents(
+          workerDurableId,
+          link,
+          this.lastWorkerStatus(binding.workspaceId, workerDurableId),
+        ),
         ...binding.adapter.linkTaskChild(link.taskId, `omo_${workerDurableId}`),
       ]);
     });
+  }
+
+  private lastWorkerStatus(
+    workspaceId: string,
+    workerDurableId: string,
+  ): SessionStatus | undefined {
+    return this.sessionStatuses.get(workspaceId)?.get(`omo_${workerDurableId}`);
   }
 
   private applyBackgroundStatus(

@@ -511,3 +511,76 @@ describe("createLiveTaskEventHandler task status", () => {
     ]);
   });
 });
+
+describe("createLiveTaskEventHandler repeated task updates", () => {
+  function childTaskUpdate(status: string, timestamp: number): JsonlRecord {
+    return {
+      type: "extension_event",
+      name: "omo.task.updated",
+      data: {
+        parent_session_id: "parallel-parent-1",
+        tasks: [
+          {
+            task_id: "st_child",
+            agent_type: "explore",
+            status,
+            child_session_id: "child-1",
+          },
+        ],
+      },
+      timestamp,
+    };
+  }
+
+  it("sends the child session only when it first appears or its status changes", () => {
+    // Given
+    const adapter = createLiveAdapter(OPTIONS);
+
+    // When
+    const sessionEventsPerUpdate = [
+      "running",
+      "running",
+      "completed",
+      "completed",
+    ].map((status, index) =>
+      adapter
+        .handle(childTaskUpdate(status, 2_000 + index))
+        .events.flatMap((event) =>
+          event.type === "session.created" || event.type === "session.updated"
+            ? [event.type]
+            : [],
+        ),
+    );
+
+    // Then
+    expect(sessionEventsPerUpdate).toEqual([
+      ["session.created"],
+      [],
+      ["session.updated"],
+      [],
+    ]);
+  });
+
+  it("links the running Task card to its child only once", () => {
+    // Given
+    const adapter = createLiveAdapter(OPTIONS);
+    adapter.handle({
+      type: "tool_execution_start",
+      toolCallId: "call-child",
+      toolName: "task",
+      args: { subagent_type: "explore", description: "Child task" },
+      timestamp: 1_000,
+    });
+
+    // When
+    const linkedPartCounts = [2_000, 2_001].map(
+      (timestamp) =>
+        updatedToolParts([
+          adapter.handle(childTaskUpdate("running", timestamp)),
+        ]).length,
+    );
+
+    // Then
+    expect(linkedPartCounts).toEqual([1, 0]);
+  });
+});

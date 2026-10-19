@@ -1,6 +1,8 @@
 import { StringDecoder } from "node:string_decoder";
 
-export const MAX_JSONL_RECORD_CHARACTERS = 16_777_216;
+// omo refuses client records over 16 MiB but only cuts its own writes past
+// 64 MiB, so a long session's get_entries reply can exceed 16 MiB.
+export const MAX_JSONL_RECORD_CHARACTERS = 67_108_864;
 
 export type JsonlRecord = Readonly<Record<string, unknown>>;
 

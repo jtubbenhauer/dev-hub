@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createJsonlDecoder,
   encodeJsonl,
+  MAX_JSONL_RECORD_CHARACTERS,
   type JsonlRecord,
 } from "@/lib/omo/jsonl";
 import {
@@ -52,11 +53,25 @@ describe("JSONL framing", () => {
     ]);
   });
 
+  it("decodes a reply larger than omo's 16 MiB input limit", () => {
+    const records: JsonlRecord[] = [];
+    const decoder = createJsonlDecoder((record) => records.push(record));
+    const entriesText = "x".repeat(17 * 1024 * 1024);
+
+    decoder.write(
+      Buffer.from(`{"type":"response","id":"dh-4","text":"${entriesText}"}\n`),
+    );
+
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ type: "response", id: "dh-4" });
+    expect(records[0]?.["text"]).toHaveLength(entriesText.length);
+  });
+
   it("resynchronizes at the next LF after an oversized record", () => {
     const records: JsonlRecord[] = [];
     const decoder = createJsonlDecoder((record) => records.push(record));
 
-    decoder.write(Buffer.from("x".repeat(16_777_217)));
+    decoder.write(Buffer.from("x".repeat(MAX_JSONL_RECORD_CHARACTERS + 1)));
     decoder.write(Buffer.from('\n{"type":"recovered"}\n'));
 
     expect(records).toEqual([

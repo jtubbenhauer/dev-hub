@@ -126,6 +126,76 @@ describe("closeFile", () => {
   });
 });
 
+describe("cycleActiveFile", () => {
+  beforeEach(resetStore);
+
+  function openThreeTabs() {
+    useEditorStore.getState().openFile(makeFile("a.ts"));
+    useEditorStore.getState().openFile(makeFile("b.ts"));
+    useEditorStore.getState().openFile(makeFile("c.ts"));
+  }
+
+  it("activates the following tab on next", () => {
+    openThreeTabs();
+    useEditorStore.getState().setActiveFile("a.ts");
+
+    useEditorStore.getState().cycleActiveFile("next");
+
+    expect(useEditorStore.getState().activeFilePath).toBe("b.ts");
+  });
+
+  it("activates the preceding tab on previous", () => {
+    openThreeTabs();
+    useEditorStore.getState().setActiveFile("b.ts");
+
+    useEditorStore.getState().cycleActiveFile("previous");
+
+    expect(useEditorStore.getState().activeFilePath).toBe("a.ts");
+  });
+
+  it("wraps from the last tab to the first on next", () => {
+    openThreeTabs();
+    // c.ts is active (last opened)
+
+    useEditorStore.getState().cycleActiveFile("next");
+
+    expect(useEditorStore.getState().activeFilePath).toBe("a.ts");
+  });
+
+  it("wraps from the first tab to the last on previous", () => {
+    openThreeTabs();
+    useEditorStore.getState().setActiveFile("a.ts");
+
+    useEditorStore.getState().cycleActiveFile("previous");
+
+    expect(useEditorStore.getState().activeFilePath).toBe("c.ts");
+  });
+
+  it("activates the first tab on next when no tab is active", () => {
+    openThreeTabs();
+    useEditorStore.setState({ activeFilePath: null });
+
+    useEditorStore.getState().cycleActiveFile("next");
+
+    expect(useEditorStore.getState().activeFilePath).toBe("a.ts");
+  });
+
+  it("activates the last tab on previous when no tab is active", () => {
+    openThreeTabs();
+    useEditorStore.setState({ activeFilePath: null });
+
+    useEditorStore.getState().cycleActiveFile("previous");
+
+    expect(useEditorStore.getState().activeFilePath).toBe("c.ts");
+  });
+
+  it("leaves activeFilePath null when no tabs are open", () => {
+    useEditorStore.getState().cycleActiveFile("next");
+
+    expect(useEditorStore.getState().activeFilePath).toBeNull();
+  });
+});
+
 describe("updateFileContent (dirty tracking)", () => {
   beforeEach(resetStore);
 

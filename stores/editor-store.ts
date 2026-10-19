@@ -56,6 +56,7 @@ interface EditorState extends ReturnType<typeof createFileContentActions> {
   openFile: (file: OpenFile) => OpenFileResult;
   closeFile: (path: string) => void;
   setActiveFile: (path: string) => void;
+  cycleActiveFile: (direction: "next" | "previous") => void;
   updateFileContent: (path: string, content: string) => void;
   markFileSaved: (path: string) => void;
   toggleFileTree: () => void;
@@ -155,6 +156,21 @@ export const useEditorStore = create<EditorState>()(
       },
 
       setActiveFile: (path) => set({ activeFilePath: path }),
+
+      // Wraps around the tab list. Without an active tab, "next" lands on the
+      // first tab and "previous" on the last.
+      cycleActiveFile: (direction) => {
+        const { openFiles, activeFilePath } = get();
+        if (openFiles.length === 0) return;
+        const step = direction === "next" ? 1 : -1;
+        const activeIndex = openFiles.findIndex(
+          (f) => f.path === activeFilePath,
+        );
+        const fromIndex = activeIndex === -1 && step === -1 ? 0 : activeIndex;
+        const nextIndex =
+          (fromIndex + step + openFiles.length) % openFiles.length;
+        set({ activeFilePath: openFiles[nextIndex].path });
+      },
 
       updateFileContent: (path, content) =>
         set((state) => ({

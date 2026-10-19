@@ -1,17 +1,60 @@
 "use client";
 import { memo } from "react";
 import { useEditorTabMetadataSelector } from "@/hooks/use-editor-tab-metadata";
+import { useLeaderAction } from "@/hooks/use-leader-action";
 
 import { useEditorStore } from "@/stores/editor-store";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
+// Closing a tab throws away its unsaved edits, so ask first when it has any.
+function closeTabWithConfirm(path: string) {
+  const { openFiles, closeFile } = useEditorStore.getState();
+  const file = openFiles.find((openFile) => openFile.path === path);
+  if (
+    file?.isDirty &&
+    !window.confirm(`${file.name} has unsaved changes. Close and discard them?`)
+  ) {
+    return;
+  }
+  closeFile(path);
+}
+
+// Module-level so useLeaderAction gets the stable array it requires.
+const fileTabLeaderActions = [
+  {
+    action: {
+      id: "files:next-tab",
+      label: "Next tab",
+      page: "files",
+      isRepeatable: true,
+    },
+    handler: () => useEditorStore.getState().cycleActiveFile("next"),
+  },
+  {
+    action: {
+      id: "files:prev-tab",
+      label: "Previous tab",
+      page: "files",
+      isRepeatable: true,
+    },
+    handler: () => useEditorStore.getState().cycleActiveFile("previous"),
+  },
+  {
+    action: { id: "files:close-tab", label: "Close tab", page: "files" },
+    handler: () => {
+      const { activeFilePath } = useEditorStore.getState();
+      if (activeFilePath) closeTabWithConfirm(activeFilePath);
+    },
+  },
+];
+
 export const FileTabs = memo(function FileTabs() {
+  useLeaderAction(fileTabLeaderActions);
   const openFiles = useEditorStore(useEditorTabMetadataSelector());
   const activeFilePath = useEditorStore((s) => s.activeFilePath);
   const setActiveFile = useEditorStore((s) => s.setActiveFile);
-  const closeFile = useEditorStore((s) => s.closeFile);
 
   if (openFiles.length === 0) return null;
 
@@ -40,18 +83,19 @@ export const FileTabs = memo(function FileTabs() {
               <span
                 role="button"
                 tabIndex={0}
+                aria-label={`Close ${file.name}`}
                 className={cn(
                   "hover:bg-accent ml-1 rounded p-0.5",
                   !isActive && "opacity-0 group-hover:opacity-100",
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
-                  closeFile(file.path);
+                  closeTabWithConfirm(file.path);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.stopPropagation();
-                    closeFile(file.path);
+                    closeTabWithConfirm(file.path);
                   }
                 }}
               >

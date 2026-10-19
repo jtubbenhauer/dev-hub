@@ -1,15 +1,20 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   validateAttachment,
   fileToDataUrl,
   generateAttachmentId,
   MAX_FILE_SIZE,
   MAX_ATTACHMENTS,
+  MAX_INLINE_TEXT_BYTES,
   ALLOWED_MIME_TYPES,
   FILE_INPUT_ACCEPT,
   isAttachableFile,
   getAttachmentMimeType,
   createAttachmentPromptPart,
+  splitAttachmentsForUpload,
+  buildWorkspaceUploadsContext,
+  uploadAttachmentToWorkspace,
+  WORKSPACE_UPLOADS_CONTEXT_PREFIX,
 } from "@/lib/attachment-utils";
 
 function createMockFile(name: string, size: number, type: string): File {
@@ -17,9 +22,17 @@ function createMockFile(name: string, size: number, type: string): File {
   return new File([content], name, { type });
 }
 
+function textDataUrl(byteLength: number): string {
+  return `data:text/plain;base64,${btoa("a".repeat(byteLength))}`;
+}
+
 describe("constants", () => {
   it("MAX_FILE_SIZE is 20MB", () => {
     expect(MAX_FILE_SIZE).toBe(20 * 1024 * 1024);
+  });
+
+  it("MAX_INLINE_TEXT_BYTES is 256KB", () => {
+    expect(MAX_INLINE_TEXT_BYTES).toBe(256 * 1024);
   });
 
   it("MAX_ATTACHMENTS is 10", () => {
@@ -53,9 +66,13 @@ describe("constants", () => {
 
   it("FILE_INPUT_ACCEPT exposes document extensions for browsers that report other MIME types", () => {
     const acceptedValues = FILE_INPUT_ACCEPT.split(",");
-    for (const extension of [".docx", ".xlsx", ".csv", ".md"]) {
+    for (const extension of [".docx", ".xlsx", ".csv", ".md", ".json"]) {
       expect(acceptedValues).toContain(extension);
     }
+  });
+
+  it("FILE_INPUT_ACCEPT exposes the JSON MIME type to the file picker", () => {
+    expect(FILE_INPUT_ACCEPT.split(",")).toContain("application/json");
   });
 
   it("does not offer legacy Office extensions in the file picker", () => {
@@ -146,6 +163,42 @@ describe("validateAttachment", () => {
     expect(validateAttachment(file)).toEqual({ valid: true });
   });
 
+  it("returns valid: true for JSON file", () => {
+    const file = createMockFile("config.json", 1024, "application/json");
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
+  it("returns valid: true for JSON file without a MIME type", () => {
+    const file = createMockFile("config.JSON", 1024, "");
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
+  it("lists JSON among the allowed types when rejecting a file", () => {
+    const file = createMockFile("page.html", 1024, "text/html");
+    expect(validateAttachment(file).error).toContain("JSON");
+  });
+
+  it("accepts a text file far over the inline text limit, since it is saved to the workspace", () => {
+    const file = createMockFile(
+      "dump.json",
+      16 * 1024 * 1024,
+      "application/json",
+    );
+    expect(validateAttachment(file)).toEqual({ valid: true });
+  });
+
+  it("still rejects text files over the file size limit", () => {
+    const file = createMockFile(
+      "dump.json",
+      MAX_FILE_SIZE + 1,
+      "application/json",
+    );
+    const result = validateAttachment(file);
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain(`${MAX_FILE_SIZE / (1024 * 1024)}MB limit`);
+  });
+
   it("returns valid: false for PDF file exceeding the size limit", () => {
     const size = MAX_FILE_SIZE + 1;
     const file = createMockFile("big.pdf", size, "application/pdf");
@@ -185,6 +238,173 @@ describe("validateAttachment", () => {
   });
 });
 
+describe("splitAttachmentsForUpload", () => {
+  it("inlines text attachments that together fit the inline limit exactly", () => {
+    const attachments = [
+      {
+        filename: "rows.csv",
+        dataUrl: textDataUrl(MAX_INLINE_TEXT_BYTES - 1000),
+      },
+      { filename: "data.json", dataUrl: textDataUrl(1000) },
+    ];
+
+    expect(splitAttachmentsForUpload(attachments)).toEqual({
+      attachmentsToSend: attachments,
+      attachmentsToUpload: [],
+    });
+  });
+
+  it("uploads the text attachment that would push the message over the limit", () => {
+    const rows = { filename: "rows.csv", dataUrl: textDataUrl(200 * 1024) };
+    const data = { filename: "data.json", dataUrl: textDataUrl(100 * 1024) };
+
+    expect(splitAttachmentsForUpload([rows, data])).toEqual({
+      attachmentsToSend: [rows],
+      attachmentsToUpload: [data],
+    });
+  });
+
+  it("keeps inlining later text attachments that still fit", () => {
+    const rows = { filename: "rows.csv", dataUrl: textDataUrl(200 * 1024) };
+    const data = { filename: "data.json", dataUrl: textDataUrl(100 * 1024) };
+    const notes = { filename: "notes.md", dataUrl: textDataUrl(10 * 1024) };
+
+    expect(splitAttachmentsForUpload([rows, data, notes])).toEqual({
+      attachmentsToSend: [rows, notes],
+      attachmentsToUpload: [data],
+    });
+  });
+
+  it("never uploads images or PDFs, which are sent as files", () => {
+    const largeBase64 = "A".repeat(4 * MAX_INLINE_TEXT_BYTES);
+    const photo = {
+      filename: "photo.png",
+      dataUrl: `data:image/png;base64,${largeBase64}`,
+    };
+    const document = {
+      filename: "doc.pdf",
+      dataUrl: `data:application/pdf;base64,${largeBase64}`,
+    };
+
+    expect(splitAttachmentsForUpload([photo, document])).toEqual({
+      attachmentsToSend: [photo, document],
+      attachmentsToUpload: [],
+    });
+  });
+
+  it("uploads Office files whose extracted text is over the limit", () => {
+    const report = {
+      filename: "report.docx",
+      dataUrl: textDataUrl(MAX_INLINE_TEXT_BYTES + 1),
+    };
+
+    expect(splitAttachmentsForUpload([report]).attachmentsToUpload).toEqual([
+      report,
+    ]);
+  });
+});
+
+describe("buildWorkspaceUploadsContext", () => {
+  it("references each saved file by name, size and workspace path", () => {
+    const context = buildWorkspaceUploadsContext([
+      {
+        filename: "data.json",
+        path: ".devhub/uploads/20261013-013045-3f9a2c-data.json",
+        sizeBytes: 16 * 1024 * 1024,
+      },
+      {
+        filename: "rows.csv",
+        path: ".devhub/uploads/20261013-013045-a1b2c3-rows.csv",
+        sizeBytes: 300 * 1024,
+      },
+    ]);
+
+    expect(context.startsWith(WORKSPACE_UPLOADS_CONTEXT_PREFIX)).toBe(true);
+    expect(context).toContain(
+      '- "data.json" (16.0MB): .devhub/uploads/20261013-013045-3f9a2c-data.json',
+    );
+    expect(context).toContain(
+      '- "rows.csv" (300KB): .devhub/uploads/20261013-013045-a1b2c3-rows.csv',
+    );
+    expect(context).toContain("read them with your tools");
+    expect(context.endsWith("\n\n")).toBe(true);
+  });
+});
+
+describe("uploadAttachmentToWorkspace", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  it("posts the attachment to the upload route and returns where it was saved", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      jsonResponse({ path: ".devhub/uploads/x-data.json", sizeBytes: 307200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const dataUrl = textDataUrl(300 * 1024);
+
+    const upload = await uploadAttachmentToWorkspace("ws-1", {
+      filename: "data.json",
+      dataUrl,
+    });
+
+    expect(upload).toEqual({
+      filename: "data.json",
+      path: ".devhub/uploads/x-data.json",
+      sizeBytes: 307200,
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/files/upload");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      workspaceId: "ws-1",
+      filename: "data.json",
+      dataUrl,
+    });
+  });
+
+  it("saves Office files under a .txt name because their extracted text is uploaded", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      jsonResponse({ path: ".devhub/uploads/x-report.docx.txt", sizeBytes: 9 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const upload = await uploadAttachmentToWorkspace("ws-1", {
+      filename: "report.docx",
+      dataUrl: textDataUrl(9),
+    });
+
+    expect(upload.filename).toBe("report.docx");
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(String(init?.body)).filename).toBe("report.docx.txt");
+  });
+
+  it("includes the server's error when saving fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () =>
+        jsonResponse({ error: "Agent request failed: 500" }, 500),
+      ),
+    );
+
+    await expect(
+      uploadAttachmentToWorkspace("ws-1", {
+        filename: "data.json",
+        dataUrl: textDataUrl(10),
+      }),
+    ).rejects.toThrow(
+      'Failed to save "data.json" to the workspace: Agent request failed: 500',
+    );
+  });
+});
+
 describe("isAttachableFile", () => {
   it("accepts document files pasted from the clipboard", () => {
     const file = createMockFile("rows.csv", 1024, "text/csv");
@@ -210,6 +430,11 @@ describe("getAttachmentMimeType", () => {
 
   it("remaps CSV files to text/plain because models reject text/csv", () => {
     const file = createMockFile("rows.csv", 1024, "text/csv");
+    expect(getAttachmentMimeType(file)).toBe("text/plain");
+  });
+
+  it("remaps JSON files to text/plain because models reject application/json", () => {
+    const file = createMockFile("config.json", 1024, "application/json");
     expect(getAttachmentMimeType(file)).toBe("text/plain");
   });
 
@@ -269,6 +494,33 @@ describe("createAttachmentPromptPart", () => {
     });
 
     expect(part.type).not.toBe("file");
+    expect("mime" in part).toBe(false);
+  });
+
+  it("converts JSON attachments to text context, preserving UTF-8 content", () => {
+    const json = '{"name": "Zoë", "tags": ["a", "b"]}';
+    const utf8Base64 = btoa(
+      String.fromCharCode(...new TextEncoder().encode(json)),
+    );
+    const part = createAttachmentPromptPart({
+      mime: "text/plain",
+      dataUrl: `data:text/plain;base64,${utf8Base64}`,
+      filename: "config.json",
+    });
+
+    expect(part.type).toBe("text");
+    expect("text" in part && part.text).toContain(json);
+    expect("text" in part && part.text).toContain("config.json");
+  });
+
+  it("never emits an application/json file part, which models reject", () => {
+    const part = createAttachmentPromptPart({
+      mime: "application/json",
+      dataUrl: `data:application/json;base64,${btoa('{"a":1}')}`,
+      filename: "config.json",
+    });
+
+    expect(part.type).toBe("text");
     expect("mime" in part).toBe(false);
   });
 
@@ -334,6 +586,33 @@ describe("fileToDataUrl", () => {
 
     await expect(fileToDataUrl(file)).resolves.toBe(
       "data:text/plain;base64,AAAA",
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  it("uses text/plain in JSON data URLs", async () => {
+    const file = createMockFile("config.json", 4, "application/json");
+
+    vi.stubGlobal(
+      "FileReader",
+      vi.fn(function (this: {
+        onload: (() => void) | null;
+        onerror: (() => void) | null;
+        result: string;
+        readAsDataURL: () => void;
+      }) {
+        this.onload = null;
+        this.onerror = null;
+        this.result = "data:application/json;base64,e30=";
+        this.readAsDataURL = () => {
+          this.onload?.();
+        };
+      }),
+    );
+
+    await expect(fileToDataUrl(file)).resolves.toBe(
+      "data:text/plain;base64,e30=",
     );
 
     vi.unstubAllGlobals();

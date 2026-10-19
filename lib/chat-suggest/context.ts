@@ -1,4 +1,5 @@
 import type { MessageWithParts } from "@/lib/opencode/types";
+import { WORKSPACE_UPLOADS_CONTEXT_PREFIX } from "@/lib/attachment-utils";
 
 export interface SuggestionContext {
   lastAgentMessageId: string;
@@ -11,7 +12,11 @@ const MAX_USER_MESSAGE_CHARS = 500;
 const MAX_USER_MESSAGES = 8;
 
 // Blocks the prompt input prepends to user messages; not part of the user's voice
-const INJECTED_CONTEXT_PREFIXES = ["Context files:", "Comment references:"];
+const INJECTED_CONTEXT_PREFIXES = [
+  "Context files:",
+  "Comment references:",
+  WORKSPACE_UPLOADS_CONTEXT_PREFIX,
+];
 // PR context spans many paragraphs, so those messages are skipped as examples
 const PR_CONTEXT_PATTERN = /^PR #\d+:/;
 

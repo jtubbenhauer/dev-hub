@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Paperclip,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FilePicker } from "@/components/chat/file-picker";
@@ -40,6 +41,9 @@ import {
   fileToDataUrl,
   generateAttachmentId,
   getAttachmentMimeType,
+  splitAttachmentsForUpload,
+  uploadAttachmentToWorkspace,
+  buildWorkspaceUploadsContext,
 } from "@/lib/attachment-utils";
 import {
   getPendingCommentChips,
@@ -217,6 +221,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       return draft?.attachments ?? [];
     });
     const [isDragging, setIsDragging] = useState(false);
+    const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
     const [pickerQuery, setPickerQuery] = useState<string | null>(null);
     const [commandQuery, setCommandQuery] = useState<string | null>(null);
     const [planArgQuery, setPlanArgQuery] = useState<string | null>(null);
@@ -313,6 +318,16 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       }
       saveDraftsToStorage(sessionDrafts);
     }, [sessionId, value, selectedComments, selectedFiles, attachments]);
+
+    // Null once unmounted, so a send that finishes after an upload can tell
+    // whether the input still shows the session it was submitted from.
+    const liveSessionIdRef = useRef<string | null>(null);
+    useEffect(() => {
+      liveSessionIdRef.current = sessionId;
+      return () => {
+        liveSessionIdRef.current = null;
+      };
+    }, [sessionId]);
 
     useImperativeHandle(
       ref,
@@ -421,9 +436,9 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       return [...builtins, ...serverCommands];
     }, [commands]);
 
-    const handleSubmit = useCallback(() => {
+    const handleSubmit = useCallback(async () => {
       const trimmed = value.trim();
-      if (!trimmed || disabled) return;
+      if (!trimmed || disabled || isUploadingAttachments) return;
 
       if (trimmed.startsWith("/")) {
         const withoutSlash = trimmed.slice(1);
@@ -489,22 +504,58 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         selectedPrContexts.length > 0
           ? selectedPrContexts.map((c) => c.contextString).join("\n\n") + "\n\n"
           : "";
+      const { attachmentsToSend, attachmentsToUpload } =
+        splitAttachmentsForUpload(attachments);
+      let uploadsContext = "";
+      if (attachmentsToUpload.length > 0) {
+        if (!workspaceId) return;
+        setIsUploadingAttachments(true);
+        try {
+          const uploads = await Promise.all(
+            attachmentsToUpload.map((attachment) =>
+              uploadAttachmentToWorkspace(workspaceId, attachment),
+            ),
+          );
+          uploadsContext = buildWorkspaceUploadsContext(uploads);
+        } catch (error) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Failed to save attachments to the workspace",
+          );
+          return;
+        } finally {
+          setIsUploadingAttachments(false);
+        }
+      }
       const submitAttachments =
-        attachments.length > 0
-          ? attachments.map((a) => ({
+        attachmentsToSend.length > 0
+          ? attachmentsToSend.map((a) => ({
               mime: a.mime,
               dataUrl: a.dataUrl,
               filename: a.filename,
             }))
           : undefined;
       onSubmit(
-        prContext + commentContext + fileContext + trimmed,
+        prContext + commentContext + fileContext + uploadsContext + trimmed,
         submitAttachments,
       );
+      // After a session switch or unmount mid-upload, the input shows other
+      // content, and the sent message would linger as the old session's draft.
+      if (liveSessionIdRef.current !== sessionId) {
+        if (sessionId) {
+          sessionDrafts.delete(sessionId);
+          saveDraftsToStorage(sessionDrafts);
+        }
+        return;
+      }
       setValue("");
       setSelectedFiles([]);
       setSelectedComments([]);
-      setAttachments([]);
+      // Files attached while an upload ran belong to the next message.
+      setAttachments((current) =>
+        current.filter((attachment) => !attachments.includes(attachment)),
+      );
       setSelectedPrContexts([]);
       setPickerQuery(null);
       setCommandQuery(null);
@@ -516,6 +567,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     }, [
       value,
       disabled,
+      isUploadingAttachments,
       selectedFiles,
       selectedComments,
       selectedPrContexts,
@@ -525,6 +577,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       onCommandSelect,
       queryClient,
       workspaceId,
+      sessionId,
     ]);
 
     const handleChange = useCallback(
@@ -697,7 +750,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         }
         if (event.key === "Enter" && !event.shiftKey && !hasCoarsePointer) {
           event.preventDefault();
-          handleSubmit();
+          void handleSubmit();
         }
       },
       [
@@ -1105,8 +1158,9 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
                     <span className="truncate">{truncatedName}</span>
                     <button
                       onClick={() => handleRemoveAttachment(attachment.id)}
+                      disabled={isUploadingAttachments}
                       aria-label={`Remove ${attachment.filename}`}
-                      className="text-muted-foreground hover:text-foreground ml-0.5"
+                      className="text-muted-foreground hover:text-foreground ml-0.5 disabled:opacity-50"
                     >
                       <X className="size-3" />
                     </button>
@@ -1116,6 +1170,15 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
               {attachments.length >= MAX_ATTACHMENTS && (
                 <span className="text-muted-foreground py-0.5 text-xs">
                   Max {MAX_ATTACHMENTS} files
+                </span>
+              )}
+              {isUploadingAttachments && (
+                <span
+                  role="status"
+                  className="text-muted-foreground flex items-center gap-1 py-0.5 text-xs"
+                >
+                  <Loader2 className="size-3 animate-spin" />
+                  Saving large files to the workspace…
                 </span>
               )}
             </div>
@@ -1175,6 +1238,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
                   : "Send a message... (@ for files, ## for PRs)"
               }
               disabled={disabled}
+              readOnly={isUploadingAttachments}
               rows={1}
               className="placeholder:text-muted-foreground relative max-h-[200px] w-full resize-none bg-transparent px-3 py-2 text-base focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
             />
@@ -1252,10 +1316,14 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
               type="button"
               size="icon"
               onClick={handleSubmit}
-              disabled={!value.trim() || disabled}
+              disabled={!value.trim() || disabled || isUploadingAttachments}
               className="size-7 shrink-0"
             >
-              <Send className="size-3.5" />
+              {isUploadingAttachments ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Send className="size-3.5" />
+              )}
             </Button>
           </div>
         </div>

@@ -47,10 +47,11 @@ export const ALLOWED_FILE_EXTENSIONS = [
   ".xlsx",
   ".csv",
   ".md",
+  ".json",
 ] as const;
 
 export const ALLOWED_TYPES_LABEL =
-  "PNG, JPEG, GIF, WebP, PDF, Word (.docx), Excel (.xlsx), CSV, Markdown";
+  "PNG, JPEG, GIF, WebP, PDF, Word (.docx), Excel (.xlsx), CSV, Markdown, JSON";
 
 // Legacy .doc/.xls are OLE binaries rather than zipped XML, so their text cannot
 // be extracted the way .docx/.xlsx can.
@@ -59,18 +60,28 @@ const LEGACY_OFFICE_EXTENSIONS = [".doc", ".xls"] as const;
 export const FILE_INPUT_ACCEPT = [
   ...ALLOWED_MIME_TYPES,
   "text/markdown",
+  "application/json",
   ...ALLOWED_FILE_EXTENSIONS,
 ].join(",");
 
+const BYTES_PER_KB = 1024;
 const BYTES_PER_MB = 1024 * 1024;
 
 export const MAX_FILE_SIZE = 20 * BYTES_PER_MB;
 
 export const MAX_ATTACHMENTS = 10;
 
-// Models reject text/csv and text/markdown as file parts (only application/pdf
-// and text/plain are accepted), so these are inlined into the prompt as text.
-const INLINE_TEXT_EXTENSIONS = [".md", ".csv"] as const;
+// Inlined text goes straight into the model's context (256KB is ~65-100K
+// tokens); text attachments past this total are saved to the workspace.
+export const MAX_INLINE_TEXT_BYTES = 256 * BYTES_PER_KB;
+
+export const WORKSPACE_UPLOADS_CONTEXT_PREFIX =
+  "Attached files saved in the workspace";
+
+// Models reject text/csv, text/markdown and application/json as file parts
+// (only application/pdf and text/plain are accepted), so these are inlined
+// into the prompt as text.
+const INLINE_TEXT_EXTENSIONS = [".md", ".csv", ".json"] as const;
 
 function hasExtension(
   filename: string,
@@ -171,6 +182,116 @@ export function validateAttachment(file: File): {
     };
   }
   return { valid: true };
+}
+
+function formatByteSize(bytes: number): string {
+  return bytes >= BYTES_PER_MB
+    ? `${(bytes / BYTES_PER_MB).toFixed(1)}MB`
+    : `${Math.ceil(bytes / BYTES_PER_KB)}KB`;
+}
+
+function getInlinedTextBytes(
+  attachment: Pick<Attachment, "filename" | "dataUrl">,
+): number {
+  const isInlined =
+    isInlineTextFile(attachment.filename) ||
+    isExtractedOfficeFile(attachment.filename);
+  if (!isInlined) return 0;
+  const base64 = attachment.dataUrl.slice(attachment.dataUrl.indexOf(",") + 1);
+  const paddingLength = base64.endsWith("==")
+    ? 2
+    : base64.endsWith("=")
+      ? 1
+      : 0;
+  return Math.floor((base64.length * 3) / 4) - paddingLength;
+}
+
+// Text attachments are inlined in order while they fit the budget; the rest
+// are uploaded. Images and PDFs are always sent as file parts.
+export function splitAttachmentsForUpload<
+  T extends Pick<Attachment, "filename" | "dataUrl">,
+>(
+  attachments: readonly T[],
+): { attachmentsToSend: T[]; attachmentsToUpload: T[] } {
+  const attachmentsToSend: T[] = [];
+  const attachmentsToUpload: T[] = [];
+  let inlinedBytes = 0;
+  for (const attachment of attachments) {
+    const textBytes = getInlinedTextBytes(attachment);
+    if (textBytes > 0 && inlinedBytes + textBytes > MAX_INLINE_TEXT_BYTES) {
+      attachmentsToUpload.push(attachment);
+      continue;
+    }
+    inlinedBytes += textBytes;
+    attachmentsToSend.push(attachment);
+  }
+  return { attachmentsToSend, attachmentsToUpload };
+}
+
+export interface WorkspaceUpload {
+  readonly filename: string;
+  readonly path: string;
+  readonly sizeBytes: number;
+}
+
+function isWorkspaceUploadResponse(
+  value: unknown,
+): value is { path: string; sizeBytes: number } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "path" in value &&
+    typeof value.path === "string" &&
+    "sizeBytes" in value &&
+    typeof value.sizeBytes === "number"
+  );
+}
+
+export async function uploadAttachmentToWorkspace(
+  workspaceId: string,
+  attachment: Pick<Attachment, "filename" | "dataUrl">,
+): Promise<WorkspaceUpload> {
+  // Office files are uploaded as their extracted text, which agents can read.
+  const savedFilename = isExtractedOfficeFile(attachment.filename)
+    ? `${attachment.filename}.txt`
+    : attachment.filename;
+  const response = await fetch("/api/files/upload", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      workspaceId,
+      filename: savedFilename,
+      dataUrl: attachment.dataUrl,
+    }),
+  });
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isWorkspaceUploadResponse(body)) {
+    const detail =
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof body.error === "string"
+        ? `: ${body.error}`
+        : "";
+    throw new Error(
+      `Failed to save ${JSON.stringify(attachment.filename)} to the workspace${detail}`,
+    );
+  }
+  return {
+    filename: attachment.filename,
+    path: body.path,
+    sizeBytes: body.sizeBytes,
+  };
+}
+
+export function buildWorkspaceUploadsContext(
+  uploads: readonly WorkspaceUpload[],
+): string {
+  const fileLines = uploads.map(
+    (upload) =>
+      `- ${JSON.stringify(upload.filename)} (${formatByteSize(upload.sizeBytes)}): ${upload.path}`,
+  );
+  return `${WORKSPACE_UPLOADS_CONTEXT_PREFIX} (too large to include in this message; read them with your tools, paths are relative to the workspace root):\n${fileLines.join("\n")}\n\n`;
 }
 
 function encodeTextAsDataUrl(text: string): string {

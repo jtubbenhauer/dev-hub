@@ -4,6 +4,7 @@ import {
   stripInjectedContext,
 } from "@/lib/chat-suggest/context";
 import type { MessageWithParts } from "@/lib/opencode/types";
+import { buildWorkspaceUploadsContext } from "@/lib/attachment-utils";
 
 function makeMessage(
   id: string,
@@ -91,5 +92,16 @@ describe("stripInjectedContext", () => {
     const text =
       'Comment references:\n- [comment:1] a.ts:3 — "hm"\n\nContext files: a.ts\n\nplease fix';
     expect(stripInjectedContext(text)).toBe("please fix");
+  });
+
+  it("removes the block referencing attachments saved in the workspace", () => {
+    const text = `${buildWorkspaceUploadsContext([
+      {
+        filename: "data.json",
+        path: ".devhub/uploads/20261013-013045-3f9a2c-data.json",
+        sizeBytes: 16 * 1024 * 1024,
+      },
+    ])}what is in this?`;
+    expect(stripInjectedContext(text)).toBe("what is in this?");
   });
 });

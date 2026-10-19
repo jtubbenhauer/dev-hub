@@ -1,0 +1,44 @@
+app/api/files/content/route.ts
+  h_c7f8735263030f 12-20,62-65
+app/api/files/raw/route.ts
+  h_c7f8735263030f 16,23,46,83,87-89,107-111,140,162-167
+lib/file-preview.ts
+  h_c7f8735263030f 46-71,92-103,104-120
+tests/api/files-content.test.ts
+  h_c7f8735263030f 1-125
+tests/api/files-raw.test.ts
+  h_c7f8735263030f 117-134,237-252
+tests/components/chat/chat-file-dialog.test.tsx
+  h_c7f8735263030f 8-12,93-98,100,101,102-104,105-106,108-124
+tests/stores/chat-file-dialog-store.test.ts
+  h_c7f8735263030f 3,101,102-103,104-105,106,107-124,125,126-145,146,148-152,153-154
+components/chat/chat-file-dialog.tsx
+  h_c7f8735263030f 5,17-18,21,44,116,129,137,144,160-168,178-180
+components/editor/file-download-button.tsx
+  h_c7f8735263030f 1-59
+components/editor/file-viewer.tsx
+  h_c7f8735263030f 1-82
+lib/files/load-file-for-editor.ts
+  h_c7f8735263030f 1-46
+stores/chat-file-dialog-store.ts
+  h_c7f8735263030f 2,52,59,61-62,67,74-75
+tests/components/editor/file-download-button.test.tsx
+  h_c7f8735263030f 1-53
+tests/components/editor/file-viewer.test.tsx
+  h_c7f8735263030f 1-81
+tests/lib/file-preview.test.ts
+  h_c7f8735263030f 3,5,8,13-14,90-128
+tests/lib/files/load-file-for-editor.test.ts
+  h_c7f8735263030f 1-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "527ab7e20437325ff8f98e549f6606be3dc0d756",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

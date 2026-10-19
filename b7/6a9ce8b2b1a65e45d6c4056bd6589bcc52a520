@@ -1,0 +1,20 @@
+app/files/page.tsx
+  h_c7f8735263030f 14-15,26,276,393-394,537-544,561-563,564,593-594,601-602
+lib/files/open-in-files-page.ts
+  h_c7f8735263030f 3-6,49,78-79,81
+tests/app/files/page.test.tsx
+  h_c7f8735263030f 47-52,55-70,396-399,401-423,425-443
+tests/lib/files/open-in-files-page.test.ts
+  h_c7f8735263030f 9-13,195-216,218-226,229,231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b76a9ce8b2b1a65e45d6c4056bd6589bcc52a520",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

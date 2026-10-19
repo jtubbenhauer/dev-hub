@@ -93,3 +93,25 @@ export function getNodeAtBuffer(
   }
   return node;
 }
+
+// After a repeatable action fires, these keys can fire again without the
+// leader: the action's repeatable siblings under the same prefix, itself
+// included. Null when the fired action is not repeatable.
+export function buildRepeatNode(
+  root: TrieNode,
+  firedKeys: string[],
+  isRepeatable: (actionId: string) => boolean,
+): TrieNode | null {
+  const firedActionId = getNodeAtBuffer(root, firedKeys)?.actionId;
+  if (firedActionId === undefined || !isRepeatable(firedActionId)) return null;
+
+  const parent = getNodeAtBuffer(root, firedKeys.slice(0, -1));
+  if (!parent) return null;
+  const children = new Map<string, TrieNode>();
+  for (const [key, child] of parent.children) {
+    if (child.actionId !== undefined && isRepeatable(child.actionId)) {
+      children.set(key, { children: new Map(), actionId: child.actionId });
+    }
+  }
+  return { children };
+}

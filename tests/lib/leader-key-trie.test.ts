@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   buildTrie,
+  buildRepeatNode,
   matchKeys,
   getChildEntries,
   getNodeAtBuffer,
 } from "@/lib/leader-key-trie";
+import type { TrieNode } from "@/lib/leader-key-trie";
 import type { LeaderBindingsMap } from "@/types/leader-key";
 
 describe("leader-key-trie", () => {
@@ -224,6 +226,47 @@ describe("leader-key-trie", () => {
       const node = getNodeAtBuffer(root, ["a", "b", "c"]);
       expect(node).not.toBeNull();
       expect(node!.actionId).toBe("a.b.c");
+    });
+  });
+
+  describe("buildRepeatNode", () => {
+    const bindings: LeaderBindingsMap = {
+      "tab.next": "]",
+      "tab.prev": "[",
+      "tab.close": "q",
+      "buffer.next": "b n",
+      "buffer.prev": "b p",
+    };
+    const root = buildTrie(bindings, new Set(Object.keys(bindings)));
+    const repeatableIds = new Set([
+      "tab.next",
+      "tab.prev",
+      "buffer.next",
+      "buffer.prev",
+    ]);
+    const isRepeatable = (actionId: string) => repeatableIds.has(actionId);
+
+    function toKeymap(node: TrieNode | null) {
+      if (!node) return null;
+      return Object.fromEntries(
+        [...node.children].map(([key, child]) => [key, child.actionId]),
+      );
+    }
+
+    it("offers the fired action and its repeatable siblings", () => {
+      const node = buildRepeatNode(root, ["]"], isRepeatable);
+
+      expect(toKeymap(node)).toEqual({ "]": "tab.next", "[": "tab.prev" });
+    });
+
+    it("returns null when the fired action is not repeatable", () => {
+      expect(buildRepeatNode(root, ["q"], isRepeatable)).toBeNull();
+    });
+
+    it("offers siblings under the same prefix for multi-key bindings", () => {
+      const node = buildRepeatNode(root, ["b", "n"], isRepeatable);
+
+      expect(toKeymap(node)).toEqual({ n: "buffer.next", p: "buffer.prev" });
     });
   });
 });

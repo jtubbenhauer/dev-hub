@@ -9,7 +9,10 @@ import {
   buildOmoAssistantMessage,
   buildOmoUserMessage,
 } from "@/lib/omo/adapter/shapes";
-import { readBackgroundStatusUpdate } from "@/lib/omo/adapter/background-status";
+import {
+  readBackgroundStatusUpdate,
+  readMonitorStateUpdate,
+} from "@/lib/omo/adapter/background-status";
 import { buildUserContent } from "@/lib/omo/adapter/entry-content";
 import {
   messageString,
@@ -242,8 +245,12 @@ export function createLiveAdapter(options: LiveAdapterOptions): LiveAdapter {
           return toolHandlers.handleUpdate(record);
         case "tool_execution_end":
           return toolHandlers.handleEnd(record);
-        case "extension_event":
-          return toolHandlers.handleExtension(record);
+        case "extension_event": {
+          const monitorEntries = readMonitorStateUpdate(record);
+          return monitorEntries === undefined
+            ? toolHandlers.handleExtension(record)
+            : { events: [], effects: [{ monitorEntries }] };
+        }
         case "extension_ui_request": {
           const update = readBackgroundStatusUpdate(record);
           return {

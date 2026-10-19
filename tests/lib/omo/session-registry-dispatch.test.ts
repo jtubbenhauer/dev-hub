@@ -432,4 +432,54 @@ describe("OmoRegistryDispatcher", () => {
     ]);
     expect(dispatcher.backgroundStatusesForWorkspace(WORKSPACE.id)).toEqual({});
   });
+
+  it("merges omo's monitor list into the background status and drops it once empty", () => {
+    // Given
+    const dispatcher = new Dispatcher({
+      client: createUnconnectedClient(),
+      refreshIndex: async () => undefined,
+      findSubAgentSessionIds: async () => [],
+    });
+    const ciWatch = {
+      id: "bash_1",
+      description: "watch checks",
+      isPaused: false,
+      startedAtMs: 1,
+    };
+    let monitorEntries = [ciWatch];
+    const { binding } = createTestBinding("goal-1", () => ({
+      events: [],
+      effects: [{ monitorEntries }],
+    }));
+    const events: OmoRegistryEvent[] = [];
+    dispatcher.subscribe(WORKSPACE.id, (event) => events.push(event));
+
+    // When
+    dispatcher.dispatch(binding, { type: "extension_event" });
+    dispatcher.dispatch(binding, { type: "extension_event" });
+    const liveStatuses = dispatcher.backgroundStatusesForWorkspace(
+      WORKSPACE.id,
+    );
+    monitorEntries = [];
+    dispatcher.dispatch(binding, { type: "extension_event" });
+
+    // Then
+    const watchingStatus = {
+      monitors: "watching watch checks",
+      monitorCount: 1,
+      monitorEntries: [ciWatch],
+    };
+    expect(events).toEqual([
+      {
+        type: "session.background",
+        properties: { sessionID: "omo_goal-1", status: watchingStatus },
+      },
+      {
+        type: "session.background",
+        properties: { sessionID: "omo_goal-1", status: null },
+      },
+    ]);
+    expect(liveStatuses).toEqual({ "omo_goal-1": watchingStatus });
+    expect(dispatcher.backgroundStatusesForWorkspace(WORKSPACE.id)).toEqual({});
+  });
 });

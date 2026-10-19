@@ -1,10 +1,13 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionBackgroundBanner } from "@/components/chat/session-background-banner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { SessionBackgroundStatus } from "@/lib/opencode/types";
+import type {
+  SessionBackgroundMonitor,
+  SessionBackgroundStatus,
+} from "@/lib/opencode/types";
 import { useSessionBackgroundStore } from "@/stores/session-background-store";
 
 const SESSION_ID = "omo_background-banner";
@@ -24,6 +27,44 @@ const TWO_MONITORS: SessionBackgroundStatus = {
   monitors: MONITORS_LINE,
   monitorCount: 2,
 };
+
+const NOW_MS = Date.UTC(2026, 9, 17, 12);
+const MINUTE_MS = 60_000;
+
+function watch(
+  id: string,
+  description: string,
+  minutesAgo: number,
+  details: Partial<SessionBackgroundMonitor> = {},
+): SessionBackgroundMonitor {
+  return {
+    id,
+    description,
+    isPaused: false,
+    startedAtMs: NOW_MS - minutesAgo * MINUTE_MS,
+    ...details,
+  };
+}
+
+const FOUR_WATCHES_LINE = "watching 4: round-7 shift r… +3 more (10h 21m)";
+const FOUR_WATCHES: SessionBackgroundStatus = {
+  monitors: FOUR_WATCHES_LINE,
+  monitorCount: 4,
+  monitorEntries: [
+    watch("bash_1", "round-7 shift review", 621, {
+      command: "tail -F round-7.log | grep --line-buffered shift",
+      fireCount: 3,
+      lastFiredAtMs: NOW_MS - 2 * MINUTE_MS,
+    }),
+    watch("bash_2", "CI checks", 45),
+    watch("bash_3", "deploy watch", 1_505, { isPaused: true }),
+    watch("bash_4", "origin/main moves", 0),
+  ],
+};
+
+function mockWatchListWidth(width: number) {
+  vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(width);
+}
 
 function setStatusBySession(
   statusBySession: Record<string, SessionBackgroundStatus>,
@@ -51,6 +92,11 @@ function animatedElements(banner: HTMLElement) {
 
 beforeEach(() => {
   useSessionBackgroundStore.setState({ statusBySession: {} });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("SessionBackgroundBanner", () => {
@@ -188,6 +234,85 @@ describe("SessionBackgroundBanner", () => {
     expect(tooltip).toHaveTextContent("Pursuing goal (25m)");
     expect(tooltip).toHaveTextContent(WAIT_LINE);
     expect(tooltip).toHaveTextContent(MONITORS_LINE);
+  });
+
+  describe("with omo's monitor list", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(NOW_MS);
+    });
+
+    it("shows each watch as its own chip instead of the summary line", () => {
+      mockWatchListWidth(1_000);
+      setStatusBySession({
+        [SESSION_ID]: { ...WAITING_GOAL, ...FOUR_WATCHES },
+      });
+
+      renderBanner();
+
+      const banner = getBanner();
+      expect(
+        within(banner).getByText("Pursuing goal (25m)"),
+      ).toBeInTheDocument();
+      expect(within(banner).getByText("4 watching")).toBeInTheDocument();
+      expect(
+        within(banner).queryByText(FOUR_WATCHES_LINE),
+      ).not.toBeInTheDocument();
+      const chips = within(
+        within(banner).getByRole("list", { name: "Watches" }),
+      ).getAllByRole("listitem");
+      expect(chips.map((chip) => chip.textContent)).toEqual([
+        "round-7 shift review10h 21m",
+        "CI checks45m",
+        "deploy watch1d 1h 5m",
+        "origin/main moves<1m",
+      ]);
+      expect(within(chips[2]).getByLabelText("Muted")).toBeInTheDocument();
+      expect(banner.querySelector(".animate-ping")).toBeInTheDocument();
+    });
+
+    it("folds the watches that do not fit into a +N more menu", async () => {
+      mockWatchListWidth(500);
+      setStatusBySession({ [SESSION_ID]: FOUR_WATCHES });
+      const user = userEvent.setup();
+      renderBanner();
+
+      const banner = getBanner();
+      expect(within(banner).getAllByRole("listitem")).toHaveLength(2);
+      expect(
+        within(banner).queryByText("deploy watch"),
+      ).not.toBeInTheDocument();
+
+      await user.click(within(banner).getByRole("button", { name: "+2 more" }));
+
+      const menuItems = screen.getAllByRole("menuitem");
+      expect(menuItems.map((item) => item.textContent)).toEqual([
+        "deploy watch1d 1h 5m",
+        "origin/main moves<1m",
+      ]);
+      expect(menuItems[0]).toHaveAttribute(
+        "title",
+        "deploy watch\nrunning 1d 1h 5m · muted",
+      );
+    });
+
+    it("shows a watch's command and fire history on hover", async () => {
+      mockWatchListWidth(1_000);
+      setStatusBySession({ [SESSION_ID]: FOUR_WATCHES });
+      renderBanner();
+
+      await userEvent.hover(
+        within(getBanner()).getByText("round-7 shift review"),
+      );
+
+      const tooltip = await screen.findByRole("tooltip");
+      expect(tooltip).toHaveTextContent(
+        "tail -F round-7.log | grep --line-buffered shift",
+      );
+      expect(tooltip).toHaveTextContent(
+        "running 10h 21m · fired 3 times · last 2m ago",
+      );
+    });
   });
 
   it("follows store updates for its session", () => {

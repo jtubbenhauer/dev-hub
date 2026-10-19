@@ -1,6 +1,10 @@
 import type { OmoBackgroundStatusUpdate } from "@/lib/omo/adapter/background-status";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
-import type { Event, SubAgentActivity } from "@/lib/opencode/types";
+import type {
+  Event,
+  SessionBackgroundMonitor,
+  SubAgentActivity,
+} from "@/lib/opencode/types";
 
 export type Effect =
   | {
@@ -35,6 +39,9 @@ export type Effect =
     }
   | {
       readonly backgroundStatus: OmoBackgroundStatusUpdate;
+    }
+  | {
+      readonly monitorEntries: readonly SessionBackgroundMonitor[];
     };
 
 export interface LiveAdapterSeed {

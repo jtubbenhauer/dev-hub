@@ -88,6 +88,48 @@ describe("omo background statuses on the workspace event stream", () => {
     );
   });
 
+  it("streams each monitor omo lists alongside the footer line", async () => {
+    // Given
+    const current = await attachGoalSession();
+    const reader = openStream(current);
+
+    // When
+    current.host.emit({
+      type: "extension_event",
+      sessionId: "route-goal",
+      name: "terminal_monitor_state",
+      data: {
+        activeCount: 1,
+        monitors: [
+          {
+            id: "bash_1",
+            description: "e2e gate",
+            paused: false,
+            startedAtMs: 1_710_000_000_000,
+            command: "tail -F e2e.log",
+          },
+        ],
+      },
+    });
+
+    // Then
+    expect(parseSseFrame(await readSseFrame(reader))).toEqual(
+      backgroundFrame({
+        monitors: "watching e2e gate",
+        monitorCount: 1,
+        monitorEntries: [
+          {
+            id: "bash_1",
+            description: "e2e gate",
+            isPaused: false,
+            startedAtMs: 1_710_000_000_000,
+            command: "tail -F e2e.log",
+          },
+        ],
+      }),
+    );
+  });
+
   it("replays a live status to a stream that starts later", async () => {
     // Given
     const current = await attachGoalSession();

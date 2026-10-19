@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import type {
+  SessionBackgroundMonitor,
   SessionBackgroundStatus,
   SessionGoalState,
 } from "@/lib/opencode/types";
@@ -32,6 +33,36 @@ function isSessionGoalState(value: unknown): value is SessionGoalState {
   return typeof value === "string" && SESSION_GOAL_STATES.has(value);
 }
 
+function isOptionalFiniteNumber(value: unknown): boolean {
+  return (
+    value === undefined || (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
+function isSessionBackgroundMonitor(
+  value: unknown,
+): value is SessionBackgroundMonitor {
+  return (
+    isRecord(value) &&
+    typeof value["id"] === "string" &&
+    typeof value["description"] === "string" &&
+    typeof value["isPaused"] === "boolean" &&
+    typeof value["startedAtMs"] === "number" &&
+    Number.isFinite(value["startedAtMs"]) &&
+    (value["command"] === undefined || typeof value["command"] === "string") &&
+    isOptionalFiniteNumber(value["fireCount"]) &&
+    isOptionalFiniteNumber(value["lastFiredAtMs"])
+  );
+}
+
+function monitorEntriesFrom(
+  value: unknown,
+): readonly SessionBackgroundMonitor[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const entries = value.filter(isSessionBackgroundMonitor);
+  return entries.length === 0 ? undefined : entries;
+}
+
 export function isBackgroundWorkLive(status: SessionBackgroundStatus): boolean {
   return (
     status.goalState === "active" ||
@@ -51,6 +82,10 @@ function backgroundStatusFrom(
   const monitors = optionalText(value["monitors"]);
   const goalWaitProgress = value["goalWaitProgress"];
   const monitorCount = value["monitorCount"];
+  const monitorEntries =
+    monitors === undefined
+      ? undefined
+      : monitorEntriesFrom(value["monitorEntries"]);
   if (goal === undefined && goalWait === undefined && monitors === undefined) {
     return undefined;
   }
@@ -72,6 +107,7 @@ function backgroundStatusFrom(
     monitorCount > 0
       ? { monitorCount }
       : {}),
+    ...(monitorEntries === undefined ? {} : { monitorEntries }),
   };
 }
 

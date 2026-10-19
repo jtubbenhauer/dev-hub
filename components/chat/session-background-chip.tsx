@@ -72,7 +72,22 @@ function BackgroundWorkDetails({
       {status.monitors !== undefined && (
         <div className="flex gap-1.5">
           <Radio aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
-          <p>{status.monitors}</p>
+          {status.monitorEntries === undefined ? (
+            <p>{status.monitors}</p>
+          ) : (
+            <ul>
+              {status.monitorEntries.map((monitor) => (
+                <li key={monitor.id}>
+                  {monitor.description === ""
+                    ? monitor.id
+                    : monitor.description}
+                  {monitor.isPaused && (
+                    <span className="text-background/70"> (muted)</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

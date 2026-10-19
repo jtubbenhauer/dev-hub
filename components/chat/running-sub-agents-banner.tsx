@@ -29,7 +29,7 @@ const AGENT_CHIP_GAP = 6;
 const OVERFLOW_PICKER_TRIGGER_WIDTH = 88;
 const MIN_VISIBLE_AGENT_CHIPS = 1;
 
-function getVisibleAgentCount(
+export function getVisibleAgentCount(
   agentCount: number,
   agentListWidth: number | null,
 ): number {

@@ -104,6 +104,16 @@ export type SessionGoalState =
   | "blocked"
   | "achieved";
 
+export interface SessionBackgroundMonitor {
+  readonly id: string;
+  readonly description: string;
+  readonly isPaused: boolean;
+  readonly startedAtMs: number;
+  readonly command?: string;
+  readonly fireCount?: number;
+  readonly lastFiredAtMs?: number;
+}
+
 export interface SessionBackgroundStatus {
   readonly goal?: string;
   readonly goalState?: SessionGoalState;
@@ -112,6 +122,7 @@ export interface SessionBackgroundStatus {
   readonly goalWaitProgress?: number;
   readonly monitors?: string;
   readonly monitorCount?: number;
+  readonly monitorEntries?: readonly SessionBackgroundMonitor[];
 }
 
 export interface SessionBackgroundEvent {

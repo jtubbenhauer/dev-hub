@@ -6,7 +6,10 @@ import {
 } from "@/lib/omo/adapter/background-status";
 import type { Effect } from "@/lib/omo/adapter/live-adapter-types";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
-import type { SessionBackgroundStatus } from "@/lib/opencode/types";
+import type {
+  SessionBackgroundMonitor,
+  SessionBackgroundStatus,
+} from "@/lib/opencode/types";
 import type { OmoRpcClient } from "@/lib/omo/rpc-client";
 import { buildOmoSession } from "@/lib/omo/adapter/shapes";
 import {
@@ -48,7 +51,14 @@ type BackgroundStatusEffect = Extract<
   { readonly backgroundStatus: unknown }
 >;
 
+type MonitorEntriesEffect = Extract<
+  Effect,
+  { readonly monitorEntries: unknown }
+>;
+
 type BackgroundStatusTexts = Map<OmoBackgroundStatusKey, string>;
+
+const NO_BACKGROUND_TEXTS: BackgroundStatusTexts = new Map();
 
 const MAX_LINKED_TASKS = 1_000;
 
@@ -114,6 +124,10 @@ export class OmoRegistryDispatcher {
     string,
     Map<string, BackgroundStatusTexts>
   >();
+  private readonly backgroundMonitorEntries = new Map<
+    string,
+    Map<string, readonly SessionBackgroundMonitor[]>
+  >();
 
   constructor(options: OmoRegistryDispatcherOptions) {
     this.client = options.client;
@@ -168,11 +182,13 @@ export class OmoRegistryDispatcher {
   backgroundStatusesForWorkspace(
     workspaceId: string,
   ): Record<string, SessionBackgroundStatus> {
-    const sessions = this.backgroundTexts.get(workspaceId);
-    if (sessions === undefined) return {};
+    const sessionIDs = new Set([
+      ...(this.backgroundTexts.get(workspaceId)?.keys() ?? []),
+      ...(this.backgroundMonitorEntries.get(workspaceId)?.keys() ?? []),
+    ]);
     return Object.fromEntries(
-      [...sessions].flatMap(([sessionID, texts]) => {
-        const status = toSessionBackgroundStatus(texts);
+      [...sessionIDs].flatMap((sessionID) => {
+        const status = this.backgroundStatusFor(workspaceId, sessionID);
         return status === null ? [] : [[sessionID, status]];
       }),
     );
@@ -182,8 +198,14 @@ export class OmoRegistryDispatcher {
   // goal or monitors, so its status is withdrawn rather than left to go stale.
   clearBackgroundStatus(workspaceId: string, sessionID: string): void {
     const sessions = this.backgroundTexts.get(workspaceId);
-    if (sessions === undefined || !sessions.delete(sessionID)) return;
-    if (sessions.size === 0) this.backgroundTexts.delete(workspaceId);
+    const hadTexts = sessions?.delete(sessionID) === true;
+    if (sessions?.size === 0) this.backgroundTexts.delete(workspaceId);
+    const monitorSessions = this.backgroundMonitorEntries.get(workspaceId);
+    const hadMonitorEntries = monitorSessions?.delete(sessionID) === true;
+    if (monitorSessions?.size === 0) {
+      this.backgroundMonitorEntries.delete(workspaceId);
+    }
+    if (!hadTexts && !hadMonitorEntries) return;
     this.emit(workspaceId, [backgroundStatusEvent(sessionID, null)]);
   }
 
@@ -218,6 +240,7 @@ export class OmoRegistryDispatcher {
     this.sinks.clear();
     this.sessionStatuses.clear();
     this.backgroundTexts.clear();
+    this.backgroundMonitorEntries.clear();
   }
 
   private queueLeaf(binding: OmoSessionBinding, record: JsonlRecord): void {
@@ -247,6 +270,10 @@ export class OmoRegistryDispatcher {
   private applyEffect(binding: OmoSessionBinding, effect: Effect): void {
     if (this.isBackgroundStatusEffect(effect)) {
       this.applyBackgroundStatus(binding, effect.backgroundStatus);
+      return;
+    }
+    if (this.isMonitorEntriesEffect(effect)) {
+      this.applyMonitorEntries(binding, effect.monitorEntries);
       return;
     }
     if (this.isLinkEffect(effect)) {
@@ -369,8 +396,50 @@ export class OmoRegistryDispatcher {
       this.backgroundTexts.set(binding.workspaceId, sessions);
     }
     this.emit(binding.workspaceId, [
-      backgroundStatusEvent(sessionID, toSessionBackgroundStatus(texts)),
+      backgroundStatusEvent(
+        sessionID,
+        this.backgroundStatusFor(binding.workspaceId, sessionID),
+      ),
     ]);
+  }
+
+  private applyMonitorEntries(
+    binding: OmoSessionBinding,
+    entries: readonly SessionBackgroundMonitor[],
+  ): void {
+    const sessionID = `omo_${binding.durableId}`;
+    const sessions =
+      this.backgroundMonitorEntries.get(binding.workspaceId) ??
+      new Map<string, readonly SessionBackgroundMonitor[]>();
+    const previous = sessions.get(sessionID) ?? [];
+    if (JSON.stringify(previous) === JSON.stringify(entries)) return;
+    if (entries.length === 0) {
+      sessions.delete(sessionID);
+    } else {
+      sessions.set(sessionID, entries);
+    }
+    if (sessions.size === 0) {
+      this.backgroundMonitorEntries.delete(binding.workspaceId);
+    } else {
+      this.backgroundMonitorEntries.set(binding.workspaceId, sessions);
+    }
+    this.emit(binding.workspaceId, [
+      backgroundStatusEvent(
+        sessionID,
+        this.backgroundStatusFor(binding.workspaceId, sessionID),
+      ),
+    ]);
+  }
+
+  private backgroundStatusFor(
+    workspaceId: string,
+    sessionID: string,
+  ): SessionBackgroundStatus | null {
+    return toSessionBackgroundStatus(
+      this.backgroundTexts.get(workspaceId)?.get(sessionID) ??
+        NO_BACKGROUND_TEXTS,
+      this.backgroundMonitorEntries.get(workspaceId)?.get(sessionID),
+    );
   }
 
   private rememberLinkedTask(key: string, workerDurableId: string): void {
@@ -411,6 +480,12 @@ export class OmoRegistryDispatcher {
     const update =
       "backgroundStatus" in effect ? effect.backgroundStatus : undefined;
     return isJsonObject(update) && typeof update["key"] === "string";
+  }
+
+  private isMonitorEntriesEffect(
+    effect: Effect,
+  ): effect is MonitorEntriesEffect {
+    return "monitorEntries" in effect && Array.isArray(effect.monitorEntries);
   }
 
   private isLinkEffect(effect: Effect): effect is LinkTaskChildEffect {

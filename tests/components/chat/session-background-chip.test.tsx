@@ -161,6 +161,33 @@ describe("SessionBackgroundChip", () => {
     );
   });
 
+  it("lists each watch in the tooltip once omo sends its monitor list", async () => {
+    setSessionStatus(SESSION_ID, {
+      monitors: "watching 2: e2e scope gate +1 more (5m)",
+      monitorCount: 2,
+      monitorEntries: [
+        {
+          id: "bash_1",
+          description: "e2e scope gate",
+          isPaused: false,
+          startedAtMs: 1,
+        },
+        { id: "bash_2", description: "deploy", isPaused: true, startedAtMs: 2 },
+      ],
+    });
+    renderChip();
+
+    await userEvent.tab();
+
+    const tooltip = await screen.findByRole("tooltip");
+    const watches = within(tooltip).getAllByRole("listitem");
+    expect(watches.map((watch) => watch.textContent)).toEqual([
+      "e2e scope gate",
+      "deploy (muted)",
+    ]);
+    expect(tooltip).not.toHaveTextContent("+1 more");
+  });
+
   it("follows store updates for its session", () => {
     setSessionStatus(SESSION_ID, WAITING_GOAL_WITH_MONITORS);
     renderChip();

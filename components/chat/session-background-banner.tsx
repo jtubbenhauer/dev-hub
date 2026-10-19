@@ -3,6 +3,7 @@
 import { Radio, Target } from "lucide-react";
 
 import { goalStateLabel } from "@/components/chat/session-background-chip";
+import { BackgroundMonitorRow } from "@/components/chat/session-background-monitors";
 import {
   Tooltip,
   TooltipContent,
@@ -96,14 +97,20 @@ function MonitorSummary({ monitors }: { monitors: string }) {
   );
 }
 
-function BackgroundWorkLines({ status }: { status: SessionBackgroundStatus }) {
+function BackgroundWorkLines({
+  status,
+  showsMonitorSummary,
+}: {
+  status: SessionBackgroundStatus;
+  showsMonitorSummary: boolean;
+}) {
   return (
     <div className="flex flex-col gap-1">
       {status.goal !== undefined && <p>{status.goal}</p>}
       {status.goalWait !== undefined && (
         <p className="text-background/70">{status.goalWait}</p>
       )}
-      {status.monitors !== undefined && <p>{status.monitors}</p>}
+      {showsMonitorSummary && <p>{status.monitors}</p>}
     </div>
   );
 }
@@ -114,35 +121,47 @@ export function SessionBackgroundBanner({ sessionId }: { sessionId: string }) {
   );
   if (!status || !shouldShowBanner(status)) return null;
   const hasGoal = status.goal !== undefined || status.goalWait !== undefined;
+  const monitorEntries = status.monitorEntries ?? [];
+  // Until omo sends its monitor list, only the footer summary line is known.
+  const showsMonitorSummary =
+    status.monitors !== undefined && monitorEntries.length === 0;
 
   return (
     <section
       aria-label="Background work"
-      className="shrink-0 border-b border-sky-500/20 bg-sky-500/10 px-4 py-1.5"
+      className="flex shrink-0 flex-col gap-1 border-b border-sky-500/20 bg-sky-500/10 px-4 py-1.5"
     >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex h-7 w-full min-w-0 items-center gap-1.5 overflow-hidden text-xs">
-            {hasGoal && <GoalSummary status={status} />}
-            {hasGoal && status.monitors !== undefined && (
-              <span
-                aria-hidden="true"
-                className="mx-1 h-3 w-px shrink-0 bg-sky-500/30"
-              />
-            )}
-            {status.monitors !== undefined && (
-              <MonitorSummary monitors={status.monitors} />
-            )}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent
-          side="bottom"
-          align="start"
-          className="max-w-80 text-pretty"
-        >
-          <BackgroundWorkLines status={status} />
-        </TooltipContent>
-      </Tooltip>
+      {(hasGoal || showsMonitorSummary) && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex h-7 w-full min-w-0 items-center gap-1.5 overflow-hidden text-xs">
+              {hasGoal && <GoalSummary status={status} />}
+              {hasGoal && showsMonitorSummary && (
+                <span
+                  aria-hidden="true"
+                  className="mx-1 h-3 w-px shrink-0 bg-sky-500/30"
+                />
+              )}
+              {showsMonitorSummary && status.monitors !== undefined && (
+                <MonitorSummary monitors={status.monitors} />
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent
+            side="bottom"
+            align="start"
+            className="max-w-80 text-pretty"
+          >
+            <BackgroundWorkLines
+              status={status}
+              showsMonitorSummary={showsMonitorSummary}
+            />
+          </TooltipContent>
+        </Tooltip>
+      )}
+      {monitorEntries.length > 0 && (
+        <BackgroundMonitorRow monitors={monitorEntries} />
+      )}
     </section>
   );
 }

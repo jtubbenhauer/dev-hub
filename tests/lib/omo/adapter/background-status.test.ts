@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import {
   readBackgroundStatusUpdate,
+  readMonitorStateUpdate,
   toSessionBackgroundStatus,
   type OmoBackgroundStatusKey,
 } from "@/lib/omo/adapter/background-status";
@@ -22,6 +23,103 @@ function setStatusRecord(statusKey: string, statusText?: string) {
 function statusFrom(entries: Array<[OmoBackgroundStatusKey, string]>) {
   return toSessionBackgroundStatus(new Map(entries));
 }
+
+function monitorStateRecord(monitors: unknown) {
+  return {
+    type: "extension_event",
+    sessionId: "rpc-29",
+    name: "terminal_monitor_state",
+    data: {
+      activeCount: Array.isArray(monitors) ? monitors.length : 0,
+      monitors,
+    },
+  };
+}
+
+const CI_WATCH = {
+  id: "bash_1",
+  description: "watch checks",
+  isPaused: false,
+  startedAtMs: 1_710_000_000_000,
+};
+
+describe("readMonitorStateUpdate", () => {
+  it("reads every monitor omo lists, with its command and fire history", () => {
+    expect(
+      readMonitorStateUpdate(
+        monitorStateRecord([
+          {
+            id: "bash_1",
+            description: "watch checks",
+            paused: false,
+            startedAtMs: 1_710_000_000_000,
+            command: "gh pr checks --watch",
+            filter: "fail",
+            persistent: true,
+            fireCount: 2,
+            lastFiredAtMs: 1_710_000_060_000,
+          },
+          {
+            id: "bash_2",
+            description: "deploy",
+            paused: true,
+            startedAtMs: 1_710_000_030_000,
+          },
+        ]),
+      ),
+    ).toEqual([
+      {
+        ...CI_WATCH,
+        command: "gh pr checks --watch",
+        fireCount: 2,
+        lastFiredAtMs: 1_710_000_060_000,
+      },
+      {
+        id: "bash_2",
+        description: "deploy",
+        isPaused: true,
+        startedAtMs: 1_710_000_030_000,
+      },
+    ]);
+  });
+
+  it("returns an empty list when the last monitor ends and skips malformed entries", () => {
+    expect(readMonitorStateUpdate(monitorStateRecord([]))).toEqual([]);
+    expect(
+      readMonitorStateUpdate(
+        monitorStateRecord([
+          { id: "bash_1", description: "watch checks" },
+          "bash_2",
+          {
+            id: "bash_3",
+            description: "deploy",
+            startedAtMs: 1,
+            fireCount: -1,
+          },
+        ]),
+      ),
+    ).toEqual([
+      { id: "bash_3", description: "deploy", isPaused: false, startedAtMs: 1 },
+    ]);
+  });
+
+  it("ignores other extension events and records without a monitor list", () => {
+    expect(
+      readMonitorStateUpdate({
+        type: "extension_event",
+        name: "omo.task.updated",
+        data: { monitors: [] },
+      }),
+    ).toBeUndefined();
+    expect(
+      readMonitorStateUpdate({
+        type: "extension_event",
+        name: "terminal_monitor_state",
+        data: { activeCount: 0 },
+      }),
+    ).toBeUndefined();
+  });
+});
 
 describe("readBackgroundStatusUpdate", () => {
   it("reads omo's goal, goal-wait and monitors footer statuses", () => {
@@ -116,6 +214,27 @@ describe("toSessionBackgroundStatus", () => {
     });
   });
 
+  it("counts monitors from omo's list and keeps the footer line as the summary", () => {
+    const deployWatch = { ...CI_WATCH, id: "bash_2", description: "deploy" };
+
+    expect(
+      toSessionBackgroundStatus(
+        new Map([["monitors", "◉ watching 2: watch ch… +1 more (5m)"]]),
+        [CI_WATCH, deployWatch],
+      ),
+    ).toEqual({
+      monitors: "watching 2: watch ch… +1 more (5m)",
+      monitorCount: 2,
+      monitorEntries: [CI_WATCH, deployWatch],
+    });
+    expect(toSessionBackgroundStatus(new Map(), [CI_WATCH])).toEqual({
+      monitors: "watching watch checks",
+      monitorCount: 1,
+      monitorEntries: [CI_WATCH],
+    });
+    expect(toSessionBackgroundStatus(new Map(), [])).toBeNull();
+  });
+
   it("merges every status line and returns null when none is left", () => {
     expect(
       statusFrom([
@@ -174,5 +293,27 @@ describe("createLiveAdapter background statuses", () => {
       events: [],
       effects: [],
     });
+  });
+
+  it("turns a monitor state event into a monitor list effect with no events", () => {
+    const adapter = createLiveAdapter({
+      sessionId: "omo_goal-session",
+      workspaceId: "workspace-1",
+      workspacePath: "/workspace",
+      skillPrefixes: [],
+    });
+
+    expect(
+      adapter.handle(
+        monitorStateRecord([
+          {
+            id: "bash_1",
+            description: "watch checks",
+            paused: false,
+            startedAtMs: 1_710_000_000_000,
+          },
+        ]),
+      ),
+    ).toEqual({ events: [], effects: [{ monitorEntries: [CI_WATCH] }] });
   });
 });

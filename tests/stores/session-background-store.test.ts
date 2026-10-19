@@ -72,6 +72,39 @@ describe("useSessionBackgroundStore", () => {
     expect(statusOf("omo_b")).toBeUndefined();
   });
 
+  it("keeps each well-formed monitor beside the monitors line", () => {
+    const { handleEvent } = useSessionBackgroundStore.getState();
+    const ciWatch = {
+      id: "bash_1",
+      description: "watch checks",
+      isPaused: false,
+      startedAtMs: 1,
+      command: "gh pr checks --watch",
+      fireCount: 2,
+    };
+
+    handleEvent(
+      backgroundEvent("omo_a", {
+        monitors: "watching 2: watch checks, deploy (1m)",
+        monitorCount: 2,
+        monitorEntries: [ciWatch, { id: "bash_2", description: "deploy" }],
+      }),
+    );
+    handleEvent(
+      backgroundEvent("omo_b", {
+        goal: "Pursuing goal",
+        monitorEntries: [ciWatch],
+      }),
+    );
+
+    expect(statusOf("omo_a")).toEqual({
+      monitors: "watching 2: watch checks, deploy (1m)",
+      monitorCount: 2,
+      monitorEntries: [ciWatch],
+    });
+    expect(statusOf("omo_b")).toEqual({ goal: "Pursuing goal" });
+  });
+
   it("keeps a known goal state only next to a goal line", () => {
     const { handleEvent } = useSessionBackgroundStore.getState();
 

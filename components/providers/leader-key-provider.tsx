@@ -20,17 +20,26 @@ import {
   matchesActivationKey,
   DEFAULT_ACTIVATION_KEY,
 } from "@/lib/leader-key-utils";
-import { buildTrie, matchKeys, getNodeAtBuffer } from "@/lib/leader-key-trie";
+import {
+  buildTrie,
+  buildRepeatNode,
+  matchKeys,
+  getNodeAtBuffer,
+} from "@/lib/leader-key-trie";
 import type { TrieNode } from "@/lib/leader-key-trie";
 
 const DEFAULT_LEADER_TIMEOUT_MS = 2000;
 const LEAF_WITH_CHILDREN_TIMEOUT_MS = 300;
+const REPEAT_WINDOW_MS = 1000;
+const MODIFIER_KEYS = ["Control", "Shift", "Alt", "Meta"];
 
 interface LeaderKeyContextValue {
   isLeaderActive: boolean;
   keyBuffer: string[];
   activePage: string;
   currentNode: TrieNode | null;
+  // Keys that fire without the leader until the repeat window closes.
+  repeatNode: TrieNode | null;
   bindings: LeaderBindingsMap;
   registerAction: (action: LeaderAction, handler: () => void) => void;
   deregisterAction: (actionId: string) => void;
@@ -64,6 +73,10 @@ function pageFromPathname(pathname: string): string {
   return "unknown";
 }
 
+function getPressedKey(e: KeyboardEvent): string {
+  return e.shiftKey && e.key.length === 1 ? e.key.toUpperCase() : e.key;
+}
+
 export function LeaderKeyProvider({
   children,
   bindings = DEFAULT_LEADER_BINDINGS,
@@ -76,6 +89,7 @@ export function LeaderKeyProvider({
   const [isLeaderActive, setIsLeaderActive] = useState(false);
   const [keyBuffer, setKeyBuffer] = useState<string[]>([]);
   const [currentNode, setCurrentNode] = useState<TrieNode | null>(null);
+  const [repeatNode, setRepeatNode] = useState<TrieNode | null>(null);
 
   // Registry: actionId -> { action, handler }
   const registryRef = useRef<
@@ -105,9 +119,10 @@ export function LeaderKeyProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bindings, registryVersion]);
 
-  // Timeout refs for auto-cancel and leaf-with-children delay
+  // Timeout refs for auto-cancel, leaf-with-children delay and the repeat window
   const leaderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leafTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repeatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearAllTimers = useCallback(() => {
     if (leaderTimeoutRef.current) {
@@ -118,6 +133,10 @@ export function LeaderKeyProvider({
       clearTimeout(leafTimeoutRef.current);
       leafTimeoutRef.current = null;
     }
+    if (repeatTimeoutRef.current) {
+      clearTimeout(repeatTimeoutRef.current);
+      repeatTimeoutRef.current = null;
+    }
   }, []);
 
   const cancel = useCallback(() => {
@@ -125,6 +144,7 @@ export function LeaderKeyProvider({
     setIsLeaderActive(false);
     setKeyBuffer([]);
     setCurrentNode(null);
+    setRepeatNode(null);
   }, [clearAllTimers]);
 
   const fireAction = useCallback(
@@ -142,14 +162,31 @@ export function LeaderKeyProvider({
     }
   }, [timeoutMs, cancel]);
 
+  const isRepeatableAction = useCallback(
+    (actionId: string) =>
+      registryRef.current.get(actionId)?.action.isRepeatable === true,
+    [],
+  );
+
+  // Opens the repeat window, or restarts it while it is open.
+  const openRepeatWindow = useCallback(
+    (node: TrieNode | null) => {
+      if (!node) return;
+      if (repeatTimeoutRef.current) clearTimeout(repeatTimeoutRef.current);
+      setRepeatNode(node);
+      repeatTimeoutRef.current = setTimeout(() => cancel(), REPEAT_WINDOW_MS);
+    },
+    [cancel],
+  );
+
   // Stable ref so keydown handler always sees latest trie/state without re-subscribing
   const stateRef = useRef({
     isLeaderActive,
     keyBuffer,
     trie,
+    repeatNode,
     activePage,
     cancel,
-    fireAction,
     armLeaderTimeout,
     activationKey,
   });
@@ -157,21 +194,50 @@ export function LeaderKeyProvider({
     isLeaderActive,
     keyBuffer,
     trie,
+    repeatNode,
     activePage,
     cancel,
-    fireAction,
     armLeaderTimeout,
     activationKey,
   };
 
   useEffect(() => {
+    // Fires a leader action, then keeps it one key away if it is repeatable.
+    function fireLeaderAction(
+      trie: TrieNode,
+      actionId: string,
+      firedKeys: string[],
+    ) {
+      fireAction(actionId);
+      openRepeatWindow(buildRepeatNode(trie, firedKeys, isRepeatableAction));
+    }
+
+    function handleRepeatKey(e: KeyboardEvent, node: TrieNode) {
+      if (MODIFIER_KEYS.includes(e.key)) return;
+      const hasCommandModifier = e.ctrlKey || e.metaKey || e.altKey;
+      const actionId = hasCommandModifier
+        ? undefined
+        : node.children.get(getPressedKey(e))?.actionId;
+      const entry =
+        actionId === undefined ? undefined : registryRef.current.get(actionId);
+      // Any other key closes the window and reaches the page untouched.
+      if (!entry) {
+        cancel();
+        return;
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      entry.handler();
+      openRepeatWindow(node);
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
       const {
         isLeaderActive,
         keyBuffer,
         trie,
+        repeatNode,
         cancel,
-        fireAction,
         armLeaderTimeout,
         activationKey,
       } = stateRef.current;
@@ -183,9 +249,12 @@ export function LeaderKeyProvider({
           setIsLeaderActive(true);
           setKeyBuffer([]);
           setCurrentNode(trie);
+          setRepeatNode(null);
 
           clearAllTimers();
           armLeaderTimeout();
+        } else if (repeatNode) {
+          handleRepeatKey(e, repeatNode);
         }
         return;
       }
@@ -198,15 +267,13 @@ export function LeaderKeyProvider({
       }
 
       // Ignore modifier-only keys
-      if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+      if (MODIFIER_KEYS.includes(e.key)) return;
 
       e.preventDefault();
       e.stopImmediatePropagation();
       clearAllTimers();
 
-      const key =
-        e.shiftKey && e.key.length === 1 ? e.key.toUpperCase() : e.key;
-      const newBuffer = [...keyBuffer, key];
+      const newBuffer = [...keyBuffer, getPressedKey(e)];
 
       const result = matchKeys(trie, newBuffer);
 
@@ -220,7 +287,7 @@ export function LeaderKeyProvider({
       if (result.kind === "exact") {
         if (!result.hasChildren) {
           // Unambiguous leaf — fire immediately
-          fireAction(result.actionId);
+          fireLeaderAction(trie, result.actionId, newBuffer);
           return;
         }
 
@@ -231,7 +298,7 @@ export function LeaderKeyProvider({
         setIsLeaderActive(true);
 
         leafTimeoutRef.current = setTimeout(() => {
-          fireAction(capturedActionId);
+          fireLeaderAction(trie, capturedActionId, newBuffer);
         }, LEAF_WITH_CHILDREN_TIMEOUT_MS);
 
         armLeaderTimeout();
@@ -247,7 +314,13 @@ export function LeaderKeyProvider({
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () =>
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [clearAllTimers, cancel, fireAction]);
+  }, [
+    clearAllTimers,
+    cancel,
+    fireAction,
+    openRepeatWindow,
+    isRepeatableAction,
+  ]);
 
   // Cancel leader mode when page changes
   useEffect(() => {
@@ -260,6 +333,7 @@ export function LeaderKeyProvider({
       keyBuffer,
       activePage,
       currentNode,
+      repeatNode,
       bindings,
       registerAction,
       deregisterAction,
@@ -270,6 +344,7 @@ export function LeaderKeyProvider({
       keyBuffer,
       activePage,
       currentNode,
+      repeatNode,
       bindings,
       registerAction,
       deregisterAction,

@@ -6,11 +6,14 @@ import { BUILTIN_ACTIONS } from "@/lib/leader-key-defaults";
 import { cn } from "@/lib/utils";
 
 export function WhichKeyPanel() {
-  const { isLeaderActive, keyBuffer, currentNode } = useLeaderKey();
+  const { isLeaderActive, keyBuffer, currentNode, repeatNode } = useLeaderKey();
 
-  if (!isLeaderActive || !currentNode) return null;
+  // Between leader sequences, an open repeat window keeps its keys listed.
+  const node = isLeaderActive ? currentNode : repeatNode;
+  if (!node) return null;
 
-  const childEntries = getChildEntries(currentNode);
+  const isRepeatWindow = !isLeaderActive;
+  const childEntries = getChildEntries(node);
   const bufferDisplay = keyBuffer.length > 0 ? keyBuffer.join(" ") : "";
 
   return (
@@ -19,10 +22,12 @@ export function WhichKeyPanel() {
         {/* Header */}
         <div className="mb-2 flex items-center justify-between">
           <span className="text-muted-foreground text-xs font-medium">
-            Leader{bufferDisplay ? `: ${bufferDisplay}` : ""}
+            {isRepeatWindow
+              ? "Repeat"
+              : `Leader${bufferDisplay ? `: ${bufferDisplay}` : ""}`}
           </span>
           <span className="text-muted-foreground text-[10px]">
-            ESC to cancel
+            {isRepeatWindow ? "Any other key to exit" : "ESC to cancel"}
           </span>
         </div>
 
@@ -61,7 +66,7 @@ export function WhichKeyPanel() {
         )}
 
         {/* Show ↵ hint when current buffer position has an action (leaf+prefix ambiguity) */}
-        {currentNode.actionId && (
+        {node.actionId && (
           <div
             className={cn(
               "flex items-center gap-3 rounded px-1 py-0.5",
@@ -72,8 +77,8 @@ export function WhichKeyPanel() {
               ↵
             </kbd>
             <span className="text-muted-foreground text-xs">
-              {BUILTIN_ACTIONS.find((a) => a.id === currentNode.actionId)
-                ?.label ?? currentNode.actionId}
+              {BUILTIN_ACTIONS.find((a) => a.id === node.actionId)?.label ??
+                node.actionId}
             </span>
           </div>
         )}

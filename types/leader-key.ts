@@ -6,6 +6,8 @@ export interface LeaderAction {
   description?: string;
   page: string | "global";
   icon?: LucideIcon;
+  // Stays one key press away, without the leader, for a moment after firing.
+  isRepeatable?: boolean;
 }
 
 export interface LeaderBinding {

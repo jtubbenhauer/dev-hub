@@ -63,3 +63,50 @@ describe("leader-key-defaults global:find-in-files", () => {
     expect(findAction?.page).toBe("global");
   });
 });
+
+describe("leader-key-defaults file tab actions", () => {
+  const tabActionIds = ["files:next-tab", "files:prev-tab", "files:close-tab"];
+
+  it("binds next, previous and close tab to ], [ and q", () => {
+    expect(DEFAULT_LEADER_BINDINGS).toMatchObject({
+      "files:next-tab": "]",
+      "files:prev-tab": "[",
+      "files:close-tab": "q",
+    });
+  });
+
+  it("lists them as files-page actions with only next and previous repeatable", () => {
+    const tabActions = BUILTIN_ACTIONS.filter((action) =>
+      tabActionIds.includes(action.id),
+    ).map(({ id, page, isRepeatable }) => ({
+      id,
+      page,
+      isRepeatable: isRepeatable === true,
+    }));
+
+    expect(tabActions).toEqual([
+      { id: "files:next-tab", page: "files", isRepeatable: true },
+      { id: "files:prev-tab", page: "files", isRepeatable: true },
+      { id: "files:close-tab", page: "files", isRepeatable: false },
+    ]);
+  });
+
+  it("does not share a first key with any other files-page or global binding", () => {
+    const pageByActionId = new Map(
+      BUILTIN_ACTIONS.map((action) => [action.id, action.page]),
+    );
+    const tabKeys = tabActionIds.map((id) => DEFAULT_LEADER_BINDINGS[id]);
+
+    const collisions = Object.entries(DEFAULT_LEADER_BINDINGS).filter(
+      ([actionId, keys]) => {
+        const page = pageByActionId.get(actionId);
+        const isReachableOnFilesPage = page === "files" || page === "global";
+        if (tabActionIds.includes(actionId) || !isReachableOnFilesPage)
+          return false;
+        return tabKeys.includes(keys.split(" ")[0]);
+      },
+    );
+
+    expect(collisions).toEqual([]);
+  });
+});

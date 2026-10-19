@@ -80,6 +80,19 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "files:focus-search", label: "Focus file search", page: "files" },
   { id: "files:focus-tree", label: "Focus file tree", page: "files" },
   { id: "files:focus-editor", label: "Focus editor", page: "files" },
+  {
+    id: "files:next-tab",
+    label: "Next tab",
+    page: "files",
+    isRepeatable: true,
+  },
+  {
+    id: "files:prev-tab",
+    label: "Previous tab",
+    page: "files",
+    isRepeatable: true,
+  },
+  { id: "files:close-tab", label: "Close tab", page: "files" },
 
   // Git page
   { id: "git:toggle-reviewed", label: "Toggle file reviewed", page: "git" },
@@ -143,6 +156,9 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "files:focus-search": "i",
   "files:focus-tree": "h",
   "files:focus-editor": "l",
+  "files:next-tab": "]",
+  "files:prev-tab": "[",
+  "files:close-tab": "q",
 
   // Chat page
   "chat:switch-model": "m",

@@ -1,0 +1,16 @@
+lib/omo/jsonl.ts
+  h_c7f8735263030f 3-5
+tests/lib/omo/jsonl.test.ts
+  h_c7f8735263030f 9,56-69,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "469169b3bac4a294206c2d5642089b7c205016b0",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

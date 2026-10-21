@@ -1,0 +1,27 @@
+components/chat/chat-interface.tsx
+  s_0de4f8403f6149::t_ba2fc508465bcc 25,737-743,1596,1598
+components/chat/use-chat-scroll-memory.ts
+  s_0de4f8403f6149::t_db67d31cd3912f 1-66
+lib/chat/session-scroll-memory.ts
+  s_0de4f8403f6149::t_613ba0743728da 1-78
+tests/components/chat/use-chat-scroll-memory.test.ts
+  s_0de4f8403f6149::t_5c697ec036572b 1-114
+tests/lib/chat/session-scroll-memory.test.ts
+  s_0de4f8403f6149::t_6166ce6ae46311 1-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aff59d0067f8b3c06c320b204c27958962575e42",
+  "prompts": {},
+  "sessions": {
+    "s_0de4f8403f6149": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ec5a4d6daffeely6Z9Rde8er8r",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

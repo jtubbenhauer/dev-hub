@@ -22,6 +22,7 @@ import {
 import { useChatCommands } from "@/components/chat/use-chat-commands";
 import { useChatEffects } from "@/components/chat/use-chat-effects";
 import { useChatUrlState } from "@/components/chat/use-chat-url-state";
+import { useChatScrollMemory } from "@/components/chat/use-chat-scroll-memory";
 import { useSessionManagement } from "@/components/chat/use-session-management";
 import { useSessionNavigation } from "@/components/chat/use-session-navigation";
 import { useSessionListActivity } from "@/components/chat/use-session-list-activity";
@@ -732,6 +733,13 @@ export function ChatInterface() {
     }
     prevFirstMessageIdRef.current = newFirstId;
   }, [activeMessages, activeSessionId]);
+
+  const { handleScrollerRef, initialScrollLocation } = useChatScrollMemory(
+    activeWorkspaceId && activeSessionId
+      ? `${activeWorkspaceId}:${activeSessionId}`
+      : null,
+    activeMessages,
+  );
 
   const handleStartReached = useCallback(() => {
     if (!activeSessionId || !activeWorkspaceId) return;
@@ -1585,7 +1593,9 @@ export function ChatInterface() {
                     firstItemIndex={firstItemIndex}
                     startReached={handleStartReached}
                     computeItemKey={(_, msg) => msg.info.id}
+                    scrollerRef={handleScrollerRef}
                     initialTopMostItemIndex={
+                      initialScrollLocation ??
                       firstItemIndex + Math.max(0, activeMessages.length - 1)
                     }
                     itemContent={(index, msg) => {

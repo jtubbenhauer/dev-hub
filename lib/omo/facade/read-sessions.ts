@@ -136,6 +136,7 @@ export async function listOmoSessions(
   const roots = [...byId.values()]
     .filter((summary) => !hidden.has(summary.durableId))
     .sort((left, right) => right.updatedMs - left.updatedMs);
+  const diskIds = new Set(disk.map((summary) => summary.durableId));
   await touchOmoSessionIndexMany(
     context.workspace.id,
     roots.map((summary) => ({
@@ -144,6 +145,7 @@ export async function listOmoSessions(
       title: summary.title,
       createdMs: summary.createdMs,
       updatedMs: summary.updatedMs,
+      isUpdatedMsFromTranscript: diskIds.has(summary.durableId),
     })),
   );
   return jsonResponse([

@@ -362,6 +362,26 @@ describe("OMO session index", () => {
     now.mockRestore();
   });
 
+  it("lets a transcript-derived touch lower activity that housekeeping pushed forward", async () => {
+    const index = await import("@/lib/omo/session-index");
+    await index.touchOmoSessionIndexMany("workspace-1", [touchRow]);
+    await index.setOmoLeafAndActivity("workspace-1", "root", null, 900);
+
+    await index.touchOmoSessionIndexMany("workspace-1", [
+      { ...touchRow, updatedMs: 150, isUpdatedMsFromTranscript: true },
+    ]);
+    expect(await index.getOmoIndexRow("workspace-1", "root")).toMatchObject({
+      updatedMs: 150,
+    });
+
+    await index.touchOmoSessionIndexMany("workspace-1", [
+      { ...touchRow, updatedMs: 100 },
+    ]);
+    expect(await index.getOmoIndexRow("workspace-1", "root")).toMatchObject({
+      updatedMs: 150,
+    });
+  });
+
   it("creates complete task-event-only worker rows", async () => {
     const { mergeOmoSessionIndexFromTaskEvent, getOmoIndexRow } =
       await import("@/lib/omo/session-index");

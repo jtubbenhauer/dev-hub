@@ -8,6 +8,9 @@ export interface OmoSessionTouchRow {
   readonly title: string;
   readonly createdMs: number;
   readonly updatedMs: number;
+  // Set when updatedMs was read from the transcript itself, so it may lower a
+  // stored value that housekeeping writes pushed forward.
+  readonly isUpdatedMsFromTranscript?: boolean;
 }
 
 export interface OmoSessionTouchMetadata {

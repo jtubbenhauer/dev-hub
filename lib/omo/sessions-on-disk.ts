@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 
 const HEADER_SCAN_CAP_BYTES = 1_048_576;
+const ACTIVITY_TAIL_SCAN_BYTES = 262_144;
 const SUB_AGENT_HEADER_SCAN_BYTES = 4_096;
 const ENTRIES_TOTAL_CAP_BYTES = 67_108_864;
 const TITLE_MAX_CHARS = 80;
@@ -222,6 +223,50 @@ async function readLeadingWindow(
   }
 }
 
+async function readTrailingLines(
+  filePath: string,
+  fileSize: number,
+  capBytes: number,
+): Promise<string[]> {
+  const start = Math.max(0, fileSize - capBytes);
+  const handle = await open(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(fileSize - start);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, start);
+    const lines = buffer.toString("utf8", 0, bytesRead).split("\n");
+    // The window can start mid-line.
+    return start > 0 ? lines.slice(1) : lines;
+  } finally {
+    await handle.close();
+  }
+}
+
+// Opening a session appends housekeeping entries (rules scans, bindings,
+// model changes), so only conversation messages count as activity.
+function latestMessageMs(lines: readonly string[]): number | null {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (!line) continue;
+    let parsedLine: unknown;
+    try {
+      parsedLine = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (
+      !isRecord(parsedLine) ||
+      parsedLine.type !== "message" ||
+      (typeof parsedLine.timestamp !== "string" &&
+        typeof parsedLine.timestamp !== "number")
+    ) {
+      continue;
+    }
+    const timestampMs = normalizeTimestampMs(parsedLine.timestamp);
+    if (Number.isFinite(timestampMs)) return timestampMs;
+  }
+  return null;
+}
+
 function extractFirstUserText(entry: SessionMessageEntry): string | null {
   const content = entry.message.content;
   let text: string;
@@ -296,14 +341,21 @@ async function readSessionSummaryIfMatching(
   }
 
   const stats = await stat(filePath);
+  const isWholeFileScanned = stats.size <= HEADER_SCAN_CAP_BYTES;
+  const createdMs = normalizeTimestampMs(header.timestamp);
+  const tailMessageMs = isWholeFileScanned
+    ? null
+    : latestMessageMs(
+        await readTrailingLines(filePath, stats.size, ACTIVITY_TAIL_SCAN_BYTES),
+      );
 
   return {
     durableId: header.id,
     sessionPath: filePath,
     forkedFrom: header.parentSession ?? null,
     title: sessionInfoName ?? firstUserText ?? "Untitled",
-    createdMs: normalizeTimestampMs(header.timestamp),
-    updatedMs: stats.mtimeMs,
+    createdMs,
+    updatedMs: tailMessageMs ?? latestMessageMs(lines) ?? createdMs,
   };
 }
 

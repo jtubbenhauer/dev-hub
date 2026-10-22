@@ -1,13 +1,6 @@
 // @vitest-environment node
 
-import {
-  mkdir,
-  mkdtemp,
-  rm,
-  symlink,
-  utimes,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -182,23 +175,25 @@ describe("listOmoSessionsForCwd", () => {
     const agentDir = join(tempRoot, "agent");
     const sessionsDir = join(agentDir, "sessions", `--${encodeCwdDir(cwd)}--`);
 
-    const namedPath = await writeSessionFile(sessionsDir, "named.jsonl", [
+    await writeSessionFile(sessionsDir, "named.jsonl", [
       header({ id: "named-session", cwd }),
       userMessageEntry("m1", null, "this should not be the title"),
       sessionInfoEntry("i1", "m1", "Custom Session Name"),
       sessionInfoEntry("i2", "i1", "Latest Session Name"),
     ]);
-    const unnamedPath = await writeSessionFile(sessionsDir, "unnamed.jsonl", [
+    await writeSessionFile(sessionsDir, "unnamed.jsonl", [
       header({ id: "unnamed-session", cwd }),
-      userMessageEntry("m1", null, "This is the fallback title text"),
+      {
+        ...userMessageEntry("m1", null, "This is the fallback title text"),
+        timestamp: "2024-12-03T15:00:00.000Z",
+      },
     ]);
-    const emptyPath = await writeSessionFile(sessionsDir, "empty.jsonl", [
-      header({ id: "empty-session", cwd }),
-    ]);
-    await Promise.all([
-      utimes(namedPath, new Date(1_000), new Date(1_000)),
-      utimes(unnamedPath, new Date(2_000), new Date(2_000)),
-      utimes(emptyPath, new Date(3_000), new Date(3_000)),
+    await writeSessionFile(sessionsDir, "empty.jsonl", [
+      header({
+        id: "empty-session",
+        cwd,
+        timestamp: "2024-12-03T16:00:00.000Z",
+      }),
     ]);
 
     const results = await listOmoSessionsForCwd({ agentDir, cwd });
@@ -249,6 +244,109 @@ describe("listOmoSessionsForCwd", () => {
 
     const results = await listOmoSessionsForCwd({ agentDir, cwd });
     expect(results[0]?.createdMs).toBe(Date.parse("2024-12-03T14:00:00.000Z"));
+  });
+
+  it("takes updatedMs from the last message, not later housekeeping entries or mtime", async () => {
+    const cwd = join(tempRoot, "project");
+    await mkdir(cwd, { recursive: true });
+    const agentDir = join(tempRoot, "agent");
+    const sessionsDir = join(agentDir, "sessions", `--${encodeCwdDir(cwd)}--`);
+
+    await writeSessionFile(sessionsDir, "session.jsonl", [
+      header({ id: "session-activity", cwd }),
+      userMessageEntry("m1", null, "hi"),
+      {
+        type: "message",
+        id: "m2",
+        parentId: "m1",
+        timestamp: "2024-12-03T15:00:00.000Z",
+        message: { role: "assistant", content: "hello" },
+      },
+      {
+        type: "custom",
+        id: "c1",
+        parentId: "m2",
+        timestamp: "2024-12-05T09:00:00.000Z",
+        customType: "pi-rules.scan",
+      },
+      {
+        type: "model_change",
+        id: "c2",
+        parentId: "c1",
+        timestamp: "2024-12-05T09:00:01.000Z",
+        provider: "anthropic",
+        modelId: "model",
+      },
+    ]);
+
+    const results = await listOmoSessionsForCwd({ agentDir, cwd });
+    expect(results[0]?.updatedMs).toBe(Date.parse("2024-12-03T15:00:00.000Z"));
+  });
+
+  it("falls back to createdMs for a session with no messages", async () => {
+    const cwd = join(tempRoot, "project");
+    await mkdir(cwd, { recursive: true });
+    const agentDir = join(tempRoot, "agent");
+    const sessionsDir = join(agentDir, "sessions", `--${encodeCwdDir(cwd)}--`);
+
+    await writeSessionFile(sessionsDir, "empty.jsonl", [
+      header({ id: "session-empty", cwd }),
+      {
+        type: "custom",
+        id: "c1",
+        parentId: null,
+        timestamp: "2024-12-05T09:00:00.000Z",
+        customType: "senpi-memory.session-binding",
+      },
+    ]);
+
+    const results = await listOmoSessionsForCwd({ agentDir, cwd });
+    expect(results[0]?.updatedMs).toBe(Date.parse("2024-12-03T14:00:00.000Z"));
+  });
+
+  it("reads the last message from the end of a file larger than the scan window", async () => {
+    const cwd = join(tempRoot, "project");
+    await mkdir(cwd, { recursive: true });
+    const agentDir = join(tempRoot, "agent");
+    const sessionsDir = join(agentDir, "sessions", `--${encodeCwdDir(cwd)}--`);
+
+    const lines: Record<string, unknown>[] = [
+      header({ id: "large-session", cwd }),
+      userMessageEntry("m1", null, "early"),
+    ];
+    let parentId = "m1";
+    for (let i = 0; i < 30; i += 1) {
+      const id = `pad${i}`;
+      lines.push({
+        type: "custom",
+        id,
+        parentId,
+        timestamp: "2024-12-03T14:00:01.000Z",
+        customType: "padding",
+        data: "p".repeat(50_000),
+      });
+      parentId = id;
+    }
+    lines.push(
+      {
+        type: "message",
+        id: "m-last",
+        parentId,
+        timestamp: "2024-12-04T10:00:00.000Z",
+        message: { role: "assistant", content: "late" },
+      },
+      {
+        type: "custom",
+        id: "c-last",
+        parentId: "m-last",
+        timestamp: "2024-12-06T10:00:00.000Z",
+        customType: "claude-sdk-oauth-binding",
+      },
+    );
+    await writeSessionFile(sessionsDir, "large.jsonl", lines);
+
+    const results = await listOmoSessionsForCwd({ agentDir, cwd });
+    expect(results[0]?.updatedMs).toBe(Date.parse("2024-12-04T10:00:00.000Z"));
   });
 
   it("respects the 1 MiB per-file header scan cap", async () => {

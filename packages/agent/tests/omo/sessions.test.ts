@@ -75,6 +75,59 @@ describe("listOmoSessionsForWorkspace / readOmoSessionEntries", () => {
     expect(summaries[0]?.durableId).toBe("session-matching");
   });
 
+  it("takes updatedMs from the last message, ignoring later housekeeping entries", async () => {
+    const sessionsDir = join(
+      agentDir,
+      "sessions",
+      `--${encodeCwdDir(workspaceA)}--`,
+    );
+    await mkdir(sessionsDir, { recursive: true });
+    const housekeeping = JSON.stringify({
+      type: "custom",
+      id: "housekeeping",
+      parentId: "padding",
+      timestamp: "2024-02-01T00:00:00.000Z",
+      customType: "pi-rules.scan",
+    });
+    const padding = JSON.stringify({
+      type: "custom",
+      id: "padding",
+      parentId: "entry-1",
+      timestamp: "2024-01-01T00:02:00.000Z",
+      customType: "padding",
+      data: "p".repeat(1_100_000),
+    });
+    await writeFile(
+      join(sessionsDir, "small.jsonl"),
+      [
+        sessionHeaderLine("session-small", workspaceA),
+        messageEntryLine("entry-1", null),
+        housekeeping,
+      ].join("\n") + "\n",
+    );
+    await writeFile(
+      join(sessionsDir, "large.jsonl"),
+      [
+        sessionHeaderLine("session-large", workspaceA),
+        padding,
+        messageEntryLine("entry-1", "padding"),
+        housekeeping,
+      ].join("\n") + "\n",
+    );
+
+    const summaries = await listOmoSessionsForWorkspace(agentDir, workspaceA);
+    const lastMessageMs = Date.parse("2024-01-01T00:01:00.000Z");
+
+    expect(
+      summaries.map((summary) => [summary.durableId, summary.updatedMs]),
+    ).toEqual(
+      expect.arrayContaining([
+        ["session-small", lastMessageMs],
+        ["session-large", lastMessageMs],
+      ]),
+    );
+  });
+
   it("returns an empty array when the sessions directory does not exist", async () => {
     const summaries = await listOmoSessionsForWorkspace(agentDir, workspaceA);
     expect(summaries).toEqual([]);

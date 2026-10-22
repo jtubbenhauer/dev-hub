@@ -15,6 +15,7 @@ import { buildOmoSession } from "@/lib/omo/adapter/shapes";
 import {
   findOmoWorkerByTaskId,
   mergeOmoSessionIndexFromTaskEvent,
+  setOmoLeaf,
   setOmoLeafAndActivity,
 } from "@/lib/omo/session-index";
 import { isJsonObject } from "@/lib/omo/session-registry-records";
@@ -255,14 +256,19 @@ export class OmoRegistryDispatcher {
       typeof timestamp === "string" || typeof timestamp === "number"
         ? normalizeTimestampMs(timestamp)
         : Date.now();
+    // Opening a session appends housekeeping entries (rules scans, bindings,
+    // model changes); only conversation messages are activity.
+    const isConversationMessage = entry["type"] === "message";
     binding.effectTail = this.continueEffectTail(binding, () =>
       this.enqueueLeaf(binding.workspaceId, binding.durableId, () =>
-        setOmoLeafAndActivity(
-          binding.workspaceId,
-          binding.durableId,
-          entryId,
-          activityMs,
-        ),
+        isConversationMessage
+          ? setOmoLeafAndActivity(
+              binding.workspaceId,
+              binding.durableId,
+              entryId,
+              activityMs,
+            )
+          : setOmoLeaf(binding.workspaceId, binding.durableId, entryId),
       ),
     );
   }

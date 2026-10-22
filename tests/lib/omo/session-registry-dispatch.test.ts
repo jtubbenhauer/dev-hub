@@ -142,6 +142,57 @@ describe("OmoRegistryDispatcher", () => {
     expect(dispatcher.sessionStatusesForWorkspace(WORKSPACE.id)).toEqual({});
   });
 
+  it("moves the leaf for every appended entry but counts only messages as activity", async () => {
+    sqlite
+      .prepare(
+        `INSERT INTO omo_session_index
+          (workspace_id, durable_id, session_path, kind, title, created_ms,
+           updated_ms, updated_at)
+         VALUES ('workspace-1', 's3', NULL, 'interactive', 'S3', 1, 2, 3)`,
+      )
+      .run();
+    const dispatcher = new Dispatcher({
+      client: createUnconnectedClient(),
+      refreshIndex: async () => undefined,
+      findSubAgentSessionIds: async () => [],
+    });
+    const { binding } = createTestBinding("s3", () => ({
+      events: [],
+      effects: [],
+    }));
+    const readRow = () =>
+      sqlite
+        .prepare(
+          "SELECT leaf_entry_id, updated_ms FROM omo_session_index WHERE durable_id = 's3'",
+        )
+        .get();
+
+    dispatcher.dispatch(binding, {
+      type: "entry_appended",
+      entry: {
+        type: "custom",
+        id: "housekeeping",
+        timestamp: "2026-01-02T00:00:00.000Z",
+      },
+    });
+    await binding.effectTail;
+    expect(readRow()).toEqual({ leaf_entry_id: "housekeeping", updated_ms: 2 });
+
+    dispatcher.dispatch(binding, {
+      type: "entry_appended",
+      entry: {
+        type: "message",
+        id: "message",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      },
+    });
+    await binding.effectTail;
+    expect(readRow()).toEqual({
+      leaf_entry_id: "message",
+      updated_ms: Date.parse("2026-01-01T00:00:00.000Z"),
+    });
+  });
+
   it("recovers from a failing merge effect so a later leaf write still lands", async () => {
     sqlite
       .prepare(

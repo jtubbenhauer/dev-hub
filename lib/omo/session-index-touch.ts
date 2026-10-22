@@ -34,7 +34,11 @@ function touchInTransaction(
       .insert(omoSessionIndex)
       .values({
         workspaceId,
-        ...row,
+        durableId: row.durableId,
+        sessionPath: row.sessionPath,
+        title: row.title,
+        createdMs: row.createdMs,
+        updatedMs: row.updatedMs,
         kind: "interactive",
         updatedAt,
       })
@@ -48,7 +52,10 @@ function touchInTransaction(
   }
   if (row.title !== existing.title) changes.title = row.title;
   if (row.createdMs !== existing.createdMs) changes.createdMs = row.createdMs;
-  if (row.updatedMs > existing.updatedMs) changes.updatedMs = row.updatedMs;
+  const isUpdatedMsChanged = row.isUpdatedMsFromTranscript
+    ? row.updatedMs !== existing.updatedMs
+    : row.updatedMs > existing.updatedMs;
+  if (isUpdatedMsChanged) changes.updatedMs = row.updatedMs;
   if (Object.keys(changes).length === 0) return 0;
   changes.updatedAt = updatedAt;
   transaction

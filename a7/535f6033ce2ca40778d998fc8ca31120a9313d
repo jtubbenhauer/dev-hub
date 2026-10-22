@@ -1,0 +1,28 @@
+lib/omo/adapter/live-tool-events.ts
+  h_c7f8735263030f 1,14,218-223,226
+lib/omo/adapter/todos.ts
+  h_c7f8735263030f 1-38
+lib/omo/facade/read-errors.ts
+  h_c7f8735263030f 30-33
+lib/omo/facade/read-sessions.ts
+  h_c7f8735263030f 1,4,14-22,267-303
+lib/omo/facade/read.ts
+  h_c7f8735263030f 96-99,103-104
+tests/lib/omo/adapter/live-tools.test.ts
+  h_c7f8735263030f 212-276
+tests/lib/omo/adapter/todos.test.ts
+  h_c7f8735263030f 1-81
+tests/lib/omo/facade/read-session-cases.ts
+  h_c7f8735263030f 35-62,296-344
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a7535f6033ce2ca40778d998fc8ca31120a9313d",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

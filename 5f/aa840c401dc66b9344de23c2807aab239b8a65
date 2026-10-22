@@ -1,0 +1,20 @@
+lib/omo/session-registry-core.ts
+  h_c7f8735263030f 3,117-121
+lib/omo/session-source.ts
+  h_c7f8735263030f 145,152
+lib/omo/sessions-on-disk.ts
+  h_c7f8735263030f 1,4,422-429,432-436,438-453,456,490,498-499,502-510,516,522-536
+tests/lib/omo/sessions-on-disk.test.ts
+  h_c7f8735263030f 3-11,526-547,566-582,584-590,605-608,611-618,621-625
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5faa840c401dc66b9344de23c2807aab239b8a65",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

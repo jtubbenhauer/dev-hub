@@ -32,6 +32,34 @@ function insertIndexRow(
     .run(id, `/sessions/${id}.jsonl`, parent, kind, id);
 }
 
+function todoStateEntry(
+  id: string,
+  parentId: string | null,
+  [content, status]: readonly [string, string],
+) {
+  return {
+    type: "custom",
+    id,
+    parentId,
+    timestamp: 10,
+    customType: "senpi.todo-state",
+    data: {
+      schema: "v2",
+      phases: [{ name: "Plan", tasks: [{ content, status }] }],
+    },
+  } as const;
+}
+
+function messageEntry(id: string, parentId: string) {
+  return {
+    type: "message",
+    id,
+    parentId,
+    timestamp: 20,
+    message: { role: "assistant", content: [] },
+  } as const;
+}
+
 describe("handleOmoRead session routes", () => {
   it("deduplicates disk and live roots; workers appear with parentID, not in roots", async () => {
     // Given
@@ -263,6 +291,55 @@ describe("handleOmoRead session routes", () => {
     expect(todos.status).toBe(200);
     expect(await readJson(todos)).toEqual([]);
     expect(fixture.source.authorizeSession).not.toHaveBeenCalled();
+  });
+
+  it("serves the latest todo state on the current branch of a root session", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    fixture.source.authorized.add("root");
+    fixture.source.entries.set("root", [
+      todoStateEntry("first", null, ["Old plan", "pending"]),
+      todoStateEntry("abandoned-branch", "first", ["Branch plan", "pending"]),
+      todoStateEntry("current", "first", ["Read the code", "completed"]),
+      messageEntry("reply", "current"),
+    ]);
+
+    // When
+    const response = await fixture.request("/session/omo_root/todo");
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toEqual([
+      {
+        id: "Plan/Read the code",
+        content: "Read the code",
+        status: "completed",
+        priority: "medium",
+      },
+    ]);
+  });
+
+  it("serves a worker's todos from its sub-agent transcript", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    insertIndexRow(fixture.sqlite, "worker", "worker", "root");
+    fixture.source.subAgentEntries.set("worker", [
+      todoStateEntry("state", null, ["Fix the casts", "in_progress"]),
+    ]);
+
+    // When
+    const response = await fixture.request("/session/omo_worker/todo");
+
+    // Then
+    expect(await readJson(response)).toEqual([
+      {
+        id: "Plan/Fix the casts",
+        content: "Fix the casts",
+        status: "in_progress",
+        priority: "medium",
+      },
+    ]);
+    expect(fixture.source.readEntries).not.toHaveBeenCalled();
   });
 
   it("keeps the indexed title when a large file's name is past the scanned window", async () => {

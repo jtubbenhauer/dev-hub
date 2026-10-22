@@ -56,7 +56,6 @@ export interface LiveAdapterOptions {
   readonly workspaceId: string;
   readonly workspacePath: string;
   readonly skillPrefixes: readonly string[];
-  readonly todoToolName?: string;
 }
 
 export interface LiveAdapterResult {

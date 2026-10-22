@@ -209,6 +209,71 @@ describe("createLiveAdapter tool events", () => {
     });
   });
 
+  it("emits the todo tool's phased list as todo.updated, and nothing for a failed call", () => {
+    const todoCall = (callId: string, isError: boolean): JsonlRecord[] => [
+      {
+        type: "tool_execution_start",
+        toolCallId: callId,
+        toolName: "todo",
+        args: { op: "done", task: "Read the code" },
+        timestamp: 1_000,
+      },
+      {
+        type: "tool_execution_end",
+        toolCallId: callId,
+        toolName: "todo",
+        result: {
+          content: [{ type: "text", text: "ok" }],
+          details: {
+            op: "done",
+            phases: [
+              {
+                name: "Investigation",
+                tasks: [
+                  { content: "Read the code", status: "completed" },
+                  { content: "Find the gap", status: "in_progress" },
+                ],
+              },
+            ],
+          },
+        },
+        isError,
+        timestamp: 1_010,
+      },
+    ];
+
+    const succeeded = allEvents(replay(todoCall("call-ok", false))).filter(
+      (event) => event.type === "todo.updated",
+    );
+    const failed = allEvents(replay(todoCall("call-failed", true))).filter(
+      (event) => event.type === "todo.updated",
+    );
+
+    expect(succeeded).toEqual([
+      {
+        type: "todo.updated",
+        properties: {
+          sessionID: OPTIONS.sessionId,
+          todos: [
+            {
+              id: "Investigation/Read the code",
+              content: "Read the code",
+              status: "completed",
+              priority: "medium",
+            },
+            {
+              id: "Investigation/Find the gap",
+              content: "Find the gap",
+              status: "in_progress",
+              priority: "medium",
+            },
+          ],
+        },
+      },
+    ]);
+    expect(failed).toEqual([]);
+  });
+
   it("emits no todo updates from all fixtures when todo_tool is none", () => {
     const fixtureNames = readdirSync(FIXTURE_DIRECTORY)
       .filter((name) => name.endsWith(".jsonl"))

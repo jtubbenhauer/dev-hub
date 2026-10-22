@@ -1,6 +1,7 @@
-import type { Session, SessionStatus } from "@opencode-ai/sdk";
+import type { Session, SessionStatus, Todo } from "@opencode-ai/sdk";
 import type { OmoSessionSelection } from "@/lib/chat/omo-session-selection";
 import { buildOmoSession } from "@/lib/omo/adapter/shapes";
+import { todosFromTodoState } from "@/lib/omo/adapter/todos";
 import { isJsonObject } from "@/lib/omo/session-registry-records";
 import {
   getOmoChildren,
@@ -10,8 +11,15 @@ import {
   touchOmoSessionIndexMany,
   type OmoSessionIndexRow,
 } from "@/lib/omo/session-index";
-import type { OmoSessionOnDiskSummary } from "@/lib/omo/sessions-on-disk";
-import { isEngineUnavailableError } from "@/lib/omo/facade/read-errors";
+import {
+  activeBranch,
+  type OmoSessionOnDiskSummary,
+  type SessionEntry,
+} from "@/lib/omo/sessions-on-disk";
+import {
+  isEngineUnavailableError,
+  isOmoNotFoundError,
+} from "@/lib/omo/facade/read-errors";
 import {
   jsonResponse,
   sessionNotFoundResponse,
@@ -256,8 +264,43 @@ export function readOmoSessionStatus(context: OmoReadContext): Response {
   return jsonResponse(sessionStatusesForWorkspace(context));
 }
 
-export function readOmoTodos(): Response {
-  return jsonResponse([]);
+async function readTodoSourceEntries(
+  context: OmoReadContext,
+  rawId: string,
+): Promise<readonly SessionEntry[] | null> {
+  const row = await getOmoIndexRow(context.workspace.id, rawId);
+  if (row === null || row.kind === "worker") {
+    const subAgentEntries = await context.source.readSubAgentEntries(rawId);
+    if (subAgentEntries !== null) return subAgentEntries;
+  }
+  try {
+    return await context.source.readEntries(rawId);
+  } catch (error) {
+    if (isOmoNotFoundError(error)) return null;
+    throw error;
+  }
+}
+
+// omo appends its todo state to the transcript after every todo call, so the
+// latest one on the current branch is the session's list.
+function todosFromEntries(entries: readonly SessionEntry[]): Todo[] {
+  const leafId = entries.at(-1)?.id;
+  const branch = leafId === undefined ? [] : activeBranch(entries, leafId);
+  for (let index = branch.length - 1; index >= 0; index -= 1) {
+    const entry = branch[index];
+    if (entry?.type === "custom" && entry.customType === "senpi.todo-state") {
+      return todosFromTodoState(entry.data) ?? [];
+    }
+  }
+  return [];
+}
+
+export async function readOmoTodos(
+  context: OmoReadContext,
+  rawId: string,
+): Promise<Todo[] | null> {
+  const entries = await readTodoSourceEntries(context, rawId);
+  return entries === null ? null : todosFromEntries(entries);
 }
 
 export interface OmoSessionStats {

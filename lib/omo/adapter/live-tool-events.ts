@@ -1,4 +1,4 @@
-import type { Todo, ToolPart, ToolState } from "@opencode-ai/sdk";
+import type { ToolPart, ToolState } from "@opencode-ai/sdk";
 import type {
   LiveAdapterOptions,
   LiveAdapterResult,
@@ -11,6 +11,7 @@ import {
   linkTaskChildToPart,
 } from "@/lib/omo/adapter/live-task-events";
 import { buildOmoToolPart } from "@/lib/omo/adapter/shapes";
+import { todosFromTodoState } from "@/lib/omo/adapter/todos";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { Event, Part } from "@/lib/opencode/types";
 
@@ -64,44 +65,6 @@ function resultFields(record: JsonlRecord): {
       ? { ...record.result.details }
       : {},
   };
-}
-
-function normalizedTodoStatus(value: unknown): Todo["status"] {
-  if (typeof value !== "string") return "pending";
-  switch (value.toLowerCase().replaceAll("-", "_").replaceAll(" ", "_")) {
-    case "in_progress":
-    case "running":
-      return "in_progress";
-    case "complete":
-    case "completed":
-    case "done":
-      return "completed";
-    case "cancel":
-    case "canceled":
-    case "cancelled":
-      return "cancelled";
-    default:
-      return "pending";
-  }
-}
-
-function normalizeTodos(value: unknown): Todo[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((candidate, index) => {
-    if (!isRecord(candidate) || typeof candidate.content !== "string")
-      return [];
-    return [
-      {
-        id: typeof candidate.id === "string" ? candidate.id : String(index),
-        content: candidate.content,
-        status: normalizedTodoStatus(candidate.status),
-        priority:
-          typeof candidate.priority === "string"
-            ? candidate.priority
-            : "medium",
-      },
-    ];
-  });
 }
 
 function stateMetadata(state: ToolState): Record<string, unknown> {
@@ -252,13 +215,15 @@ export function createLiveToolEventHandlers(
           };
     const part = buildOmoToolPart({ ...tracked.part, state });
     const events: Event[] = [replacePart(tracked, part)];
-    if (options.todoToolName === part.tool) {
+    // omo's todo tool returns the session's whole list in its result details.
+    const todos =
+      part.tool === "todo" && record.isError !== true
+        ? todosFromTodoState(result.metadata)
+        : null;
+    if (todos !== null) {
       events.push({
         type: "todo.updated",
-        properties: {
-          sessionID: options.sessionId,
-          todos: normalizeTodos(previous.input["todos"]),
-        },
+        properties: { sessionID: options.sessionId, todos },
       });
     }
     return { events, effects: [] };

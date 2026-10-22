@@ -93,11 +93,15 @@ async function readSessionRoute(
       return readOmoSessionStats(context, rawId);
     case "selection":
       return readOmoSessionSelection(context, rawId);
-    case "todo":
+    case "todo": {
+      const todos = await readOmoTodos(context, rawId);
+      if (todos !== null) return jsonResponse(todos);
+      // A freshly created session is indexed before omo writes its file.
       if (!(await isOmoIdKnown(context, rawId))) {
         return jsonResponse({ error: "session_not_found" }, { status: 404 });
       }
-      return readOmoTodos();
+      return jsonResponse([]);
+    }
     case undefined:
       return readOmoSession(context, rawId);
     default:

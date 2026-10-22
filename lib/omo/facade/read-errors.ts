@@ -27,6 +27,10 @@ function numberProperty(error: Error, key: string): number | undefined {
   return typeof value === "number" ? value : undefined;
 }
 
+export function isOmoNotFoundError(error: unknown): boolean {
+  return hasErrorName(error, "OmoNotFoundError");
+}
+
 export function replacementId(error: unknown): string | undefined {
   if (
     !(error instanceof OmoSessionReplacedError) &&

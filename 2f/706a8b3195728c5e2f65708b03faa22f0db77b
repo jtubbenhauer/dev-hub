@@ -1,0 +1,68 @@
+app/api/chat-suggest/route.ts
+  h_c7f8735263030f 3
+app/api/workspaces/[id]/session-title/route.ts
+  h_c7f8735263030f 1-217
+components/chat/chat-interface.tsx
+  h_c7f8735263030f 100,1450-1469
+components/chat/session-list.tsx
+  h_c7f8735263030f 26,797-808,860,1069-1077
+drizzle/migrations/0017_ordinary_raza.sql
+  h_c7f8735263030f 1-9
+drizzle/migrations/meta/0017_snapshot.json
+  h_c7f8735263030f 1-1407
+drizzle/migrations/meta/_journal.json
+  h_c7f8735263030f 123-129
+drizzle/schema.ts
+  h_c7f8735263030f 270-283
+lib/chat-suggest/context.ts
+  h_c7f8735263030f 23
+lib/chat-suggest/settings.ts
+  h_c7f8735263030f 1-19
+lib/omo/facade/write-prompt.ts
+  h_c7f8735263030f 5,11,65-85,109-116
+lib/omo/facade/write-session.ts
+  h_c7f8735263030f 22,24,81,144-155,162,168
+lib/omo/session-registry-attach.ts
+  h_c7f8735263030f 108
+lib/omo/session-registry-records.ts
+  h_c7f8735263030f 8-9,45
+lib/session-title/context.ts
+  h_c7f8735263030f 1-150
+lib/session-title/history.ts
+  h_c7f8735263030f 1-61
+lib/session-title/prompts.ts
+  h_c7f8735263030f 1-88
+lib/session-title/request-title.ts
+  h_c7f8735263030f 1-59
+lib/session-title/title-state.ts
+  h_c7f8735263030f 1-61
+lib/session-title/title-text.ts
+  h_c7f8735263030f 1-9
+stores/chat-store.ts
+  h_c7f8735263030f 52-57,1171-1178,2301-2396,4598-4602
+tests/api/session-title.test.ts
+  h_c7f8735263030f 1-184
+tests/lib/omo/facade/write-prompt-cases.ts
+  h_c7f8735263030f 4,299-409
+tests/lib/omo/session-registry-hydration-cases.ts
+  h_c7f8735263030f 340-365
+tests/lib/session-title/context.test.ts
+  h_c7f8735263030f 1-163
+tests/lib/session-title/prompts.test.ts
+  h_c7f8735263030f 1-63
+tests/lib/session-title/title-text.test.ts
+  h_c7f8735263030f 1-23
+tests/stores/chat-store-session-title.test.ts
+  h_c7f8735263030f 1-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f706a8b3195728c5e2f65708b03faa22f0db77b",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+lib/omo/facade/read-sessions.ts
+  h_c7f8735263030f 139,148
+lib/omo/session-index-touch.ts
+  h_c7f8735263030f 37-41,55-58
+lib/omo/session-index-types.ts
+  h_c7f8735263030f 11-13
+lib/omo/session-registry-dispatch.ts
+  h_c7f8735263030f 18,259-261,264-271
+lib/omo/sessions-on-disk.ts
+  h_c7f8735263030f 7,226-269,344-350,357-358
+packages/agent/src/omo/sessions.ts
+  h_c7f8735263030f 7,148-191,281-287,294-295
+packages/agent/tests/omo/sessions.test.ts
+  h_c7f8735263030f 78-130
+tests/lib/omo/session-index.test.ts
+  h_c7f8735263030f 365-384
+tests/lib/omo/session-registry-dispatch.test.ts
+  h_c7f8735263030f 145-195
+tests/lib/omo/sessions-on-disk.test.ts
+  h_c7f8735263030f 3,178,184,186-189,191-196,249-351
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dd5d77b6f41bd8a14502e638600cce7c710a3c51",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

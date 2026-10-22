@@ -1,5 +1,6 @@
 import type { SessionStatus } from "@opencode-ai/sdk";
 import type { SessionBackgroundStatus } from "@/lib/opencode/types";
+import { resolveOmoAgentDir } from "@/lib/omo/agent-dir";
 import { DialogLedger } from "@/lib/omo/dialog-ledger";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoRpcClient } from "@/lib/omo/rpc-client";
@@ -113,7 +114,11 @@ export class OmoSessionRegistry {
     workspace: OmoSessionRegistryWorkspace,
     taskId: string,
   ): Promise<readonly string[]> {
-    return findOmoSubAgentSessionIds(workspace.path, taskId);
+    return findOmoSubAgentSessionIds(
+      resolveOmoAgentDir(),
+      workspace.path,
+      taskId,
+    );
   }
 
   findBinding(

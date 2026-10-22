@@ -1,6 +1,14 @@
 // @vitest-environment node
 
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import {
+  mkdir,
+  mkdtemp,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -515,6 +523,28 @@ describe("omo sub-agent transcripts", () => {
     );
   }
 
+  function agentDir(): string {
+    return join(tempRoot, "agent");
+  }
+
+  async function projectSubAgentSessionsDir(
+    workspace: string,
+    taskId: string,
+  ): Promise<string> {
+    const workspaceRealPath = await realpath(workspace);
+    const hash = createHash("sha256").update(workspaceRealPath).digest("hex");
+    return join(
+      agentDir(),
+      "projects",
+      `repo-${hash.slice(0, 12)}`,
+      "senpi-task",
+      "children",
+      taskId,
+      "sessions",
+      taskId,
+    );
+  }
+
   async function createWorkspace(): Promise<string> {
     const workspace = join(tempRoot, "repo");
     await mkdir(workspace, { recursive: true });
@@ -533,13 +563,31 @@ describe("omo sub-agent transcripts", () => {
     );
     await writeFile(`${transcript}.claude-sdk-oauth-binding.json`, "{}");
 
-    expect(await findOmoSubAgentSessionIds(workspace, "st_01a13ed1")).toEqual([
-      "01a13ed1-9a17",
-    ]);
-    expect(await findOmoSubAgentTranscript(workspace, "01a13ed1-9a17")).toBe(
-      transcript,
+    expect(
+      await findOmoSubAgentSessionIds(agentDir(), workspace, "st_01a13ed1"),
+    ).toEqual(["01a13ed1-9a17"]);
+    expect(
+      await findOmoSubAgentTranscript(agentDir(), workspace, "01a13ed1-9a17"),
+    ).toBe(transcript);
+    expect(
+      await findOmoSubAgentTranscript(agentDir(), workspace, "7ef5e249"),
+    ).toBeNull();
+  });
+
+  it("finds a task's sub-agent in omo's per-project state directory under the agent dir", async () => {
+    const workspace = await createWorkspace();
+    const transcript = await writeSessionFile(
+      await projectSubAgentSessionsDir(workspace, "st_01a162b9"),
+      "2026-10-22T08-28-23.708Z_f3be0286-2984-4657-8afa-f445d5ba754e.jsonl",
+      [header({ id: "01a162b9-c32d", cwd: workspace })],
     );
-    expect(await findOmoSubAgentTranscript(workspace, "7ef5e249")).toBeNull();
+
+    expect(
+      await findOmoSubAgentSessionIds(agentDir(), workspace, "st_01a162b9"),
+    ).toEqual(["01a162b9-c32d"]);
+    expect(
+      await findOmoSubAgentTranscript(agentDir(), workspace, "01a162b9-c32d"),
+    ).toBe(transcript);
   });
 
   it("ignores another workspace's transcripts, unknown tasks and unsafe task ids", async () => {
@@ -553,18 +601,28 @@ describe("omo sub-agent transcripts", () => {
       header({ id: "worker-escaped", cwd: workspace }),
     ]);
 
-    expect(await findOmoSubAgentSessionIds(workspace, "st_other")).toEqual([]);
     expect(
-      await findOmoSubAgentTranscript(workspace, "worker-other"),
-    ).toBeNull();
-    expect(await findOmoSubAgentSessionIds(workspace, "st_missing")).toEqual(
-      [],
-    );
-    expect(
-      await findOmoSubAgentSessionIds(workspace, "../../../../outside"),
+      await findOmoSubAgentSessionIds(agentDir(), workspace, "st_other"),
     ).toEqual([]);
     expect(
-      await findOmoSubAgentSessionIds(join(tempRoot, "no-repo"), "st_other"),
+      await findOmoSubAgentTranscript(agentDir(), workspace, "worker-other"),
+    ).toBeNull();
+    expect(
+      await findOmoSubAgentSessionIds(agentDir(), workspace, "st_missing"),
+    ).toEqual([]);
+    expect(
+      await findOmoSubAgentSessionIds(
+        agentDir(),
+        workspace,
+        "../../../../outside",
+      ),
+    ).toEqual([]);
+    expect(
+      await findOmoSubAgentSessionIds(
+        agentDir(),
+        join(tempRoot, "no-repo"),
+        "st_other",
+      ),
     ).toEqual([]);
   });
 });

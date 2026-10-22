@@ -142,13 +142,14 @@ export class LocalFsSessionSource implements SessionSource {
   }
 
   findSubAgentSessionIds(taskId: string): Promise<readonly string[]> {
-    return findOmoSubAgentSessionIds(this.workspacePath, taskId);
+    return findOmoSubAgentSessionIds(this.agentDir, this.workspacePath, taskId);
   }
 
   async readSubAgentEntries(
     rawId: string,
   ): Promise<readonly SessionEntry[] | null> {
     const transcript = await findOmoSubAgentTranscript(
+      this.agentDir,
       this.workspacePath,
       rawId,
     );

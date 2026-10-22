@@ -23,6 +23,7 @@ import {
   MoreVertical,
   StickyNote,
   Pencil,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -793,6 +794,18 @@ function renameHandlerFor(
   };
 }
 
+function regenerateTitleHandlerFor(
+  workspaceId: string | undefined,
+  sessionId: string,
+): () => void {
+  return () => {
+    const chatState = useChatStore.getState();
+    const targetWorkspaceId = workspaceId ?? chatState.activeWorkspaceId;
+    if (!targetWorkspaceId) return;
+    void chatState.regenerateSessionTitle(sessionId, targetWorkspaceId);
+  };
+}
+
 interface SessionItemProps {
   session: Session;
   // Workspace the row's actions target; undefined means the active one.
@@ -844,6 +857,7 @@ const SessionItem = memo(function SessionItem({
   const onSelect = () => onSelectSession(session);
   const onDelete = () => onDeleteSession(session.id, workspaceId);
   const onRename = renameHandlerFor(workspaceId, session.id);
+  const onRegenerateTitle = regenerateTitleHandlerFor(workspaceId, session.id);
   const onTogglePin =
     onPinSession && onUnpinSession
       ? () => {
@@ -1051,6 +1065,15 @@ const SessionItem = memo(function SessionItem({
             >
               <Pencil className="mr-2 size-3.5" />
               Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation();
+                onRegenerateTitle();
+              }}
+            >
+              <Sparkles className="mr-2 size-3.5" />
+              Regenerate title
             </DropdownMenuItem>
             {onTogglePin && (
               <DropdownMenuItem

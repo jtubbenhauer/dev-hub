@@ -20,7 +20,7 @@ const INJECTED_CONTEXT_PREFIXES = [
 // PR context spans many paragraphs, so those messages are skipped as examples
 const PR_CONTEXT_PATTERN = /^PR #\d+:/;
 
-function getVisibleText(message: MessageWithParts): string {
+export function getVisibleText(message: MessageWithParts): string {
   return message.parts
     .flatMap((part) =>
       part.type === "text" && !part.synthetic && !part.ignored

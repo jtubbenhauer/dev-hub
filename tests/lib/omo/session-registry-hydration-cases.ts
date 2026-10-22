@@ -337,3 +337,29 @@ describe("OmoSessionRegistry hydration", () => {
     expect(context.runtime.registry.leafQueue.size).toBe(0);
   });
 });
+
+describe("OmoSessionRegistry attach title", () => {
+  it("keeps the indexed title when omo reports no session name", async () => {
+    const path = "/sessions/titled.jsonl";
+    const context = await createRegistryContext([
+      {
+        type: "open_session",
+        response: {
+          data: {
+            sessionId: "route-titled",
+            state: { sessionId: "titled", sessionFile: path, status: "idle" },
+          },
+        },
+      },
+      { type: "get_entries", response: entriesResponse() },
+    ]);
+    insertLeafRow(context, "titled", path, 0, null);
+
+    await context.runtime.registry.attach({
+      workspace: context.workspace,
+      durableId: "titled",
+    });
+
+    expect(readIndexRow(context, "titled")).toMatchObject({ title: "Leaf" });
+  });
+});

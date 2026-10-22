@@ -19,7 +19,9 @@ import {
   type OmoSessionIndexRow,
 } from "@/lib/omo/session-index";
 import { isJsonObject } from "@/lib/omo/session-registry-records";
+import type { OmoSessionBinding } from "@/lib/omo/session-registry";
 import { OmoNotFoundError } from "@/lib/omo/session-source";
+import type { Session } from "@/lib/opencode/types";
 
 function sessionFromRow(context: OmoWriteContext, row: OmoSessionIndexRow) {
   return buildOmoSession({
@@ -76,7 +78,7 @@ export async function createOmoSession(
       rawId: binding.durableId,
       workspaceId: context.workspace.id,
       directory: context.workspace.path,
-      title: binding.openedState.title,
+      title: binding.openedState.title ?? "Untitled",
       created: now,
       updated: now,
     }),
@@ -139,17 +141,29 @@ export async function renameOmoSession(
   const title = requiredString(body, "title");
   if (title === null) return invalidRequestResponse();
   const binding = await attachOmoWriteSession(context, rawId);
+  const session = await applyOmoSessionTitle(context, binding, rawId, title);
+  if (session === null) return sessionNotFoundResponse();
+  return jsonResponse(session);
+}
+
+// Names the session in omo, the index and every open client.
+export async function applyOmoSessionTitle(
+  context: OmoWriteContext,
+  binding: OmoSessionBinding,
+  rawId: string,
+  title: string,
+): Promise<Session | null> {
   await context.runtime.registry.request(binding, {
     type: "set_session_name",
     name: title,
   });
   await setOmoSessionTitle(context.workspace.id, rawId, title);
   const row = await getOmoWriteIndexRow(context, rawId);
-  if (row === null) return sessionNotFoundResponse();
+  if (row === null) return null;
   const session = sessionFromRow(context, row);
   context.runtime.registry.emitEvent(context.workspace.id, {
     type: "session.updated",
     properties: { info: session },
   });
-  return jsonResponse(session);
+  return session;
 }

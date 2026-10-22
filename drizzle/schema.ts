@@ -269,6 +269,20 @@ export const sessionNotes = sqliteTable(
   (table) => [primaryKey({ columns: [table.workspaceId, table.sessionId] })],
 );
 
+export const sessionTitleStates = sqliteTable(
+  "session_title_states",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    lastAutoTitleTurn: integer("last_auto_title_turn").notNull().default(0),
+    lastGeneratedTitle: text("last_generated_title"),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.sessionId] })],
+);
+
 export const cachedSessions = sqliteTable(
   "cached_sessions",
   {

@@ -2,11 +2,13 @@ import { attachOmoWriteSession } from "@/lib/omo/facade/write-access";
 import { parsePromptBody } from "@/lib/omo/facade/write-body";
 import { lateOmoFailureMessage } from "@/lib/omo/facade/write-errors";
 import { ensureOmoPermissionPreset } from "@/lib/omo/facade/write-permission-preset";
+import { applyOmoSessionTitle } from "@/lib/omo/facade/write-session";
 import type { OmoWriteContext } from "@/lib/omo/facade/write-types";
 import { jsonResponse, noContentResponse } from "@/lib/omo/facade/write-types";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoSessionBinding } from "@/lib/omo/session-registry";
 import { isJsonObject } from "@/lib/omo/session-registry-records";
+import { titleFromUserText } from "@/lib/session-title/title-text";
 
 const ACCEPTANCE_WINDOW_MS = 10_000;
 
@@ -60,6 +62,27 @@ export async function sendWithAcceptanceWindow(
   return new Response(null, { status: 202 });
 }
 
+// omo never names a session itself, so without this a new chat stays
+// "Untitled" until the session list is next read from disk.
+async function nameSessionFromFirstPrompt(
+  context: OmoWriteContext,
+  binding: OmoSessionBinding,
+  rawId: string,
+  message: string,
+): Promise<void> {
+  const title = titleFromUserText(message);
+  if (title === null) return;
+  try {
+    await applyOmoSessionTitle(context, binding, rawId, title);
+  } catch (error) {
+    // The prompt matters more than its title; send it regardless.
+    console.warn("[omo] Could not name session from its first prompt", {
+      rawId,
+      error,
+    });
+  }
+}
+
 export async function promptOmoSession(
   context: OmoWriteContext,
   rawId: string,
@@ -83,6 +106,14 @@ export async function promptOmoSession(
   const state = stateRecord(
     await context.runtime.registry.request(binding, { type: "get_state" }),
   );
+  if (!state["sessionName"] && state["messageCount"] === 0) {
+    await nameSessionFromFirstPrompt(
+      context,
+      binding,
+      rawId,
+      parsed.value.message,
+    );
+  }
   const currentModel = state["model"];
   const currentProvider = isJsonObject(currentModel)
     ? currentModel["provider"]

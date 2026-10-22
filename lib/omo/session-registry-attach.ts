@@ -105,12 +105,7 @@ async function touchOpenedBinding(
     binding.durableId,
   );
   const now = Date.now();
-  const title =
-    typeof binding.openedState.title === "string" && binding.openedState.title
-      ? binding.openedState.title
-      : typeof existing?.title === "string"
-        ? existing.title
-        : "Untitled";
+  const title = binding.openedState.title ?? existing?.title ?? "Untitled";
   await touchOmoSessionIndex(
     binding.workspaceId,
     binding.durableId,

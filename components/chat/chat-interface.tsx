@@ -97,6 +97,7 @@ import {
   Plus,
   RotateCw,
   ScrollText,
+  Sparkles,
   StickyNote,
   X,
 } from "lucide-react";
@@ -1444,6 +1445,26 @@ export function ChatInterface() {
                       <VscodeIcon className="mr-2 size-4" />
                       Open in {externalEditorLabel}
                     </a>
+                  </DropdownMenuItem>
+                )}
+                {activeSessionId && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      const chatState = useChatStore.getState();
+                      if (
+                        !chatState.activeSessionId ||
+                        !chatState.activeWorkspaceId
+                      ) {
+                        return;
+                      }
+                      void chatState.regenerateSessionTitle(
+                        chatState.activeSessionId,
+                        chatState.activeWorkspaceId,
+                      );
+                    }}
+                  >
+                    <Sparkles className="mr-2 size-4" />
+                    Regenerate title
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem

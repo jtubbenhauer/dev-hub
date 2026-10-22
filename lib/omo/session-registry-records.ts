@@ -5,7 +5,8 @@ import type { OmoOpenedSession } from "@/lib/omo/rpc-client";
 export type OmoOpenedState = {
   readonly durableId: string;
   readonly sessionPath: string | null;
-  readonly title: string;
+  // Undefined until the session is named; omo never invents a name itself.
+  readonly title: string | undefined;
   readonly isStreaming: boolean;
   readonly modelId: string | undefined;
   readonly providerId: string | undefined;
@@ -41,7 +42,7 @@ export function parseOpenedState(opened: OmoOpenedSession): OmoOpenedState {
   return {
     durableId: state["sessionId"],
     sessionPath: optionalString(state["sessionFile"]) ?? null,
-    title: optionalString(state["sessionName"]) ?? "Untitled",
+    title: optionalString(state["sessionName"]) || undefined,
     isStreaming: state["isStreaming"] === true,
     modelId:
       optionalString(model?.["id"]) ?? optionalString(model?.["modelId"]),

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth/config";
-import { db } from "@/lib/db";
-import { settings } from "@/drizzle/schema";
-import { CHAT_SUGGESTIONS_ENABLED_SETTING_KEY } from "@/lib/chat-suggest/constants";
+import { isChatSuggestionsEnabledForUser } from "@/lib/chat-suggest/settings";
 import {
   requestChatCompletion,
   resolveChatSuggestConfig,
@@ -39,21 +36,6 @@ function parseRequestBody(body: unknown): ChatSuggestRequestBody | null {
     return { mode, lastAgentMessage, recentUserMessages, typedText };
   }
   return { mode, lastAgentMessage, recentUserMessages };
-}
-
-async function isChatSuggestionsEnabledForUser(
-  userId: string,
-): Promise<boolean> {
-  const rows = await db
-    .select({ value: settings.value })
-    .from(settings)
-    .where(
-      and(
-        eq(settings.userId, userId),
-        eq(settings.key, CHAT_SUGGESTIONS_ENABLED_SETTING_KEY),
-      ),
-    );
-  return rows[0]?.value !== false;
 }
 
 export async function POST(request: NextRequest) {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import {
+  insertWriteIndexRow,
   namedWriteError,
   useWriteFixture,
   writeJson,
@@ -294,4 +295,115 @@ describe("handleOmoWrite slow prompt acceptance", () => {
       });
     },
   );
+});
+
+describe("handleOmoWrite prompt_async first prompt naming", () => {
+  function answerStateWith(
+    fixture: WriteFixture,
+    state: Readonly<Record<string, unknown>>,
+    options: { readonly isNamingRejected?: boolean } = {},
+  ): void {
+    fixture.registry.request.mockImplementation(
+      async (_binding, command): Promise<JsonlRecord> => {
+        if (command["type"] === "get_state") {
+          return { data: { model: null, isStreaming: false, ...state } };
+        }
+        if (
+          command["type"] === "set_session_name" &&
+          options.isNamingRejected
+        ) {
+          throw new Error("naming failed");
+        }
+        return { data: {} };
+      },
+    );
+  }
+
+  it("names an unnamed session from its first prompt", async () => {
+    // Given
+    const fixture = await useWriteFixture();
+    fixture.source.authorized.add("root");
+    insertWriteIndexRow(fixture.sqlite, { durableId: "root" });
+    answerStateWith(fixture, { messageCount: 0 });
+
+    // When
+    const response = await fixture.request("/session/omo_root/prompt_async", {
+      body: promptBody({
+        parts: [
+          {
+            type: "text",
+            text: "Context files:\n- a.ts\n\nFix the   login\nbug",
+          },
+        ],
+      }),
+    });
+
+    // Then
+    expect(response.status).toBe(204);
+    expect(sentCommands(fixture).map((command) => command["type"])).toEqual([
+      "get_state",
+      "set_session_name",
+      "prompt",
+    ]);
+    expect(sentCommands(fixture)[1]).toMatchObject({
+      name: "Fix the login bug",
+    });
+    expect(
+      fixture.sqlite
+        .prepare(
+          "SELECT title FROM omo_session_index WHERE durable_id = 'root'",
+        )
+        .get(),
+    ).toEqual({ title: "Fix the login bug" });
+    expect(fixture.registry.emitEvent).toHaveBeenCalledWith(
+      "workspace-1",
+      expect.objectContaining({
+        type: "session.updated",
+        properties: {
+          info: expect.objectContaining({ title: "Fix the login bug" }),
+        },
+      }),
+    );
+  });
+
+  it.each([
+    ["already named", { sessionName: "Existing", messageCount: 0 }],
+    ["already started", { messageCount: 4 }],
+  ])("leaves a session that is %s alone", async (_label, state) => {
+    // Given
+    const fixture = await useWriteFixture();
+    fixture.source.authorized.add("root");
+    insertWriteIndexRow(fixture.sqlite, { durableId: "root" });
+    answerStateWith(fixture, state);
+
+    // When
+    await fixture.request("/session/omo_root/prompt_async", {
+      body: promptBody(),
+    });
+
+    // Then
+    expect(sentCommands(fixture).map((command) => command["type"])).toEqual([
+      "get_state",
+      "prompt",
+    ]);
+  });
+
+  it("still sends the prompt when naming fails", async () => {
+    // Given
+    const fixture = await useWriteFixture();
+    fixture.source.authorized.add("root");
+    insertWriteIndexRow(fixture.sqlite, { durableId: "root" });
+    answerStateWith(fixture, { messageCount: 0 }, { isNamingRejected: true });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    // When
+    const response = await fixture.request("/session/omo_root/prompt_async", {
+      body: promptBody(),
+    });
+
+    // Then
+    expect(response.status).toBe(204);
+    expect(sentCommands(fixture).at(-1)).toMatchObject({ type: "prompt" });
+    expect(warn).toHaveBeenCalled();
+  });
 });

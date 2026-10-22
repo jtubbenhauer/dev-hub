@@ -49,6 +49,12 @@ import {
 } from "@/lib/chat/session-deletion";
 import { engineForSessionId, type ChatEngine } from "@/lib/engine/types";
 import { requestGitStatusRefresh } from "@/lib/git/git-status-refresh";
+import {
+  AUTO_TITLE_USER_TURNS,
+  buildSessionTitleContext,
+} from "@/lib/session-title/context";
+import { loadEarlierHistory } from "@/lib/session-title/history";
+import { requestSessionTitle } from "@/lib/session-title/request-title";
 
 export type StreamingStatus =
   | "idle"
@@ -1162,6 +1168,14 @@ interface ChatState {
     workspaceId: string,
     title: string,
   ) => Promise<boolean>;
+  regenerateSessionTitle: (
+    sessionId: string,
+    workspaceId: string,
+  ) => Promise<boolean>;
+  autoTitleSessionAfterTurn: (
+    sessionId: string,
+    workspaceId: string,
+  ) => Promise<void>;
   removeSessionLocal: (
     sessionId: string,
     workspaceId: string,
@@ -2282,6 +2296,102 @@ export const useChatStore = create<ChatState>()(
           })),
         );
         return true;
+      },
+
+      regenerateSessionTitle: async (sessionId, workspaceId) => {
+        if (!get().workspaceStates[workspaceId]?.messages[sessionId]?.length) {
+          await get().fetchMessages(sessionId, workspaceId);
+        }
+        const toastId = toast.loading("Regenerating title…");
+        const ws = get().workspaceStates[workspaceId];
+        const loadedMessages = ws?.messages[sessionId] ?? [];
+        // A long chat's loaded window misses how it started.
+        const history = get().hasMoreBeforeBySession[
+          sessionKey(workspaceId, sessionId)
+        ]
+          ? await loadEarlierHistory({
+              sessionId,
+              workspaceId,
+              loadedMessages,
+            }).catch((error: unknown) => {
+              console.warn("[session-title] Older history failed", error);
+              return loadedMessages;
+            })
+          : loadedMessages;
+        const context = buildSessionTitleContext(history);
+        if (!context) {
+          toast.error("Nothing to title yet", {
+            id: toastId,
+            description: "Send a message in this chat first.",
+          });
+          return false;
+        }
+        const result = await requestSessionTitle({
+          workspaceId,
+          sessionId,
+          currentTitle: ws?.sessions[sessionId]?.title ?? "",
+          trigger: { kind: "regenerate" },
+          context,
+        }).catch(
+          (error: unknown) =>
+            ({
+              kind: "failed",
+              error: error instanceof Error ? error.message : String(error),
+            }) as const,
+        );
+        if (result.kind !== "titled") {
+          toast.error("Couldn't regenerate the title", {
+            id: toastId,
+            description: result.kind === "failed" ? result.error : undefined,
+          });
+          return false;
+        }
+        const isRenamed = await get().renameSession(
+          sessionId,
+          workspaceId,
+          result.title,
+        );
+        if (isRenamed) {
+          toast.success("Title updated", {
+            id: toastId,
+            description: result.title,
+          });
+        } else {
+          toast.error("Couldn't save the new title", { id: toastId });
+        }
+        return isRenamed;
+      },
+
+      autoTitleSessionAfterTurn: async (sessionId, workspaceId) => {
+        const state = get();
+        const ws = state.workspaceStates[workspaceId];
+        const session = ws?.sessions[sessionId];
+        if (!ws || !session || session.parentID) return;
+        // A partial history would miscount turns on a long session.
+        if (state.hasMoreBeforeBySession[sessionKey(workspaceId, sessionId)]) {
+          return;
+        }
+        const context = buildSessionTitleContext(ws.messages[sessionId] ?? []);
+        if (
+          !context ||
+          !AUTO_TITLE_USER_TURNS.includes(context.userTurnCount)
+        ) {
+          return;
+        }
+        const result = await requestSessionTitle({
+          workspaceId,
+          sessionId,
+          currentTitle: session.title,
+          trigger: { kind: "auto", turn: context.userTurnCount },
+          context,
+        });
+        if (result.kind === "failed") {
+          console.warn("[session-title] Auto title failed", result.error);
+          return;
+        }
+        if (result.kind === "titled" && result.title !== session.title) {
+          await get().renameSession(sessionId, workspaceId, result.title);
+        }
       },
 
       deleteSession: async (sessionId, workspaceId) => {
@@ -4485,6 +4595,11 @@ export const useChatStore = create<ChatState>()(
             }
             // OpenCode emits no per-file edit events; a finished turn is when its writes land.
             requestGitStatusRefresh(wsId);
+            void get()
+              .autoTitleSessionAfterTurn(sessionID, wsId)
+              .catch((error: unknown) =>
+                console.warn("[session-title] Auto title failed", error),
+              );
             playSoundForEvent("agent");
             sendBrowserNotification("Agent completed", {
               body: "The agent has finished processing.",

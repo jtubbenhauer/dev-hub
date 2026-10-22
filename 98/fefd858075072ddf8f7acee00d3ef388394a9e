@@ -1,0 +1,26 @@
+lib/omo/facade/read-sessions.ts
+  h_c7f8735263030f 122-132,143-153,190
+lib/omo/remote-session-source.ts
+  h_c7f8735263030f 31-33
+lib/omo/sessions-on-disk.ts
+  h_c7f8735263030f 119-121,360
+packages/agent/src/omo/sessions.ts
+  h_c7f8735263030f 36-38,297
+packages/agent/tests/omo/sessions.test.ts
+  h_c7f8735263030f 78-120
+tests/lib/omo/facade/read-session-cases.ts
+  h_c7f8735263030f 268-301
+tests/lib/omo/sessions-on-disk.test.ts
+  h_c7f8735263030f 208-209,388
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "98fefd858075072ddf8f7acee00d3ef388394a9e",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

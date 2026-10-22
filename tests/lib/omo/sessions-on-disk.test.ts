@@ -205,6 +205,8 @@ describe("listOmoSessionsForCwd", () => {
       "named-session",
     ]);
     expect(byId.get("named-session")?.title).toBe("Latest Session Name");
+    expect(byId.get("named-session")?.isTitleProvisional).toBe(false);
+    expect(byId.get("unnamed-session")?.isTitleProvisional).toBe(false);
     expect(byId.get("unnamed-session")?.title).toBe(
       "This is the fallback title text",
     );
@@ -383,6 +385,7 @@ describe("listOmoSessionsForCwd", () => {
     const results = await listOmoSessionsForCwd({ agentDir, cwd });
     expect(results).toHaveLength(1);
     expect(results[0]?.title).toBe("in-window fallback title");
+    expect(results[0]?.isTitleProvisional).toBe(true);
   });
 
   it("returns an empty list when the cwd's session directory does not exist", async () => {

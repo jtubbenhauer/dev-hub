@@ -33,6 +33,9 @@ export type OmoSessionOnDiskSummary = {
   readonly sessionPath: string;
   readonly forkedFrom: string | null;
   readonly title: string;
+  // omo appends a session's name, so in a file larger than the scanned window
+  // the name can sit past it and the title falls back to the first message.
+  readonly isTitleProvisional: boolean;
   readonly createdMs: number;
   readonly updatedMs: number;
 };
@@ -291,6 +294,7 @@ async function readSessionSummaryIfMatching(
     sessionPath: filePath,
     forkedFrom: header.parentSession ?? null,
     title: sessionInfoName ?? firstUserText ?? "Untitled",
+    isTitleProvisional: sessionInfoName === null && !isWholeFileScanned,
     createdMs,
     updatedMs: tailMessageMs ?? latestMessageMs(lines) ?? createdMs,
   };

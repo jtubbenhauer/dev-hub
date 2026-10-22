@@ -265,6 +265,40 @@ describe("handleOmoRead session routes", () => {
     expect(fixture.source.authorizeSession).not.toHaveBeenCalled();
   });
 
+  it("keeps the indexed title when a large file's name is past the scanned window", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    fixture.client.isConnected = false;
+    fixture.source.authorized.add("large");
+    fixture.source.summaries.push(
+      {
+        ...summary("large", "First message text", 30),
+        isTitleProvisional: true,
+      },
+      summary("small", "Disk name", 20),
+    );
+    insertIndexRow(fixture.sqlite, "large", "interactive");
+    insertIndexRow(fixture.sqlite, "small", "interactive");
+
+    // When
+    const list = await readJson(await fixture.request("/session"));
+    const detail = await readJson(await fixture.request("/session/omo_large"));
+
+    // Then
+    expect(list).toEqual([
+      expect.objectContaining({ id: "omo_large", title: "large" }),
+      expect.objectContaining({ id: "omo_small", title: "Disk name" }),
+    ]);
+    expect(detail).toMatchObject({ id: "omo_large", title: "large" });
+    expect(
+      fixture.sqlite
+        .prepare(
+          "SELECT title FROM omo_session_index WHERE durable_id = 'large'",
+        )
+        .get(),
+    ).toEqual({ title: "large" });
+  });
+
   it("merges get_state into detail when the session is attached", async () => {
     // Given
     const fixture = await useReadFixture();

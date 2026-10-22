@@ -75,6 +75,49 @@ describe("listOmoSessionsForWorkspace / readOmoSessionEntries", () => {
     expect(summaries[0]?.durableId).toBe("session-matching");
   });
 
+  it("marks a fallback title provisional only when the file outgrows the scanned window", async () => {
+    const sessionsDir = join(
+      agentDir,
+      "sessions",
+      `--${encodeCwdDir(workspaceA)}--`,
+    );
+    await mkdir(sessionsDir, { recursive: true });
+    const padding = JSON.stringify({
+      type: "custom",
+      id: "padding",
+      parentId: "entry-1",
+      timestamp: "2024-01-01T00:02:00.000Z",
+      customType: "padding",
+      data: "p".repeat(1_100_000),
+    });
+    await writeFile(
+      join(sessionsDir, "large.jsonl"),
+      [
+        sessionHeaderLine("session-large", workspaceA),
+        messageEntryLine("entry-1", null),
+        padding,
+      ].join("\n") + "\n",
+    );
+    await writeFile(
+      join(sessionsDir, "small.jsonl"),
+      [
+        sessionHeaderLine("session-small", workspaceA),
+        messageEntryLine("entry-1", null),
+      ].join("\n") + "\n",
+    );
+
+    const summaries = await listOmoSessionsForWorkspace(agentDir, workspaceA);
+    const byId = new Map(
+      summaries.map((summary) => [summary.durableId, summary]),
+    );
+
+    expect(byId.get("session-large")).toMatchObject({
+      title: "hello world",
+      isTitleProvisional: true,
+    });
+    expect(byId.get("session-small")?.isTitleProvisional).toBe(false);
+  });
+
   it("takes updatedMs from the last message, ignoring later housekeeping entries", async () => {
     const sessionsDir = join(
       agentDir,

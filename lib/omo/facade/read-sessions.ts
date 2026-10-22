@@ -119,6 +119,17 @@ async function liveSummaries(
   }
 }
 
+// A provisional title is only the first message; the index keeps the name
+// omo was last given.
+function withIndexedTitle(
+  summary: OmoSessionOnDiskSummary,
+  row: OmoSessionIndexRow | null,
+): OmoSessionOnDiskSummary {
+  return summary.isTitleProvisional && row !== null
+    ? { ...summary, title: row.title }
+    : summary;
+}
+
 export async function listOmoSessions(
   context: OmoReadContext,
 ): Promise<Response> {
@@ -129,7 +140,17 @@ export async function listOmoSessions(
   ]);
   const hidden = new Set(await listOmoHiddenIds(context.workspace.id));
   const byId = new Map<string, OmoSessionOnDiskSummary>();
-  for (const summary of disk) byId.set(summary.durableId, summary);
+  const indexedDisk = await Promise.all(
+    disk.map(async (summary) =>
+      summary.isTitleProvisional
+        ? withIndexedTitle(
+            summary,
+            await getOmoIndexRow(context.workspace.id, summary.durableId),
+          )
+        : summary,
+    ),
+  );
+  for (const summary of indexedDisk) byId.set(summary.durableId, summary);
   for (const summary of live) {
     if (!byId.has(summary.durableId)) byId.set(summary.durableId, summary);
   }
@@ -166,7 +187,7 @@ export async function readOmoSession(
   const summary = summaries.find((candidate) => candidate.durableId === rawId);
   let session: Session;
   if (summary !== undefined) {
-    session = sessionFromSummary(context, summary);
+    session = sessionFromSummary(context, withIndexedTitle(summary, row));
     if (row?.parentDurableId) {
       session = { ...session, parentID: `omo_${row.parentDurableId}` };
     }

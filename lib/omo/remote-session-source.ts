@@ -28,6 +28,9 @@ function isSessionSummary(value: unknown): value is OmoSessionOnDiskSummary {
     typeof value["sessionPath"] === "string" &&
     (typeof value["forkedFrom"] === "string" || value["forkedFrom"] === null) &&
     typeof value["title"] === "string" &&
+    // Older agents do not send it.
+    (value["isTitleProvisional"] === undefined ||
+      typeof value["isTitleProvisional"] === "boolean") &&
     isFiniteNumber(value["createdMs"]) &&
     isFiniteNumber(value["updatedMs"])
   );

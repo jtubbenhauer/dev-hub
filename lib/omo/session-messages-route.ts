@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { cachedMessages } from "@/drizzle/schema";
 import { db } from "@/lib/db";
+import { dropCachedMessagesOffActiveBranch } from "@/lib/omo/cached-message-branch";
 import { handleOmoRead } from "@/lib/omo/facade/read";
 import type { OmoReadWorkspace } from "@/lib/omo/facade/read-types";
 import {
@@ -169,7 +170,10 @@ async function mergedWindow(
       isUpstreamWindowFull = remote.messages.length >= size;
       full = cached
         ? mergeTailWindow(
-            truncateMessagesForTransport(cached.messages),
+            dropCachedMessagesOffActiveBranch(
+              truncateMessagesForTransport(cached.messages),
+              remote.messages,
+            ),
             remote.messages,
           )
         : remote.messages;

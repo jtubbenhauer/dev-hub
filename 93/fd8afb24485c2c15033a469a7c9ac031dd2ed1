@@ -1,0 +1,18 @@
+lib/omo/cached-message-branch.ts
+  h_c7f8735263030f 1-21
+lib/omo/session-messages-route.ts
+  h_c7f8735263030f 4,173-176
+tests/lib/omo/cached-message-branch.test.ts
+  h_c7f8735263030f 1-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "93fd8afb24485c2c15033a469a7c9ac031dd2ed1",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

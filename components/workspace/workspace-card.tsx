@@ -7,6 +7,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useCommandStore } from "@/stores/command-store";
 import { useGitStatus, useAgentHealth } from "@/hooks/use-git";
 import { useWorkspaceResume } from "@/hooks/use-workspace-resume";
+import { useWorkspaceUpgrade } from "@/hooks/use-workspace-upgrade";
 import { VscodeTargetEditor } from "@/components/workspace/vscode-target-editor";
 import { WorkspaceEngineEditor } from "@/components/workspace/workspace-engine-editor";
 import { WorkspaceAccessBadge } from "@/components/workspace/workspace-access-badge";
@@ -55,6 +56,7 @@ import {
   Loader2,
   Link2,
   MoreHorizontal,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils";
@@ -63,6 +65,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type {
@@ -459,6 +462,8 @@ export function WorkspaceCard({
 function WorkspaceTaskLinkMenu({ workspace }: { workspace: Workspace }) {
   const queryClient = useQueryClient();
   const [isTaskPickerOpen, setIsTaskPickerOpen] = useState(false);
+  const [isUpgradeConfirmOpen, setIsUpgradeConfirmOpen] = useState(false);
+  const { canUpgrade, isUpgrading, upgrade } = useWorkspaceUpgrade(workspace);
 
   const linkTaskMutation = useMutation({
     mutationFn: async (data: {
@@ -552,8 +557,45 @@ function WorkspaceTaskLinkMenu({ workspace }: { workspace: Workspace }) {
               Link Task
             </DropdownMenuItem>
           )}
+          {canUpgrade && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setIsUpgradeConfirmOpen(true);
+                }}
+                disabled={isUpgrading}
+              >
+                <RefreshCw
+                  className={cn("mr-2 size-3.5", isUpgrading && "animate-spin")}
+                />
+                {isUpgrading ? "Upgrading..." : "Upgrade container"}
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <AlertDialog
+        open={isUpgradeConfirmOpen}
+        onOpenChange={setIsUpgradeConfirmOpen}
+      >
+        <AlertDialogContent onClick={(event) => event.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Upgrade {workspace.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Recreates the container from the current image and configuration.
+              OpenCode restarts, so a running agent session is interrupted.
+              Files, volumes and cloud access are kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={upgrade}>Upgrade</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <TaskPicker
         open={isTaskPickerOpen}

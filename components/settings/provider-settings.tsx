@@ -103,6 +103,7 @@ interface ProviderFormState {
   shellCommand: string;
   startCommand: string;
   accessOptionsCommand: string;
+  upgradeCommand: string;
   providerType: ProviderTypePreset;
   behaviour: ProviderBehaviour;
 }
@@ -116,6 +117,7 @@ const EMPTY_FORM: ProviderFormState = {
   shellCommand: "",
   startCommand: "{binary} start {name} --provider fly --json",
   accessOptionsCommand: "",
+  upgradeCommand: "",
   providerType: "always-on",
   behaviour: DEFAULT_PROVIDER_BEHAVIOUR,
 };
@@ -151,6 +153,7 @@ export function ProviderSettings() {
       shellCommand: provider.commands.shell ?? "",
       startCommand: provider.commands.start ?? "",
       accessOptionsCommand: provider.commands.accessOptions ?? "",
+      upgradeCommand: provider.commands.upgrade ?? "",
       providerType,
       behaviour: provider.behaviour ?? DEFAULT_PROVIDER_BEHAVIOUR,
     });
@@ -197,6 +200,9 @@ export function ProviderSettings() {
           : {}),
         ...(form.accessOptionsCommand.trim()
           ? { accessOptions: form.accessOptionsCommand.trim() }
+          : {}),
+        ...(form.upgradeCommand.trim()
+          ? { upgrade: form.upgradeCommand.trim() }
           : {}),
       },
       behaviour:
@@ -513,6 +519,25 @@ export function ProviderSettings() {
                 <p className="text-muted-foreground text-xs">
                   Lists the cloud access profiles you can give a workspace.
                   Leave blank to hide the access picker.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="cmd-upgrade" className="text-xs">
+                  Upgrade (optional)
+                </Label>
+                <Input
+                  id="cmd-upgrade"
+                  value={form.upgradeCommand}
+                  onChange={(e) =>
+                    updateField("upgradeCommand", e.target.value)
+                  }
+                  placeholder="{binary} upgrade {id}"
+                  className="h-8 font-mono text-xs"
+                />
+                <p className="text-muted-foreground text-xs">
+                  Recreates a workspace&apos;s container from the current image
+                  and configuration. Leave blank to hide the Upgrade action.
                 </p>
               </div>
 

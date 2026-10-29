@@ -127,3 +127,35 @@ describe("ProviderSettings", () => {
     expect(value[0].commands.accessOptions).toBe(expectedCommand);
   });
 });
+
+describe("ProviderSettings upgrade command", () => {
+  it.each([
+    [
+      "saves the upgrade command when one is entered",
+      "{binary} upgrade {id}",
+      "{binary} upgrade {id}",
+    ],
+    ["leaves the upgrade command out when the field is blank", "", undefined],
+  ])("%s", async (_description, enteredCommand, expectedCommand) => {
+    const user = userEvent.setup();
+    render(<ProviderSettings />);
+
+    await user.click(screen.getByRole("button", { name: /Add Provider/i }));
+    await user.type(screen.getByLabelText("Name"), "rig-cli");
+    await user.type(screen.getByLabelText("Binary Path"), "rig-cli");
+    if (enteredCommand) {
+      await user.type(
+        screen.getByLabelText("Upgrade (optional)"),
+        enteredCommand.replaceAll("{", "{{"),
+      );
+    }
+    const addButtons = screen.getAllByRole("button", { name: /Add Provider/i });
+    await user.click(addButtons[addButtons.length - 1]);
+
+    expect(mockMutate).toHaveBeenCalledTimes(1);
+    const [{ value }] = mockMutate.mock.calls[0] as [
+      { value: Array<{ commands: Record<string, string> }> },
+    ];
+    expect(value[0].commands.upgrade).toBe(expectedCommand);
+  });
+});

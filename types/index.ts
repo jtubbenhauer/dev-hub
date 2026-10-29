@@ -524,6 +524,7 @@ export interface WorkspaceProvider {
     shell?: string;
     start?: string;
     accessOptions?: string;
+    upgrade?: string;
   };
   behaviour?: ProviderBehaviour;
 }

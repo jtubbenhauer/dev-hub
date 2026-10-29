@@ -12,6 +12,14 @@ const mockSetActiveWorkspaceId = vi.fn();
 const mockRunCommand = vi.fn();
 const mockSetDrawerOpen = vi.fn();
 
+vi.mock("@/hooks/use-workspace-upgrade", () => ({
+  useWorkspaceUpgrade: vi.fn(() => ({
+    canUpgrade: false,
+    isUpgrading: false,
+    upgrade: vi.fn(),
+  })),
+}));
+
 vi.mock("@/hooks/use-workspace-resume", () => ({
   useWorkspaceResume: vi.fn(() => ({
     isResuming: false,

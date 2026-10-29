@@ -1,0 +1,42 @@
+app/api/providers/access-options/route.ts
+  h_c7f8735263030f 1-91
+app/api/providers/create-workspace/route.ts
+  h_c7f8735263030f 8-17,140-151,207-208,212-215,285,322,336,396
+components/settings/provider-settings.tsx
+  h_c7f8735263030f 105,118,153,198-200,436-439,500-518
+components/workspace/access-profile-picker.tsx
+  h_c7f8735263030f 1-121
+components/workspace/create-provider-workspace-dialog.tsx
+  h_c7f8735263030f 49,51-55,86-87,116-132,184,208-210,229-230,243-244,310,324-335,653-658
+components/workspace/workspace-access-badge.tsx
+  h_c7f8735263030f 1-72
+components/workspace/workspace-card.tsx
+  h_c7f8735263030f 12,189-190
+hooks/use-provider-access-options.ts
+  h_c7f8735263030f 1-31
+lib/workspaces/access-profiles.ts
+  h_c7f8735263030f 1-107
+stores/provider-creation-store.ts
+  h_c7f8735263030f 28-29,69-70,97-98,163-164,178-179,204-205
+tests/components/access-profile-picker.test.tsx
+  h_c7f8735263030f 1-153
+tests/components/provider-settings.test.tsx
+  h_c7f8735263030f 99-128
+tests/components/workspace-access-badge.test.tsx
+  h_c7f8735263030f 1-62
+tests/lib/access-profiles.test.ts
+  h_c7f8735263030f 1-175
+types/index.ts
+  h_c7f8735263030f 526,531-551
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f7fad4a83fabb759d52c4591e5d24b68934c1a1",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -26,6 +26,7 @@ import { useChatScrollMemory } from "@/components/chat/use-chat-scroll-memory";
 import { useSessionManagement } from "@/components/chat/use-session-management";
 import { useSessionNavigation } from "@/components/chat/use-session-navigation";
 import { useSessionListActivity } from "@/components/chat/use-session-list-activity";
+import { useRefocusPromptOnTerminalClose } from "@/components/chat/use-refocus-prompt-on-terminal-close";
 import { TaskProgressPanel } from "@/components/chat/task-progress";
 import { McpStatusPanel } from "@/components/chat/mcp-status";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
@@ -242,6 +243,7 @@ export function ChatInterface() {
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const visibleRangeRef = useRef({ startIndex: 0, endIndex: 0 });
   const lastJumpedUserIdxRef = useRef<number | null>(null);
+  useRefocusPromptOnTerminalClose(promptInputRef);
 
   const activeWorkspaceId = useWorkspaceStore(
     (state) => state.activeWorkspaceId,

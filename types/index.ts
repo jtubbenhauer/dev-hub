@@ -523,8 +523,30 @@ export interface WorkspaceProvider {
     status: string;
     shell?: string;
     start?: string;
+    accessOptions?: string;
   };
   behaviour?: ProviderBehaviour;
+}
+
+export interface ProviderAccessGate {
+  ttlHours: number;
+  isReasonRequired: boolean;
+}
+
+export interface ProviderAccessOption {
+  id: string;
+  label: string;
+  description?: string;
+  isEligible: boolean;
+  ineligibleReason?: string;
+  isReasonRequired: boolean;
+  gate?: ProviderAccessGate;
+}
+
+export interface WorkspaceAccess {
+  profile: string;
+  reason?: string;
+  expiresAt?: string;
 }
 
 export interface ProviderBehaviour {

@@ -5,7 +5,16 @@ import { settings, workspaces } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
-import type { WorkspaceProvider, WorkspaceProviderCreateResult } from "@/types";
+import type {
+  WorkspaceAccess,
+  WorkspaceProvider,
+  WorkspaceProviderCreateResult,
+} from "@/types";
+import {
+  NO_ACCESS_PROFILE_ID,
+  isValidAccessProfileId,
+  shellQuote,
+} from "@/lib/workspaces/access-profiles";
 import { DEFAULT_PROVIDER_BEHAVIOUR } from "@/types";
 
 function isWorkspaceProvider(value: unknown): value is WorkspaceProvider {
@@ -128,6 +137,18 @@ export async function POST(request: NextRequest) {
   const branch = typeof body.branch === "string" ? body.branch : "main";
   const name = typeof body.name === "string" ? body.name : undefined;
   const context = typeof body.context === "string" ? body.context : "";
+  const access =
+    typeof body.access === "string" && body.access
+      ? body.access
+      : NO_ACCESS_PROFILE_ID;
+  if (!isValidAccessProfileId(access)) {
+    return NextResponse.json(
+      { error: "access must be a profile id like dev-ops" },
+      { status: 400 },
+    );
+  }
+  const accessReason =
+    typeof body.accessReason === "string" ? body.accessReason.trim() : "";
   const color = typeof body.color === "string" ? body.color : null;
   const linkedTaskId =
     typeof body.linkedTaskId === "string" ? body.linkedTaskId : null;
@@ -183,9 +204,15 @@ export async function POST(request: NextRequest) {
     name: derivedName,
     id,
     context,
+    access,
+    accessReason: shellQuote(accessReason),
   };
 
   const command = interpolateCommand(provider.commands.create, templateVars);
+  const requestedAccess: WorkspaceAccess | undefined =
+    access === NO_ACCESS_PROFILE_ID
+      ? undefined
+      : { profile: access, ...(accessReason ? { reason: accessReason } : {}) };
   const userId = session.user.id;
 
   const encoder = new TextEncoder();
@@ -255,6 +282,7 @@ export async function POST(request: NextRequest) {
           color,
           linkedTaskId,
           linkedTaskMeta,
+          requestedAccess,
           emit,
           createOutput: createStdout,
         })
@@ -291,6 +319,7 @@ interface PostSpawnParams {
   color: string | null;
   linkedTaskId: string | null;
   linkedTaskMeta: Record<string, unknown> | null;
+  requestedAccess: WorkspaceAccess | undefined;
   emit: (event: string, data: Record<string, unknown>) => void;
   createOutput: string;
 }
@@ -304,6 +333,7 @@ async function handlePostSpawn({
   color,
   linkedTaskId,
   linkedTaskMeta,
+  requestedAccess,
   emit,
   createOutput,
 }: PostSpawnParams) {
@@ -363,6 +393,7 @@ async function handlePostSpawn({
       repo,
       branch,
       behaviour: provider.behaviour ?? DEFAULT_PROVIDER_BEHAVIOUR,
+      ...(requestedAccess ? { access: requestedAccess } : {}),
       ...createResult.metadata,
     },
     color,

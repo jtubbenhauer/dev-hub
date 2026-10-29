@@ -46,7 +46,13 @@ import { toast } from "sonner";
 import { cn, WORKSPACE_PRESET_COLORS, sanitizeBranchName } from "@/lib/utils";
 import { pickNextColor } from "@/lib/workspace-color-utils";
 import { useWorkspaceProviders } from "@/hooks/use-settings";
+import { useProviderAccessOptions } from "@/hooks/use-provider-access-options";
 import { useProviderCreationStore } from "@/stores/provider-creation-store";
+import { AccessProfilePicker } from "@/components/workspace/access-profile-picker";
+import {
+  NO_ACCESS_PROFILE_ID,
+  shellQuote,
+} from "@/lib/workspaces/access-profiles";
 import type { Workspace, ClickUpTask, LinkedTaskMeta } from "@/types";
 
 interface CreateProviderWorkspaceDialogProps {
@@ -77,6 +83,8 @@ export function CreateProviderWorkspaceDialog({
   const [branch, setBranch] = useState(initialBranch ?? "");
   const [name, setName] = useState("");
   const [context, setContext] = useState("");
+  const [accessProfileId, setAccessProfileId] = useState(NO_ACCESS_PROFILE_ID);
+  const [accessReason, setAccessReason] = useState("");
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
   const [repoSearch, setRepoSearch] = useState("");
   const [branchPopoverOpen, setBranchPopoverOpen] = useState(false);
@@ -104,6 +112,23 @@ export function CreateProviderWorkspaceDialog({
     () => providers.find((p) => p.id === providerId),
     [providers, providerId],
   );
+
+  const accessOptionsQuery = useProviderAccessOptions(selectedProvider);
+  const accessOptions = useMemo(
+    () => accessOptionsQuery.data ?? [],
+    [accessOptionsQuery.data],
+  );
+  const selectedAccessOption = accessOptions.find(
+    (option) => option.id === accessProfileId,
+  );
+  const isAccessReasonMissing =
+    !!selectedAccessOption?.isReasonRequired && !accessReason.trim();
+
+  function handleProviderChange(nextProviderId: string) {
+    setProviderId(nextProviderId);
+    setAccessProfileId(NO_ACCESS_PROFILE_ID);
+    setAccessReason("");
+  }
 
   const linkedRepos = useMemo(() => {
     const repos = new Map<string, string>();
@@ -156,7 +181,7 @@ export function CreateProviderWorkspaceDialog({
     return remoteBranches.filter((b) => b.toLowerCase().includes(lower));
   }, [remoteBranches, branchSearch]);
 
-  const canSubmit = !!providerId && !!repo.trim();
+  const canSubmit = !!providerId && !!repo.trim() && !isAccessReasonMissing;
 
   const handleCreate = useCallback(() => {
     if (!canSubmit || !selectedProvider) return;
@@ -180,6 +205,9 @@ export function CreateProviderWorkspaceDialog({
       branch: sanitizeBranchName(branch, "all") || undefined,
       name: name.trim() || undefined,
       context: context.trim() || undefined,
+      access:
+        accessProfileId !== NO_ACCESS_PROFILE_ID ? accessProfileId : undefined,
+      accessReason: accessReason.trim() || undefined,
       color: selectedColor ?? undefined,
       linkedTaskId: task?.id,
       linkedTaskMeta: taskMeta,
@@ -198,6 +226,8 @@ export function CreateProviderWorkspaceDialog({
     branch,
     name,
     context,
+    accessProfileId,
+    accessReason,
     selectedColor,
     task,
     queryClient,
@@ -210,6 +240,8 @@ export function CreateProviderWorkspaceDialog({
     setBranch(initialBranch ?? "");
     setName("");
     setContext("");
+    setAccessProfileId(NO_ACCESS_PROFILE_ID);
+    setAccessReason("");
     setRepoSearch("");
     setBranchSearch("");
     setSelectedColor(autoColor);
@@ -275,7 +307,7 @@ export function CreateProviderWorkspaceDialog({
             <>
               <div className="space-y-1.5">
                 <Label htmlFor="provider-select">Provider</Label>
-                <Select value={providerId} onValueChange={setProviderId}>
+                <Select value={providerId} onValueChange={handleProviderChange}>
                   <SelectTrigger id="provider-select">
                     <SelectValue placeholder="Select a provider" />
                   </SelectTrigger>
@@ -288,6 +320,18 @@ export function CreateProviderWorkspaceDialog({
                   </SelectContent>
                 </Select>
               </div>
+
+              {selectedProvider?.commands.accessOptions && (
+                <AccessProfilePicker
+                  options={accessOptions}
+                  isLoading={accessOptionsQuery.isLoading}
+                  loadError={accessOptionsQuery.error?.message}
+                  selectedProfileId={accessProfileId}
+                  onProfileChange={setAccessProfileId}
+                  reason={accessReason}
+                  onReasonChange={setAccessReason}
+                />
+              )}
 
               <div className="space-y-1.5">
                 <Label>Repository</Label>
@@ -606,7 +650,12 @@ export function CreateProviderWorkspaceDialog({
                         .replaceAll("{branch}", branchVal)
                         .replaceAll("{name}", derivedName)
                         .replaceAll("{id}", toKebab(idSource))
-                        .replaceAll("{context}", context.trim());
+                        .replaceAll("{context}", context.trim())
+                        .replaceAll("{access}", accessProfileId)
+                        .replaceAll(
+                          "{accessReason}",
+                          shellQuote(accessReason.trim()),
+                        );
                     })()}
                   </p>
                 </div>

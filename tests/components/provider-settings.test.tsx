@@ -96,4 +96,34 @@ describe("ProviderSettings", () => {
 
     expect(screen.queryByLabelText("Start (optional)")).not.toBeInTheDocument();
   });
+
+  it.each([
+    [
+      "saves the access options command when one is entered",
+      "{binary} access list --json",
+      "{binary} access list --json",
+    ],
+    ["leaves access options out when the field is blank", "", undefined],
+  ])("%s", async (_description, enteredCommand, expectedCommand) => {
+    const user = userEvent.setup();
+    render(<ProviderSettings />);
+
+    await user.click(screen.getByRole("button", { name: /Add Provider/i }));
+    await user.type(screen.getByLabelText("Name"), "rig-cli");
+    await user.type(screen.getByLabelText("Binary Path"), "rig-cli");
+    if (enteredCommand) {
+      await user.type(
+        screen.getByLabelText("Access options (optional)"),
+        enteredCommand.replaceAll("{", "{{"),
+      );
+    }
+    const addButtons = screen.getAllByRole("button", { name: /Add Provider/i });
+    await user.click(addButtons[addButtons.length - 1]);
+
+    expect(mockMutate).toHaveBeenCalledTimes(1);
+    const [{ value }] = mockMutate.mock.calls[0] as [
+      { value: Array<{ commands: Record<string, string> }> },
+    ];
+    expect(value[0].commands.accessOptions).toBe(expectedCommand);
+  });
 });

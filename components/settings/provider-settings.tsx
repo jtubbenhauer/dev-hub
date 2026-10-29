@@ -102,6 +102,7 @@ interface ProviderFormState {
   statusCommand: string;
   shellCommand: string;
   startCommand: string;
+  accessOptionsCommand: string;
   providerType: ProviderTypePreset;
   behaviour: ProviderBehaviour;
 }
@@ -114,6 +115,7 @@ const EMPTY_FORM: ProviderFormState = {
   statusCommand: "{binary} status --id {id}",
   shellCommand: "",
   startCommand: "{binary} start {name} --provider fly --json",
+  accessOptionsCommand: "",
   providerType: "always-on",
   behaviour: DEFAULT_PROVIDER_BEHAVIOUR,
 };
@@ -148,6 +150,7 @@ export function ProviderSettings() {
       statusCommand: provider.commands.status,
       shellCommand: provider.commands.shell ?? "",
       startCommand: provider.commands.start ?? "",
+      accessOptionsCommand: provider.commands.accessOptions ?? "",
       providerType,
       behaviour: provider.behaviour ?? DEFAULT_PROVIDER_BEHAVIOUR,
     });
@@ -191,6 +194,9 @@ export function ProviderSettings() {
         ...(shellCmd ? { shell: shellCmd } : {}),
         ...(form.startCommand.trim()
           ? { start: form.startCommand.trim() }
+          : {}),
+        ...(form.accessOptionsCommand.trim()
+          ? { accessOptions: form.accessOptionsCommand.trim() }
           : {}),
       },
       behaviour:
@@ -427,7 +433,10 @@ export function ProviderSettings() {
                 <code className="text-foreground">{"{branch}"}</code>,{" "}
                 <code className="text-foreground">{"{name}"}</code>,{" "}
                 <code className="text-foreground">{"{id}"}</code>,{" "}
-                <code className="text-foreground">{"{context}"}</code>
+                <code className="text-foreground">{"{context}"}</code>,{" "}
+                <code className="text-foreground">{"{access}"}</code>,{" "}
+                <code className="text-foreground">{"{accessReason}"}</code>{" "}
+                (already shell-quoted)
               </p>
 
               <div className="space-y-1.5">
@@ -485,6 +494,25 @@ export function ProviderSettings() {
                 <p className="text-muted-foreground text-xs">
                   Command to open a terminal session. Leave blank to disable
                   terminal access.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="cmd-access-options" className="text-xs">
+                  Access options (optional)
+                </Label>
+                <Input
+                  id="cmd-access-options"
+                  value={form.accessOptionsCommand}
+                  onChange={(e) =>
+                    updateField("accessOptionsCommand", e.target.value)
+                  }
+                  placeholder="{binary} access list --json"
+                  className="h-8 font-mono text-xs"
+                />
+                <p className="text-muted-foreground text-xs">
+                  Lists the cloud access profiles you can give a workspace.
+                  Leave blank to hide the access picker.
                 </p>
               </div>
 

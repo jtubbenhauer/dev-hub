@@ -9,6 +9,7 @@ import { useGitStatus, useAgentHealth } from "@/hooks/use-git";
 import { useWorkspaceResume } from "@/hooks/use-workspace-resume";
 import { VscodeTargetEditor } from "@/components/workspace/vscode-target-editor";
 import { WorkspaceEngineEditor } from "@/components/workspace/workspace-engine-editor";
+import { WorkspaceAccessBadge } from "@/components/workspace/workspace-access-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -184,6 +185,8 @@ export function WorkspaceCard({
         <p className="text-muted-foreground truncate font-mono text-xs">
           {workspace.path}
         </p>
+
+        <WorkspaceAccessBadge providerMeta={workspace.providerMeta} />
 
         {workspace.linkedTaskMeta && (
           <a

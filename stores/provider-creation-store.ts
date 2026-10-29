@@ -25,6 +25,8 @@ interface ProviderCreationState {
     branch?: string;
     name?: string;
     context?: string;
+    access?: string;
+    accessReason?: string;
     color?: string;
     linkedTaskId?: string;
     linkedTaskMeta?: LinkedTaskMeta;
@@ -64,6 +66,8 @@ export const useProviderCreationStore = create<ProviderCreationState>()(
       branch,
       name,
       context,
+      access,
+      accessReason,
       color,
       linkedTaskId,
       linkedTaskMeta,
@@ -90,6 +94,8 @@ export const useProviderCreationStore = create<ProviderCreationState>()(
         branch,
         name,
         context,
+        access,
+        accessReason,
         color,
         linkedTaskId,
         linkedTaskMeta,
@@ -154,6 +160,8 @@ async function streamCreation({
   branch,
   name,
   context,
+  access,
+  accessReason,
   color,
   linkedTaskId,
   linkedTaskMeta,
@@ -167,6 +175,8 @@ async function streamCreation({
   branch?: string;
   name?: string;
   context?: string;
+  access?: string;
+  accessReason?: string;
   color?: string;
   linkedTaskId?: string;
   linkedTaskMeta?: LinkedTaskMeta;
@@ -191,6 +201,8 @@ async function streamCreation({
         branch: branch?.trim() || undefined,
         name: name?.trim() || undefined,
         context: context?.trim() || undefined,
+        access: access || undefined,
+        accessReason: accessReason?.trim() || undefined,
         color: color || undefined,
         linkedTaskId: linkedTaskId || undefined,
         linkedTaskMeta: linkedTaskMeta || undefined,

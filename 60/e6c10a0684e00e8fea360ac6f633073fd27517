@@ -1,0 +1,34 @@
+app/api/workspaces/[id]/upgrade/route.ts
+  h_c7f8735263030f 1-153
+components/settings/provider-settings.tsx
+  h_c7f8735263030f 106,120,156,204-206,525-543
+components/workspace/workspace-card.tsx
+  h_c7f8735263030f 10,59,68,465-466,560-576,580-599
+hooks/use-workspace-upgrade.ts
+  h_c7f8735263030f 1-51
+lib/workspaces/upgrade.ts
+  h_c7f8735263030f 1-20
+tests/api/upgrade.test.ts
+  h_c7f8735263030f 1-241
+tests/components/provider-settings.test.tsx
+  h_c7f8735263030f 130-161
+tests/components/workspace-card-status.test.tsx
+  h_c7f8735263030f 15-22
+tests/components/workspace-card-upgrade.test.tsx
+  h_c7f8735263030f 1-167
+tests/lib/workspace-upgrade.test.ts
+  h_c7f8735263030f 1-101
+types/index.ts
+  h_c7f8735263030f 527
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "60e6c10a0684e00e8fea360ac6f633073fd27517",
+  "prompts": {},
+  "humans": {
+    "h_c7f8735263030f": {
+      "author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

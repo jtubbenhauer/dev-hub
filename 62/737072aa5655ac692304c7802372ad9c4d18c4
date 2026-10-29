@@ -1,0 +1,21 @@
+components/chat/chat-interface.tsx
+  s_d6e571210cff8c::t_c191587730ba4e 29,246
+components/chat/use-refocus-prompt-on-terminal-close.ts
+  s_d6e571210cff8c::t_f7a49f2219619c 1-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "62737072aa5655ac692304c7802372ad9c4d18c4",
+  "prompts": {},
+  "sessions": {
+    "s_d6e571210cff8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a18607-d199-7c21-8fbd-ff25f596e2df",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

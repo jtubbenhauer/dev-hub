@@ -1,0 +1,33 @@
+components/terminal/terminal-panel.tsx
+  s_be535ce4ef89d6::t_d71537f257055b 16-20,293,295,307,309,431-432,465,468-470
+components/terminal/terminal-theme.ts
+  s_be535ce4ef89d6::t_72e26a5ba97bc3 48-58
+lib/terminal/pty-sessions.ts
+  s_be535ce4ef89d6::t_134e2814addefd 74-76,79-82
+tests/components/terminal/terminal-panel-focus.test.tsx
+  s_be535ce4ef89d6::t_8abca1734b2027 187,195,204,211,339-355
+  s_be535ce4ef89d6::t_9087a13d779c58 1
+tests/lib/terminal/pty-sessions.test.ts
+  s_be535ce4ef89d6::t_0ed58e79f9cf42 2-17
+  s_be535ce4ef89d6::t_c4f38663cd8f0b 1
+components/chat/use-chat-url-state.ts
+  s_be535ce4ef89d6::t_3aa4f8fc6f1d66 100-111
+tests/components/chat/use-chat-url-state.test.ts
+  s_be535ce4ef89d6::t_d15f17ff772954 22,69,133-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5342349ac8af3ca8ebec83a420103c16a2f11154",
+  "prompts": {},
+  "sessions": {
+    "s_be535ce4ef89d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a18b5a-2d23-710b-b38b-66c5259dbee2",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

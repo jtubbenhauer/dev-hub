@@ -1,0 +1,63 @@
+app/terminal/page.tsx
+  s_d6e571210cff8c::t_73340b333f00d6 121
+components/chat/prompt-input.tsx
+  s_d6e571210cff8c::t_a1b48b53339dce 54-58,365-368,372-396
+components/layout/header.tsx
+  s_d6e571210cff8c::t_1628fcfd4ca4a1 9,74
+components/settings/general-settings.tsx
+  s_d6e571210cff8c::t_2038935bac8eab 36,51-52,630-631,634-657,752-782
+components/terminal/terminal-drawer.tsx
+  s_d6e571210cff8c::t_275ccd0b7793a3 3,5-22,27,30-39,41-44,52-61,63-64,66-67,70-80,83-91,121-126,171,177,179-240,244-247,250-253,256-370,374-422,424-426
+components/terminal/terminal-panel.tsx
+  s_d6e571210cff8c::t_3ba8b0da535a34 14,16-29,35,49-50,53-85,89-98,110-111,117-120,125-131,138-139,142-151,153-156,158-161,163-177,179-187,189,191-198,200,204-205,208,213-214,221,223-224,227-229,231,234,237,241-257,261-278,280,282-283,285-293,295-307,310-333,335-341,344-359,369-370,372-373,377-379,382-383,388,390,414-424,427,430-447,451-456
+components/terminal/terminal-theme.ts
+  s_30b736ec1d03b6::t_e7b7489b2e1eac 1-56
+hooks/use-settings.ts
+  s_d6e571210cff8c::t_0b7d39d1957259 70,617-635
+lib/terminal/pty-server.ts
+  s_d6e571210cff8c::t_fd6a77a0b367f0 1,3-23,27,29,31,33-36,46-49,71-80,82-86,90,93-100,104-107,109-114,116-138,140-142,147,150-155,157,159-177,179,184-185,191
+lib/terminal/pty-sessions.ts
+  s_30b736ec1d03b6::t_a5189e9b2dbf3c 1-415
+next.config.ts
+  s_d6e571210cff8c::t_c1899dd44f1a04 7-13
+package.json
+  s_d6e571210cff8c::t_dd0ac00fd0e448 54-55,57
+pnpm-lock.yaml
+  s_d6e571210cff8c::t_a55a2a4203101b 97-102,106-108,2997-3002,3006-3008,9053-9056,9059-9060
+stores/terminal-store.ts
+  s_d6e571210cff8c::t_286363916faa3d 3-17,21-28,31-59,64,66-72,75-147,149-158
+tests/components/editor/neovim-editor-reveal.test.tsx
+  s_d6e571210cff8c::t_a6ce6033227e90 53-58
+tests/components/editor/neovim-editor.test.tsx
+  s_d6e571210cff8c::t_eac9a55140154c 241,258,291,352
+tests/components/review/neovim-review-editor.test.tsx
+  s_d6e571210cff8c::t_4f93550444f5d9 191,212,245,302
+tests/components/terminal/terminal-drawer.test.tsx
+  s_d6e571210cff8c::t_574b6d32592170 2,4,7-8,11-19,22-24,34-37,41-45,47-54,58-80,111-149,153-173,181-182,186,197,202,204,209-290
+tests/components/terminal/terminal-panel-focus.test.tsx
+  s_d6e571210cff8c::t_8ec362d7239a4b 2,19-20,22-25,30,38-45,47,50-51,55-56,68-70,73-81,86,88,90-94,98,104-111,122-132,134-149,151-159,161-168,170,172-173,180-181,205,218-338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3888301bfd7c5069ff98e0755bde0403fb2e9859",
+  "prompts": {},
+  "sessions": {
+    "s_30b736ec1d03b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a17d13-3a39-719c-a595-b76cd022dea2",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_d6e571210cff8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a18607-d199-7c21-8fbd-ff25f596e2df",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

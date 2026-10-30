@@ -45,6 +45,17 @@ export function buildTerminalTheme(): ITheme {
   };
 }
 
+// next/font exposes families as CSS variables on <body>. FontFaceSet.load()
+// rejects var() outright, so resolve them to the concrete family names.
+export function resolveTerminalFontFamily(fontFamily: string): string {
+  const bodyStyles = getComputedStyle(document.body);
+  return fontFamily.replace(
+    /var\((--[\w-]+)\)/g,
+    (match, variableName: string) =>
+      bodyStyles.getPropertyValue(variableName).trim() || match,
+  );
+}
+
 // The theme provider swaps classes on <html> (dark/light plus a flavour class).
 export function observeThemeChanges(onChange: () => void): () => void {
   const observer = new MutationObserver(onChange);

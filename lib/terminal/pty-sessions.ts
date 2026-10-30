@@ -71,9 +71,15 @@ function getShell(): string {
   return process.env.SHELL || "/bin/zsh";
 }
 
-function buildEnv(overrides?: Record<string, string>): Record<string, string> {
+export function buildEnv(
+  overrides?: Record<string, string>,
+): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
   env.TERM = "xterm-256color";
+  // xterm.js renders 24-bit colour; advertise it so CLIs stop downgrading.
+  env.COLORTERM = "truecolor";
+  // BSD ls (macOS) only colours output when CLICOLOR is set.
+  env.CLICOLOR = "1";
 
   const pathDirs = (env.PATH || "").split(":");
   for (const dir of STANDARD_PATH_DIRS) {

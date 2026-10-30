@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, waitFor, screen } from "@testing-library/react";
 
 // jsdom does not provide ResizeObserver
@@ -184,7 +184,7 @@ describe("TerminalPanel focus restoration", () => {
 
   it("re-focuses terminal on wheel event over the container", async () => {
     const { container } = await renderConnectedTerminal();
-    const terminalContainer = container.querySelector(".min-h-0.flex-1.p-1");
+    const terminalContainer = container.querySelector(".min-h-0.flex-1.px-3");
     expect(terminalContainer).not.toBeNull();
     fireEvent.wheel(terminalContainer!, { deltaY: 100 });
     expect(mockFocus).toHaveBeenCalledTimes(1);
@@ -192,7 +192,7 @@ describe("TerminalPanel focus restoration", () => {
 
   it("re-focuses terminal on repeated wheel events", async () => {
     const { container } = await renderConnectedTerminal();
-    const terminalContainer = container.querySelector(".min-h-0.flex-1.p-1");
+    const terminalContainer = container.querySelector(".min-h-0.flex-1.px-3");
     fireEvent.wheel(terminalContainer!, { deltaY: 100 });
     fireEvent.wheel(terminalContainer!, { deltaY: 100 });
     fireEvent.wheel(terminalContainer!, { deltaY: 100 });
@@ -201,14 +201,14 @@ describe("TerminalPanel focus restoration", () => {
 
   it("re-focuses terminal on mousedown on the container padding area", async () => {
     const { container } = await renderConnectedTerminal();
-    const terminalContainer = container.querySelector(".min-h-0.flex-1.p-1");
+    const terminalContainer = container.querySelector(".min-h-0.flex-1.px-3");
     fireEvent.mouseDown(terminalContainer!, { target: terminalContainer });
     expect(mockFocus).toHaveBeenCalledTimes(1);
   });
 
   it("does not re-focus on mousedown on xterm canvas (child element)", async () => {
     const { container } = await renderConnectedTerminal();
-    const terminalContainer = container.querySelector(".min-h-0.flex-1.p-1");
+    const terminalContainer = container.querySelector(".min-h-0.flex-1.px-3");
     const childEl = document.createElement("div");
     terminalContainer!.appendChild(childEl);
     fireEvent.mouseDown(childEl);
@@ -334,5 +334,22 @@ describe("TerminalPanel links and shortcuts", () => {
     await renderPanel();
     const cmdF = new KeyboardEvent("keydown", { key: "f", metaKey: true });
     expect(mockKeyHandler?.(cmdF)).toBe(true);
+  });
+});
+
+describe("TerminalPanel font loading", () => {
+  afterEach(() => {
+    document.body.style.removeProperty("--font-geist-mono");
+  });
+
+  it("resolves next/font CSS variables before loading and measuring the font", async () => {
+    document.body.style.setProperty(
+      "--font-geist-mono",
+      "'Geist Mono', 'Geist Mono Fallback'",
+    );
+    await renderPanel({ fontFamily: "var(--font-geist-mono), monospace" });
+    const resolved = "'Geist Mono', 'Geist Mono Fallback', monospace";
+    expect(document.fonts.load).toHaveBeenCalledWith(`14px ${resolved}`);
+    expect(capturedTerminalOptions?.fontFamily).toBe(resolved);
   });
 });

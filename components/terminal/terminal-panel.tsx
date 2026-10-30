@@ -13,7 +13,11 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
-import { buildTerminalTheme, observeThemeChanges } from "./terminal-theme";
+import {
+  buildTerminalTheme,
+  observeThemeChanges,
+  resolveTerminalFontFamily,
+} from "./terminal-theme";
 import { TerminalSearchBar } from "./terminal-search-bar";
 import { openTerminalLink } from "@/lib/terminal/terminal-links";
 import {
@@ -286,8 +290,9 @@ export function TerminalPanel({
       // the xterm instance. document.fonts.ready alone is insufficient because
       // @font-face with font-display:swap resolves immediately with a fallback,
       // causing xterm to measure character cells with wrong metrics on first load.
+      const resolvedFontFamily = resolveTerminalFontFamily(fontFamily);
       try {
-        await document.fonts.load(`14px ${fontFamily}`);
+        await document.fonts.load(`14px ${resolvedFontFamily}`);
       } catch {
         await document.fonts.ready;
       }
@@ -299,9 +304,9 @@ export function TerminalPanel({
 
       const term = new XTerm({
         cursorBlink: true,
-        fontFamily,
+        fontFamily: resolvedFontFamily,
         fontSize: 14,
-        lineHeight: 1.2,
+        lineHeight: 1.3,
         scrollback,
         theme: buildTerminalTheme(),
         altClickMovesCursor: false,
@@ -423,6 +428,8 @@ export function TerminalPanel({
   const actionLabel =
     connectionState === "connected" ? null : STATUS_ACTIONS[connectionState];
 
+  // Padding goes on a wrapper, never on the xterm parent: FitAddon sizes rows
+  // from that parent's border-box height, so padding there clips the last row.
   return (
     <div className="relative flex h-full flex-col">
       {connectionState !== "connected" && (
@@ -455,11 +462,12 @@ export function TerminalPanel({
         />
       )}
       <div
-        ref={containerRef}
-        className="min-h-0 flex-1 p-1"
+        className="min-h-0 flex-1 px-3 py-2"
         onMouseDown={handleContainerMouseDown}
         onWheel={handleContainerWheel}
-      />
+      >
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
     </div>
   );
 }

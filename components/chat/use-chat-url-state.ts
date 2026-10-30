@@ -97,6 +97,18 @@ export function useChatUrlState(
         isApplyingUrlRef.current = true;
         chatState.setActiveSession(urlState.sessionId);
       }
+      // The list only loads on a workspace switch, so a linked session it has
+      // not seen yet (e.g. one started outside dev-hub) needs a refetch.
+      const sessionWorkspaceId =
+        urlState.workspaceId ?? chatState.activeWorkspaceId;
+      if (
+        sessionWorkspaceId &&
+        !chatState.workspaceStates[sessionWorkspaceId]?.sessions[
+          urlState.sessionId
+        ]
+      ) {
+        void chatState.fetchSessions(sessionWorkspaceId);
+      }
     }
 
     const shouldUseUnifiedMode = urlState.view === "unified";

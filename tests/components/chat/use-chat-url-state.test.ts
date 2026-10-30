@@ -19,6 +19,7 @@ const mockChatState = {
   } as Record<string, { sessions: Record<string, object> }>,
   setActiveWorkspaceId: vi.fn(),
   setActiveSession: vi.fn(),
+  fetchSessions: vi.fn(),
 };
 const mockWorkspaceState = {
   activeWorkspaceId: "ws-1" as string | null,
@@ -65,6 +66,7 @@ describe("useChatUrlState", () => {
     };
     mockChatState.setActiveWorkspaceId.mockClear();
     mockChatState.setActiveSession.mockClear();
+    mockChatState.fetchSessions.mockClear();
     mockWorkspaceState.activeWorkspaceId = "ws-1";
     mockWorkspaceState.setActiveWorkspaceId.mockClear();
   });
@@ -126,6 +128,28 @@ describe("useChatUrlState", () => {
       "session-1",
     );
     expect(options.onSetSessionAgeFilter).toHaveBeenLastCalledWith("all");
+  });
+
+  it("refetches the session list when a linked session is not in it", () => {
+    mockSearch =
+      "workspaceId=ws-1&sessionId=session-external&view=workspace&group=0&age=all";
+
+    renderHook(() => useChatUrlState(createOptions()));
+
+    expect(mockChatState.setActiveSession).toHaveBeenCalledWith(
+      "session-external",
+    );
+    expect(mockChatState.fetchSessions).toHaveBeenCalledWith("ws-1");
+  });
+
+  it("does not refetch the session list when a linked session is listed", () => {
+    mockSearch =
+      "workspaceId=ws-2&sessionId=session-2&view=workspace&group=0&age=all";
+
+    renderHook(() => useChatUrlState(createOptions()));
+
+    expect(mockChatState.setActiveSession).toHaveBeenCalledWith("session-2");
+    expect(mockChatState.fetchSessions).not.toHaveBeenCalled();
   });
 
   it("pushes a complete next state while preserving unchanged settings", () => {

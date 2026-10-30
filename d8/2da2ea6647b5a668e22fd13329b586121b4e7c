@@ -1,0 +1,21 @@
+components/chat/use-chat-url-state.ts
+  s_be535ce4ef89d6::t_3aa4f8fc6f1d66 100-111
+tests/components/chat/use-chat-url-state.test.ts
+  s_be535ce4ef89d6::t_d15f17ff772954 22,69,133-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d82da2ea6647b5a668e22fd13329b586121b4e7c",
+  "prompts": {},
+  "sessions": {
+    "s_be535ce4ef89d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a18b5a-2d23-710b-b38b-66c5259dbee2",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -19,7 +19,23 @@ import type {
   Command,
 } from "@/lib/opencode/types";
 import { playSoundForEvent } from "@/lib/sounds";
-import { sendBrowserNotification } from "@/lib/notifications";
+import { showBrowserNotification } from "@/lib/notifications";
+import { findRootSessionId } from "@/lib/attention/session-tree";
+import {
+  createSessionLineageResolver,
+  type SessionLineage,
+} from "@/lib/attention/session-lineage";
+import {
+  buildErrorNotification,
+  buildFinishedNotification,
+  buildPermissionNotification,
+  buildQuestionNotification,
+} from "@/lib/attention/notification-content";
+import {
+  createTurnCompletionTracker,
+  TURN_SETTLE_DELAY_MS,
+} from "@/lib/attention/turn-completion-tracker";
+import { createRecentIdSet } from "@/lib/attention/recent-id-set";
 import { toast } from "sonner";
 import { extractFilePathFromToolPart } from "@/lib/chat/extract-tool-file-path";
 import { getTodoUpdatedAt } from "@/lib/chat/todo-updated-at";
@@ -34,6 +50,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { getOmoPermissionPreset } from "@/stores/omo-permission-preset-store";
 import { useSubAgentActivityStore } from "@/stores/sub-agent-activity-store";
 import { useSessionBackgroundStore } from "@/stores/session-background-store";
+import { useAttentionStore } from "@/stores/attention-store";
 import { createAttachmentPromptPart } from "@/lib/attachment-utils";
 import {
   applyMessagePartDelta,
@@ -284,6 +301,144 @@ const sessionCacheWriteTimers = new Map<
   ReturnType<typeof setTimeout>
 >();
 
+const MAX_NOTIFIED_PROMPT_IDS = 500;
+const notifiedPromptIds = createRecentIdSet(MAX_NOTIFIED_PROMPT_IDS);
+
+async function fetchSessionForLineage(
+  workspaceId: string,
+  sessionId: string,
+): Promise<Session | null> {
+  try {
+    const response = await fetch(
+      buildProxyUrl(`session/${sessionId}`, workspaceId),
+    );
+    if (!response.ok) return null;
+    const body: unknown = await response.json();
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return null;
+    }
+    const candidate = body as Partial<Session>;
+    return typeof candidate.id === "string" &&
+      typeof candidate.title === "string" &&
+      typeof candidate.time === "object" &&
+      candidate.time !== null
+      ? (body as Session)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+const sessionLineageResolver = createSessionLineageResolver({
+  fetchSession: fetchSessionForLineage,
+  maxHops: 5,
+  capacity: 500,
+});
+
+function getWorkspaceName(workspaceId: string): string | null {
+  return (
+    useWorkspaceStore
+      .getState()
+      .workspaces.find((workspace) => workspace.id === workspaceId)?.name ??
+    null
+  );
+}
+
+function getLineageSessions(workspaceId: string): Record<string, Session> {
+  return {
+    ...sessionLineageResolver.getCachedSessions(workspaceId),
+    ...(useChatStore.getState().workspaceStates[workspaceId]?.sessions ?? {}),
+  };
+}
+
+function isRootSessionOnScreen(
+  workspaceId: string,
+  rootSessionId: string,
+): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.location.pathname !== "/chat") return false;
+  if (document.visibilityState !== "visible" || !document.hasFocus()) {
+    return false;
+  }
+  const { activeWorkspaceId, activeSessionId } = useChatStore.getState();
+  if (activeWorkspaceId !== workspaceId || activeSessionId === null) {
+    return false;
+  }
+  return (
+    activeSessionId === rootSessionId ||
+    findRootSessionId(getLineageSessions(workspaceId), activeSessionId) ===
+      rootSessionId
+  );
+}
+
+function announceTurnFinished(
+  workspaceId: string,
+  lineage: SessionLineage,
+): void {
+  if (!isRootSessionOnScreen(workspaceId, lineage.rootSessionId)) {
+    useAttentionStore
+      .getState()
+      .markFinishedUnseen(workspaceId, lineage.rootSessionId);
+  }
+  playSoundForEvent("agent");
+  showBrowserNotification(
+    buildFinishedNotification({
+      workspaceId,
+      workspaceName: getWorkspaceName(workspaceId),
+      rootSessionId: lineage.rootSessionId,
+      rootTitle: lineage.rootSession?.title ?? null,
+    }),
+  );
+}
+
+function withSessionLineage(
+  workspaceId: string,
+  sessionId: string,
+  callback: (lineage: SessionLineage) => void,
+): void {
+  const known =
+    useChatStore.getState().workspaceStates[workspaceId]?.sessions ?? {};
+  const lineage = sessionLineageResolver.resolveSync(
+    workspaceId,
+    sessionId,
+    known,
+  );
+  if (lineage) {
+    callback(lineage);
+    return;
+  }
+  void sessionLineageResolver
+    .resolve(workspaceId, sessionId, known)
+    .then(callback)
+    .catch(() => {});
+}
+
+const turnCompletionTracker = createTurnCompletionTracker({
+  settleDelayMs: TURN_SETTLE_DELAY_MS,
+  readWorkspaceTree: (workspaceId) => {
+    const ws = useChatStore.getState().workspaceStates[workspaceId];
+    return ws
+      ? {
+          sessions: ws.sessions,
+          statuses: ws.sessionStatuses,
+          permissions: ws.permissions,
+          questions: ws.questions,
+        }
+      : null;
+  },
+  lineage: sessionLineageResolver,
+  reconcileWorkspaceStatuses: (workspaceId) =>
+    useChatStore.getState().reconcileWorkspaceStatuses(workspaceId),
+  onTreeSettled: announceTurnFinished,
+  now: () => Date.now(),
+});
+
+export function resetTurnCompletionTracker(): void {
+  turnCompletionTracker.reset();
+  notifiedPromptIds.clear();
+  sessionLineageResolver.reset();
+}
+
 // Switching workspaces can briefly pair the previous active session with the
 // new workspace id; a session already attributed elsewhere would only 404.
 export function isSessionOwnedByOtherWorkspace(
@@ -324,6 +479,9 @@ function markSessionDeleted(
     }
   }
   deletedSessionIdsByWorkspace.set(workspaceId, deleted);
+  useAttentionStore.getState().clearUnseen(workspaceId, sessionId);
+  turnCompletionTracker.forgetSession(workspaceId, sessionId);
+  sessionLineageResolver.forgetSession(workspaceId, sessionId);
 }
 
 function clearSessionDeleted(
@@ -1264,6 +1422,10 @@ interface ChatState {
   resetWorkspace: (workspaceId: string) => void;
   reconcileOmoSessionIdentities: (workspaceId: string) => Promise<void>;
   refreshActiveSessionStatus: (workspaceId: string) => Promise<void>;
+  reconcileWorkspaceStatuses: (
+    workspaceId: string,
+    signal?: AbortSignal,
+  ) => Promise<boolean>;
   handleVisibilityRestored: () => void;
 
   // Internal
@@ -3854,6 +4016,10 @@ export const useChatStore = create<ChatState>()(
           }
 
           for (const wsId of workspaceIds) {
+            void get().reconcileWorkspaceStatuses(wsId, signal);
+          }
+
+          for (const wsId of workspaceIds) {
             scheduleOmoIdentitiesReconcile(wsId, get);
           }
         };
@@ -4016,6 +4182,9 @@ export const useChatStore = create<ChatState>()(
             streamingError: isActiveWorkspace ? null : current.streamingError,
           };
         });
+        turnCompletionTracker.forgetWorkspace(workspaceId);
+        sessionLineageResolver.forgetWorkspace(workspaceId);
+        useAttentionStore.getState().clearWorkspaceUnseen(workspaceId);
         get().connectGlobalSSE(get().sseWorkspaceIds, { force: true });
       },
 
@@ -4025,10 +4194,14 @@ export const useChatStore = create<ChatState>()(
       refreshActiveSessionStatus: async (workspaceId) => {
         const { activeSessionId, activeWorkspaceId } = get();
         if (!activeSessionId || activeWorkspaceId !== workspaceId) return;
+        const capturedStatus =
+          get().workspaceStates[workspaceId]?.sessionStatuses[activeSessionId];
 
         try {
           const response = await fetch(
-            buildProxyUrl("session/status", workspaceId),
+            buildProxyUrl("session/status", workspaceId, {
+              engine: engineForSessionId(activeSessionId),
+            }),
           );
           if (!response.ok) return;
 
@@ -4040,6 +4213,11 @@ export const useChatStore = create<ChatState>()(
 
           if (!status) {
             // Session absent from the active status map → it's idle (server only lists non-idle sessions)
+            const isUnchangedSinceFetch =
+              get().workspaceStates[workspaceId]?.sessionStatuses[
+                activeSessionId
+              ] === capturedStatus;
+            if (!isUnchangedSinceFetch) return;
             set((state) =>
               updateWorkspace(state, workspaceId, (ws) => ({
                 sessionStatuses: {
@@ -4048,9 +4226,26 @@ export const useChatStore = create<ChatState>()(
                 },
               })),
             );
+            if (
+              capturedStatus !== undefined &&
+              capturedStatus.type !== "idle"
+            ) {
+              turnCompletionTracker.handleSessionSettled(
+                workspaceId,
+                activeSessionId,
+              );
+            }
             set({ optimisticStreamingSessionId: null });
             get().clearStreamingPoll();
             return;
+          }
+
+          if (status.type === "idle") {
+            const isUnchangedSinceFetch =
+              get().workspaceStates[workspaceId]?.sessionStatuses[
+                activeSessionId
+              ] === capturedStatus;
+            if (!isUnchangedSinceFetch) return;
           }
 
           set((state) =>
@@ -4063,6 +4258,15 @@ export const useChatStore = create<ChatState>()(
           );
 
           if (status.type === "idle") {
+            if (
+              capturedStatus !== undefined &&
+              capturedStatus.type !== "idle"
+            ) {
+              turnCompletionTracker.handleSessionSettled(
+                workspaceId,
+                activeSessionId,
+              );
+            }
             // Clear optimistic flag and poll — session is confirmed done
             set({ optimisticStreamingSessionId: null });
             get().clearStreamingPoll();
@@ -4072,6 +4276,114 @@ export const useChatStore = create<ChatState>()(
         } catch {
           // Best effort — SSE events will catch up
         }
+      },
+
+      reconcileWorkspaceStatuses: async (workspaceId, signal) => {
+        const startEngineRev = get().engineRev;
+        const startWorkspace = get().workspaceStates[workspaceId];
+        if (!startWorkspace) return false;
+        const capturedStatuses = startWorkspace.sessionStatuses;
+        // Only engines the workspace already has chats on are asked.
+        const enginesToQuery = new Set<ChatEngine>(
+          [
+            ...Object.keys(startWorkspace.sessions),
+            ...Object.keys(capturedStatuses),
+          ].map((id) => engineForSessionId(id)),
+        );
+        if (enginesToQuery.size === 0) return false;
+
+        const answers = await Promise.all(
+          [...enginesToQuery].map(async (engine) => {
+            try {
+              const response = await fetch(
+                buildProxyUrl("session/status", workspaceId, { engine }),
+                signal ? { signal } : undefined,
+              );
+              if (!response.ok) return null;
+              const body: unknown = await response.json();
+              if (
+                typeof body !== "object" ||
+                body === null ||
+                Array.isArray(body)
+              ) {
+                return null;
+              }
+              return {
+                engine,
+                statuses: body as Record<string, SessionStatus>,
+              };
+            } catch {
+              return null;
+            }
+          }),
+        );
+        if (signal?.aborted || get().engineRev !== startEngineRev) {
+          return false;
+        }
+        const answeredEngines = new Set(
+          answers.flatMap((answer) => (answer ? [answer.engine] : [])),
+        );
+        if (answeredEngines.size === 0) return false;
+
+        // omo lists idle bindings explicitly; idle entries count as not active.
+        const activeStatuses: Record<string, SessionStatus> = {};
+        for (const answer of answers) {
+          if (!answer) continue;
+          for (const [id, rawStatus] of Object.entries(answer.statuses)) {
+            const candidate: unknown = rawStatus;
+            if (
+              typeof candidate !== "object" ||
+              candidate === null ||
+              typeof (candidate as { type?: unknown }).type !== "string"
+            ) {
+              continue;
+            }
+            const status = candidate as SessionStatus;
+            if (
+              status.type !== "idle" &&
+              engineForSessionId(id) === answer.engine
+            ) {
+              activeStatuses[id] = status;
+            }
+          }
+        }
+
+        const flippedToIdle: string[] = [];
+        // Compare-and-set: a status SSE wrote after the capture is a new
+        // object, so fresher live data is never overwritten.
+        set((state) => {
+          const ws = state.workspaceStates[workspaceId];
+          if (!ws) return state;
+          const deletedIds = deletedSessionIdsByWorkspace.get(workspaceId);
+          const next = { ...ws.sessionStatuses };
+          let isChanged = false;
+          for (const [id, captured] of Object.entries(capturedStatuses)) {
+            if (!answeredEngines.has(engineForSessionId(id))) continue;
+            if (ws.sessionStatuses[id] !== captured) continue;
+            if (captured.type !== "idle" && !(id in activeStatuses)) {
+              next[id] = { type: "idle" };
+              flippedToIdle.push(id);
+              isChanged = true;
+            }
+          }
+          for (const [id, status] of Object.entries(activeStatuses)) {
+            if (deletedIds?.has(id)) continue;
+            const current = ws.sessionStatuses[id];
+            if (current !== capturedStatuses[id]) continue;
+            if (current?.type === status.type) continue;
+            next[id] = status;
+            isChanged = true;
+          }
+          return isChanged
+            ? updateWorkspace(state, workspaceId, () => ({
+                sessionStatuses: next,
+              }))
+            : state;
+        });
+        for (const id of flippedToIdle) {
+          turnCompletionTracker.handleSessionSettled(workspaceId, id);
+        }
+        return true;
       },
 
       handleVisibilityRestored: () => {
@@ -4147,6 +4459,9 @@ export const useChatStore = create<ChatState>()(
               void get().flushQueuedMessages(sourceWorkspaceId, {
                 maxQueuedAgeMs: RECONNECT_RESEND_MAX_AGE_MS,
               });
+            }
+            if (properties.state === "connected" && properties.attempt !== 0) {
+              void get().reconcileWorkspaceStatuses(sourceWorkspaceId);
             }
             const { activeWorkspaceId, activeSessionId } = get();
             if (
@@ -4553,6 +4868,11 @@ export const useChatStore = create<ChatState>()(
             const wsId =
               findWorkspaceForSession(get().workspaceStates, sessionID) ??
               sourceWorkspaceId;
+            // A buffered status not yet applied is newer than the stored one.
+            const previousStatusType = (
+              pendingSessionStatuses.get(sourceWorkspaceId)?.get(sessionID) ??
+              get().workspaceStates[wsId]?.sessionStatuses[sessionID]
+            )?.type;
 
             queuePendingSessionStatus(sourceWorkspaceId, sessionID, status);
             schedulePendingSessionFlush(set, get);
@@ -4568,6 +4888,20 @@ export const useChatStore = create<ChatState>()(
               if (wsId === activeWorkspaceId && sessionID === activeSessionId) {
                 get().clearStreamingPoll();
               }
+            }
+            if (status.type !== "idle") {
+              turnCompletionTracker.handleSessionBusy(wsId, sessionID);
+            } else if (
+              previousStatusType !== undefined &&
+              previousStatusType !== "idle" &&
+              Boolean(
+                get().workspaceStates[wsId]?.sessions[sessionID]?.parentID,
+              )
+            ) {
+              // Roots also send session.idle, so a status-only idle settles
+              // children only. The tracker re-reads statuses: apply them first.
+              flushPendingSessionUpdates(set, get);
+              turnCompletionTracker.handleSessionSettled(wsId, sessionID);
             }
             break;
           }
@@ -4600,10 +4934,9 @@ export const useChatStore = create<ChatState>()(
               .catch((error: unknown) =>
                 console.warn("[session-title] Auto title failed", error),
               );
-            playSoundForEvent("agent");
-            sendBrowserNotification("Agent completed", {
-              body: "The agent has finished processing.",
-            });
+            // The tracker re-reads statuses, so the buffered idle lands first.
+            flushPendingSessionUpdates(set, get);
+            turnCompletionTracker.handleSessionSettled(wsId, sessionID);
             break;
           }
 
@@ -4619,7 +4952,7 @@ export const useChatStore = create<ChatState>()(
           case "session.error": {
             const sessionID = properties.sessionID as string | undefined;
             const errorObj = properties.error as
-              | { data?: { message?: string } }
+              | { name?: string; data?: { message?: string } }
               | undefined;
             const { activeSessionId, activeWorkspaceId } = get();
             if (
@@ -4633,10 +4966,41 @@ export const useChatStore = create<ChatState>()(
                 streamingError: errorObj?.data?.message ?? "Session error",
               });
             }
-            playSoundForEvent("errors");
-            sendBrowserNotification("Session error", {
-              body: errorObj?.data?.message ?? "An error occurred.",
-            });
+            const errorWorkspaceId = sessionID
+              ? (findWorkspaceForSession(get().workspaceStates, sessionID) ??
+                sourceWorkspaceId)
+              : sourceWorkspaceId;
+            const message = errorObj?.data?.message ?? null;
+            if (errorObj?.name === "MessageAbortedError") break;
+            if (!sessionID) {
+              playSoundForEvent("errors");
+              showBrowserNotification(
+                buildErrorNotification({
+                  workspaceId: errorWorkspaceId,
+                  workspaceName: getWorkspaceName(errorWorkspaceId),
+                  rootSessionId: null,
+                  rootTitle: null,
+                  message,
+                }),
+              );
+            } else {
+              withSessionLineage(errorWorkspaceId, sessionID, (lineage) => {
+                // A known child stays silent; an unidentifiable session notifies.
+                if (lineage.isResolved && lineage.rootSessionId !== sessionID) {
+                  return;
+                }
+                playSoundForEvent("errors");
+                showBrowserNotification(
+                  buildErrorNotification({
+                    workspaceId: errorWorkspaceId,
+                    workspaceName: getWorkspaceName(errorWorkspaceId),
+                    rootSessionId: lineage.rootSessionId,
+                    rootTitle: lineage.rootSession?.title ?? null,
+                    message,
+                  }),
+                );
+              });
+            }
             break;
           }
 
@@ -4656,10 +5020,26 @@ export const useChatStore = create<ChatState>()(
                   : [...ws.permissions, permission],
               })),
             );
-            playSoundForEvent("permissions");
-            sendBrowserNotification("Permission required", {
-              body: "The agent is waiting for your approval.",
-            });
+            if (notifiedPromptIds.add(permission.id)) {
+              playSoundForEvent("permissions");
+              withSessionLineage(wsId, permission.sessionID, (lineage) => {
+                const requester =
+                  getLineageSessions(wsId)[permission.sessionID];
+                showBrowserNotification(
+                  buildPermissionNotification({
+                    workspaceId: wsId,
+                    workspaceName: getWorkspaceName(wsId),
+                    rootSessionId: lineage.rootSessionId,
+                    rootTitle: lineage.rootSession?.title ?? null,
+                    permission,
+                    requesterTitle:
+                      lineage.rootSessionId === permission.sessionID
+                        ? null
+                        : (requester?.title ?? "subagent"),
+                  }),
+                );
+              });
+            }
             break;
           }
 
@@ -4726,6 +5106,24 @@ export const useChatStore = create<ChatState>()(
                   : [...ws.questions, question],
               })),
             );
+            if (notifiedPromptIds.add(question.id)) {
+              withSessionLineage(wsId, question.sessionID, (lineage) => {
+                const requester = getLineageSessions(wsId)[question.sessionID];
+                showBrowserNotification(
+                  buildQuestionNotification({
+                    workspaceId: wsId,
+                    workspaceName: getWorkspaceName(wsId),
+                    rootSessionId: lineage.rootSessionId,
+                    rootTitle: lineage.rootSession?.title ?? null,
+                    question,
+                    requesterTitle:
+                      lineage.rootSessionId === question.sessionID
+                        ? null
+                        : (requester?.title ?? "subagent"),
+                  }),
+                );
+              });
+            }
             break;
           }
 

@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useChatStore } from "../../stores/chat-store";
+import {
+  resetTurnCompletionTracker,
+  useChatStore,
+} from "../../stores/chat-store";
 import { playSoundForEvent } from "@/lib/sounds";
 
 vi.mock("@/lib/sounds", () => ({
@@ -47,6 +50,7 @@ describe("chat-store sounds integration", () => {
   beforeEach(() => {
     resetStore();
     vi.clearAllMocks();
+    resetTurnCompletionTracker();
   });
 
   it("playSoundForEvent('agent') called on session.idle event", () => {

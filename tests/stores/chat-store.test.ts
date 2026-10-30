@@ -142,7 +142,11 @@ function _emitEvent(
 // Suites that need full module re-initialisation use dynamic import inside
 // a beforeEach after calling vi.resetModules().
 
-import { useChatStore, _resetModuleCaches } from "../../stores/chat-store";
+import {
+  useChatStore,
+  _resetModuleCaches,
+  resetTurnCompletionTracker,
+} from "../../stores/chat-store";
 import { subscribeToGitStatusRefresh } from "@/lib/git/git-status-refresh";
 
 async function flushMicrotasks(ticks = 8) {
@@ -163,6 +167,10 @@ function resetStore() {
     messageLoadErrorBySession: {},
   });
 }
+
+beforeEach(() => {
+  resetTurnCompletionTracker();
+});
 
 // ---------------------------------------------------------------------------
 // 1. Workspace state isolation

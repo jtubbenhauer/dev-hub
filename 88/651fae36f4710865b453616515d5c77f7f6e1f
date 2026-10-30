@@ -1,0 +1,21 @@
+tests/components/terminal/terminal-panel-focus.test.tsx
+  s_be535ce4ef89d6::t_9087a13d779c58 1
+tests/lib/terminal/pty-sessions.test.ts
+  s_be535ce4ef89d6::t_c4f38663cd8f0b 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "88651fae36f4710865b453616515d5c77f7f6e1f",
+  "prompts": {},
+  "sessions": {
+    "s_be535ce4ef89d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a18b5a-2d23-710b-b38b-66c5259dbee2",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

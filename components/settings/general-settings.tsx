@@ -851,8 +851,8 @@ function CommandSettingsCard() {
   );
 }
 
-function NotificationSettingsCard() {
-  const { isSoundEnabled, isPushEnabled, isLoading } =
+export function NotificationSettingsCard() {
+  const { isSoundEnabled, isPushEnabled, isFaviconStatusEnabled, isLoading } =
     useNotificationSettings();
   const mutation = useSettingsMutation();
 
@@ -879,6 +879,18 @@ function NotificationSettingsCard() {
             checked
               ? "Push notifications enabled"
               : "Push notifications disabled",
+          ),
+      },
+    );
+  };
+
+  const handleFaviconToggle = (checked: boolean) => {
+    mutation.mutate(
+      { key: SETTINGS_KEYS.NOTIFICATIONS_FAVICON_ENABLED, value: checked },
+      {
+        onSuccess: () =>
+          toast.success(
+            checked ? "Tab status dot enabled" : "Tab status dot disabled",
           ),
       },
     );
@@ -929,6 +941,22 @@ function NotificationSettingsCard() {
             id="notifications-push"
             checked={isPushEnabled}
             onCheckedChange={handlePushToggle}
+            disabled={mutation.isPending}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="notifications-favicon">Tab status dot</Label>
+            <p className="text-muted-foreground text-xs">
+              Show a dot on the browser tab icon: red when approval is needed,
+              blinking while agents work, blue when a reply is ready
+            </p>
+          </div>
+          <Switch
+            id="notifications-favicon"
+            checked={isFaviconStatusEnabled}
+            onCheckedChange={handleFaviconToggle}
             disabled={mutation.isPending}
           />
         </div>

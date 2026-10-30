@@ -74,6 +74,7 @@ export const SETTINGS_KEYS = {
   CHAT_ENGINE: CHAT_ENGINE_SETTING_KEY,
   NOTIFICATIONS_SOUND_ENABLED: "notifications-sound-enabled",
   NOTIFICATIONS_PUSH_ENABLED: "notifications-push-enabled",
+  NOTIFICATIONS_FAVICON_ENABLED: "notifications-favicon-enabled",
   CHAT_SUGGESTIONS_ENABLED: CHAT_SUGGESTIONS_ENABLED_SETTING_KEY,
   LSP_ENABLED: "lsp-enabled",
   CODE_LENS_ENABLED: CODE_LENS_ENABLED_SETTING_KEY,
@@ -720,6 +721,7 @@ export function useChatSidebarTabsOpenSetting(): {
 export function useNotificationSettings(): {
   isSoundEnabled: boolean;
   isPushEnabled: boolean;
+  isFaviconStatusEnabled: boolean;
   isLoading: boolean;
 } {
   const { data, isLoading } = useSettings();
@@ -727,7 +729,9 @@ export function useNotificationSettings(): {
     data?.[SETTINGS_KEYS.NOTIFICATIONS_SOUND_ENABLED] !== false;
   const isPushEnabled =
     data?.[SETTINGS_KEYS.NOTIFICATIONS_PUSH_ENABLED] !== false;
-  return { isSoundEnabled, isPushEnabled, isLoading };
+  const isFaviconStatusEnabled =
+    data?.[SETTINGS_KEYS.NOTIFICATIONS_FAVICON_ENABLED] !== false;
+  return { isSoundEnabled, isPushEnabled, isFaviconStatusEnabled, isLoading };
 }
 
 export function useChatSuggestionsSetting(): {

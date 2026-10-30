@@ -188,6 +188,7 @@ describe("NeovimReviewEditor", () => {
         write: vi.fn(),
         focus: vi.fn(),
         blur: vi.fn(),
+        getSelection: vi.fn(() => ""),
       };
       await act(() => capturedOnReady?.(mockHandle));
 
@@ -208,6 +209,7 @@ describe("NeovimReviewEditor", () => {
         write: vi.fn(),
         focus: vi.fn(),
         blur: vi.fn(),
+        getSelection: vi.fn(() => ""),
       };
       act(() => capturedOnReady?.(mockHandle));
 
@@ -240,6 +242,7 @@ describe("NeovimReviewEditor", () => {
         write: vi.fn(),
         focus: vi.fn(),
         blur: vi.fn(),
+        getSelection: vi.fn(() => ""),
       };
       act(() => capturedOnReady?.(mockHandle));
 
@@ -296,6 +299,7 @@ describe("NeovimReviewEditor", () => {
         write: vi.fn(),
         focus: vi.fn(),
         blur: vi.fn(),
+        getSelection: vi.fn(() => ""),
       };
       act(() => capturedOnReady?.(mockHandle));
 

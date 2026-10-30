@@ -51,6 +51,11 @@ import {
   getAllCachedComments,
   type CommentChip,
 } from "@/lib/comment-chat-bridge";
+import {
+  appendToComposerText,
+  takePendingTerminalOutput,
+  TERMINAL_OUTPUT_TO_CHAT_EVENT,
+} from "@/lib/terminal-chat-bridge";
 import { isPrTrigger } from "@/lib/pr-mention";
 import { fetchPrContext, formatPrContextForAI } from "@/lib/pr-context";
 import { useWorkspaceGitHub } from "@/hooks/use-git";
@@ -357,8 +362,37 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           setSelectedComments(chips);
           clearPendingCommentChips(workspaceId);
         }
+        const terminalOutput = takePendingTerminalOutput(workspaceId);
+        if (terminalOutput) {
+          setValue((prev) => appendToComposerText(prev, terminalOutput));
+        }
       }
     }
+
+    useEffect(() => {
+      if (!workspaceId) return;
+      const handleTerminalOutput = () => {
+        const terminalOutput = takePendingTerminalOutput(workspaceId);
+        if (!terminalOutput) return;
+        setValue((prev) => appendToComposerText(prev, terminalOutput));
+        requestAnimationFrame(() => {
+          const textarea = textareaRef.current;
+          if (!textarea) return;
+          textarea.style.height = "auto";
+          textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+          textarea.focus();
+        });
+      };
+      window.addEventListener(
+        TERMINAL_OUTPUT_TO_CHAT_EVENT,
+        handleTerminalOutput,
+      );
+      return () =>
+        window.removeEventListener(
+          TERMINAL_OUTPUT_TO_CHAT_EVENT,
+          handleTerminalOutput,
+        );
+    }, [workspaceId]);
 
     useEffect(() => {
       if (!workspaceId) return;

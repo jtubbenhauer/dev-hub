@@ -33,6 +33,7 @@ import {
   useShellRcPathSetting,
   useTerminalScrollbackSetting,
   useTerminalFontSetting,
+  useTerminalIdleTimeoutSetting,
   useSettingsMutation,
   useSoundSettings,
   useFileTabsSetting,
@@ -47,6 +48,8 @@ import {
   EDITOR_TYPE_OPTIONS,
   TERMINAL_SCROLLBACK_OPTIONS,
   TERMINAL_FONT_OPTIONS,
+  TERMINAL_IDLE_TIMEOUT_OPTIONS,
+  DEFAULT_TERMINAL_IDLE_TIMEOUT_MINUTES,
   CHAT_FILE_OPEN_MODES,
   DEFAULT_FONT_SIZE,
   DEFAULT_MOBILE_FONT_SIZE,
@@ -624,9 +627,34 @@ function TerminalSettingsCard() {
   const { scrollback, isLoading: isLoadingScrollback } =
     useTerminalScrollbackSetting();
   const { terminalFont, isLoading: isLoadingFont } = useTerminalFontSetting();
+  const { idleTimeoutMinutes, isLoading: isLoadingIdleTimeout } =
+    useTerminalIdleTimeoutSetting();
   const mutation = useSettingsMutation();
 
-  const isLoading = isLoadingScrollback || isLoadingFont;
+  const isLoading =
+    isLoadingScrollback || isLoadingFont || isLoadingIdleTimeout;
+
+  const idleTimeoutLabel = (minutes: number) =>
+    minutes === 0
+      ? "Never"
+      : minutes >= 60
+        ? `${minutes / 60} hour${minutes === 60 ? "" : "s"}`
+        : `${minutes} minutes`;
+
+  const handleIdleTimeoutChange = (value: string) => {
+    const next = Number(value);
+    mutation.mutate(
+      { key: SETTINGS_KEYS.TERMINAL_IDLE_TIMEOUT, value: next },
+      {
+        onSuccess: () =>
+          toast.success(
+            next === 0
+              ? "Closed terminals now stay alive until you end them"
+              : `Closed terminals now end after ${idleTimeoutLabel(next)}`,
+          ),
+      },
+    );
+  };
 
   const handleScrollbackChange = (value: string) => {
     const next = Number(value);
@@ -716,6 +744,37 @@ function TerminalSettingsCard() {
                 <SelectItem key={size} value={String(size)}>
                   {size.toLocaleString()} lines
                   {size === DEFAULT_TERMINAL_SCROLLBACK ? " (default)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="terminal-idle-timeout">End closed terminals</Label>
+            <p className="text-muted-foreground text-xs">
+              How long a closed terminal keeps running. Pinned terminals never
+              end on their own.
+            </p>
+          </div>
+          <Select
+            value={String(idleTimeoutMinutes)}
+            onValueChange={handleIdleTimeoutChange}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger id="terminal-idle-timeout" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TERMINAL_IDLE_TIMEOUT_OPTIONS.map((minutes) => (
+                <SelectItem key={minutes} value={String(minutes)}>
+                  {minutes === 0
+                    ? "Never"
+                    : `After ${idleTimeoutLabel(minutes)}`}
+                  {minutes === DEFAULT_TERMINAL_IDLE_TIMEOUT_MINUTES
+                    ? " (default)"
+                    : ""}
                 </SelectItem>
               ))}
             </SelectContent>

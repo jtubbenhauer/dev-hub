@@ -11,58 +11,28 @@ import {
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import type { ITheme } from "@xterm/xterm";
+import { SearchAddon } from "@xterm/addon-search";
 import "@xterm/xterm/css/xterm.css";
-
-function resolveColor(varName: string): string {
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue(varName)
-    .trim();
-  if (!raw) return "";
-  const el = document.createElement("div");
-  el.style.color = raw;
-  document.body.appendChild(el);
-  const resolved = getComputedStyle(el).color;
-  el.remove();
-  return resolved;
-}
-
-function buildTheme(): ITheme {
-  const bg = resolveColor("--background");
-  const fg = resolveColor("--foreground");
-  const accent = resolveColor("--accent");
-  const isDark = document.documentElement.classList.contains("dark");
-
-  return {
-    background: bg,
-    foreground: fg,
-    cursor: fg,
-    cursorAccent: bg,
-    selectionBackground: accent,
-    selectionForeground: fg,
-    black: isDark ? "#45475a" : "#bcc0cc",
-    red: isDark ? "#f38ba8" : "#d20f39",
-    green: isDark ? "#a6e3a1" : "#40a02b",
-    yellow: isDark ? "#f9e2af" : "#df8e1d",
-    blue: isDark ? "#89b4fa" : "#1e66f5",
-    magenta: isDark ? "#cba6f7" : "#8839ef",
-    cyan: isDark ? "#94e2d5" : "#179299",
-    white: isDark ? "#bac2de" : "#4c4f69",
-    brightBlack: isDark ? "#585b70" : "#acb0be",
-    brightRed: isDark ? "#f38ba8" : "#d20f39",
-    brightGreen: isDark ? "#a6e3a1" : "#40a02b",
-    brightYellow: isDark ? "#f9e2af" : "#df8e1d",
-    brightBlue: isDark ? "#89b4fa" : "#1e66f5",
-    brightMagenta: isDark ? "#cba6f7" : "#8839ef",
-    brightCyan: isDark ? "#94e2d5" : "#179299",
-    brightWhite: isDark ? "#a6adc8" : "#5c5f77",
-  };
-}
+import { buildTerminalTheme, observeThemeChanges } from "./terminal-theme";
+import { TerminalSearchBar } from "./terminal-search-bar";
+import { openTerminalLink } from "@/lib/terminal/terminal-links";
+import {
+  classifySocketClose,
+  isMacPlatform,
+  matchTerminalShortcut,
+  MAX_RECONNECT_ATTEMPTS,
+  reconnectDelayMs,
+} from "@/lib/terminal/terminal-client-utils";
+import {
+  parseServerMessage,
+  type TerminalClientMessage,
+} from "@/lib/terminal/terminal-protocol";
 
 export interface TerminalHandle {
   write: (data: string) => void;
   focus: () => void;
   blur: () => void;
+  getSelection: () => string;
 }
 
 interface TerminalPanelProps {
@@ -76,10 +46,55 @@ interface TerminalPanelProps {
   onReady?: (handle: TerminalHandle) => void;
   fontFamily?: string;
   autoFocus?: boolean;
+  hasShellFeatures?: boolean;
+  idleTimeoutMinutes?: number;
 }
+
+type ConnectionState =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "disconnected"
+  | "exited"
+  | "replaced"
+  | "ended"
+  | "error";
+
+const STATUS_LABELS: Record<Exclude<ConnectionState, "connected">, string> = {
+  connecting: "Connecting...",
+  reconnecting: "Connection lost. Reconnecting...",
+  disconnected: "Disconnected",
+  exited: "Process exited",
+  replaced: "This session is open in another window",
+  ended: "Session ended",
+  error: "Connection error",
+};
+
+const STATUS_ACTIONS: Record<
+  Exclude<ConnectionState, "connected">,
+  string | null
+> = {
+  connecting: null,
+  reconnecting: "Retry now",
+  disconnected: "Reconnect",
+  exited: "Restart",
+  replaced: "Take over",
+  ended: "Start new session",
+  error: "Retry",
+};
 
 const DEFAULT_SCROLLBACK = 5000;
 const DEFAULT_FONT_FAMILY = "var(--font-geist-mono), monospace";
+
+async function fetchSocketToken(workspaceId: string): Promise<string> {
+  const res = await fetch(
+    `/api/terminal/token?workspaceId=${encodeURIComponent(workspaceId)}`,
+  );
+  if (!res.ok) throw new Error(`Failed to authorize terminal (${res.status})`);
+  const body = (await res.json()) as { token?: string };
+  if (!body.token) throw new Error("Failed to authorize terminal");
+  return body.token;
+}
 
 export function TerminalPanel({
   wsUrl,
@@ -92,49 +107,195 @@ export function TerminalPanel({
   onReady,
   fontFamily = DEFAULT_FONT_FAMILY,
   autoFocus = true,
+  hasShellFeatures = false,
+  idleTimeoutMinutes,
 }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const socketGenerationRef = useRef(0);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectNowRef = useRef<(() => void) | null>(null);
   const shellCommandRef = useRef(shellCommand);
   const envOverridesRef = useRef(envOverrides);
   const onReadyRef = useRef(onReady);
   const autoFocusRef = useRef(autoFocus);
-  const [connectionState, setConnectionState] = useState<
-    "connecting" | "connected" | "disconnected" | "error"
-  >("connecting");
+  const hasShellFeaturesRef = useRef(hasShellFeatures);
+  const idleTimeoutMinutesRef = useRef(idleTimeoutMinutes);
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("connecting");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [searchAddon, setSearchAddon] = useState<SearchAddon | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     shellCommandRef.current = shellCommand;
     envOverridesRef.current = envOverrides;
     autoFocusRef.current = autoFocus;
     onReadyRef.current = onReady;
+    hasShellFeaturesRef.current = hasShellFeatures;
+    idleTimeoutMinutesRef.current = idleTimeoutMinutes;
   });
 
-  const connect = useCallback(
-    async (signal: AbortSignal) => {
+  useEffect(() => {
+    let isDisposed = false;
+    const encoder = new TextEncoder();
+    const isMac = isMacPlatform();
+
+    const sendInput = (data: string | Uint8Array) => {
+      const ws = wsRef.current;
+      if (ws?.readyState !== WebSocket.OPEN) return;
+      ws.send(typeof data === "string" ? encoder.encode(data) : data);
+    };
+
+    const sendControl = (message: TerminalClientMessage) => {
+      const ws = wsRef.current;
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
+    };
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    };
+
+    const scheduleReconnect = (term: XTerm, message: string | null) => {
+      if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+        setConnectionState("disconnected");
+        setStatusMessage(message);
+        return;
+      }
+      const delay = reconnectDelayMs(reconnectAttemptRef.current);
+      reconnectAttemptRef.current += 1;
+      setConnectionState("reconnecting");
+      setStatusMessage(message);
+      reconnectTimerRef.current = setTimeout(
+        () => void openSocket(term),
+        delay,
+      );
+    };
+
+    // Each socket gets a generation number; events from a socket we have since
+    // replaced or closed on purpose are ignored instead of triggering reconnects.
+    const openSocket = async (term: XTerm) => {
+      clearReconnectTimer();
+      const generation = ++socketGenerationRef.current;
+      const previousSocket = wsRef.current;
+      wsRef.current = null;
+      previousSocket?.close(1000);
+      if (reconnectAttemptRef.current === 0) setConnectionState("connecting");
+
+      let token: string;
+      try {
+        token = await fetchSocketToken(workspaceId);
+      } catch (err) {
+        if (generation !== socketGenerationRef.current) return;
+        scheduleReconnect(
+          term,
+          err instanceof Error ? err.message : "Failed to authorize terminal",
+        );
+        return;
+      }
+      if (generation !== socketGenerationRef.current) return;
+
+      const params = new URLSearchParams({
+        workspaceId,
+        cols: String(term.cols),
+        rows: String(term.rows),
+        cwd,
+        scrollback: String(scrollback),
+        token,
+      });
+      if (shellCommandRef.current)
+        params.set("shellCommand", shellCommandRef.current);
+      if (sessionId) params.set("sessionId", sessionId);
+      if (idleTimeoutMinutesRef.current !== undefined)
+        params.set("idleTimeoutMinutes", String(idleTimeoutMinutesRef.current));
+      const env = envOverridesRef.current;
+      if (env && Object.keys(env).length > 0) {
+        params.set("env", JSON.stringify(env));
+      }
+
+      const ws = new WebSocket(`${wsUrl}?${params.toString()}`);
+      ws.binaryType = "arraybuffer";
+      wsRef.current = ws;
+      let hasExited = false;
+      let hasFatalError = false;
+
+      ws.onopen = () => {
+        if (generation !== socketGenerationRef.current) return;
+        reconnectAttemptRef.current = 0;
+        term.reset();
+        setConnectionState("connected");
+        setStatusMessage(null);
+        if (autoFocusRef.current) term.focus();
+        onReadyRef.current?.({
+          write: (data: string) => sendInput(data),
+          focus: () => term.focus(),
+          blur: () => term.blur(),
+          getSelection: () => term.getSelection(),
+        });
+      };
+
+      ws.onmessage = (event: MessageEvent) => {
+        if (generation !== socketGenerationRef.current) return;
+        if (event.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(event.data));
+          return;
+        }
+        if (typeof event.data !== "string") return;
+        const message = parseServerMessage(event.data);
+        if (message?.type === "exit") {
+          hasExited = true;
+          term.writeln(
+            `\r\n[Process exited with code ${message.exitCode ?? "unknown"}]`,
+          );
+        } else if (message?.type === "error") {
+          hasFatalError = message.isFatal;
+          term.writeln(`\r\n[Error: ${message.data}]`);
+          setStatusMessage(message.data);
+        }
+      };
+
+      ws.onclose = (event: CloseEvent) => {
+        if (generation !== socketGenerationRef.current) return;
+        wsRef.current = null;
+        const outcome = classifySocketClose({
+          closeCode: event.code,
+          hasExited,
+          hasFatalError,
+          attempt: reconnectAttemptRef.current,
+        });
+        if (outcome === "reconnect") {
+          scheduleReconnect(term, null);
+        } else if (outcome === "give-up") {
+          setConnectionState("disconnected");
+        } else if (outcome === "fatal") {
+          setConnectionState("error");
+        } else {
+          setConnectionState(outcome);
+        }
+      };
+    };
+
+    const setup = async () => {
       if (!containerRef.current) return;
 
       // Wait for the requested font to actually finish loading before creating
       // the xterm instance. document.fonts.ready alone is insufficient because
       // @font-face with font-display:swap resolves immediately with a fallback,
       // causing xterm to measure character cells with wrong metrics on first load.
-      // We explicitly trigger a load of the specific font family (14px matches our
-      // fontSize so the browser fetches the correct weight/style).
       try {
         await document.fonts.load(`14px ${fontFamily}`);
       } catch {
-        // Font load can reject for CSS variable fonts or missing families —
-        // fall back to basic ready gate so the terminal still renders.
         await document.fonts.ready;
       }
 
       // The effect cleanup may have fired while we were awaiting fonts (e.g.
       // React Strict Mode double-invoke). Bail out to avoid creating a second
       // xterm instance that appends to the same container.
-      if (signal.aborted || !containerRef.current) return;
+      if (isDisposed || !containerRef.current) return;
 
       const term = new XTerm({
         cursorBlink: true,
@@ -142,13 +303,15 @@ export function TerminalPanel({
         fontSize: 14,
         lineHeight: 1.2,
         scrollback,
-        theme: buildTheme(),
+        theme: buildTerminalTheme(),
+        altClickMovesCursor: false,
       });
 
       const fitAddon = new FitAddon();
-      const webLinksAddon = new WebLinksAddon();
+      const newSearchAddon = new SearchAddon();
       term.loadAddon(fitAddon);
-      term.loadAddon(webLinksAddon);
+      term.loadAddon(new WebLinksAddon(openTerminalLink));
+      term.loadAddon(newSearchAddon);
       term.open(containerRef.current);
 
       try {
@@ -159,103 +322,41 @@ export function TerminalPanel({
 
       termRef.current = term;
       fitAddonRef.current = fitAddon;
+      setSearchAddon(newSearchAddon);
 
-      const cols = term.cols;
-      const rows = term.rows;
-      const params = new URLSearchParams({
-        workspaceId,
-        cols: String(cols),
-        rows: String(rows),
-        cwd,
-        scrollback: String(scrollback),
-      });
-      if (shellCommandRef.current)
-        params.set("shellCommand", shellCommandRef.current);
-      if (sessionId) params.set("sessionId", sessionId);
-      const env = envOverridesRef.current;
-      if (env && Object.keys(env).length > 0) {
-        params.set("env", JSON.stringify(env));
-      }
-
-      const ws = new WebSocket(`${wsUrl}?${params.toString()}`);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setConnectionState("connected");
-        if (autoFocusRef.current) term.focus();
-        onReadyRef.current?.({
-          write: (data: string) => {
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(data);
-            }
-          },
-          focus: () => term.focus(),
-          blur: () => term.blur(),
-        });
-      };
-
-      ws.onmessage = (event) => {
-        const data = typeof event.data === "string" ? event.data : "";
-        if (data.startsWith("{")) {
-          try {
-            const msg = JSON.parse(data) as {
-              type: string;
-              exitCode?: number;
-              data?: string;
-            };
-            if (msg.type === "exit") {
-              term.writeln(
-                `\r\n[Process exited with code ${msg.exitCode ?? "unknown"}]`,
-              );
-              setConnectionState("disconnected");
-              return;
-            }
-            if (msg.type === "error") {
-              term.writeln(`\r\n[Error: ${msg.data}]`);
-              setConnectionState("error");
-              return;
-            }
-          } catch {
-            void 0;
-          }
+      term.attachCustomKeyEventHandler((event) => {
+        if (!hasShellFeaturesRef.current) return true;
+        const shortcut = matchTerminalShortcut(event, isMac);
+        if (shortcut === "search") {
+          event.preventDefault();
+          setIsSearchOpen(true);
+          return false;
         }
-        term.write(data);
-      };
-
-      ws.onclose = () => {
-        setConnectionState("disconnected");
-      };
-
-      ws.onerror = () => {
-        setConnectionState("error");
-      };
-
-      term.onData((data) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(data);
+        if (shortcut === "clear") {
+          event.preventDefault();
+          term.clear();
+          sendControl({ type: "clear" });
+          return false;
         }
+        return true;
       });
 
-      term.onBinary((data) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(Uint8Array.from(data, (c) => c.charCodeAt(0)));
-        }
-      });
+      term.onData((data) => sendInput(data));
+      term.onBinary((data) =>
+        sendInput(Uint8Array.from(data, (c) => c.charCodeAt(0))),
+      );
+      term.onResize(({ cols, rows }) =>
+        sendControl({ type: "resize", cols, rows }),
+      );
 
-      term.onResize(({ cols, rows }) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "resize", cols, rows }));
-        }
-      });
-    },
-    [wsUrl, workspaceId, cwd, scrollback, sessionId, fontFamily],
-  );
+      reconnectNowRef.current = () => {
+        reconnectAttemptRef.current = 0;
+        void openSocket(term);
+      };
+      void openSocket(term);
+    };
 
-  useEffect(() => {
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-    void connect(ac.signal);
+    void setup();
 
     const handleResize = () => {
       try {
@@ -264,27 +365,29 @@ export function TerminalPanel({
         void 0;
       }
     };
-
     window.addEventListener("resize", handleResize);
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (containerRef.current) resizeObserver.observe(containerRef.current);
 
-    const resizeObserver = new ResizeObserver(() => {
-      handleResize();
+    const stopObservingTheme = observeThemeChanges(() => {
+      if (termRef.current) termRef.current.options.theme = buildTerminalTheme();
     });
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-    }
 
     return () => {
-      ac.abort();
+      isDisposed = true;
+      socketGenerationRef.current += 1;
+      clearReconnectTimer();
       window.removeEventListener("resize", handleResize);
       resizeObserver.disconnect();
-      wsRef.current?.close();
+      stopObservingTheme();
+      wsRef.current?.close(1000);
       termRef.current?.dispose();
       wsRef.current = null;
       termRef.current = null;
       fitAddonRef.current = null;
+      reconnectNowRef.current = null;
     };
-  }, [connect]);
+  }, [wsUrl, workspaceId, cwd, scrollback, sessionId, fontFamily]);
 
   // Re-focus xterm when the user interacts with the terminal container.
   // xterm.js only forwards mouse/wheel events to the PTY when its internal
@@ -308,50 +411,48 @@ export function TerminalPanel({
   }, []);
 
   const handleReconnect = useCallback(() => {
-    abortRef.current?.abort();
-    wsRef.current?.close();
-    termRef.current?.dispose();
-    wsRef.current = null;
-    termRef.current = null;
-    fitAddonRef.current = null;
-    setConnectionState("connecting");
-    const ac = new AbortController();
-    abortRef.current = ac;
-    void connect(ac.signal);
-  }, [connect]);
+    reconnectNowRef.current?.();
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setIsSearchOpen(false);
+    searchAddon?.clearDecorations();
+    termRef.current?.focus();
+  }, [searchAddon]);
+
+  const actionLabel =
+    connectionState === "connected" ? null : STATUS_ACTIONS[connectionState];
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       {connectionState !== "connected" && (
         <div className="bg-muted/50 flex items-center gap-2 border-b px-3 py-1.5 text-xs">
-          {connectionState === "connecting" && (
-            <span className="text-muted-foreground">Connecting...</span>
-          )}
-          {connectionState === "disconnected" && (
-            <>
-              <span className="text-muted-foreground">Disconnected</span>
-              <button
-                type="button"
-                onClick={handleReconnect}
-                className="text-primary hover:underline"
-              >
-                Reconnect
-              </button>
-            </>
-          )}
-          {connectionState === "error" && (
-            <>
-              <span className="text-destructive">Connection error</span>
-              <button
-                type="button"
-                onClick={handleReconnect}
-                className="text-primary hover:underline"
-              >
-                Retry
-              </button>
-            </>
+          <span
+            className={
+              connectionState === "error"
+                ? "text-destructive"
+                : "text-muted-foreground"
+            }
+          >
+            {STATUS_LABELS[connectionState]}
+            {statusMessage ? `: ${statusMessage}` : ""}
+          </span>
+          {actionLabel && (
+            <button
+              type="button"
+              onClick={handleReconnect}
+              className="text-primary hover:underline"
+            >
+              {actionLabel}
+            </button>
           )}
         </div>
+      )}
+      {isSearchOpen && searchAddon && (
+        <TerminalSearchBar
+          searchAddon={searchAddon}
+          onClose={handleCloseSearch}
+        />
       )}
       <div
         ref={containerRef}

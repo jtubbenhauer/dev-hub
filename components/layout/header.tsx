@@ -6,6 +6,7 @@ import { GitStatusBar } from "@/components/layout/git-status-bar";
 import { SystemIndicator } from "@/components/layout/system-indicator";
 import { CommandDrawer } from "@/components/command-runner/command-drawer";
 import { TerminalDrawer } from "@/components/terminal/terminal-drawer";
+import { TerminalToggleButton } from "@/components/terminal/terminal-toggle-button";
 import { ProviderCreationIndicator } from "@/components/workspace/provider-creation-indicator";
 import { useCommandPalette } from "@/components/providers/command-palette-provider";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -70,6 +71,7 @@ export function Header() {
           >
             <Search className="h-4 w-4" />
           </Button>
+          <TerminalToggleButton />
           <Button
             variant="ghost"
             size="icon"

@@ -4,7 +4,13 @@ const nextConfig: NextConfig = {
   devIndicators: {
     position: "bottom-left",
   },
-  serverExternalPackages: ["node-pty", "ws", "vscode-jsonrpc"],
+  serverExternalPackages: [
+    "node-pty",
+    "ws",
+    "vscode-jsonrpc",
+    "@xterm/headless",
+    "@xterm/addon-serialize",
+  ],
   experimental: {
     proxyClientMaxBodySize: "50mb",
   },

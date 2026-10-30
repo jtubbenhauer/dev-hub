@@ -50,7 +50,12 @@ vi.stubGlobal(
 import { NeovimEditor } from "@/components/editor/neovim-editor";
 
 function createFakeHandle() {
-  return { write: vi.fn(), focus: vi.fn(), blur: vi.fn() };
+  return {
+    write: vi.fn(),
+    focus: vi.fn(),
+    blur: vi.fn(),
+    getSelection: vi.fn(() => ""),
+  };
 }
 
 async function renderEditor() {

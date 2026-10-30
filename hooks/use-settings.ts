@@ -67,6 +67,7 @@ export const SETTINGS_KEYS = {
   PANEL_NAVIGATION: "panel-navigation", // deprecated — panel nav removed
   TERMINAL_SCROLLBACK: "terminal-scrollback",
   TERMINAL_FONT: "terminal-font",
+  TERMINAL_IDLE_TIMEOUT: "terminal-idle-timeout",
   DISABLE_FILE_TABS: "disable-file-tabs",
   CHAT_FILE_OPEN_MODE: "chat-file-open-mode",
   CHAT_SIDEBAR_TABS_OPEN_MODE: "chat-sidebar-tabs-open-mode",
@@ -611,6 +612,25 @@ export function useTerminalScrollbackSetting(): {
   const raw = data?.[SETTINGS_KEYS.TERMINAL_SCROLLBACK];
   const isValid = typeof raw === "number" && raw > 0;
   return { scrollback: isValid ? raw : DEFAULT_TERMINAL_SCROLLBACK, isLoading };
+}
+
+export const DEFAULT_TERMINAL_IDLE_TIMEOUT_MINUTES = 5;
+// 0 keeps detached terminals alive until they are ended explicitly.
+export const TERMINAL_IDLE_TIMEOUT_OPTIONS = [5, 15, 30, 60, 240, 0] as const;
+
+export function useTerminalIdleTimeoutSetting(): {
+  idleTimeoutMinutes: number;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useSettings();
+  const raw = data?.[SETTINGS_KEYS.TERMINAL_IDLE_TIMEOUT];
+  const isValid =
+    typeof raw === "number" &&
+    (TERMINAL_IDLE_TIMEOUT_OPTIONS as readonly number[]).includes(raw);
+  return {
+    idleTimeoutMinutes: isValid ? raw : DEFAULT_TERMINAL_IDLE_TIMEOUT_MINUTES,
+    isLoading,
+  };
 }
 
 export type TerminalFont =

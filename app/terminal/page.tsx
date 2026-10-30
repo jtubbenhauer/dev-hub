@@ -118,6 +118,7 @@ function TerminalPageContent() {
           workspaceId={workspaceId!}
           cwd={config.cwd}
           shellCommand={config.shellCommand}
+          hasShellFeatures
         />
       </div>
     </div>

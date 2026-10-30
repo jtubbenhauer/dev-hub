@@ -37,6 +37,7 @@ export class MemorySessionSource implements SessionSource {
 export type TestBinding = {
   readonly durableId: string;
   readonly routingHandle: string;
+  readonly sessionPath: string | null;
   readonly openedState: {
     readonly isStreaming: boolean;
     readonly record: JsonlRecord;
@@ -54,6 +55,7 @@ export function createBinding(
   return {
     durableId,
     routingHandle: `route-${durableId}`,
+    sessionPath: null,
     openedState: { isStreaming, record: state },
     ready: Promise.resolve(),
     state: "live",

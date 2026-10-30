@@ -7,6 +7,7 @@ import {
   jsonResponse,
   noContentResponse,
 } from "@/lib/omo/facade/write-types";
+import { requestOmoEntries } from "@/lib/omo/session-entries-request";
 import { setOmoLeaf } from "@/lib/omo/session-index";
 import {
   activeHydrationBranch,
@@ -45,7 +46,11 @@ export async function revertOmoSession(
   if (entryId === null || entryId.length === 0) return invalidRequestResponse();
   const binding = await attachOmoWriteSession(context, rawId);
   const snapshot = parseEntriesSnapshot(
-    await context.runtime.registry.request(binding, { type: "get_entries" }),
+    await requestOmoEntries({
+      send: (command) => context.runtime.registry.request(binding, command),
+      durableId: binding.durableId,
+      sessionPath: binding.sessionPath,
+    }),
   );
   const target = activeHydrationBranch(snapshot.entries, snapshot.leafId).find(
     (entry) => entry.id === entryId,

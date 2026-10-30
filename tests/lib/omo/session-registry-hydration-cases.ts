@@ -1,9 +1,13 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoRegistryEvent } from "@/lib/omo/session-registry";
 import {
   createRegistryContext,
   entriesResponse,
+  navigateFixture,
   openedResponse,
   readIndexRow,
   receivedByType,
@@ -132,6 +136,48 @@ describe("OmoSessionRegistry hydration", () => {
     expect(receivedByType(context, "navigate_tree")[0]).toMatchObject({
       entryId: "saved-leaf",
       intent: "resume",
+      expectedLeafId: "host-leaf",
+    });
+  });
+
+  it("hydrates from the session file plus omo's newer entries", async () => {
+    const user = messageEntry("user", null, "user", 1);
+    const savedLeaf = messageEntry("saved-leaf", "user", "assistant", 2);
+    const hostLeaf = messageEntry("host-leaf", "user", "assistant", 3);
+    const directory = await mkdtemp(join(tmpdir(), "devhub-hydration-"));
+    const path = join(directory, "large.jsonl");
+    const header = { type: "session", id: "large", cwd: directory };
+    await writeFile(
+      path,
+      [header, user, savedLeaf].map((line) => JSON.stringify(line)).join("\n"),
+    );
+    const context = await createRegistryContext([
+      {
+        type: "open_session",
+        response: openedResponse({ durableId: "large", sessionPath: path }),
+      },
+      {
+        type: "get_entries",
+        response: entriesResponse({ entries: [hostLeaf], leafId: "host-leaf" }),
+      },
+      navigateFixture("saved-leaf"),
+    ]);
+    insertLeafRow(context, "large", path, 1, "saved-leaf");
+
+    try {
+      await context.runtime.registry.attach({
+        workspace: context.workspace,
+        durableId: "large",
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+
+    expect(receivedByType(context, "get_entries")[0]).toMatchObject({
+      since: "saved-leaf",
+    });
+    expect(receivedByType(context, "navigate_tree")[0]).toMatchObject({
+      entryId: "saved-leaf",
       expectedLeafId: "host-leaf",
     });
   });

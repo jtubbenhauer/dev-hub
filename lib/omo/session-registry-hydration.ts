@@ -1,6 +1,7 @@
 import { OmoCommandError } from "@/lib/omo/errors";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { OmoRpcClient } from "@/lib/omo/rpc-client";
+import { requestOmoEntries } from "@/lib/omo/session-entries-request";
 import { setOmoLeaf, type OmoSessionIndexRow } from "@/lib/omo/session-index";
 import {
   OmoHydrationAbortedError,
@@ -52,9 +53,19 @@ function abortHydration(binding: OmoSessionBinding): void {
 
 function getEntries(
   client: OmoRpcClient,
-  routingHandle: string,
+  binding: OmoSessionBinding,
+  onResponse?: (response: JsonlRecord) => void,
 ): Promise<JsonlRecord> {
-  return client.request({ type: "get_entries", sessionId: routingHandle });
+  return requestOmoEntries({
+    send: (command, onCommandResponse) =>
+      client.request(
+        { ...command, sessionId: binding.routingHandle },
+        onCommandResponse ? { onResponse: onCommandResponse } : undefined,
+      ),
+    durableId: binding.durableId,
+    sessionPath: binding.sessionPath,
+    onResponse,
+  });
 }
 
 async function persistLeaf(
@@ -91,7 +102,7 @@ async function restoreAfterStaleLeaf(
   savedLeaf: string,
 ): Promise<RestoredSnapshot> {
   const snapshot = parseEntriesSnapshot(
-    await getEntries(controller.client, binding.routingHandle),
+    await getEntries(controller.client, binding),
   );
   if (
     opened.isStreaming ||
@@ -118,7 +129,7 @@ async function restoreAfterStaleLeaf(
       throw error;
     }
     const finalSnapshot = parseEntriesSnapshot(
-      await getEntries(controller.client, binding.routingHandle),
+      await getEntries(controller.client, binding),
     );
     await persistLeaf(controller, binding, finalSnapshot.leafId);
     return { snapshot: finalSnapshot, leafId: finalSnapshot.leafId };
@@ -196,21 +207,13 @@ async function hydrateAfterOverflow(
   binding.buffer.clear();
   for (let fence = 2; fence <= 3; fence += 1) {
     let snapshot: OmoEntriesSnapshot | undefined;
-    await controller.client.request(
-      { type: "get_entries", sessionId: binding.routingHandle },
-      {
-        onResponse: (response) => {
-          snapshot = parseEntriesSnapshot(response);
-          const branch = activeHydrationBranch(
-            snapshot.entries,
-            snapshot.leafId,
-          );
-          binding.adapter.seed(adapterSeedForReplay(branch, [], opened));
-          binding.state = "cutover";
-          binding.buffer = new OmoRegistryRecordBuffer();
-        },
-      },
-    );
+    await getEntries(controller.client, binding, (response) => {
+      snapshot = parseEntriesSnapshot(response);
+      const branch = activeHydrationBranch(snapshot.entries, snapshot.leafId);
+      binding.adapter.seed(adapterSeedForReplay(branch, [], opened));
+      binding.state = "cutover";
+      binding.buffer = new OmoRegistryRecordBuffer();
+    });
     if (snapshot === undefined)
       throw new TypeError("Missing OmO hydration fence");
     if (binding.buffer.overflowed) continue;
@@ -240,7 +243,7 @@ export async function hydrateOmoBinding(
     binding.durableId,
   );
   const firstSnapshot = parseEntriesSnapshot(
-    await getEntries(controller.client, binding.routingHandle),
+    await getEntries(controller.client, binding),
   );
   if (!controller.isCurrent(binding)) {
     abortHydration(binding);

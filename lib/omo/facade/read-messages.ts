@@ -16,6 +16,7 @@ import {
   type OmoSessionIndexRow,
 } from "@/lib/omo/session-index";
 import { activeBranch, type SessionEntry } from "@/lib/omo/sessions-on-disk";
+import { requestOmoEntries } from "@/lib/omo/session-entries-request";
 import {
   isHistoryFallbackError,
   replacementId,
@@ -195,7 +196,11 @@ export async function readOmoMessages(
     await binding.ready;
     ingestPendingQuestions(context, rawId, binding);
     const snapshot = parseRpcEntriesResponse(
-      await context.runtime.registry.request(binding, { type: "get_entries" }),
+      await requestOmoEntries({
+        send: (command) => context.runtime.registry.request(binding, command),
+        durableId: binding.durableId,
+        sessionPath: binding.sessionPath,
+      }),
     );
     return await responseForMessages(
       branchForLeaf(snapshot.entries, snapshot.leafId),

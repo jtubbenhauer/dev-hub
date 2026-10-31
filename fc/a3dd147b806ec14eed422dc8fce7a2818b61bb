@@ -1,0 +1,51 @@
+drizzle/migrations/0018_same_odin.sql
+  s_44bdbc758f0a47::t_7400f606acd5a9 1
+drizzle/migrations/meta/0018_snapshot.json
+  s_44bdbc758f0a47::t_5536f07dd9359f 1-1414
+drizzle/migrations/meta/_journal.json
+  s_44bdbc758f0a47::t_0bb36ca2260f85 130-136
+drizzle/schema.ts
+  s_44bdbc758f0a47::t_ddaddb06510ae4 96
+lib/omo/facade/write-revert.ts
+  s_44bdbc758f0a47::t_804881eb3d9921 81-87
+lib/omo/session-index-read.ts
+  s_44bdbc758f0a47::t_c9af9590e1079d 103-104,109,113-118,126,134
+lib/omo/session-index-replacement.ts
+  s_44bdbc758f0a47::t_5af580f6869125 92-95
+lib/omo/session-registry-dispatch.ts
+  s_44bdbc758f0a47::t_9b57cccc6090c5 269,272-277
+lib/omo/session-registry-hydration.ts
+  s_9c3834252c250f::t_65a4befe35e6ed 19,76,79-116,118-123,156,167,179,192,200,204-205,210,221
+tests/lib/omo/facade/write-revert-cases.ts
+  s_44bdbc758f0a47::t_3b258812f4193b 172
+tests/lib/omo/session-index.test.ts
+  s_44bdbc758f0a47::t_ba7565f24fdece 59,329,359,369
+tests/lib/omo/session-registry-db-fixture.ts
+  s_44bdbc758f0a47::t_94ea18cb6f4cbd 29
+tests/lib/omo/session-registry-hydration-cases.ts
+  s_44bdbc758f0a47::t_9b2e3254f464d6 38-52,63,69-71,73-80,269-346
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fca3dd147b806ec14eed422dc8fce7a2818b61bb",
+  "prompts": {},
+  "sessions": {
+    "s_44bdbc758f0a47": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a19187-adb6-7e43-9db2-d530f5fa976f",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_9c3834252c250f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a19187-acd1-7c96-bca5-fb0f5c48143a",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

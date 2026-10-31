@@ -1,0 +1,21 @@
+lib/omo/session-registry-hydration.ts
+  s_fa47aca7c15b18::t_7e18b6826af972 159-167
+tests/lib/omo/session-registry-hydration-cases.ts
+  s_fa47aca7c15b18::t_11efdb28fef544 212-244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8eb348f1e33b7ba4779038bf6cb7a666e20b2385",
+  "prompts": {},
+  "sessions": {
+    "s_fa47aca7c15b18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a190ec-5e69-7b35-8508-76812b77a0c5",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

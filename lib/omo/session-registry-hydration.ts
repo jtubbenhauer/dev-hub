@@ -156,6 +156,15 @@ async function restoreLeaf(
     return { snapshot, leafId: snapshot.leafId };
   }
   if (savedLeaf === snapshot.leafId) return { snapshot, leafId: savedLeaf };
+  // omo moved forward while dev-hub was not watching (another client, or a
+  // detached binding). Navigating back would orphan everything since.
+  if (
+    savedLeaf !== null &&
+    isEntryAncestor(snapshot.entries, savedLeaf, snapshot.leafId)
+  ) {
+    await persistLeaf(controller, binding, snapshot.leafId);
+    return { snapshot, leafId: snapshot.leafId };
+  }
   const target = savedLeaf ?? rootUserEntryId(snapshot.entries);
   if (target === undefined) {
     await persistLeaf(controller, binding, snapshot.leafId);

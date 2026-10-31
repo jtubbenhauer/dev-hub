@@ -209,6 +209,39 @@ describe("OmoSessionRegistry hydration", () => {
     });
   });
 
+  it("adopts the host leaf when omo moved past the stored leaf on the same branch", async () => {
+    const path = "/sessions/moved-on.jsonl";
+    const user = messageEntry("user", null, "user", 1);
+    const savedLeaf = messageEntry("saved-leaf", "user", "assistant", 2);
+    const laterUser = messageEntry("later-user", "saved-leaf", "user", 3);
+    const hostLeaf = messageEntry("host-leaf", "later-user", "assistant", 4);
+    const context = await createRegistryContext([
+      {
+        type: "open_session",
+        response: openedResponse({ durableId: "moved-on", sessionPath: path }),
+      },
+      {
+        type: "get_entries",
+        response: entriesResponse({
+          entries: [user, savedLeaf, laterUser, hostLeaf],
+          leafId: "host-leaf",
+        }),
+      },
+    ]);
+    insertLeafRow(context, "moved-on", path, 1, "saved-leaf");
+
+    await context.runtime.registry.attach({
+      workspace: context.workspace,
+      durableId: "moved-on",
+    });
+    await Promise.all(context.runtime.registry.leafQueue.values());
+
+    expect(receivedByType(context, "navigate_tree")).toEqual([]);
+    expect(readIndexRow(context, "moved-on")).toMatchObject({
+      leaf_entry_id: "host-leaf",
+    });
+  });
+
   it("seeds before buffered replay so each assistant keeps its user parent", async () => {
     const path = "/sessions/replay.jsonl";
     const user1 = messageEntry("user-1", null, "user", 1);

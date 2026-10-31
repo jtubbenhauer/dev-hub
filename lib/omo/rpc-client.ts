@@ -277,6 +277,9 @@ export class OmoRpcClient {
     if (socket === undefined) return;
     this.intentionallyClosedSockets.add(socket);
     socket.destroy();
+    // Closing the socket drops every session attachment on omo's side, so
+    // bindings must detach and reopen, or omo stops sending them records.
+    this.listeners.dispatchAll({ type: "__devhub_disconnected" });
   }
 
   private handleRecord(record: JsonlRecord): void {

@@ -158,12 +158,16 @@ describe("OmoRpcClient reconnect supervision", () => {
     const connection = host.connections[0];
     expect(connection).toBeDefined();
     if (connection === undefined) return;
+    const records: JsonlRecord[] = [];
+    client.on((record) => records.push(record));
 
     await advanceHealthyIntervals(client, connection, 20);
     await vi.advanceTimersByTimeAsync(30_000);
 
     expect(client.state).toBe("idle");
     expect(connection.socket.destroyed).toBe(true);
+    // omo dropped this connection's attachments, so bindings must detach.
+    expect(records).toContainEqual({ type: "__devhub_disconnected" });
     expect(vi.getTimerCount()).toBe(0);
     const reconnected = waitForEvent(client, "__devhub_connected");
     const response = client.request({ type: "list_sessions" });

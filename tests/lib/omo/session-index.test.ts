@@ -56,6 +56,7 @@ describe("OMO session index", () => {
         updated_ms INTEGER NOT NULL,
         leaf_known INTEGER NOT NULL DEFAULT 0,
         leaf_entry_id TEXT,
+        leaf_seen_through_entry_id TEXT,
         updated_at INTEGER NOT NULL,
         PRIMARY KEY(workspace_id, durable_id)
       );
@@ -325,7 +326,7 @@ describe("OMO session index", () => {
         updatedMs: 1,
       },
     ]);
-    await index.setOmoLeaf("workspace-1", "parent", "entry-1");
+    await index.setOmoLeaf("workspace-1", "parent", "entry-1", "entry-1");
     expect(await index.getOmoIndexRow("workspace-1", "parent")).toMatchObject({
       leafKnown: 1,
       leafEntryId: "entry-1",
@@ -355,7 +356,7 @@ describe("OMO session index", () => {
       touchRow.sessionPath,
       { ...touchRow, updatedMs: 100 },
     );
-    await index.setOmoLeafAndActivity("workspace-1", "root", null, 150);
+    await index.setOmoLeafAndActivity("workspace-1", "root", null, null, 150);
     expect(await index.getOmoIndexRow("workspace-1", "root")).toMatchObject({
       updatedMs: 200,
     });
@@ -365,7 +366,7 @@ describe("OMO session index", () => {
   it("lets a transcript-derived touch lower activity that housekeeping pushed forward", async () => {
     const index = await import("@/lib/omo/session-index");
     await index.touchOmoSessionIndexMany("workspace-1", [touchRow]);
-    await index.setOmoLeafAndActivity("workspace-1", "root", null, 900);
+    await index.setOmoLeafAndActivity("workspace-1", "root", null, null, 900);
 
     await index.touchOmoSessionIndexMany("workspace-1", [
       { ...touchRow, updatedMs: 150, isUpdatedMsFromTranscript: true },

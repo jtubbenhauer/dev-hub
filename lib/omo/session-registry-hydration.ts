@@ -16,6 +16,7 @@ import {
   responseLeafId,
   rootUserEntryId,
   type OmoEntriesSnapshot,
+  type OmoHydrationEntry,
   type OmoOpenedState,
 } from "@/lib/omo/session-registry-records";
 import type {
@@ -72,10 +73,54 @@ async function persistLeaf(
   controller: OmoHydrationController,
   binding: OmoSessionBinding,
   leafId: string | null,
+  snapshot: OmoEntriesSnapshot,
 ): Promise<void> {
   await controller.enqueueLeaf(binding.workspaceId, binding.durableId, () =>
-    setOmoLeaf(binding.workspaceId, binding.durableId, leafId),
+    setOmoLeaf(
+      binding.workspaceId,
+      binding.durableId,
+      leafId,
+      snapshot.entries.at(-1)?.id ?? null,
+    ),
   );
+}
+
+function isMessageEntry(entry: OmoHydrationEntry): boolean {
+  return entry.type === "message";
+}
+
+// omo reopens a session at the newest entry in its file. A leaf that only got
+// there, with no conversation dev-hub has not seen, says nothing about where
+// the session should be, so dev-hub restores its saved leaf (an undo, say).
+// Any other mismatch means omo moved on, or was switched to another branch,
+// while dev-hub was not watching.
+function hasOmoMovedSinceSave(
+  snapshot: OmoEntriesSnapshot,
+  savedLeaf: string | null,
+  seenThroughEntryId: string | null,
+): boolean {
+  const omoBranch = activeHydrationBranch(snapshot.entries, snapshot.leafId);
+  const savedIndex = omoBranch.findIndex((entry) => entry.id === savedLeaf);
+  if (
+    savedIndex !== -1 &&
+    !omoBranch.slice(savedIndex + 1).some(isMessageEntry)
+  ) {
+    return true;
+  }
+  const seenIndex = snapshot.entries.findIndex(
+    (entry) => entry.id === seenThroughEntryId,
+  );
+  // Rows saved before dev-hub recorded the newest entry it had seen.
+  if (seenIndex === -1) return savedIndex !== -1;
+  const unseenIds = new Set(
+    snapshot.entries.slice(seenIndex + 1).map((entry) => entry.id),
+  );
+  if (
+    omoBranch.some((entry) => isMessageEntry(entry) && unseenIds.has(entry.id))
+  ) {
+    return true;
+  }
+  return !omoBranch.some((entry) => entry.id === seenThroughEntryId);
 }
 
 async function navigate(
@@ -108,7 +153,7 @@ async function restoreAfterStaleLeaf(
     opened.isStreaming ||
     isEntryAncestor(snapshot.entries, savedLeaf, snapshot.leafId)
   ) {
-    await persistLeaf(controller, binding, snapshot.leafId);
+    await persistLeaf(controller, binding, snapshot.leafId, snapshot);
     return { snapshot, leafId: snapshot.leafId };
   }
   try {
@@ -119,7 +164,7 @@ async function restoreAfterStaleLeaf(
       "resume",
       snapshot.leafId,
     );
-    await persistLeaf(controller, binding, leafId);
+    await persistLeaf(controller, binding, leafId, snapshot);
     return { snapshot, leafId };
   } catch (error) {
     if (
@@ -131,7 +176,7 @@ async function restoreAfterStaleLeaf(
     const finalSnapshot = parseEntriesSnapshot(
       await getEntries(controller.client, binding),
     );
-    await persistLeaf(controller, binding, finalSnapshot.leafId);
+    await persistLeaf(controller, binding, finalSnapshot.leafId, finalSnapshot);
     return { snapshot: finalSnapshot, leafId: finalSnapshot.leafId };
   }
 }
@@ -144,7 +189,7 @@ async function restoreLeaf(
   snapshot: OmoEntriesSnapshot,
 ): Promise<RestoredSnapshot> {
   if (row?.leafKnown !== 1 || opened.isStreaming) {
-    await persistLeaf(controller, binding, snapshot.leafId);
+    await persistLeaf(controller, binding, snapshot.leafId, snapshot);
     return { snapshot, leafId: snapshot.leafId };
   }
   const savedLeaf = row.leafEntryId;
@@ -152,22 +197,17 @@ async function restoreLeaf(
     savedLeaf !== null &&
     !snapshot.entries.some((entry) => entry.id === savedLeaf)
   ) {
-    await persistLeaf(controller, binding, snapshot.leafId);
+    await persistLeaf(controller, binding, snapshot.leafId, snapshot);
     return { snapshot, leafId: snapshot.leafId };
   }
   if (savedLeaf === snapshot.leafId) return { snapshot, leafId: savedLeaf };
-  // omo moved forward while dev-hub was not watching (another client, or a
-  // detached binding). Navigating back would orphan everything since.
-  if (
-    savedLeaf !== null &&
-    isEntryAncestor(snapshot.entries, savedLeaf, snapshot.leafId)
-  ) {
-    await persistLeaf(controller, binding, snapshot.leafId);
+  if (hasOmoMovedSinceSave(snapshot, savedLeaf, row.leafSeenThroughEntryId)) {
+    await persistLeaf(controller, binding, snapshot.leafId, snapshot);
     return { snapshot, leafId: snapshot.leafId };
   }
   const target = savedLeaf ?? rootUserEntryId(snapshot.entries);
   if (target === undefined) {
-    await persistLeaf(controller, binding, snapshot.leafId);
+    await persistLeaf(controller, binding, snapshot.leafId, snapshot);
     return { snapshot, leafId: snapshot.leafId };
   }
   try {
@@ -178,7 +218,7 @@ async function restoreLeaf(
       savedLeaf === null ? "select" : "resume",
       snapshot.leafId,
     );
-    await persistLeaf(controller, binding, leafId);
+    await persistLeaf(controller, binding, leafId, snapshot);
     return { snapshot, leafId };
   } catch (error) {
     if (

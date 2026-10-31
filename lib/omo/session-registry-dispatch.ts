@@ -266,9 +266,15 @@ export class OmoRegistryDispatcher {
               binding.workspaceId,
               binding.durableId,
               entryId,
+              entryId,
               activityMs,
             )
-          : setOmoLeaf(binding.workspaceId, binding.durableId, entryId),
+          : setOmoLeaf(
+              binding.workspaceId,
+              binding.durableId,
+              entryId,
+              entryId,
+            ),
       ),
     );
   }

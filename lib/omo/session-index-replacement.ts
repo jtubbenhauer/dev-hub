@@ -89,6 +89,10 @@ export async function recordOmoSessionReplacement(
         updatedMs: successor?.updatedMs ?? oldRow?.updatedMs ?? updatedAt,
         leafKnown: successor?.leafKnown ?? oldRow?.leafKnown ?? 0,
         leafEntryId: successor?.leafEntryId ?? oldRow?.leafEntryId ?? null,
+        leafSeenThroughEntryId:
+          successor?.leafSeenThroughEntryId ??
+          oldRow?.leafSeenThroughEntryId ??
+          null,
         updatedAt,
       };
       transaction

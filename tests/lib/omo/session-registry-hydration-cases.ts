@@ -35,6 +35,21 @@ function messageEntry(
   };
 }
 
+function customEntry(
+  id: string,
+  parentId: string,
+  timestamp: number,
+): JsonlRecord {
+  return {
+    type: "custom",
+    id,
+    parentId,
+    timestamp,
+    customType: "pi-rules.scan",
+    data: {},
+  };
+}
+
 function appended(entry: JsonlRecord): JsonlRecord {
   return { type: "entry_appended", entry, timestamp: entry["timestamp"] };
 }
@@ -45,15 +60,24 @@ function insertLeafRow(
   sessionPath: string,
   leafKnown: number,
   leafEntryId: string | null,
+  seenThroughEntryId: string | null = null,
 ): void {
   context.sqlite
     .prepare(
       `INSERT INTO omo_session_index
         (workspace_id, durable_id, session_path, kind, title, created_ms,
-         updated_ms, leaf_known, leaf_entry_id, updated_at)
-       VALUES (?, ?, ?, 'interactive', 'Leaf', 1, 2, ?, ?, 3)`,
+         updated_ms, leaf_known, leaf_entry_id, leaf_seen_through_entry_id,
+         updated_at)
+       VALUES (?, ?, ?, 'interactive', 'Leaf', 1, 2, ?, ?, ?, 3)`,
     )
-    .run(context.workspace.id, durableId, sessionPath, leafKnown, leafEntryId);
+    .run(
+      context.workspace.id,
+      durableId,
+      sessionPath,
+      leafKnown,
+      leafEntryId,
+      seenThroughEntryId,
+    );
 }
 
 afterEach(() => {
@@ -239,6 +263,84 @@ describe("OmoSessionRegistry hydration", () => {
     expect(receivedByType(context, "navigate_tree")).toEqual([]);
     expect(readIndexRow(context, "moved-on")).toMatchObject({
       leaf_entry_id: "host-leaf",
+    });
+  });
+
+  it("keeps a branch omo was switched to while dev-hub was away", async () => {
+    const path = "/sessions/switched.jsonl";
+    const user = messageEntry("user", null, "user", 1);
+    const firstAnswer = messageEntry("a1", "user", "assistant", 2);
+    const otherUser = messageEntry("u2b", "a1", "user", 3);
+    const otherAnswer = messageEntry("a2b", "u2b", "assistant", 4);
+    const savedUser = messageEntry("u2", "a1", "user", 5);
+    const savedLeaf = messageEntry("a2", "u2", "assistant", 6);
+    const context = await createRegistryContext([
+      {
+        type: "open_session",
+        response: openedResponse({ durableId: "switched", sessionPath: path }),
+      },
+      {
+        type: "get_entries",
+        response: entriesResponse({
+          entries: [
+            user,
+            firstAnswer,
+            otherUser,
+            otherAnswer,
+            savedUser,
+            savedLeaf,
+          ],
+          leafId: "a2b",
+        }),
+      },
+    ]);
+    insertLeafRow(context, "switched", path, 1, "a2", "a2");
+
+    await context.runtime.registry.attach({
+      workspace: context.workspace,
+      durableId: "switched",
+    });
+    await Promise.all(context.runtime.registry.leafQueue.values());
+
+    expect(receivedByType(context, "navigate_tree")).toEqual([]);
+    expect(readIndexRow(context, "switched")).toMatchObject({
+      leaf_entry_id: "a2b",
+      leaf_seen_through_entry_id: "a2",
+    });
+  });
+
+  it("restores an undo that omo dropped when it reopened the session", async () => {
+    const path = "/sessions/undone.jsonl";
+    const user = messageEntry("user", null, "user", 1);
+    const firstAnswer = messageEntry("a1", "user", "assistant", 2);
+    const undoneUser = messageEntry("u2", "a1", "user", 3);
+    const undoneAnswer = messageEntry("a2", "u2", "assistant", 4);
+    const reopenScan = customEntry("scan", "a2", 5);
+    const context = await createRegistryContext([
+      {
+        type: "open_session",
+        response: openedResponse({ durableId: "undone", sessionPath: path }),
+      },
+      {
+        type: "get_entries",
+        response: entriesResponse({
+          entries: [user, firstAnswer, undoneUser, undoneAnswer, reopenScan],
+          leafId: "scan",
+        }),
+      },
+      navigateFixture("u2"),
+    ]);
+    insertLeafRow(context, "undone", path, 1, "u2", "a2");
+
+    await context.runtime.registry.attach({
+      workspace: context.workspace,
+      durableId: "undone",
+    });
+
+    expect(receivedByType(context, "navigate_tree")[0]).toMatchObject({
+      entryId: "u2",
+      intent: "resume",
+      expectedLeafId: "scan",
     });
   });
 

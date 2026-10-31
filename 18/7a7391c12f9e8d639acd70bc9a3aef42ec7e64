@@ -1,0 +1,21 @@
+lib/omo/rpc-client.ts
+  s_44bdbc758f0a47::t_f285379b65b031 280-282
+tests/lib/omo/rpc-client-reconnect.test.ts
+  s_44bdbc758f0a47::t_1a8a7b992964d6 161-162,169-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "187a7391c12f9e8d639acd70bc9a3aef42ec7e64",
+  "prompts": {},
+  "sessions": {
+    "s_44bdbc758f0a47": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a19187-adb6-7e43-9db2-d530f5fa976f",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

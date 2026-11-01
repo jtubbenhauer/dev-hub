@@ -26,6 +26,7 @@ export function createRegistryTestDatabase(): Database.Database {
       updated_ms INTEGER NOT NULL,
       leaf_known INTEGER NOT NULL DEFAULT 0,
       leaf_entry_id TEXT,
+      leaf_seen_through_entry_id TEXT,
       updated_at INTEGER NOT NULL,
       PRIMARY KEY(workspace_id, durable_id)
     );

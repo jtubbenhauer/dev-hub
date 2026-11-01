@@ -93,6 +93,7 @@ export const omoSessionIndex = sqliteTable(
     updatedMs: integer("updated_ms").notNull(),
     leafKnown: integer("leaf_known").notNull().default(0),
     leafEntryId: text("leaf_entry_id"),
+    leafSeenThroughEntryId: text("leaf_seen_through_entry_id"),
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [

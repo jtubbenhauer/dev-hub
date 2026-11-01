@@ -169,7 +169,7 @@ describe("handleOmoWrite revert", () => {
 
     // When
     await fixture.registry.enqueueLeaf(fixture.workspace.id, "root", () =>
-      setOmoLeafAndActivity(fixture.workspace.id, "root", "new", 50),
+      setOmoLeafAndActivity(fixture.workspace.id, "root", "new", "new", 50),
     );
 
     // Then

@@ -1,0 +1,1 @@
+ALTER TABLE `omo_session_index` ADD `leaf_seen_through_entry_id` text;

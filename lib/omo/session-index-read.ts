@@ -100,14 +100,22 @@ export async function setOmoSessionTitle(
     .where(sessionIndexScope(workspaceId, durableId));
 }
 
+// seenThroughEntryId is the newest entry dev-hub had seen when it saved the
+// leaf; hydration uses it to tell a stale saved leaf from omo's reopen default.
 export async function setOmoLeaf(
   workspaceId: string,
   durableId: string,
   leafEntryId: string | null,
+  seenThroughEntryId: string | null,
 ): Promise<void> {
   await db
     .update(omoSessionIndex)
-    .set({ leafKnown: 1, leafEntryId, updatedAt: Date.now() })
+    .set({
+      leafKnown: 1,
+      leafEntryId,
+      leafSeenThroughEntryId: seenThroughEntryId,
+      updatedAt: Date.now(),
+    })
     .where(sessionIndexScope(workspaceId, durableId));
 }
 
@@ -115,6 +123,7 @@ export async function setOmoLeafAndActivity(
   workspaceId: string,
   durableId: string,
   leafEntryId: string | null,
+  seenThroughEntryId: string | null,
   activityMs: number,
 ): Promise<void> {
   await db
@@ -122,6 +131,7 @@ export async function setOmoLeafAndActivity(
     .set({
       leafKnown: 1,
       leafEntryId,
+      leafSeenThroughEntryId: seenThroughEntryId,
       updatedMs: sql`max(${omoSessionIndex.updatedMs}, ${activityMs})`,
       updatedAt: Date.now(),
     })

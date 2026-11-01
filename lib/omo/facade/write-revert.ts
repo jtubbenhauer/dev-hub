@@ -78,7 +78,13 @@ export async function revertOmoSession(
     await context.runtime.registry.enqueueLeaf(
       context.workspace.id,
       rawId,
-      () => setOmoLeaf(context.workspace.id, rawId, leafId),
+      () =>
+        setOmoLeaf(
+          context.workspace.id,
+          rawId,
+          leafId,
+          snapshot.entries.at(-1)?.id ?? null,
+        ),
     );
     return noContentResponse();
   } catch (error) {

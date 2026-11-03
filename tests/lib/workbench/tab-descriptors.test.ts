@@ -5,6 +5,7 @@ import {
   diffTabTitle,
   fileTabTitle,
   isWorkbenchTabParams,
+  isWorkbenchTerminalSessionId,
   nextTerminalTitle,
   tabResourceKey,
   type WorkbenchTabParams,
@@ -207,6 +208,21 @@ describe("createWorkbenchTerminalSessionId", () => {
       expect(sessionId.startsWith("term-")).toBe(false);
     }
   });
+});
+
+describe("isWorkbenchTerminalSessionId", () => {
+  it("recognizes a generated workbench terminal session id", () => {
+    expect(
+      isWorkbenchTerminalSessionId(createWorkbenchTerminalSessionId()),
+    ).toBe(true);
+  });
+
+  it.each(["default", "term-11111111", "nvim-file-editor", "wb-term"])(
+    "rejects the non-workbench session id %s",
+    (sessionId) => {
+      expect(isWorkbenchTerminalSessionId(sessionId)).toBe(false);
+    },
+  );
 });
 
 describe("fileTabTitle", () => {

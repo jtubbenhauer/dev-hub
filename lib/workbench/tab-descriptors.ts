@@ -46,9 +46,15 @@ export function createPanelId(): string {
   return `tab-${shortRandomHex()}`;
 }
 
+const WORKBENCH_TERMINAL_SESSION_ID_PREFIX = "wb-term-";
+
 // The drawer uses "default" and "term-*"; the "wb-term-" prefix keeps the two apart.
 export function createWorkbenchTerminalSessionId(): string {
-  return `wb-term-${shortRandomHex()}`;
+  return `${WORKBENCH_TERMINAL_SESSION_ID_PREFIX}${shortRandomHex()}`;
+}
+
+export function isWorkbenchTerminalSessionId(sessionId: string): boolean {
+  return sessionId.startsWith(WORKBENCH_TERMINAL_SESSION_ID_PREFIX);
 }
 
 export function tabResourceKey(

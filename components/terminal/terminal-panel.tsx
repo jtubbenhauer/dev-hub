@@ -100,6 +100,12 @@ async function fetchSocketToken(workspaceId: string): Promise<string> {
   return body.token;
 }
 
+// A hidden dockview panel can measure 0x0; fitting it would shrink the pty to 2 columns.
+export function shouldFitTerminal(element: HTMLElement | null): boolean {
+  if (!element) return false;
+  return element.clientWidth > 0 && element.clientHeight > 0;
+}
+
 export function TerminalPanel({
   wsUrl,
   workspaceId,
@@ -319,10 +325,12 @@ export function TerminalPanel({
       term.loadAddon(newSearchAddon);
       term.open(containerRef.current);
 
-      try {
-        fitAddon.fit();
-      } catch {
-        void 0;
+      if (shouldFitTerminal(containerRef.current)) {
+        try {
+          fitAddon.fit();
+        } catch {
+          void 0;
+        }
       }
 
       termRef.current = term;
@@ -364,6 +372,7 @@ export function TerminalPanel({
     void setup();
 
     const handleResize = () => {
+      if (!shouldFitTerminal(containerRef.current)) return;
       try {
         fitAddonRef.current?.fit();
       } catch {

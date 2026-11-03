@@ -16,6 +16,7 @@ import {
 } from "@/lib/terminal/terminal-activity";
 import { terminalSessionKey } from "@/lib/terminal/terminal-protocol";
 import { sendBrowserNotification } from "@/lib/notifications";
+import { isWorkbenchTerminalSessionId } from "@/lib/workbench/tab-descriptors";
 
 const OPEN_POLL_INTERVAL_MS = 2000;
 const CLOSED_POLL_INTERVAL_MS = 4000;
@@ -85,19 +86,23 @@ export function TerminalActivityWatcher() {
 
   useEffect(() => {
     if (!sessions) return;
+    // Workbench tabs own their terminals: never adopt or announce them here.
+    const drawerSessions = sessions.filter(
+      (session) => !isWorkbenchTerminalSessionId(session.sessionId),
+    );
     const focusedVisibleKey =
       typeof document !== "undefined" && document.hasFocus()
         ? visibleKey
         : null;
     const store = useTerminalStore.getState();
     const update = computeTerminalActivity(
-      sessions,
+      drawerSessions,
       store.activityBaseline,
       focusedVisibleKey,
     );
     store.setActivityBaseline(update.baseline);
     store.setUnseenActivityKeys(update.unseenActivityKeys);
-    for (const session of sessions) {
+    for (const session of drawerSessions) {
       const key = terminalSessionKey(session.workspaceId, session.sessionId);
       const isKnownTab = store.tabsByWorkspace[session.workspaceId]?.some(
         (tab) => tab.sessionId === session.sessionId,

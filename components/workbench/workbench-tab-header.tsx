@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { createDockviewLayoutApi } from "@/components/workbench/dockview-layout-api";
 import { requestCloseTab } from "@/components/workbench/workbench-close-tab";
+import { TerminalTabRunningIndicator } from "@/components/workbench/tabs/terminal-tab-panel";
 import {
   workbenchTabTitle,
   type ChatSessionTitleSource,
@@ -163,6 +164,12 @@ export function WorkbenchTabHeader({
         {title}
       </span>
       <ChatActivityDot activity={chatActivity} />
+      {params.kind === "terminal" && (
+        <TerminalTabRunningIndicator
+          workspaceId={params.workspaceId}
+          sessionId={params.sessionId}
+        />
+      )}
       <button
         type="button"
         aria-label={`Close ${title}`}

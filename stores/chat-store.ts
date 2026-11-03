@@ -58,7 +58,16 @@ import {
   PartDeltaBuffer,
   reconcilePartSnapshot,
 } from "@/lib/opencode/part-delta";
-import { getDescendantActivity } from "@/lib/chat/descendant-activity";
+import {
+  addVisibleSession,
+  computeStreamingStatus,
+  EMPTY_MESSAGES,
+  EMPTY_TODOS,
+  listOnScreenSessionIds,
+  listVisibleSessionsToRefetch,
+  planMessageCacheEviction,
+  removeVisibleSession,
+} from "@/lib/chat/session-scoped-selectors";
 import {
   readSessionDeletionFailureMessage,
   SESSION_DELETION_FAILED_MESSAGE,
@@ -72,6 +81,7 @@ import {
 } from "@/lib/session-title/context";
 import { loadEarlierHistory } from "@/lib/session-title/history";
 import { requestSessionTitle } from "@/lib/session-title/request-title";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 
 export type StreamingStatus =
   | "idle"
@@ -151,15 +161,15 @@ function emptyWorkspaceState(): WorkspaceState {
 // Stable empty references to avoid infinite re-render loops with Zustand selectors.
 // Returning `{}` or `[]` inline creates a new reference each call, breaking Object.is equality.
 const EMPTY_SESSIONS: Record<string, Session> = {};
-const EMPTY_MESSAGES: MessageWithParts[] = [];
 const EMPTY_PERMISSIONS: PermissionRequest[] = [];
 const EMPTY_QUESTIONS: QuestionRequest[] = [];
-const EMPTY_TODOS: Todo[] = [];
 const EMPTY_SESSION_STATUSES: Record<string, SessionStatus> = {};
 const EMPTY_LAST_VIEWED: Record<string, number> = {};
 const EMPTY_UNIFIED_SESSIONS: SessionWithWorkspace[] = [];
 const EMPTY_PINNED: Set<string> = new Set();
 const EMPTY_SESSION_NOTES: Record<string, string> = {};
+// The message and todo fallbacks are shared with the session-scoped selectors.
+export { EMPTY_MESSAGES, EMPTY_TODOS };
 
 // Memoization cache for getRecentSessionsAcrossWorkspaces.
 // We compare each workspace's `sessions` record by reference to detect changes.
@@ -356,18 +366,21 @@ function isRootSessionOnScreen(
   rootSessionId: string,
 ): boolean {
   if (typeof window === "undefined") return false;
-  if (window.location.pathname !== "/chat") return false;
+  if (!["/chat", WORKBENCH_PATH].includes(window.location.pathname)) {
+    return false;
+  }
   if (document.visibilityState !== "visible" || !document.hasFocus()) {
     return false;
   }
-  const { activeWorkspaceId, activeSessionId } = useChatStore.getState();
-  if (activeWorkspaceId !== workspaceId || activeSessionId === null) {
-    return false;
-  }
-  return (
-    activeSessionId === rootSessionId ||
-    findRootSessionId(getLineageSessions(workspaceId), activeSessionId) ===
-      rootSessionId
+  const onScreenSessionIds = listOnScreenSessionIds(
+    useChatStore.getState(),
+    workspaceId,
+  );
+  if (onScreenSessionIds.includes(rootSessionId)) return true;
+  const lineageSessions = getLineageSessions(workspaceId);
+  return onScreenSessionIds.some(
+    (sessionId) =>
+      findRootSessionId(lineageSessions, sessionId) === rootSessionId,
   );
 }
 
@@ -539,6 +552,14 @@ function scheduleOmoIdentitiesReconcile(
     void get().reconcileOmoSessionIdentities(workspaceId);
   }, IDENTITIES_RECONCILE_COALESCE_MS);
   identitiesReconcileTimers.set(workspaceId, timer);
+}
+
+// Visible chat tabs other than the focused one may also have missed events.
+function refetchVisibleSessions(get: () => ChatState): void {
+  const visibleSessions = listVisibleSessionsToRefetch(get());
+  for (const { workspaceId, sessionId } of visibleSessions) {
+    void get().fetchMessages(sessionId, workspaceId, { force: true });
+  }
 }
 
 // D23 — reconcileOmoSessionIdentities: per-workspace single-flight with a
@@ -1293,6 +1314,8 @@ interface ChatState {
   // UI focus
   activeWorkspaceId: string | null;
   activeSessionId: string | null;
+  // Ref-counted chat sessions on screen, keyed by `${workspaceId}:${sessionId}`; never persisted
+  visibleSessionKeys: Record<string, number>;
 
   // Streaming error for the focused session — stored explicitly because it has no other source of truth
   streamingError: string | null;
@@ -1310,6 +1333,8 @@ interface ChatState {
   setActiveSession: (sessionId: string | null) => void;
   setActiveWorkspaceId: (workspaceId: string | null) => void;
   setActiveWorkspaceSession: (workspaceId: string, sessionId: string) => void;
+  registerVisibleSession: (workspaceId: string, sessionId: string) => void;
+  unregisterVisibleSession: (workspaceId: string, sessionId: string) => void;
 
   // Session CRUD
   fetchSessions: (workspaceId: string) => Promise<void>;
@@ -1580,7 +1605,8 @@ function updateWorkspace(
 }
 
 // Moves a session to the front of the LRU access list and evicts the oldest
-// session's messages when the list exceeds MAX_CACHED_SESSIONS.
+// hidden sessions' messages when the list exceeds MAX_CACHED_SESSIONS. Visible
+// sessions are never evicted, so they may keep the list above that limit.
 function touchLru(
   state: ChatState,
   sessionId: string,
@@ -1595,8 +1621,11 @@ function touchLru(
     return { messageAccessOrder: next };
   }
 
-  const evicted = next.slice(MAX_CACHED_SESSIONS);
-  const kept = next.slice(0, MAX_CACHED_SESSIONS);
+  const { kept, evicted } = planMessageCacheEviction(
+    next,
+    state.visibleSessionKeys,
+    MAX_CACHED_SESSIONS,
+  );
   const nextWorkspaceStates = { ...state.workspaceStates };
 
   for (const entry of evicted) {
@@ -2065,6 +2094,7 @@ export const useChatStore = create<ChatState>()(
       sessionMutationGen: {},
       activeWorkspaceId: null,
       activeSessionId: null,
+      visibleSessionKeys: {},
       streamingError: null,
       streamingPollInterval: null,
       optimisticStreamingSessionId: null,
@@ -2115,6 +2145,34 @@ export const useChatStore = create<ChatState>()(
             streamingError: null,
           };
         });
+      },
+
+      registerVisibleSession: (workspaceId, sessionId) => {
+        set((state) => {
+          const visibleSessionKeys = addVisibleSession(
+            state.visibleSessionKeys,
+            workspaceId,
+            sessionId,
+          );
+          return {
+            visibleSessionKeys,
+            ...touchLru(
+              { ...state, visibleSessionKeys },
+              sessionId,
+              workspaceId,
+            ),
+          };
+        });
+      },
+
+      unregisterVisibleSession: (workspaceId, sessionId) => {
+        set((state) => ({
+          visibleSessionKeys: removeVisibleSession(
+            state.visibleSessionKeys,
+            workspaceId,
+            sessionId,
+          ),
+        }));
       },
 
       setActiveWorkspaceId: (workspaceId) => {
@@ -3999,6 +4057,7 @@ export const useChatStore = create<ChatState>()(
             });
             get().refreshActiveSessionStatus(activeWorkspaceId);
           }
+          refetchVisibleSessions(get);
 
           if (activeWorkspaceId) {
             void reconcileWorkspacePrompts(
@@ -4435,6 +4494,7 @@ export const useChatStore = create<ChatState>()(
               void get().fetchMessages(activeSessionId, wsId, { force: true });
             }
           }
+          refetchVisibleSessions(get);
         }
       },
 
@@ -5210,53 +5270,16 @@ export const useChatStore = create<ChatState>()(
       // Selectors
 
       getStreamingStatus: (): StreamingStatus => {
-        const {
+        const { activeWorkspaceId, activeSessionId, streamingError } = get();
+        if (!activeWorkspaceId || !activeSessionId) {
+          return streamingError ? "error" : "idle";
+        }
+        return computeStreamingStatus(
+          get(),
           activeWorkspaceId,
           activeSessionId,
-          workspaceStates,
-          optimisticStreamingSessionId,
-          streamingError,
-        } = get();
-
-        // Error state takes priority — cleared explicitly when user dismisses or SSE reconnects
-        if (streamingError) return "error";
-
-        if (!activeWorkspaceId || !activeSessionId) return "idle";
-
-        const ws = workspaceStates[activeWorkspaceId];
-        if (!ws) return "idle";
-
-        // Pending question or permission for this session → waiting for user input
-        if (ws.questions.some((q) => q.sessionID === activeSessionId))
-          return "waiting";
-        if (ws.permissions.some((p) => p.sessionID === activeSessionId))
-          return "waiting";
-
-        // SSE-confirmed non-idle session status → streaming
-        const sessionStatus = ws.sessionStatuses[activeSessionId];
-        if (sessionStatus && sessionStatus.type !== "idle") return "streaming";
-
-        // Optimistic: sendMessage fired but first SSE hasn't arrived yet
-        if (optimisticStreamingSessionId === activeSessionId)
-          return "streaming";
-
-        const descendantActivity = getDescendantActivity({
-          parentSessionId: activeSessionId,
-          sessions: ws.sessions,
-          statuses: ws.sessionStatuses,
-          permissions: ws.permissions,
-          questions: ws.questions,
-          now: Date.now(),
-          recentWindowMs: 30_000,
-        });
-        if (
-          descendantActivity.activeCount > 0 ||
-          descendantActivity.waitingCount > 0
-        ) {
-          return "streaming";
-        }
-
-        return "idle";
+          { isActiveSession: true, now: Date.now() },
+        );
       },
 
       getWorkspaceActivity: (workspaceId) => {

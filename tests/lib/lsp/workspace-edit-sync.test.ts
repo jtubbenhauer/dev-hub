@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { handleWorkspaceEditResult } from "@/lib/lsp/client/workspace-edit-sync";
 import { useEditorStore } from "@/stores/editor-store";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 import type { LspWorkspaceEditResult } from "@/lib/lsp/types";
 import { subscribeToGitStatusRefresh } from "@/lib/git/git-status-refresh";
@@ -33,7 +32,6 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   models = [model()];
   useEditorStore.setState(useEditorStore.getInitialState(), true);
-  useSidePanelStore.setState(useSidePanelStore.getInitialState(), true);
   useChatFileDialogStore.getState().reset();
 });
 afterEach(() => {
@@ -65,16 +63,12 @@ describe("workspace edit reload", () => {
       useEditorStore.getState(),
       "replaceFileContentFromDisk",
     );
-    const side = vi.spyOn(
-      useSidePanelStore.getState(),
-      "replaceFileContentFromDisk",
-    );
     const dialog = vi.spyOn(
       useChatFileDialogStore.getState(),
       "replaceContentFromDisk",
     );
     await handleWorkspaceEditResult(result, context);
-    for (const action of [editor, side, dialog])
+    for (const action of [editor, dialog])
       expect(action).toHaveBeenCalledExactlyOnceWith(
         "A & B",
         "src/a.ts",
@@ -90,7 +84,7 @@ describe("workspace edit reload", () => {
     );
     expect(models[0].getValue()).toBe("disk");
   });
-  it.each([useEditorStore, useSidePanelStore, useChatFileDialogStore])(
+  it.each([useEditorStore, useChatFileDialogStore])(
     "keeps all matching models when a store becomes dirty during fetch",
     async (store) => {
       const pending = deferredResponse();
@@ -133,10 +127,6 @@ describe("workspace edit reload", () => {
       useEditorStore.getState(),
       "replaceFileContentFromDisk",
     );
-    const side = vi.spyOn(
-      useSidePanelStore.getState(),
-      "replaceFileContentFromDisk",
-    );
     const dialog = vi.spyOn(
       useChatFileDialogStore.getState(),
       "replaceContentFromDisk",
@@ -147,7 +137,7 @@ describe("workspace edit reload", () => {
     await second;
     older.resolve(Response.json({ content: "older" }));
     await first;
-    for (const action of [editor, side, dialog])
+    for (const action of [editor, dialog])
       expect(action).toHaveBeenCalledExactlyOnceWith(
         "A & B",
         "src/a.ts",

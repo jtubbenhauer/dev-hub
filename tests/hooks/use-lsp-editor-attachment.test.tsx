@@ -51,7 +51,7 @@ const defaults = {
   isEditorReady: true,
 };
 
-function environment(surface = "files-page") {
+function environment() {
   const order: string[] = [];
   const models = new Map<string, Monaco.editor.ITextModel>();
   const createModel = (uri: string, initialValue: string) => {
@@ -74,7 +74,7 @@ function environment(surface = "files-page") {
   };
   let currentModel = createModel("inmemory://model/1", "tab text");
   const container = document.createElement("div");
-  container.setAttribute("data-lsp-surface", surface);
+  container.setAttribute("data-lsp-surface", "files-page");
   const child = document.createElement("div");
   container.append(child);
   const listeners = new Set<
@@ -135,11 +135,8 @@ function environment(surface = "files-page") {
   };
 }
 
-function pending(
-  surface: "files-page" | "split-panel",
-  uri = "file:///workspace/src/a.ts",
-) {
-  return navigation.setPendingNavigation(surface, {
+function pending(uri = "file:///workspace/src/a.ts") {
+  return navigation.setPendingNavigation("files-page", {
     uriKey: uri,
     lineNumber: 17,
     column: 4,
@@ -160,9 +157,7 @@ describe("useLspEditorAttachment", () => {
   });
   afterEach(() => {
     cleanup();
-    for (const surface of ["files-page", "split-panel"] as const) {
-      navigation.clearPendingNavigation(surface, pending(surface));
-    }
+    navigation.clearPendingNavigation("files-page", pending());
     vi.restoreAllMocks();
     vi.clearAllMocks();
     vi.useRealTimers();
@@ -314,7 +309,7 @@ describe("useLspEditorAttachment", () => {
         return <Child path={path} />;
       }
       const view = render(<Parent filePath="src/a.ts" content="old tab" />);
-      pending("files-page", "file:///workspace/src/b.ts");
+      pending("file:///workspace/src/b.ts");
       fixture.order.length = 0;
 
       view.rerender(<Parent filePath="src/b.ts" content="tab text" />);
@@ -438,52 +433,41 @@ describe("useLspEditorAttachment", () => {
     },
   );
 
-  it.each(["files-page", "split-panel"] as const)(
-    "applies only split-panel pending when remounted ready five seconds after %s navigation",
-    (surface) => {
-      vi.useFakeTimers();
-      const fixture = environment("split-panel");
-      const target = fixture.createModel(
-        "file:///Workspace/src/a.ts",
-        "tab text",
-      );
-      fixture.switchModel(target);
-      const previous = renderHook(() =>
-        useLspEditorAttachment({ ...defaults, ...fixture }),
-      );
-      previous.unmount();
-      pending(surface);
-      act(() => vi.advanceTimersByTime(5000));
-      const view = renderHook(
-        ({ ready }) =>
-          useLspEditorAttachment({
-            ...defaults,
-            ...fixture,
-            isEditorReady: ready,
-          }),
-        { initialProps: { ready: false } },
-      );
-      fixture.editor.setPosition.mockClear();
+  it("applies a pending navigation when remounted ready five seconds after it started", () => {
+    vi.useFakeTimers();
+    const fixture = environment();
+    const target = fixture.createModel(
+      "file:///Workspace/src/a.ts",
+      "tab text",
+    );
+    fixture.switchModel(target);
+    const previous = renderHook(() =>
+      useLspEditorAttachment({ ...defaults, ...fixture }),
+    );
+    previous.unmount();
+    pending();
+    act(() => vi.advanceTimersByTime(5000));
+    const view = renderHook(
+      ({ ready }) =>
+        useLspEditorAttachment({
+          ...defaults,
+          ...fixture,
+          isEditorReady: ready,
+        }),
+      { initialProps: { ready: false } },
+    );
+    fixture.editor.setPosition.mockClear();
 
-      view.rerender({ ready: true });
+    view.rerender({ ready: true });
 
-      expect(fixture.editor.setPosition).toHaveBeenCalledTimes(
-        surface === "split-panel" ? 1 : 0,
-      );
-      if (surface === "split-panel") {
-        expect(fixture.editor.revealPositionInCenter).toHaveBeenCalledWith({
-          lineNumber: 17,
-          column: 4,
-        });
-        expect(fixture.editor.focus).toHaveBeenCalledOnce();
-      } else {
-        expect(
-          navigation.takePendingNavigation(
-            "files-page",
-            "file:///workspace/src/a.ts",
-          ),
-        ).toEqual({ lineNumber: 17, column: 4 });
-      }
-    },
-  );
+    expect(fixture.editor.setPosition).toHaveBeenCalledExactlyOnceWith({
+      lineNumber: 17,
+      column: 4,
+    });
+    expect(fixture.editor.revealPositionInCenter).toHaveBeenCalledWith({
+      lineNumber: 17,
+      column: 4,
+    });
+    expect(fixture.editor.focus).toHaveBeenCalledOnce();
+  });
 });

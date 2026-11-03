@@ -1,12 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Loader2, Minus, Plus, X } from "lucide-react";
-import { toast } from "sonner";
+import { Loader2, Minus, Plus } from "lucide-react";
 
-import { WorkbenchDiffView } from "@/components/workbench/workbench-diff-view";
 import { GitSyncControls } from "@/components/chat/git-sync-controls";
 import { GitRevertDialog } from "@/components/chat/git-revert-dialog";
 import { GitRevertAction } from "@/components/chat/git-revert-action";
@@ -26,9 +24,7 @@ import {
   useGitUnstage,
   useGitCommit,
 } from "@/hooks/use-git";
-import { openFileInSidePanel } from "@/lib/side-panel-open-file";
 import { cn } from "@/lib/utils";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 
 import type { GitStatusResult } from "@/types";
 
@@ -111,13 +107,11 @@ export function GitTabPanel({
   onSelectFile,
 }: {
   workspaceId: string;
-  onSelectFile?: (selection: { path: string; staged: boolean }) => void;
+  onSelectFile: (selection: { path: string; staged: boolean }) => void;
 }) {
   const queryClient = useQueryClient();
   const { data: status } = useGitStatus(workspaceId);
   const fileDiffs = useGitFileDiffs(workspaceId);
-  const gitTabSelection = useSidePanelStore((s) => s.gitTabSelection);
-  const setGitTabSelection = useSidePanelStore((s) => s.setGitTabSelection);
 
   const stageMutation = useGitStage(workspaceId);
   const unstageMutation = useGitUnstage(workspaceId);
@@ -126,76 +120,6 @@ export function GitTabPanel({
   const [commitMessage, setCommitMessage] = useState("");
   const { isDialogMode, openDiffDialog, diffDialog } =
     useGitDiffDialog(workspaceId);
-
-  const GIT_LIST_STORAGE_KEY = "dev-hub:git-tab-list-height";
-  const GIT_LIST_MIN_HEIGHT = 80;
-  const GIT_LIST_MAX_HEIGHT = 600;
-  const GIT_LIST_DEFAULT_HEIGHT = 200;
-
-  const [listHeight, setListHeight] = useState<number>(() => {
-    try {
-      const stored = localStorage.getItem(GIT_LIST_STORAGE_KEY);
-      if (stored === null) return GIT_LIST_DEFAULT_HEIGHT;
-      const parsed = parseInt(stored, 10);
-      if (isNaN(parsed)) return GIT_LIST_DEFAULT_HEIGHT;
-      return Math.max(
-        GIT_LIST_MIN_HEIGHT,
-        Math.min(GIT_LIST_MAX_HEIGHT, parsed),
-      );
-    } catch {
-      return GIT_LIST_DEFAULT_HEIGHT;
-    }
-  });
-
-  const listHeightRef = useRef(listHeight);
-  useEffect(() => {
-    listHeightRef.current = listHeight;
-  });
-
-  const listDragRef = useRef({
-    isDragging: false,
-    startY: 0,
-    startHeight: 0,
-  });
-
-  const handleListDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const drag = listDragRef.current;
-    drag.isDragging = true;
-    drag.startY = e.clientY;
-    drag.startHeight = listHeightRef.current;
-
-    const handleMove = (me: MouseEvent) => {
-      if (!drag.isDragging) return;
-      const delta = me.clientY - drag.startY;
-      const next = Math.max(
-        GIT_LIST_MIN_HEIGHT,
-        Math.min(GIT_LIST_MAX_HEIGHT, drag.startHeight + delta),
-      );
-      listHeightRef.current = next;
-      setListHeight(next);
-    };
-
-    const handleUp = () => {
-      if (!drag.isDragging) return;
-      drag.isDragging = false;
-      document.removeEventListener("mousemove", handleMove);
-      document.removeEventListener("mouseup", handleUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      try {
-        localStorage.setItem(
-          GIT_LIST_STORAGE_KEY,
-          String(listHeightRef.current),
-        );
-      } catch {}
-    };
-
-    document.body.style.cursor = "row-resize";
-    document.body.style.userSelect = "none";
-    document.addEventListener("mousemove", handleMove);
-    document.addEventListener("mouseup", handleUp);
-  }, []);
 
   const rows = useMemo(() => (status ? buildGitRows(status) : []), [status]);
 
@@ -212,7 +136,7 @@ export function GitTabPanel({
     return map;
   }, [rows]);
 
-  // Unique dirty paths across every bucket (matches the side-panel badge).
+  // Unique dirty paths across every bucket (matches the Changes badge).
   const presentPaths = useMemo(() => {
     const set = new Set<string>();
     if (status) {
@@ -225,7 +149,7 @@ export function GitTabPanel({
   }, [status]);
 
   // The built-in hook invalidations only touch git-status/git-log. Diffs and
-  // file-content must be refreshed too so the diff screen never shows stale
+  // file-content must be refreshed too so open diff tabs never show stale
   // content after a stage/unstage/commit.
   const invalidateFreshness = useCallback(() => {
     queryClient.invalidateQueries({
@@ -331,52 +255,8 @@ export function GitTabPanel({
 
   const selectRow = (row: GitRow) => {
     if (isDialogMode) return openDiffDialog(row.path, row.staged);
-    const selection = { path: row.path, staged: row.section === "staged" };
-    if (onSelectFile) return onSelectFile(selection);
-    setGitTabSelection({ workspaceId, ...selection });
+    onSelectFile({ path: row.path, staged: row.section === "staged" });
   };
-
-  const selectionWorkspaceId = gitTabSelection?.workspaceId;
-  const selectionPath = gitTabSelection?.path;
-
-  // Clear stale cross-workspace selections, and auto-return to the list once
-  // the selected path leaves every status bucket (e.g. after a commit).
-  useEffect(() => {
-    if (!gitTabSelection) return;
-    if (selectionWorkspaceId !== workspaceId) {
-      setGitTabSelection(null);
-      return;
-    }
-    if (status && selectionPath && !presentPaths.has(selectionPath)) {
-      setGitTabSelection(null);
-    }
-  }, [
-    gitTabSelection,
-    selectionWorkspaceId,
-    selectionPath,
-    workspaceId,
-    status,
-    presentPaths,
-    setGitTabSelection,
-  ]);
-
-  const handleOpenInFiles = useCallback(async () => {
-    if (!selectionPath) return;
-    let failed = false;
-    await openFileInSidePanel(workspaceId, selectionPath, () => {
-      failed = true;
-      toast.error("Could not open file");
-    });
-    // openFileInSidePanel resolves even on failure — the fallback is the ONLY
-    // failure signal. Keep the diff screen open when the open failed so the
-    // user does not silently lose context.
-    if (!failed) setGitTabSelection(null);
-  }, [workspaceId, selectionPath, setGitTabSelection]);
-
-  const hasValidSelection =
-    !!gitTabSelection && gitTabSelection.workspaceId === workspaceId;
-
-  const selection = hasValidSelection && !onSelectFile ? gitTabSelection : null;
 
   // ---- List states ----
   if (!status) {
@@ -399,17 +279,9 @@ export function GitTabPanel({
   const canStageAllAndCommit =
     commitMessage.trim().length > 0 && dirtyCount > 0;
 
-  // flex-1 wins in a flex parent (sidebar); the side panel uses the calc.
   return (
-    <div className="flex h-[calc(100%-2.5rem)] min-h-0 flex-1 flex-col">
-      <div
-        className={
-          selection
-            ? "shrink-0 overflow-y-auto p-1"
-            : "min-h-0 flex-1 overflow-y-auto p-1"
-        }
-        style={selection ? { height: listHeight } : undefined}
-      >
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto p-1">
         {rows.length === 0 ? (
           <div className="px-3 py-4 text-xs">
             <p className="text-muted-foreground">No changes</p>
@@ -482,19 +354,12 @@ export function GitTabPanel({
                   const diffKey = `${row.staged ? "staged" : "unstaged"}:${row.path}`;
                   const diff = fileDiffs.get(diffKey);
                   const isStaged = row.section === "staged";
-                  const isSelected =
-                    !!selection &&
-                    selection.path === row.path &&
-                    selection.staged === isStaged;
                   return (
                     <div
                       key={`${row.section}-${row.path}`}
                       role="button"
                       tabIndex={0}
-                      className={cn(
-                        "group hover:bg-accent/50 flex w-full items-center gap-1.5 rounded-sm px-2 py-1 text-left text-sm",
-                        isSelected && "bg-accent",
-                      )}
+                      className="group hover:bg-accent/50 flex w-full items-center gap-1.5 rounded-sm px-2 py-1 text-left text-sm"
                       onClick={() => selectRow(row)}
                       onKeyDown={(e) => {
                         if (isActivateKey(e)) {
@@ -570,62 +435,6 @@ export function GitTabPanel({
           })
         )}
       </div>
-
-      {selection && (
-        <div
-          className="hover:bg-accent/50 active:bg-accent flex h-1.5 shrink-0 cursor-row-resize items-center justify-center border-y transition-colors"
-          data-testid="git-list-resize-handle"
-          onMouseDown={handleListDragStart}
-        />
-      )}
-      {selection && (
-        <div
-          className="flex min-h-0 flex-1 flex-col"
-          data-testid="git-tab-diff-screen"
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              setGitTabSelection(null);
-            }
-          }}
-        >
-          <div className="flex h-8 items-center gap-1 border-b px-1">
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Close diff"
-              data-testid="git-diff-close"
-              onClick={() => setGitTabSelection(null)}
-            >
-              <X className="size-3.5" />
-            </Button>
-            <Tooltip delayDuration={500} disableHoverableContent>
-              <TooltipTrigger asChild>
-                <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                  {selection.path}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="left">{selection.path}</TooltipContent>
-            </Tooltip>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Open in Files tab"
-              data-testid="git-diff-open-in-files"
-              onClick={handleOpenInFiles}
-            >
-              <ExternalLink className="size-3.5" />
-            </Button>
-          </div>
-          <div className="min-h-0 flex-1">
-            <WorkbenchDiffView
-              workspaceId={workspaceId}
-              filePath={selection.path}
-              staged={selection.staged}
-            />
-          </div>
-        </div>
-      )}
 
       <div className="shrink-0 space-y-2 border-t p-2">
         <textarea

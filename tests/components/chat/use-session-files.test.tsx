@@ -67,9 +67,6 @@ vi.mock("@/hooks/use-mobile", () => ({
 vi.mock("@/hooks/use-settings", () => ({
   useChatFileOpenSetting: () => ({ fileOpenMode: "sidebar", isLoading: false }),
 }));
-vi.mock("@/lib/side-panel-open-file", () => ({
-  openFileInSidePanel: vi.fn(),
-}));
 
 function makeSession(id: string, parentID: string, created: number): Session {
   return {
@@ -460,8 +457,7 @@ describe("scope check", () => {
   // The worktree is shared across concurrent tasks, so a raw `git status`
   // baseline is polluted by unrelated in-flight edits. Instead we assert the
   // hard MUST-NOT directly: this task's wiring (useSessionFiles) lives ONLY in
-  // session-files-panel.tsx and never leaks into side-panel.tsx or
-  // chat-interface.tsx.
+  // session-files-panel.tsx and never leaks into chat-interface.tsx.
   const readSource = (relativePath: string): string =>
     readFileSync(join(process.cwd(), relativePath), "utf8");
 
@@ -469,14 +465,9 @@ describe("scope check", () => {
     const panel = readSource("components/chat/session-files-panel.tsx");
     expect(panel).toContain("useSessionFiles");
 
-    for (const forbidden of [
-      "components/chat/side-panel.tsx",
-      "components/chat/chat-interface.tsx",
-    ]) {
-      const source = readSource(forbidden);
-      expect(source).not.toContain("useSessionFiles");
-      expect(source).not.toContain("use-session-files");
-      expect(source).not.toContain("descendant-sessions");
-    }
+    const chatInterface = readSource("components/chat/chat-interface.tsx");
+    expect(chatInterface).not.toContain("useSessionFiles");
+    expect(chatInterface).not.toContain("use-session-files");
+    expect(chatInterface).not.toContain("descendant-sessions");
   });
 });

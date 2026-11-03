@@ -32,14 +32,8 @@ vi.mock("@/hooks/use-git", () => ({
   useGitDiscard: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
-const setGitTabSelection = vi.fn();
-vi.mock("@/stores/side-panel-store", () => ({
-  useSidePanelStore: (selector: (s: unknown) => unknown) =>
-    selector({ setGitTabSelection, gitTabSelection: null }),
-}));
-
 vi.mock("@/components/workbench/workbench-diff-view", () => ({
-  WorkbenchDiffView: () => <div data-testid="side-panel-diff-view" />,
+  WorkbenchDiffView: () => <div data-testid="workbench-diff-view" />,
 }));
 
 vi.mock("sonner", () => ({
@@ -75,6 +69,8 @@ function makeStatus(overrides: Partial<GitStatusResult>): GitStatusResult {
   };
 }
 
+const onSelectFile = vi.fn();
+
 function renderPanel() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -83,7 +79,7 @@ function renderPanel() {
   const result = render(
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <GitTabPanel workspaceId="ws-1" />
+        <GitTabPanel workspaceId="ws-1" onSelectFile={onSelectFile} />
       </TooltipProvider>
     </QueryClientProvider>,
   );
@@ -362,7 +358,7 @@ describe("GitTabPanel commit bar", () => {
     expect(screen.getByTestId("git-ahead-count")).toHaveTextContent("3");
   });
 
-  it("does not select the row on stage/unstage clicks and renders no nested native buttons", async () => {
+  it("does not open the row on stage/unstage clicks and renders no nested native buttons", async () => {
     const user = userEvent.setup();
     mockUseGitStatus.mockReturnValue({
       data: makeStatus({
@@ -376,8 +372,8 @@ describe("GitTabPanel commit bar", () => {
     await user.click(screen.getByTestId("git-stage-action"));
     await user.click(screen.getByTestId("git-unstage-action"));
 
-    // Row selection (gitTabSelection) must NOT change from a stage/unstage click
-    expect(setGitTabSelection).not.toHaveBeenCalled();
+    // A stage/unstage click must NOT also open the row
+    expect(onSelectFile).not.toHaveBeenCalled();
     // Rows use div/span[role=button] — never native buttons nested in buttons
     expect(container.querySelector("button button")).toBeNull();
   });

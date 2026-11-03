@@ -10,10 +10,13 @@ import {
 } from "@/lib/lsp/client/navigation-registry";
 import {
   getLspSurfaceOf,
+  isEditorHidden,
   isEditorShowingUriKey,
   isTopLevelEditor,
   waitForEditorShowing,
+  waitForEditorShown,
 } from "@/lib/lsp/client/open-editor-wait";
+import type { LspSurface } from "@/lib/lsp/types";
 import {
   fileUriToWorkspaceRelativePath,
   isLspDocumentUriInWorkspace,
@@ -24,6 +27,7 @@ export { waitForEditorShowing } from "@/lib/lsp/client/open-editor-wait";
 
 const EDITOR_SHOWING_TIMEOUT_MS = 5_000;
 const EDITOR_SHOWING_INTERVAL_MS = 50;
+const HIDDEN_TARGET_SHOWN_TIMEOUT_MS = 1_000;
 
 type NavigationSelection = {
   readonly startLineNumber: number;
@@ -132,6 +136,27 @@ export const openEditorFromLsp: OpenEditor = async (
   return editor;
 };
 
+async function openTabOfHiddenTarget(
+  surface: LspSurface,
+  target: Monaco.editor.ICodeEditor,
+  uri: string,
+): Promise<boolean> {
+  const root = getActiveLspWorkspaceRoot();
+  const relativePath =
+    root === null ? null : fileUriToWorkspaceRelativePath(uri, root);
+  const handler = getLspOpenFileHandler(surface);
+  if (relativePath === null || handler === undefined) return false;
+  const isOpened = await handler(relativePath, () => true).catch(() => false);
+  // The tab's editor is shown a frame after the tab switch; focus needs it shown.
+  if (isOpened) {
+    await waitForEditorShown(target, {
+      timeoutMs: HIDDEN_TARGET_SHOWN_TIMEOUT_MS,
+      intervalMs: EDITOR_SHOWING_INTERVAL_MS,
+    });
+  }
+  return false;
+}
+
 export function registerLspOpenGuard(
   monaco: typeof Monaco,
 ): Monaco.IDisposable {
@@ -142,15 +167,27 @@ export function registerLspOpenGuard(
       const sourceSurface = getLspSurfaceOf(source.getContainerDomNode());
       if (sourceSurface === null) return true;
       const uriKey = toLowerCaseUriKey(uri);
-      return monaco.editor
+      const showingEditors = monaco.editor
         .getEditors()
-        .some(
+        .filter(
           (editor) =>
             editor !== source &&
             isTopLevelEditor(editor) &&
-            isEditorShowingUriKey(editor, uriKey) &&
-            getLspSurfaceOf(editor.getContainerDomNode()) !== sourceSurface,
+            isEditorShowingUriKey(editor, uriKey),
         );
+      if (
+        showingEditors.some(
+          (editor) =>
+            getLspSurfaceOf(editor.getContainerDomNode()) !== sourceSurface,
+        )
+      )
+        return true;
+      // The editor service then reveals the target in the editor showing it,
+      // which cannot take focus until its tab is the shown one.
+      const [hiddenTarget] = showingEditors;
+      if (hiddenTarget !== undefined && showingEditors.every(isEditorHidden))
+        return openTabOfHiddenTarget(sourceSurface, hiddenTarget, uri);
+      return false;
     },
   });
 }

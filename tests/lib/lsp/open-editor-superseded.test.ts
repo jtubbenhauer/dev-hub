@@ -29,7 +29,7 @@ beforeEach(() => {
   state.editors = [];
   state.onGetEditors = undefined;
   handler.mockReset();
-  unregisterHandler = registerLspOpenFileHandler("split-panel", handler);
+  unregisterHandler = registerLspOpenFileHandler("files-page", handler);
 });
 afterEach(() => {
   unregisterHandler();
@@ -37,8 +37,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function focusedSplitPanelEditor() {
-  const dom = mountSurface("split-panel");
+function focusedFilesPageEditor() {
+  const dom = mountSurface("files-page");
   dom.focusTarget.focus();
   const top = createFakeEditor(dom.container, workspaceUri("src/start.ts"));
   return top;
@@ -50,7 +50,7 @@ function isCurrentOfCall(callIndex: number): () => boolean {
 
 describe("openEditorFromLsp superseded navigation", () => {
   it("abandons A when B starts later and their handlers resolve in reverse order", async () => {
-    const top = focusedSplitPanelEditor();
+    const top = focusedFilesPageEditor();
     state.editors = [top.editor];
     const openA = deferred<boolean>();
     const openB = deferred<boolean>();
@@ -78,7 +78,7 @@ describe("openEditorFromLsp superseded navigation", () => {
   });
 
   it("stops A's poll when B starts after A's handler already opened the tab", async () => {
-    const top = focusedSplitPanelEditor();
+    const top = focusedFilesPageEditor();
     state.editors = [top.editor];
     const openB = deferred<boolean>();
     handler
@@ -108,7 +108,7 @@ describe("openEditorFromLsp superseded navigation", () => {
   });
 
   it("abandons A when B starts between A's successful wait and its continuation", async () => {
-    const top = focusedSplitPanelEditor();
+    const top = focusedFilesPageEditor();
     top.showUri(TARGET_A);
     state.editors = [top.editor];
     handler

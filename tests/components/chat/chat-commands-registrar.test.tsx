@@ -24,7 +24,6 @@ import {
   useChatStore,
   type WorkspaceState,
 } from "@/stores/chat-store";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useTerminalStore } from "@/stores/terminal-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
@@ -98,7 +97,6 @@ vi.mock("@/components/chat/prompt-input", async () => {
 
 const initialChatState = useChatStore.getState();
 const initialWorkspaceState = useWorkspaceStore.getState();
-const initialSidePanelState = useSidePanelStore.getState();
 
 function makeWorkspace(id: string): Workspace {
   return {
@@ -257,7 +255,6 @@ beforeEach(() => {
     "fetch",
     vi.fn(async () => new Response("[]")),
   );
-  useSidePanelStore.setState({ isOpen: false });
   seedStores();
 });
 
@@ -268,7 +265,6 @@ afterEach(() => {
   localStorage.clear();
   useChatStore.setState(initialChatState, true);
   useWorkspaceStore.setState(initialWorkspaceState, true);
-  useSidePanelStore.setState(initialSidePanelState, true);
   useTerminalStore.setState({ isOpen: false });
   _resetModuleCaches();
 });

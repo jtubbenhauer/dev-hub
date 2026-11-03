@@ -7,7 +7,6 @@ import type { LspWorkspaceEditResult } from "@/lib/lsp/types";
 import { requestGitStatusRefresh } from "@/lib/git/git-status-refresh";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 import { useEditorStore } from "@/stores/editor-store";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 
 const reloadGeneration = new Map<string, number>();
 let nextReloadGeneration = 0;
@@ -64,13 +63,6 @@ export async function handleWorkspaceEditResult(
         const content = data.content;
         const replacements = [
           useEditorStore
-            .getState()
-            .replaceFileContentFromDisk(
-              context.workspaceId,
-              relativePath,
-              content,
-            ),
-          useSidePanelStore
             .getState()
             .replaceFileContentFromDisk(
               context.workspaceId,

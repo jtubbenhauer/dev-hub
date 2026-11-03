@@ -114,9 +114,11 @@ export function WorkbenchDockview({
   }, [api, workspaceId, isMobile, endTerminalSession]);
 
   // `isolate` keeps dockview's z-index 99 sashes under app overlays (drawer).
+  // `overflow-clip` keeps never-laid-out hidden tab overlays from making the
+  // page scrollable, so Monaco's scrollIntoView cannot shift the workbench.
   return (
     <WorkbenchModeProvider isMobile={isMobile}>
-      <div className="isolate h-full w-full">
+      <div className="isolate h-full w-full overflow-clip">
         <DockviewReact
           theme={DEVHUB_DOCKVIEW_THEME}
           components={WORKBENCH_PANEL_COMPONENTS}

@@ -256,12 +256,12 @@ describe("GitSyncControls", () => {
   });
 
   // (11)
-  it("keeps git-tab-panel.tsx at or under 689 lines", () => {
+  it("keeps git-tab-panel.tsx at or under 497 lines", () => {
     const source = readFileSync(
       resolve(process.cwd(), "components/chat/git-tab-panel.tsx"),
       "utf8",
     );
     const lineCount = source.split("\n").length;
-    expect(lineCount).toBeLessThanOrEqual(689);
+    expect(lineCount).toBeLessThanOrEqual(497);
   });
 });

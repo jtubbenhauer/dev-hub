@@ -2,9 +2,8 @@
 
 import { useCallback, useMemo, useState } from "react";
 
-import { ArrowUpDown, FolderTree, RefreshCw, X } from "lucide-react";
+import { ArrowUpDown, FolderTree, RefreshCw } from "lucide-react";
 
-import { WorkbenchDiffView } from "@/components/workbench/workbench-diff-view";
 import { useGitDiffDialog } from "@/components/chat/git-diff-dialog";
 import { ChangedFileList } from "@/components/git/changed-file-list";
 import { Button } from "@/components/ui/button";
@@ -48,7 +47,7 @@ export function GitBranchComparePanel({
   onSelectFile,
 }: {
   workspaceId: string;
-  onSelectFile?: (path: string, baseRef: string) => void;
+  onSelectFile: (path: string, baseRef: string) => void;
 }) {
   const { data: branches, isLoading: isBranchesLoading } =
     useGitBranches(workspaceId);
@@ -58,7 +57,6 @@ export function GitBranchComparePanel({
   const setBranchCompareBaseRef = useContextSidebarStore(
     (s) => s.setBranchCompareBaseRef,
   );
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const { isDialogMode, openDiffDialog, diffDialog } =
     useGitDiffDialog(workspaceId);
 
@@ -119,14 +117,8 @@ export function GitBranchComparePanel({
     return { additions, deletions };
   }, [changedFiles]);
 
-  const activeSelectedPath =
-    selectedPath && changedFiles.some((f) => f.path === selectedPath)
-      ? selectedPath
-      : null;
-
   const handleBaseRefChange = (value: string) => {
     setBranchCompareBaseRef(workspaceId, value);
-    setSelectedPath(null);
   };
 
   const handleSelectFile = (path: string) => {
@@ -135,11 +127,7 @@ export function GitBranchComparePanel({
       openDiffDialog(path, false, baseRef);
       return;
     }
-    if (onSelectFile) {
-      onSelectFile(path, baseRef);
-      return;
-    }
-    setSelectedPath(path);
+    onSelectFile(path, baseRef);
   };
 
   if (isBranchesLoading) {
@@ -159,9 +147,8 @@ export function GitBranchComparePanel({
     );
   }
 
-  // flex-1 wins in a flex parent (sidebar); the side panel uses the calc.
   return (
-    <div className="flex h-[calc(100%-2.5rem)] min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-1.5 border-b px-2 py-1.5">
         <Select value={baseRef ?? ""} onValueChange={handleBaseRefChange}>
           <SelectTrigger
@@ -204,12 +191,7 @@ export function GitBranchComparePanel({
         </Button>
       </div>
 
-      <div
-        className={cn(
-          "flex min-h-0 flex-col",
-          activeSelectedPath ? "max-h-[40%] shrink-0" : "flex-1",
-        )}
-      >
+      <div className="flex min-h-0 flex-1 flex-col">
         {!baseRef ? (
           <p className="text-muted-foreground px-2 py-3 text-xs">
             Select a branch to compare against
@@ -270,7 +252,7 @@ export function GitBranchComparePanel({
             </div>
             <ChangedFileList
               files={sortedChangedFiles}
-              selectedFile={activeSelectedPath}
+              selectedFile={null}
               isLoading={isChangedFilesLoading}
               reviewedFiles={reviewedFiles}
               sortMode={sortMode}
@@ -284,44 +266,6 @@ export function GitBranchComparePanel({
           </>
         )}
       </div>
-
-      {activeSelectedPath && baseRef && (
-        <div
-          className="flex min-h-0 flex-1 flex-col border-t"
-          data-testid="compare-diff-screen"
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              setSelectedPath(null);
-            }
-          }}
-        >
-          <div className="flex h-8 shrink-0 items-center gap-1 border-b px-1">
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Close diff"
-              data-testid="compare-diff-close"
-              onClick={() => setSelectedPath(null)}
-            >
-              <X className="size-3.5" />
-            </Button>
-            <span
-              className="min-w-0 flex-1 truncate font-mono text-xs"
-              title={activeSelectedPath}
-            >
-              {activeSelectedPath}
-            </span>
-          </div>
-          <div className="min-h-0 flex-1">
-            <WorkbenchDiffView
-              workspaceId={workspaceId}
-              filePath={activeSelectedPath}
-              baseRef={baseRef}
-            />
-          </div>
-        </div>
-      )}
       {diffDialog}
     </div>
   );

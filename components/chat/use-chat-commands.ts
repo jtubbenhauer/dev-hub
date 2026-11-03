@@ -12,14 +12,12 @@ import {
   Clock,
   Coins,
   FoldVertical,
-  PanelRight,
   Plus,
   ScrollText,
   Wrench,
 } from "lucide-react";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useMemo } from "react";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 
 export interface ChatCommandRefs {
   handleCreateSession: RefObject<() => void>;
@@ -36,7 +34,6 @@ export interface ChatCommandRefs {
 
 export interface ChatCommandLabels {
   isPlanPanelOpen: boolean;
-  isSidePanelOpen: boolean;
   showThinking: boolean;
   showToolCalls: boolean;
   showTokens: boolean;
@@ -128,13 +125,6 @@ export function useChatCommands(
         onSelect: () => refs.handleCreateSession.current(),
       },
       {
-        id: "chat:toggle-side-panel",
-        label: labels.isSidePanelOpen ? "Hide Side Panel" : "Show Side Panel",
-        group: "Chat",
-        icon: PanelRight,
-        onSelect: () => useSidePanelStore.getState().togglePanel(),
-      },
-      {
         id: "chat:toggle-thinking",
         label: labels.showThinking ? "Hide Thinking" : "Show Thinking",
         group: "Chat",
@@ -212,7 +202,6 @@ export function useChatCommands(
       labels.showTokens,
       labels.showTimestamps,
       labels.isPlanPanelOpen,
-      labels.isSidePanelOpen,
       refs.setIsPlanPanelOpen,
       refs.handleCreateSession,
       refs.jumpToNextUserMessage,
@@ -265,14 +254,6 @@ export function useChatCommands(
           page: "chat" as const,
         },
         handler: () => refs.setIsPlanPanelOpen.current((prev) => !prev),
-      },
-      {
-        action: {
-          id: "chat:toggle-side-panel",
-          label: "Toggle side panel",
-          page: "chat" as const,
-        },
-        handler: () => useSidePanelStore.getState().togglePanel(),
       },
       {
         action: {

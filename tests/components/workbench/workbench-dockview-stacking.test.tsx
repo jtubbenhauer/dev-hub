@@ -44,4 +44,18 @@ describe("WorkbenchDockview stacking", () => {
     const shell = container.querySelector(".dv-shell");
     expect(shell?.closest(".isolate")).not.toBeNull();
   });
+
+  it("clips dockview's overlays so revealing an editor cannot scroll the workbench out of place", () => {
+    // When
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WorkbenchDockview workspaceId="w1" isMobile={false} />
+      </QueryClientProvider>,
+    );
+
+    // Then: hidden tabs' overlays that were never laid out overflow the
+    // shell; `overflow: clip` keeps them out of the page's scrollable area.
+    const shell = container.querySelector(".dv-shell");
+    expect(shell?.closest(".overflow-clip")).not.toBeNull();
+  });
 });

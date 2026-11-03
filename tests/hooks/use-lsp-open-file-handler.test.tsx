@@ -34,17 +34,17 @@ describe("useLspOpenFileHandler", () => {
     const second = vi.fn(async () => true);
     const { rerender, unmount } = renderHook(
       ({ open, active }) =>
-        useLspOpenFileHandler("split-panel", open, () => active),
+        useLspOpenFileHandler("files-page", open, () => active),
       { initialProps: { open: first, active: "old.ts" } },
     );
-    const handler = getLspOpenFileHandler("split-panel");
+    const handler = getLspOpenFileHandler("files-page");
     rerender({ open: second, active: "a.ts" });
 
     expect(await handler?.("a.ts", () => true)).toBe(true);
     expect(first).not.toHaveBeenCalled();
-    expect(getLspOpenFileHandler("split-panel")).toBe(handler);
+    expect(getLspOpenFileHandler("files-page")).toBe(handler);
     unmount();
-    expect(getLspOpenFileHandler("split-panel")).toBeUndefined();
+    expect(getLspOpenFileHandler("files-page")).toBeUndefined();
   });
 
   it("returns false when currency changes while opening", async () => {

@@ -11,11 +11,16 @@ export function getLspSurfaceOf(
   const surface = element
     ?.closest("[data-lsp-surface]")
     ?.getAttribute("data-lsp-surface");
-  return surface === "files-page" || surface === "split-panel" ? surface : null;
+  return surface === "files-page" ? surface : null;
 }
 
 export function isTopLevelEditor(editor: CodeEditor): boolean {
   return !editor.getContainerDomNode().parentElement?.closest(".monaco-editor");
+}
+
+// Workbench tabs keep inactive editors mounted under a visibility:hidden overlay.
+export function isEditorHidden(editor: CodeEditor): boolean {
+  return getComputedStyle(editor.getContainerDomNode()).visibility === "hidden";
 }
 
 export function isEditorShowingUriKey(
@@ -68,6 +73,27 @@ export function waitForEditorShowing(
       const editor = findEditorShowing(uriKey, surface);
       if (editor !== null || elapsedMs >= timeoutMs) {
         resolve(editor);
+        return;
+      }
+      elapsedMs += intervalMs;
+      setTimeout(poll, intervalMs);
+    };
+    poll();
+  });
+}
+
+export function waitForEditorShown(
+  editor: CodeEditor,
+  {
+    timeoutMs,
+    intervalMs,
+  }: { readonly timeoutMs: number; readonly intervalMs: number },
+): Promise<void> {
+  return new Promise((resolve) => {
+    let elapsedMs = 0;
+    const poll = () => {
+      if (!isEditorHidden(editor) || elapsedMs >= timeoutMs) {
+        resolve();
         return;
       }
       elapsedMs += intervalMs;

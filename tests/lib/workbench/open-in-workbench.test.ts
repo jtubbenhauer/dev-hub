@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  BINARY_FILE_LANGUAGE,
+  IMAGE_LANGUAGE,
+  PDF_LANGUAGE,
+} from "@/lib/file-preview";
+import {
+  isPendingNavigationCurrent,
+  setPendingNavigation,
+} from "@/lib/lsp/client/navigation-registry";
+import {
   focusRecentInWorkbench,
   isWorkbenchPathname,
   openChatInWorkbench,
@@ -229,6 +238,151 @@ describe("openFileInWorkbench", () => {
     expect(useEditorStore.getState().openFiles).toHaveLength(1);
     expect(controller.closeTabs).not.toHaveBeenCalled();
     expect(controller.openTab).not.toHaveBeenCalled();
+  });
+
+  it("returns false without navigating when the file cannot be read", async () => {
+    // Given
+    const controller = register(createFakeController(WORKSPACE_ID));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 404 })),
+    );
+    const navigate = vi.fn();
+
+    // When
+    const result = await openFileInWorkbench({ ...fileInput, navigate });
+
+    // Then
+    expect(result).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(controller.openTab).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().openFiles).toEqual([]);
+  });
+
+  it.each([
+    { kind: "a PDF", path: "docs/spec.pdf", language: PDF_LANGUAGE },
+    {
+      kind: "an image",
+      path: "assets/screenshot.jpg",
+      language: IMAGE_LANGUAGE,
+    },
+  ])(
+    "opens $kind as a preview tab without reading its text",
+    async ({ path, language }) => {
+      // Given
+      const controller = register(createFakeController(WORKSPACE_ID));
+
+      // When
+      const result = await openFileInWorkbench({
+        ...fileInput,
+        path,
+        navigate: vi.fn(),
+      });
+
+      // Then
+      expect(result).toBe(true);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(controller.openTab).toHaveBeenCalledExactlyOnceWith({
+        kind: "file",
+        workspaceId: WORKSPACE_ID,
+        path,
+      });
+      expect(useEditorStore.getState().openFiles).toEqual([
+        expect.objectContaining({ path, language }),
+      ]);
+    },
+  );
+
+  it("opens a file the editor refuses as a download tab", async () => {
+    // Given
+    const controller = register(createFakeController(WORKSPACE_ID));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ error: "binary" }, { status: 415 })),
+    );
+
+    // When
+    const result = await openFileInWorkbench({
+      ...fileInput,
+      path: "build/app.zip",
+      navigate: vi.fn(),
+    });
+
+    // Then
+    expect(result).toBe(true);
+    expect(controller.openTab).toHaveBeenCalledExactlyOnceWith({
+      kind: "file",
+      workspaceId: WORKSPACE_ID,
+      path: "build/app.zip",
+    });
+    expect(useEditorStore.getState().openFiles).toEqual([
+      expect.objectContaining({
+        path: "build/app.zip",
+        language: BINARY_FILE_LANGUAGE,
+      }),
+    ]);
+  });
+
+  it("never opens a navigation that a later one superseded and outran", async () => {
+    // Given
+    const controller = register(createFakeController(WORKSPACE_ID));
+    let finishA: (response: Response) => void = () => {};
+    let finishB: (response: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              finishA = resolve;
+            }),
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              finishB = resolve;
+            }),
+        ),
+    );
+    const target = { lineNumber: 1, column: 1 };
+    const tokenA = setPendingNavigation("files-page", {
+      ...target,
+      uriKey: "a",
+    });
+    const openA = openFileInWorkbench({
+      ...fileInput,
+      path: "a.ts",
+      shouldCommit: () => isPendingNavigationCurrent("files-page", tokenA),
+      navigate: vi.fn(),
+    });
+    const tokenB = setPendingNavigation("files-page", {
+      ...target,
+      uriKey: "b",
+    });
+    const openB = openFileInWorkbench({
+      ...fileInput,
+      path: "b.ts",
+      shouldCommit: () => isPendingNavigationCurrent("files-page", tokenB),
+      navigate: vi.fn(),
+    });
+
+    // When
+    finishB(diskResponse());
+    await openB;
+    finishA(diskResponse());
+    const resultA = await openA;
+
+    // Then
+    expect(resultA).toBe(false);
+    expect(controller.openTab).toHaveBeenCalledExactlyOnceWith({
+      kind: "file",
+      workspaceId: WORKSPACE_ID,
+      path: "b.ts",
+    });
+    expect(
+      useEditorStore.getState().openFiles.map((file) => file.path),
+    ).toEqual(["b.ts"]);
   });
 });
 

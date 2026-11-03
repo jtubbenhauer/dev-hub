@@ -1,15 +1,15 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { FileViewMode } from "@/components/chat/use-file-view-mode";
+import type { FileViewMode } from "@/stores/editor-store";
 
 interface FileViewToggleProps {
   mode: FileViewMode;
   onChange: (mode: FileViewMode) => void;
 }
 
-// Editor|Diff segmented toggle for the chat side panel file header. Only shown
-// when the active file can be diffed (in-repo file in a git repo).
+// Editor|Diff segmented toggle for a file tab's toolbar. Only shown when the
+// file can be diffed (git lists it as changed).
 export function FileViewToggle({ mode, onChange }: FileViewToggleProps) {
   return (
     <div

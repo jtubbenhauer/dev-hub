@@ -36,7 +36,7 @@ export function registerLspOpenFileHandler(
 export function getLspOpenFileHandler(
   surface: string | null | undefined,
 ): OpenFileHandler | undefined {
-  if (surface !== "files-page" && surface !== "split-panel") return undefined;
+  if (surface !== "files-page") return undefined;
   return handlers.get(surface);
 }
 
@@ -82,7 +82,7 @@ export function takePendingNavigation(
   surface: string | null | undefined,
   uriKey: string,
 ): { lineNumber: number; column: number } | null {
-  if (surface !== "files-page" && surface !== "split-panel") return null;
+  if (surface !== "files-page") return null;
   const pending = pendingBySurface.get(surface);
   if (!pending) return null;
   if (!isPendingNavigationCurrent(surface, pending.token)) {

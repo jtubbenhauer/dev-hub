@@ -24,14 +24,8 @@ vi.mock("@/hooks/use-git", () => ({
   useGitDiscard: () => ({ mutate: discardMutate, isPending: discardPending }),
 }));
 
-const setGitTabSelection = vi.fn();
-vi.mock("@/stores/side-panel-store", () => ({
-  useSidePanelStore: (selector: (s: unknown) => unknown) =>
-    selector({ setGitTabSelection, gitTabSelection: null }),
-}));
-
 vi.mock("@/components/workbench/workbench-diff-view", () => ({
-  WorkbenchDiffView: () => <div data-testid="side-panel-diff-view" />,
+  WorkbenchDiffView: () => <div data-testid="workbench-diff-view" />,
 }));
 
 vi.mock("@/components/chat/git-sync-controls", () => ({
@@ -92,6 +86,8 @@ function makeStatus(overrides: Partial<GitStatusResult>): GitStatusResult {
   };
 }
 
+const onSelectFile = vi.fn();
+
 function renderPanel(workspaceId = "ws-1") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -100,7 +96,7 @@ function renderPanel(workspaceId = "ws-1") {
   const result = render(
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <GitTabPanel workspaceId={workspaceId} />
+        <GitTabPanel workspaceId={workspaceId} onSelectFile={onSelectFile} />
       </TooltipProvider>
     </QueryClientProvider>,
   );
@@ -260,7 +256,7 @@ describe("GitTabPanel revert action", () => {
     expect(dialogState.props!.target).toBeNull();
   });
 
-  it("revert click does not change selection and renders no nested native buttons", async () => {
+  it("revert click does not open the row and renders no nested native buttons", async () => {
     const user = userEvent.setup();
     mockUseGitStatus.mockReturnValue({
       data: makeStatus({
@@ -271,7 +267,7 @@ describe("GitTabPanel revert action", () => {
     const { container } = renderPanel();
     await user.click(screen.getByTestId("git-revert-action"));
 
-    expect(setGitTabSelection).not.toHaveBeenCalled();
+    expect(onSelectFile).not.toHaveBeenCalled();
     expect(container.querySelector("button button")).toBeNull();
   });
 
@@ -323,7 +319,7 @@ describe("GitTabPanel revert action", () => {
       rerender(
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            <GitTabPanel workspaceId="ws-1" />
+            <GitTabPanel workspaceId="ws-1" onSelectFile={onSelectFile} />
           </TooltipProvider>
         </QueryClientProvider>,
       );
@@ -375,7 +371,7 @@ describe("GitTabPanel revert action", () => {
       rerender(
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            <GitTabPanel workspaceId="ws-2" />
+            <GitTabPanel workspaceId="ws-2" onSelectFile={onSelectFile} />
           </TooltipProvider>
         </QueryClientProvider>,
       );

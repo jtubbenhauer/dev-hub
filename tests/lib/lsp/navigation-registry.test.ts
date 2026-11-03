@@ -95,14 +95,11 @@ describe("surface navigation registry", () => {
     });
   });
 
-  it("never returns entries belonging to another surface", () => {
-    const token = registry.setPendingNavigation("files-page", target);
-    for (const surface of ["split-panel", "other", null, undefined]) {
+  it("never returns entries for an unknown or missing surface name", () => {
+    registry.setPendingNavigation("files-page", target);
+    for (const surface of ["other", null, undefined]) {
       expect(registry.takePendingNavigation(surface, target.uriKey)).toBeNull();
     }
-    expect(registry.isPendingNavigationCurrent("split-panel", token)).toBe(
-      false,
-    );
     expect(
       registry.takePendingNavigation("files-page", target.uriKey),
     ).not.toBeNull();

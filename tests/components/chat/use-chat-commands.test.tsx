@@ -48,7 +48,6 @@ function renderChatCommands() {
       },
       {
         isPlanPanelOpen: false,
-        isSidePanelOpen: false,
         showThinking: true,
         showToolCalls: true,
         showTokens: true,

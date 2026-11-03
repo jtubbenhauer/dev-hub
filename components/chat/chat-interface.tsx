@@ -1065,7 +1065,6 @@ function ChatInterfaceContent({
       }}
       labels={{
         isPlanPanelOpen,
-        isSidePanelOpen: false,
         showThinking,
         showToolCalls,
         showTokens,

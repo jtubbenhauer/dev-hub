@@ -12,18 +12,6 @@ vi.mock("@/hooks/use-git", () => ({
   useGitChangedFiles: (...args: unknown[]) => useGitChangedFilesMock(...args),
 }));
 
-vi.mock("@/components/workbench/workbench-diff-view", () => ({
-  WorkbenchDiffView: (props: {
-    workspaceId: string;
-    filePath: string;
-    baseRef?: string | null;
-  }) => (
-    <div data-testid="side-panel-diff-view">
-      {props.workspaceId}:{props.filePath}:{props.baseRef}
-    </div>
-  ),
-}));
-
 const openDiffDialog = vi.fn();
 let isDialogMode = false;
 vi.mock("@/components/chat/git-diff-dialog", () => ({
@@ -67,20 +55,13 @@ function mockChangedFiles(
 
 type OnSelectFile = (path: string, baseRef: string) => void;
 
-function renderPanel(onSelectFile?: OnSelectFile) {
+function renderPanel(onSelectFile: OnSelectFile = vi.fn()) {
   return render(
     <TooltipProvider>
       <GitBranchComparePanel workspaceId="ws-1" onSelectFile={onSelectFile} />
     </TooltipProvider>,
   );
 }
-
-// The base ref lives in the context sidebar store in both modes.
-const PANEL_MODES: { mode: string; onSelectFile: OnSelectFile | undefined }[] =
-  [
-    { mode: "side panel", onSelectFile: undefined },
-    { mode: "workbench sidebar", onSelectFile: vi.fn<OnSelectFile>() },
-  ];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -127,84 +108,72 @@ describe("GitBranchComparePanel", () => {
     expect(screen.getByText(/feature/)).toBeInTheDocument();
   });
 
-  it.each(PANEL_MODES)(
-    "uses the stored base branch for the workspace when it still exists ($mode)",
-    ({ onSelectFile }) => {
-      // Given
-      useContextSidebarStore.setState({
-        branchCompareBaseRefs: { "ws-1": "dev" },
-      });
+  it("uses the stored base branch for the workspace when it still exists", () => {
+    // Given
+    useContextSidebarStore.setState({
+      branchCompareBaseRefs: { "ws-1": "dev" },
+    });
 
-      // When
-      renderPanel(onSelectFile);
+    // When
+    renderPanel();
 
-      // Then
-      expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "dev");
-    },
-  );
+    // Then
+    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "dev");
+  });
 
-  it.each(PANEL_MODES)(
-    "falls back to the default when the stored base branch is gone ($mode)",
-    ({ onSelectFile }) => {
-      // Given
-      useContextSidebarStore.setState({
-        branchCompareBaseRefs: { "ws-1": "deleted-branch" },
-      });
+  it("falls back to the default when the stored base branch is gone", () => {
+    // Given
+    useContextSidebarStore.setState({
+      branchCompareBaseRefs: { "ws-1": "deleted-branch" },
+    });
 
-      // When
-      renderPanel(onSelectFile);
+    // When
+    renderPanel();
 
-      // Then
-      expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "main");
-    },
-  );
+    // Then
+    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "main");
+  });
 
-  it.each(PANEL_MODES)(
-    "stores the picked base branch for the workspace ($mode)",
-    async ({ onSelectFile }) => {
-      // Given
-      const user = userEvent.setup();
-      renderPanel(onSelectFile);
-
-      // When
-      await user.click(screen.getByTestId("compare-base-select"));
-      await user.click(await screen.findByRole("option", { name: "dev" }));
-
-      // Then
-      expect(useContextSidebarStore.getState().branchCompareBaseRefs).toEqual({
-        "ws-1": "dev",
-      });
-      expect(useGitChangedFilesMock).toHaveBeenLastCalledWith("ws-1", "dev");
-    },
-  );
-
-  it("opens the branch diff for a file and closes it again", async () => {
+  it("stores the picked base branch for the workspace", async () => {
+    // Given
     const user = userEvent.setup();
     renderPanel();
 
-    await user.click(screen.getByText("a.ts"));
+    // When
+    await user.click(screen.getByTestId("compare-base-select"));
+    await user.click(await screen.findByRole("option", { name: "dev" }));
 
-    expect(screen.getByTestId("side-panel-diff-view")).toHaveTextContent(
-      "ws-1:src/a.ts:main",
-    );
+    // Then
+    expect(useContextSidebarStore.getState().branchCompareBaseRefs).toEqual({
+      "ws-1": "dev",
+    });
+    expect(useGitChangedFilesMock).toHaveBeenLastCalledWith("ws-1", "dev");
+  });
 
-    await user.click(screen.getByTestId("compare-diff-close"));
-    expect(
-      screen.queryByTestId("side-panel-diff-view"),
-    ).not.toBeInTheDocument();
+  it("hands a clicked file and the base branch to onSelectFile", async () => {
+    // Given
+    const onSelectFile = vi.fn<OnSelectFile>();
+    renderPanel(onSelectFile);
+
+    // When
+    await userEvent.setup().click(screen.getByText("a.ts"));
+
+    // Then
+    expect(onSelectFile).toHaveBeenCalledExactlyOnceWith("src/a.ts", "main");
   });
 
   it("opens the diff dialog with the base ref in dialog mode", async () => {
+    // Given
     isDialogMode = true;
-    const user = userEvent.setup();
-    renderPanel();
+    const onSelectFile = vi.fn<OnSelectFile>();
+    renderPanel(onSelectFile);
 
-    await user.click(screen.getByText("new.ts"));
+    // When
+    await userEvent.setup().click(screen.getByText("new.ts"));
 
+    // Then
     expect(openDiffDialog).toHaveBeenCalledWith("src/new.ts", false, "main");
-    expect(
-      screen.queryByTestId("side-panel-diff-view"),
-    ).not.toBeInTheDocument();
+    expect(onSelectFile).not.toHaveBeenCalled();
   });
 
   it("refetches when refresh is clicked", async () => {
@@ -310,37 +279,5 @@ describe("GitBranchComparePanel", () => {
     expect(
       useGitReviewStore.getState().reviewedFiles["ws-1:branch:main"],
     ).toHaveLength(1);
-  });
-});
-
-describe("GitBranchComparePanel with onSelectFile (list-only mode)", () => {
-  it("hands a clicked file and the base branch to onSelectFile instead of the inline diff", async () => {
-    // Given
-    const onSelectFile = vi.fn<OnSelectFile>();
-    renderPanel(onSelectFile);
-
-    // When
-    await userEvent.setup().click(screen.getByText("a.ts"));
-
-    // Then
-    expect(onSelectFile).toHaveBeenCalledExactlyOnceWith("src/a.ts", "main");
-    expect(screen.queryByTestId("compare-diff-screen")).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("side-panel-diff-view"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("still opens the diff dialog in dialog mode", async () => {
-    // Given
-    isDialogMode = true;
-    const onSelectFile = vi.fn<OnSelectFile>();
-    renderPanel(onSelectFile);
-
-    // When
-    await userEvent.setup().click(screen.getByText("new.ts"));
-
-    // Then
-    expect(openDiffDialog).toHaveBeenCalledWith("src/new.ts", false, "main");
-    expect(onSelectFile).not.toHaveBeenCalled();
   });
 });

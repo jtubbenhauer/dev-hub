@@ -47,7 +47,6 @@ import {
   dropSupersededOptimistic,
 } from "@/lib/opencode/merge-messages";
 import { useEditorStore, type FileDiskReload } from "@/stores/editor-store";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { getOmoPermissionPreset } from "@/stores/omo-permission-preset-store";
 import { useSubAgentActivityStore } from "@/stores/sub-agent-activity-store";
@@ -974,7 +973,6 @@ function flushPendingPartUpdates(
           wsPath && rawFilePath.startsWith(wsPrefix)
             ? rawFilePath.slice(wsPrefix.length)
             : rawFilePath;
-        // Before the side-panel check, which skips files the side panel lacks.
         if (
           findOwnFileBuffer(useEditorStore.getState().openFiles, wsId, filePath)
         ) {
@@ -982,11 +980,6 @@ function flushPendingPartUpdates(
             useEditorStore.getState().reloadFileFromDisk(wsId, filePath),
           );
         }
-        const { openFiles } = useSidePanelStore.getState();
-        if (!openFiles.some((f) => f.path === filePath)) continue;
-        scheduleAgentEditReload(filePath, filePath, () =>
-          useSidePanelStore.getState().reloadFileFromDisk(wsId, filePath),
-        );
       }
     }
   }

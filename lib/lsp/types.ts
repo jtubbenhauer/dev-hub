@@ -143,7 +143,7 @@ export type LspClientStatus =
   | "busy"
   | "error";
 
-export type LspSurface = "files-page" | "split-panel";
+export type LspSurface = "files-page";
 
 export type JsonRpcId = number | string;
 

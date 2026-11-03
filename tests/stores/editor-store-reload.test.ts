@@ -121,6 +121,18 @@ describe("editor-store reloadFileFromDisk", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("reports not-open without reading the disk when no buffer holds the path", async () => {
+    // Given
+    useEditorStore.setState({ openFiles: [] });
+
+    // When
+    const result = await reload();
+
+    // Then
+    expect(result).toBe("not-open");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       "an error status",

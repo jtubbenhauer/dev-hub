@@ -150,7 +150,6 @@ import {
 import { subscribeToGitStatusRefresh } from "@/lib/git/git-status-refresh";
 import { toast } from "sonner";
 import { useEditorStore, type FileDiskReload } from "@/stores/editor-store";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 import type { OpenFile } from "@/types";
 
 async function flushMicrotasks(ticks = 8) {
@@ -5966,17 +5965,9 @@ describe("memory management — LRU and sessionSourceWorkspace", () => {
 // ---------------------------------------------------------------------------
 
 describe("agent-edit auto-reload", () => {
-  type SidePanelReload = Awaited<
-    ReturnType<
-      ReturnType<typeof useSidePanelStore.getState>["reloadFileFromDisk"]
-    >
-  >;
   const realEditorReload = useEditorStore.getState().reloadFileFromDisk;
-  const realSidePanelReload = useSidePanelStore.getState().reloadFileFromDisk;
   const editorReload =
     vi.fn<(workspaceId: string, path: string) => Promise<FileDiskReload>>();
-  const sidePanelReload =
-    vi.fn<(workspaceId: string, path: string) => Promise<SidePanelReload>>();
 
   function openBuffer(workspaceId: string, path: string): OpenFile {
     return {
@@ -6021,14 +6012,9 @@ describe("agent-edit auto-reload", () => {
     resetStore();
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     editorReload.mockReset().mockResolvedValue("reloaded");
-    sidePanelReload.mockReset().mockResolvedValue("reloaded");
     useEditorStore.setState({
       openFiles: [openBuffer("ws-a", "src/a.ts")],
       reloadFileFromDisk: editorReload,
-    });
-    useSidePanelStore.setState({
-      openFiles: [openBuffer("ws-a", "src/a.ts")],
-      reloadFileFromDisk: sidePanelReload,
     });
   });
 
@@ -6039,13 +6025,9 @@ describe("agent-edit auto-reload", () => {
       openFiles: [],
       reloadFileFromDisk: realEditorReload,
     });
-    useSidePanelStore.setState({
-      openFiles: [],
-      reloadFileFromDisk: realSidePanelReload,
-    });
   });
 
-  it("reloads the editor buffer and the side panel tab of the same edited file", async () => {
+  it("reloads the editor buffer of the edited file", async () => {
     // Given
     emitCompletedWrite("src/a.ts");
 
@@ -6054,20 +6036,6 @@ describe("agent-edit auto-reload", () => {
 
     // Then
     expect(editorReload).toHaveBeenCalledExactlyOnceWith("ws-a", "src/a.ts");
-    expect(sidePanelReload).toHaveBeenCalledExactlyOnceWith("ws-a", "src/a.ts");
-  });
-
-  it("reloads an editor buffer the side panel does not hold", async () => {
-    // Given
-    useSidePanelStore.setState({ openFiles: [] });
-    emitCompletedWrite("src/a.ts");
-
-    // When
-    await vi.advanceTimersByTimeAsync(500);
-
-    // Then
-    expect(editorReload).toHaveBeenCalledExactlyOnceWith("ws-a", "src/a.ts");
-    expect(sidePanelReload).not.toHaveBeenCalled();
   });
 
   it("debounces repeated edits of a file into one editor reload", async () => {
@@ -6098,7 +6066,6 @@ describe("agent-edit auto-reload", () => {
   it("warns once when the edited editor buffer has unsaved changes", async () => {
     // Given
     const warning = vi.spyOn(toast, "warning");
-    useSidePanelStore.setState({ openFiles: [] });
     editorReload.mockResolvedValue("dirty-skipped");
     emitCompletedWrite("src/a.ts");
 

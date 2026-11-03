@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -29,49 +29,6 @@ vi.mock("@/hooks/use-git", () => ({
   useGitDiscard: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
-const setGitTabSelection = vi.fn();
-const setActivePanelTab = vi.fn();
-const openFile = vi.fn();
-const setIsLoading = vi.fn();
-const clearError = vi.fn();
-
-interface MockStore {
-  gitTabSelection: {
-    workspaceId: string;
-    path: string;
-    staged: boolean;
-  } | null;
-  setGitTabSelection: typeof setGitTabSelection;
-  setActivePanelTab: typeof setActivePanelTab;
-  openFile: typeof openFile;
-  setIsLoading: typeof setIsLoading;
-  clearError: typeof clearError;
-  activePanelTab: string;
-}
-
-let storeState: MockStore;
-
-function resetStore() {
-  storeState = {
-    gitTabSelection: null,
-    setGitTabSelection,
-    setActivePanelTab,
-    openFile,
-    setIsLoading,
-    clearError,
-    activePanelTab: "git",
-  };
-}
-resetStore();
-
-vi.mock("@/stores/side-panel-store", () => {
-  const useSidePanelStore = Object.assign(
-    (selector: (s: MockStore) => unknown) => selector(storeState),
-    { getState: () => storeState },
-  );
-  return { useSidePanelStore };
-});
-
 vi.mock("@/components/workbench/workbench-diff-view", () => ({
   WorkbenchDiffView: (props: {
     workspaceId: string;
@@ -79,7 +36,7 @@ vi.mock("@/components/workbench/workbench-diff-view", () => ({
     staged?: boolean;
   }) => (
     <div
-      data-testid="side-panel-diff-view"
+      data-testid="workbench-diff-view"
       data-file-path={props.filePath}
       data-staged={String(props.staged)}
     />
@@ -108,13 +65,11 @@ vi.mock("@/stores/chat-file-dialog-store", () => ({
 
 import { GitTabPanel } from "@/components/chat/git-tab-panel";
 import { useGitStatus, useGitFileDiffs } from "@/hooks/use-git";
-import { toast } from "sonner";
 
 const mockUseGitStatus = useGitStatus as unknown as ReturnType<typeof vi.fn>;
 const mockUseGitFileDiffs = useGitFileDiffs as unknown as ReturnType<
   typeof vi.fn
 >;
-const mockToastError = toast.error as unknown as ReturnType<typeof vi.fn>;
 
 type DiffMap = Map<
   string,
@@ -142,7 +97,9 @@ interface GitTabFileSelection {
   staged: boolean;
 }
 
-function renderPanel(onSelectFile?: (selection: GitTabFileSelection) => void) {
+function renderPanel(
+  onSelectFile: (selection: GitTabFileSelection) => void = vi.fn(),
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -157,14 +114,9 @@ function renderPanel(onSelectFile?: (selection: GitTabFileSelection) => void) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetStore();
   sidebarTabsOpenMode = "sidebar";
   mockUseGitFileDiffs.mockReturnValue(new Map() as DiffMap);
   mockUseGitStatus.mockReturnValue({ data: undefined });
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
 });
 
 describe("GitTabPanel", () => {
@@ -218,60 +170,68 @@ describe("GitTabPanel", () => {
     expect(screen.queryByText("M")).not.toBeInTheDocument();
   });
 
-  it("sets gitTabSelection with staged=true when clicking a staged row", async () => {
-    const user = userEvent.setup();
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        staged: [{ path: "src/staged.ts", index: "M", workingDir: " " }],
-      }),
-    });
-
-    renderPanel();
-
-    await user.click(screen.getByText("src/staged.ts"));
-
-    expect(setGitTabSelection).toHaveBeenCalledWith({
-      workspaceId: "ws-1",
+  it.each([
+    {
+      section: "staged",
       path: "src/staged.ts",
-      staged: true,
-    });
-  });
-
-  it("sets gitTabSelection with staged=false when clicking a changes row", async () => {
-    const user = userEvent.setup();
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/changed.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    renderPanel();
-
-    await user.click(screen.getByText("src/changed.ts"));
-
-    expect(setGitTabSelection).toHaveBeenCalledWith({
-      workspaceId: "ws-1",
+      expected: { path: "src/staged.ts", staged: true },
+    },
+    {
+      section: "changes",
       path: "src/changed.ts",
-      staged: false,
-    });
-  });
+      expected: { path: "src/changed.ts", staged: false },
+    },
+    {
+      section: "untracked",
+      path: "src/new.ts",
+      expected: { path: "src/new.ts", staged: false },
+    },
+    {
+      section: "conflicts",
+      path: "src/conflict.ts",
+      expected: { path: "src/conflict.ts", staged: false },
+    },
+  ])(
+    "hands a clicked $section row to onSelectFile",
+    async ({ path, expected }) => {
+      // Given
+      const onSelectFile = vi.fn<(selection: GitTabFileSelection) => void>();
+      mockUseGitStatus.mockReturnValue({
+        data: makeStatus({
+          staged: [{ path: "src/staged.ts", index: "M", workingDir: " " }],
+          unstaged: [{ path: "src/changed.ts", index: " ", workingDir: "M" }],
+          untracked: ["src/new.ts"],
+          conflicted: ["src/conflict.ts"],
+        }),
+      });
+      renderPanel(onSelectFile);
 
-  it("opens the diff in a dialog instead of inline when dialog mode is set", async () => {
-    const user = userEvent.setup();
+      // When
+      await userEvent.setup().click(screen.getByText(path));
+
+      // Then
+      expect(onSelectFile).toHaveBeenCalledExactlyOnceWith(expected);
+    },
+  );
+
+  it("opens the diff in a dialog instead of a tab when dialog mode is set", async () => {
+    // Given
     sidebarTabsOpenMode = "dialog";
+    const onSelectFile = vi.fn<(selection: GitTabFileSelection) => void>();
     mockUseGitStatus.mockReturnValue({
       data: makeStatus({
         staged: [{ path: "src/staged.ts", index: "M", workingDir: " " }],
       }),
     });
+    renderPanel(onSelectFile);
 
-    renderPanel();
+    // When
+    await userEvent.setup().click(screen.getByText("src/staged.ts"));
 
-    await user.click(screen.getByText("src/staged.ts"));
-
-    expect(setGitTabSelection).not.toHaveBeenCalled();
+    // Then
+    expect(onSelectFile).not.toHaveBeenCalled();
     const dialog = await screen.findByTestId("git-diff-dialog");
-    const diffView = screen.getByTestId("side-panel-diff-view");
+    const diffView = screen.getByTestId("workbench-diff-view");
     expect(dialog).toContainElement(diffView);
     expect(diffView).toHaveAttribute("data-file-path", "src/staged.ts");
     expect(diffView).toHaveAttribute("data-staged", "true");
@@ -354,339 +314,5 @@ describe("GitTabPanel", () => {
 
     expect(screen.getByText("No changes")).toBeInTheDocument();
     expect(screen.getByText("feature/x")).toBeInTheDocument();
-  });
-
-  // ---- Inline diff screen (TODO 11) ----
-
-  it("renders the diff screen with WorkbenchDiffView receiving the selection path + staged", () => {
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/foo.ts",
-      staged: false,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/foo.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    renderPanel();
-
-    expect(screen.getByTestId("git-tab-diff-screen")).toBeInTheDocument();
-    const diff = screen.getByTestId("side-panel-diff-view");
-    expect(diff).toHaveAttribute("data-file-path", "src/foo.ts");
-    expect(diff).toHaveAttribute("data-staged", "false");
-  });
-
-  it("closes the diff when the close button is clicked", async () => {
-    const user = userEvent.setup();
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/foo.ts",
-      staged: false,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/foo.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    renderPanel();
-
-    await user.click(screen.getByTestId("git-diff-close"));
-
-    expect(setGitTabSelection).toHaveBeenCalledWith(null);
-  });
-
-  it("open-in-Files-tab success runs the store openFile path and clears the selection", async () => {
-    const user = userEvent.setup();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ content: "hello", language: "typescript" }),
-      }),
-    );
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/foo.ts",
-      staged: false,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/foo.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    renderPanel();
-
-    await user.click(screen.getByTestId("git-diff-open-in-files"));
-
-    await waitFor(() => {
-      expect(openFile).toHaveBeenCalledWith(
-        "src/foo.ts",
-        "hello",
-        "typescript",
-        "ws-1",
-      );
-    });
-    expect(setActivePanelTab).toHaveBeenCalledWith("files");
-    expect(setGitTabSelection).toHaveBeenCalledWith(null);
-  });
-
-  it("open-in-Files-tab failure keeps the selection and shows the diff screen", async () => {
-    const user = userEvent.setup();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/foo.ts",
-      staged: false,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/foo.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    renderPanel();
-
-    await user.click(screen.getByTestId("git-diff-open-in-files"));
-
-    await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith("Could not open file");
-    });
-    // Fallback fired → selection must NOT be cleared, diff screen stays
-    expect(setGitTabSelection).not.toHaveBeenCalledWith(null);
-    expect(screen.getByTestId("git-tab-diff-screen")).toBeInTheDocument();
-  });
-
-  it("ignores and clears a stale cross-workspace selection, showing the list", () => {
-    storeState.gitTabSelection = {
-      workspaceId: "other-ws",
-      path: "src/foo.ts",
-      staged: false,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/changed.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    renderPanel();
-
-    // List view shown (not the diff screen), stale selection cleared via effect
-    expect(screen.queryByTestId("git-tab-diff-screen")).not.toBeInTheDocument();
-    expect(screen.getByText("Changes")).toBeInTheDocument();
-    expect(setGitTabSelection).toHaveBeenCalledWith(null);
-  });
-
-  it("auto-returns to the list when the selected path leaves every bucket", () => {
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/gone.ts",
-      staged: false,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/other.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    renderPanel();
-
-    expect(setGitTabSelection).toHaveBeenCalledWith(null);
-  });
-
-  it("passes staged: true to WorkbenchDiffView for a staged selection", () => {
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/foo.ts",
-      staged: true,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        staged: [{ path: "src/foo.ts", index: "M", workingDir: " " }],
-      }),
-    });
-
-    renderPanel();
-
-    expect(screen.getByTestId("side-panel-diff-view")).toHaveAttribute(
-      "data-staged",
-      "true",
-    );
-  });
-
-  it("Escape on the diff screen returns to the list without invoking the panel onEscape", () => {
-    const onEscape = vi.fn();
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/foo.ts",
-      staged: false,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/foo.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    render(
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <div
-            onKeyDown={(e) => {
-              if (e.key === "Escape") onEscape();
-            }}
-          >
-            <GitTabPanel workspaceId="ws-1" />
-          </div>
-        </TooltipProvider>
-      </QueryClientProvider>,
-    );
-
-    fireEvent.keyDown(screen.getByTestId("git-tab-diff-screen"), {
-      key: "Escape",
-    });
-
-    expect(setGitTabSelection).toHaveBeenCalledWith(null);
-    expect(onEscape).not.toHaveBeenCalled();
-  });
-
-  it("highlights the row matching the current selection with bg-accent", () => {
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/changed.ts",
-      staged: false,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/changed.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    renderPanel();
-
-    // The path appears both in the row and the diff header; find the row
-    // (the only match with a role=button ancestor).
-    const row = screen
-      .getAllByText("src/changed.ts")
-      .map((el) => el.closest('[role="button"]'))
-      .find((el): el is HTMLElement => el !== null);
-    expect(row).toBeDefined();
-    expect(row?.className).toContain("bg-accent");
-  });
-
-  it("shows the resize handle only when a selection is active", () => {
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/changed.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    const { unmount } = renderPanel();
-    expect(
-      screen.queryByTestId("git-list-resize-handle"),
-    ).not.toBeInTheDocument();
-    unmount();
-
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/changed.ts",
-      staged: false,
-    };
-    renderPanel();
-    expect(screen.getByTestId("git-list-resize-handle")).toBeInTheDocument();
-  });
-});
-
-describe("GitTabPanel with onSelectFile (list-only mode)", () => {
-  it.each([
-    {
-      section: "staged",
-      path: "src/staged.ts",
-      expected: { path: "src/staged.ts", staged: true },
-    },
-    {
-      section: "changes",
-      path: "src/changed.ts",
-      expected: { path: "src/changed.ts", staged: false },
-    },
-    {
-      section: "untracked",
-      path: "src/new.ts",
-      expected: { path: "src/new.ts", staged: false },
-    },
-  ])(
-    "hands a clicked $section row to onSelectFile instead of the inline diff",
-    async ({ path, expected }) => {
-      // Given
-      const onSelectFile = vi.fn<(selection: GitTabFileSelection) => void>();
-      mockUseGitStatus.mockReturnValue({
-        data: makeStatus({
-          staged: [{ path: "src/staged.ts", index: "M", workingDir: " " }],
-          unstaged: [{ path: "src/changed.ts", index: " ", workingDir: "M" }],
-          untracked: ["src/new.ts"],
-        }),
-      });
-      renderPanel(onSelectFile);
-
-      // When
-      await userEvent.setup().click(screen.getByText(path));
-
-      // Then
-      expect(onSelectFile).toHaveBeenCalledExactlyOnceWith(expected);
-      expect(setGitTabSelection).not.toHaveBeenCalled();
-      expect(
-        screen.queryByTestId("git-tab-diff-screen"),
-      ).not.toBeInTheDocument();
-    },
-  );
-
-  it("never shows the inline diff or its resize handle for a side-panel selection", () => {
-    // Given
-    storeState.gitTabSelection = {
-      workspaceId: "ws-1",
-      path: "src/changed.ts",
-      staged: false,
-    };
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        unstaged: [{ path: "src/changed.ts", index: " ", workingDir: "M" }],
-      }),
-    });
-
-    // When
-    renderPanel(vi.fn());
-
-    // Then
-    expect(screen.queryByTestId("git-tab-diff-screen")).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("git-list-resize-handle"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("side-panel-diff-view"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("still opens the diff dialog in dialog mode", async () => {
-    // Given
-    sidebarTabsOpenMode = "dialog";
-    const onSelectFile = vi.fn<(selection: GitTabFileSelection) => void>();
-    mockUseGitStatus.mockReturnValue({
-      data: makeStatus({
-        staged: [{ path: "src/staged.ts", index: "M", workingDir: " " }],
-      }),
-    });
-    renderPanel(onSelectFile);
-
-    // When
-    await userEvent.setup().click(screen.getByText("src/staged.ts"));
-
-    // Then
-    expect(await screen.findByTestId("git-diff-dialog")).toBeInTheDocument();
-    expect(onSelectFile).not.toHaveBeenCalled();
   });
 });

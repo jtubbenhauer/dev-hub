@@ -545,7 +545,9 @@ describe("ChatInterface without the legacy side panel", () => {
       />,
     );
 
-    expect(screen.queryByTestId("split-panel-toggle")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /side panel/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("leaves Cmd+\\ to the workbench", () => {

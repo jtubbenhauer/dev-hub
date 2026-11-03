@@ -147,3 +147,23 @@ describe("leader-key-defaults workbench navigation", () => {
     },
   );
 });
+
+describe("leader-key-defaults consistency", () => {
+  it("binds only built-in actions", () => {
+    const builtinIds = new Set(BUILTIN_ACTIONS.map((action) => action.id));
+
+    const unknownBindings = Object.keys(DEFAULT_LEADER_BINDINGS).filter(
+      (actionId) => !builtinIds.has(actionId),
+    );
+
+    expect(unknownBindings).toEqual([]);
+  });
+
+  it("gives every built-in action a default binding", () => {
+    const unboundActions = BUILTIN_ACTIONS.filter(
+      (action) => DEFAULT_LEADER_BINDINGS[action.id] === undefined,
+    ).map((action) => action.id);
+
+    expect(unboundActions).toEqual([]);
+  });
+});

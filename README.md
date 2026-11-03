@@ -4,15 +4,13 @@ Personal development command center — a self-hosted web app for managing works
 
 ## Features
 
-- **Dashboard** — live system stats (CPU, memory, disk, network) with sparkline charts, process list, quick-action grid, workspace overview, and ClickUp task widget
-- **AI Chat** — full chat interface powered by [OpenCode](https://opencode.ai), with model/agent selection, streaming responses, tool use display, session management, plan panel, and file context picker
-- **File Browser & Editor** — CodeMirror 6 editor with multi-language syntax highlighting, Vim mode, file tabs, tree navigation, and git status indicators
+- **Workbench** (the landing page at `/`): tabs for chats, files, diffs and terminals in split panes. Chats are powered by [OpenCode](https://opencode.ai) or OmO Native, and several can stream side by side. Files open in Monaco or Neovim. A right sidebar has Explorer (file tree and find in files), Changes, Compare (branch diff) and Status (workspace context, task progress, MCP servers, files the focused chat touched). The terminal drawer still opens with ``Ctrl+` ``.
+- **Dashboard** (at `/dashboard`): live system stats (CPU, memory, disk, network) with sparkline charts, process list, quick-action grid, workspace overview, and ClickUp task widget
 - **Git** — branch, commit, push, pull, fetch, stash, diff viewer, branch management, and commit log — all from the UI
 - **Code Review** — side-by-side diff viewer for branch diffs, uncommitted changes, or last commit. Track reviewed files with persistent checkmarks, auto-detect when files change underneath a review.
 - **Workspaces** — register local directories, clone repos, create git worktrees, connect to remote containers, or provision workspaces via external CLI providers
 - **Remote Workspaces** — operate on workspaces running in Docker containers on other machines. All file, git, and command operations work transparently over HTTP via a lightweight sidecar agent.
 - **Workspace Providers** — pluggable CLI tools (e.g., `rig-cli`) for creating and destroying remote workspaces. Register providers in settings, create workspaces with a click.
-- **Embedded Terminal** — run commands per-workspace with shell autocomplete, process management, output streaming, and command history
 - **ClickUp Integration** — browse tasks by view, search, view task details and comments, link tasks to workspaces
 - **GitHub Integration** — PR review via GitHub API proxy with personal access token
 - **Command Palette** — `Ctrl+K` for fuzzy-search navigation across the app
@@ -21,6 +19,34 @@ Personal development command center — a self-hosted web app for managing works
 - **Settings** — General preferences, AI model config, keybinding customization, per-workspace settings, integration tokens (GitHub, ClickUp), workspace provider management
 - **Auth** — password login with a first-run setup flow. Single-user design for self-hosted use.
 - **Mobile Responsive** — touch-friendly navigation, keyboard detection, resizable panels
+
+### Keyboard
+
+Workbench chords (only on the workbench; turn them off in Settings → Keybindings → Workbench shortcuts):
+
+| Keys                 | Action                                                                  |
+| -------------------- | ----------------------------------------------------------------------- |
+| `Ctrl+Shift+]` / `[` | Next / previous tab                                                     |
+| `Alt+1` … `Alt+9`    | Jump to tab N (`9` = last tab; Option on macOS; not inside text fields) |
+| `Ctrl+Alt+Arrow`     | Focus the adjacent split group                                          |
+| `Ctrl+Shift+\`       | Split right                                                             |
+| `Cmd+\` / `Ctrl+\`   | Toggle the right sidebar                                                |
+
+Workbench leader keys (press `<leader>`, then):
+
+| Keys            | Action                                   |
+| --------------- | ---------------------------------------- |
+| `]` / `[`       | Next / previous tab (repeatable)         |
+| `1` … `9`       | Go to tab N (`9` = last tab)             |
+| `q`             | Close tab                                |
+| `\|` / `-`      | Split right / split down                 |
+| `>` / `<`       | Move tab right / left                    |
+| `H` `L` `K` `J` | Focus the group left / right / up / down |
+| `o t` / `o c`   | New terminal / new chat                  |
+| `B`             | Toggle the right sidebar                 |
+| `g w`           | Go to the workbench                      |
+
+In a chat tab, `{` / `}` jump to the first / last user message.
 
 ## Prerequisites
 
@@ -209,7 +235,8 @@ Any reverse proxy or tunnel will work — nginx, Caddy, Tailscale Funnel, ngrok,
 
 - **Framework:** Next.js 16 (App Router) + React 19 + TypeScript
 - **UI:** Tailwind CSS v4, shadcn/ui, Radix UI
-- **Editor:** CodeMirror 6 (multi-language, Vim mode, diff/merge views)
+- **Workbench:** dockview-react (tabs and split groups)
+- **Editor:** Monaco or Neovim (multi-language, LSP, diff views)
 - **State:** Zustand + TanStack React Query
 - **Database:** SQLite (better-sqlite3 + Drizzle ORM)
 - **AI:** OpenCode CLI + SDK

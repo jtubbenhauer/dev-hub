@@ -291,7 +291,7 @@ function EditorSettingsCard() {
           toast.success(
             nextMode === "dialog"
               ? "Chat files will open in a dialog"
-              : "Chat files will open in the sidebar",
+              : "Chat files will open in a workbench tab",
           ),
       },
     );
@@ -306,8 +306,8 @@ function EditorSettingsCard() {
         onSuccess: () =>
           toast.success(
             nextMode === "dialog"
-              ? "Files/Git tab files will open in a dialog"
-              : "Files/Git tab files will open in the sidebar",
+              ? "Changes/Compare files will open in a dialog"
+              : "Changes/Compare files will open in a workbench tab",
           ),
       },
     );
@@ -584,7 +584,7 @@ function EditorSettingsCard() {
             <SelectContent>
               {CHAT_FILE_OPEN_MODES.map((mode) => (
                 <SelectItem key={mode} value={mode}>
-                  {mode === "sidebar" ? "Sidebar (default)" : "Dialog"}
+                  {mode === "sidebar" ? "Workbench tab" : "Dialog"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -594,11 +594,11 @@ function EditorSettingsCard() {
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-0.5">
             <Label htmlFor="chat-sidebar-tabs-open-mode">
-              Open Files/Git tab files in
+              Open Changes/Compare files in
             </Label>
             <p className="text-muted-foreground text-xs">
-              Choose where files clicked in the chat side panel&apos;s Files and
-              Git tabs appear
+              Choose where files clicked in the workbench sidebar&apos;s Changes
+              and Compare views appear
             </p>
           </div>
           <Select
@@ -612,7 +612,7 @@ function EditorSettingsCard() {
             <SelectContent>
               {CHAT_FILE_OPEN_MODES.map((mode) => (
                 <SelectItem key={mode} value={mode}>
-                  {mode === "sidebar" ? "Sidebar (default)" : "Dialog"}
+                  {mode === "sidebar" ? "Workbench tab" : "Dialog"}
                 </SelectItem>
               ))}
             </SelectContent>

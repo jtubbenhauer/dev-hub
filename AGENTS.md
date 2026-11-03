@@ -32,7 +32,9 @@ This repo is fully vibe-coded. Multiple people (and agents) push directly to `ma
 ```
 app/                    # Next.js App Router pages and API routes
   api/                  # API route handlers (REST-style)
-  chat/                 # Chat UI pages
+  page.tsx              # Workbench (tabs + splits)
+  dashboard/            # Dashboard page
+  chat/ files/ terminal/  # Redirect shims to the workbench
   git/                  # Git management pages
   workspaces/           # Workspace management pages
   tasks/                # Task/ClickUp integration pages
@@ -41,6 +43,7 @@ app/                    # Next.js App Router pages and API routes
 components/             # React components
   ui/                   # shadcn/ui base components
   chat/                 # Chat feature components
+  workbench/            # Workbench view, dockview tabs, context sidebar, chords
   git/                  # Git feature components (pr-panel, etc.)
   workspace/            # Workspace feature components
   dashboard/            # Dashboard components
@@ -51,6 +54,7 @@ stores/                 # Zustand stores (chat-store.ts, workspace-store.ts, etc
 lib/                    # Shared utilities and business logic
   db.ts                 # Database client (better-sqlite3 + Drizzle)
   git/                  # Git operations (worktrees, etc.)
+  workbench/            # Workbench openers, hrefs, tab descriptors, controller registry
   utils.ts              # cn() and shared helpers
 drizzle/
   schema.ts             # Database schema (single file, all tables)
@@ -231,6 +235,16 @@ This app is self-hosted (localhost). CDN, SEO, image optimisation, and compressi
 - **Agent package tests** run under `pnpm --filter @devhub/agent test`, which is part of `pnpm check`. Root vitest excludes `packages/**`.
 - **Env:** `OMO_BIN`, `OMO_CODING_AGENT_DIR`, `OMO_IDLE_DISCONNECT_MS`, `DEVHUB_AGENT_TOKEN`, `DEVHUB_AGENT_ALLOWED_ORIGINS` (see `.env.example`).
 - **Re-capture fixtures:** `pnpm tsx scripts/omo-capture-fixtures.ts` (needs omo installed and a configured model provider). See `tests/fixtures/omo/README.md`.
+
+## Workbench
+
+The landing page `/` is a dockview workbench with chat, file, diff and terminal tabs, split groups and a right context sidebar.
+
+- **Open things only through `lib/workbench/open-in-workbench.ts`** (`openFileInWorkbench`, `openChatInWorkbench`, `openTerminalInWorkbench`, `openDiffInWorkbench`, ...). Never `router.push` to `/chat`, `/files` or `/terminal`; those are redirect shims for old links.
+- **Use `WORKBENCH_PATH`** (`lib/workbench/workbench-href.ts`) and `createWorkbenchHref()` instead of hard-coding `/`.
+- **One tab per resource** (file path, chat session, terminal session, diff target) per workspace. Openers focus an existing tab instead of adding a duplicate.
+- **Page-scoped leader actions** (`chat:*`, `files:*`) are registered only by the focused tab. `workbench:*` actions are registered by `WorkbenchView`.
+- **Chat views read their session via `useChatViewSessionId()`**, never the global `activeSessionId`, so side-by-side chat tabs stay independent.
 
 ## Common Gotchas
 

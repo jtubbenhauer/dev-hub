@@ -52,7 +52,7 @@ import { ProblemsPanel } from "@/components/editor/problems-panel";
 import { LspStatusToggle } from "@/components/editor/lsp-status-toggle";
 import { useLspOpenFileHandler } from "@/hooks/use-lsp-open-file-handler";
 import { useWorkspaceFileTabs } from "@/hooks/use-workspace-file-tabs";
-import { openFileInFilesPage } from "@/lib/files/open-in-files-page";
+import { loadFileIntoEditorBuffer } from "@/lib/files/load-file-into-editor-buffer";
 import {
   buildFileSaveBody,
   resolveTabWorkspaceId,
@@ -144,7 +144,7 @@ function FilesContent() {
     (entry: FileTreeEntry) => {
       if (!activeWorkspaceId) return;
       expandPathToFile(activeWorkspaceId, entry.path);
-      void openFileInFilesPage({
+      void loadFileIntoEditorBuffer({
         workspaceId: activeWorkspaceId,
         path: entry.path,
         isFileTabsDisabled,
@@ -157,7 +157,7 @@ function FilesContent() {
     (filePath: string) => {
       if (activeWorkspaceId) {
         expandPathToFile(activeWorkspaceId, filePath);
-        void openFileInFilesPage({
+        void loadFileIntoEditorBuffer({
           workspaceId: activeWorkspaceId,
           path: filePath,
           isFileTabsDisabled,
@@ -173,7 +173,7 @@ function FilesContent() {
       shouldCommit: () => boolean,
     ): Promise<boolean> => {
       if (!activeWorkspaceId) return false;
-      const opened = await openFileInFilesPage({
+      const opened = await loadFileIntoEditorBuffer({
         workspaceId: activeWorkspaceId,
         path: relativePath,
         isFileTabsDisabled,
@@ -223,7 +223,7 @@ function FilesContent() {
     // Wait for saved tabs to restore so they cannot steal focus from the
     // requested file (image previews open without a fetch, so they finish first).
     void (restoreTabsPromiseRef.current ?? Promise.resolve()).then(() =>
-      openFileInFilesPage({
+      loadFileIntoEditorBuffer({
         workspaceId: activeWorkspaceId,
         path: openPath,
         isFileTabsDisabled,

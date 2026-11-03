@@ -7,7 +7,7 @@ import {
 import { resolveTabWorkspaceId } from "@/lib/files/save-request";
 import { didOpenFile } from "@/lib/files/open-result";
 
-export async function openFileInFilesPage(input: {
+export async function loadFileIntoEditorBuffer(input: {
   readonly workspaceId: string;
   readonly path: string;
   readonly isFileTabsDisabled: boolean;

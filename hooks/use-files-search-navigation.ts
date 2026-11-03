@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { isSearchMatchCurrent, type ContentSearchMatch } from "@devhub/shared";
 import { toast } from "sonner";
 import { isTextEditorLanguage } from "@/lib/file-preview";
-import { openFileInFilesPage } from "@/lib/files/open-in-files-page";
+import { loadFileIntoEditorBuffer } from "@/lib/files/load-file-into-editor-buffer";
 import { resolveTabWorkspaceId } from "@/lib/files/save-request";
 import { useContentSearchStore } from "@/stores/content-search-store";
 import { useEditorStore } from "@/stores/editor-store";
@@ -30,7 +30,7 @@ export function useFilesSearchNavigation(input: {
       const isCurrent = () =>
         token === navigationTokenRef.current &&
         useWorkspaceStore.getState().activeWorkspaceId === workspaceId;
-      const isOpened = await openFileInFilesPage({
+      const isOpened = await loadFileIntoEditorBuffer({
         workspaceId,
         path,
         isFileTabsDisabled,

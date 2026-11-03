@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { toast } from "sonner";
-import { openFileInFilesPage } from "@/lib/files/open-in-files-page";
+import { loadFileIntoEditorBuffer } from "@/lib/files/load-file-into-editor-buffer";
 import { useEditorStore } from "@/stores/editor-store";
 import {
   isPendingNavigationCurrent,
@@ -32,7 +32,7 @@ function seed(path: string, isDirty = false, workspaceId?: string) {
 const response = () =>
   Response.json({ content: "disk", language: "typescript" });
 
-describe("openFileInFilesPage", () => {
+describe("loadFileIntoEditorBuffer", () => {
   beforeEach(() => {
     useEditorStore.getState().closeAllFiles();
     vi.clearAllMocks();
@@ -58,7 +58,7 @@ describe("openFileInFilesPage", () => {
         }),
       );
 
-      expect(await openFileInFilesPage(input)).toBe(false);
+      expect(await loadFileIntoEditorBuffer(input)).toBe(false);
       expect(useEditorStore.getState()).toBe(before);
     },
   );
@@ -68,7 +68,7 @@ describe("openFileInFilesPage", () => {
     seed("clean.ts");
     const before = useEditorStore.getState();
 
-    expect(await openFileInFilesPage(input)).toBe(false);
+    expect(await loadFileIntoEditorBuffer(input)).toBe(false);
     expect(toast.warning).toHaveBeenCalledWith(
       "Save or discard your unsaved changes before opening another file",
     );
@@ -80,9 +80,9 @@ describe("openFileInFilesPage", () => {
     async (isFileTabsDisabled) => {
       seed(input.path, true);
 
-      expect(await openFileInFilesPage({ ...input, isFileTabsDisabled })).toBe(
-        true,
-      );
+      expect(
+        await loadFileIntoEditorBuffer({ ...input, isFileTabsDisabled }),
+      ).toBe(true);
       expect(useEditorStore.getState().openFiles).toEqual([
         expect.objectContaining({
           path: input.path,
@@ -98,7 +98,7 @@ describe("openFileInFilesPage", () => {
     seed("old.ts");
     seed("other.ts");
 
-    expect(await openFileInFilesPage(input)).toBe(true);
+    expect(await loadFileIntoEditorBuffer(input)).toBe(true);
     expect(useEditorStore.getState().openFiles).toEqual([
       expect.objectContaining({
         path: input.path,
@@ -113,7 +113,7 @@ describe("openFileInFilesPage", () => {
     seed(input.path, true);
 
     const before = useEditorStore.getState();
-    expect(await openFileInFilesPage(input)).toBe(false);
+    expect(await loadFileIntoEditorBuffer(input)).toBe(false);
     expect(useEditorStore.getState()).toBe(before);
     expect(toast.warning).toHaveBeenCalled();
   });
@@ -122,7 +122,7 @@ describe("openFileInFilesPage", () => {
     seed("other.ts", true);
 
     expect(
-      await openFileInFilesPage({ ...input, isFileTabsDisabled: false }),
+      await loadFileIntoEditorBuffer({ ...input, isFileTabsDisabled: false }),
     ).toBe(true);
     expect(
       useEditorStore.getState().openFiles.map((file) => file.path),
@@ -160,7 +160,7 @@ describe("openFileInFilesPage", () => {
         lineNumber: 1,
         column: 1,
       });
-      const a = openFileInFilesPage({
+      const a = loadFileIntoEditorBuffer({
         ...input,
         path: "a.ts",
         isFileTabsDisabled,
@@ -171,7 +171,7 @@ describe("openFileInFilesPage", () => {
         lineNumber: 1,
         column: 1,
       });
-      const b = openFileInFilesPage({
+      const b = loadFileIntoEditorBuffer({
         ...input,
         path: "b.ts",
         isFileTabsDisabled,
@@ -201,7 +201,7 @@ describe("openFileInFilesPage", () => {
       const fetchMock = vi.fn();
       vi.stubGlobal("fetch", fetchMock);
 
-      expect(await openFileInFilesPage({ ...input, path })).toBe(true);
+      expect(await loadFileIntoEditorBuffer({ ...input, path })).toBe(true);
       expect(fetchMock).not.toHaveBeenCalled();
       expect(useEditorStore.getState().openFiles).toEqual([
         expect.objectContaining({
@@ -221,9 +221,9 @@ describe("openFileInFilesPage", () => {
       vi.fn(async () => Response.json({ error: "binary" }, { status: 415 })),
     );
 
-    expect(await openFileInFilesPage({ ...input, path: "build/app.zip" })).toBe(
-      true,
-    );
+    expect(
+      await loadFileIntoEditorBuffer({ ...input, path: "build/app.zip" }),
+    ).toBe(true);
     expect(useEditorStore.getState().openFiles).toEqual([
       expect.objectContaining({
         path: "build/app.zip",
@@ -234,7 +234,7 @@ describe("openFileInFilesPage", () => {
   });
 
   it("opens new files with their workspace", async () => {
-    expect(await openFileInFilesPage(input)).toBe(true);
+    expect(await loadFileIntoEditorBuffer(input)).toBe(true);
     expect(useEditorStore.getState().openFiles[0].workspaceId).toBe(
       input.workspaceId,
     );
@@ -242,7 +242,7 @@ describe("openFileInFilesPage", () => {
   it("replaces clean foreign tabs", async () => {
     seed(input.path, false, "foreign");
     const previous = useEditorStore.getState().openFiles[0];
-    expect(await openFileInFilesPage(input)).toBe(true);
+    expect(await loadFileIntoEditorBuffer(input)).toBe(true);
     expect(useEditorStore.getState().openFiles[0]).toMatchObject({
       content: "disk",
       workspaceId: input.workspaceId,
@@ -255,7 +255,7 @@ describe("openFileInFilesPage", () => {
     seed(input.path, true, "foreign");
     const previous = useEditorStore.getState().openFiles[0];
     seed("other.ts");
-    expect(await openFileInFilesPage(input)).toBe(false);
+    expect(await loadFileIntoEditorBuffer(input)).toBe(false);
     expect(fetch).not.toHaveBeenCalled();
     expect(useEditorStore.getState().openFiles[0]).toBe(previous);
     expect(useEditorStore.getState().openFiles).toHaveLength(2);
@@ -271,7 +271,7 @@ describe("openFileInFilesPage", () => {
       useEditorStore.getState().updateFileContent(input.path, "typed");
       return response();
     });
-    expect(await openFileInFilesPage(input)).toBe(false);
+    expect(await loadFileIntoEditorBuffer(input)).toBe(false);
     expect(useEditorStore.getState().openFiles[0]).toMatchObject({
       content: "typed",
       workspaceId: "foreign",
@@ -282,7 +282,7 @@ describe("openFileInFilesPage", () => {
   it("reuses a same-workspace tab without fetching", async () => {
     seed(input.path, true, input.workspaceId);
     vi.mocked(fetch).mockRejectedValue(new Error("must not fetch"));
-    expect(await openFileInFilesPage(input)).toBe(true);
+    expect(await loadFileIntoEditorBuffer(input)).toBe(true);
     expect(fetch).not.toHaveBeenCalled();
     expect(useEditorStore.getState().openFiles[0].content).toBe("unsaved");
   });
@@ -290,7 +290,7 @@ describe("openFileInFilesPage", () => {
     seed("other.ts");
     const closeAll = vi.spyOn(useEditorStore.getState(), "closeAllFiles");
     const close = vi.spyOn(useEditorStore.getState(), "closeFile");
-    expect(await openFileInFilesPage(input)).toBe(true);
+    expect(await loadFileIntoEditorBuffer(input)).toBe(true);
     expect(close).toHaveBeenCalledWith("other.ts");
     expect(closeAll).not.toHaveBeenCalled();
     vi.restoreAllMocks();
@@ -299,7 +299,7 @@ describe("openFileInFilesPage", () => {
     seed(input.path, true, input.workspaceId);
     const before = useEditorStore.getState();
     expect(
-      await openFileInFilesPage({ ...input, shouldCommit: () => false }),
+      await loadFileIntoEditorBuffer({ ...input, shouldCommit: () => false }),
     ).toBe(false);
     expect(useEditorStore.getState()).toBe(before);
   });

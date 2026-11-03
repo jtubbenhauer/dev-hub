@@ -33,6 +33,24 @@ vi.mock("@/components/workbench/context-sidebar/explorer-view", () => ({
   ),
 }));
 
+vi.mock("@/components/workbench/context-sidebar/changes-view", () => ({
+  ChangesView: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="changes-view">changes:{workspaceId}</div>
+  ),
+}));
+
+vi.mock("@/components/workbench/context-sidebar/compare-view", () => ({
+  CompareView: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="compare-view">compare:{workspaceId}</div>
+  ),
+}));
+
+vi.mock("@/components/workbench/context-sidebar/status-view", () => ({
+  StatusView: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="status-view">status:{workspaceId}</div>
+  ),
+}));
+
 const WORKSPACE_ID = "ws-1";
 const VIEW_LABELS = ["Explorer", "Changes", "Compare", "Status"];
 
@@ -280,6 +298,9 @@ describe("ContextSidebar on mobile", () => {
       isOpen: true,
       isMobileSheetOpen: true,
     });
+    expect(
+      within(screen.getByRole("dialog")).getByTestId("status-view"),
+    ).toHaveTextContent(`status:${WORKSPACE_ID}`);
   });
 
   it("closes the sheet from its close button", async () => {

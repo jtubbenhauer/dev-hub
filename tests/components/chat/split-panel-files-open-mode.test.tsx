@@ -14,8 +14,8 @@ vi.mock("next/dynamic", () => ({
     },
 }));
 
-vi.mock("@/components/chat/side-panel-diff-view", () => ({
-  SidePanelDiffView: () => <div data-testid="side-panel-diff-view" />,
+vi.mock("@/components/workbench/workbench-diff-view", () => ({
+  WorkbenchDiffView: () => <div data-testid="side-panel-diff-view" />,
 }));
 
 vi.mock("@/hooks/use-git", () => ({

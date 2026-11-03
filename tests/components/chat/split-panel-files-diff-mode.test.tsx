@@ -19,8 +19,8 @@ vi.mock("next/dynamic", () => ({
 // Capture the props the diff surface receives so we can prove an outside-repo
 // path never reaches it.
 let diffProps: { workspaceId: string; filePath: string } | undefined;
-vi.mock("@/components/chat/side-panel-diff-view", () => ({
-  SidePanelDiffView: (props: { workspaceId: string; filePath: string }) => {
+vi.mock("@/components/workbench/workbench-diff-view", () => ({
+  WorkbenchDiffView: (props: { workspaceId: string; filePath: string }) => {
     diffProps = props;
     return <div data-testid="side-panel-diff-view">{props.filePath}</div>;
   },

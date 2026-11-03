@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
+import { WorkbenchDiffView } from "@/components/workbench/workbench-diff-view";
 import { useChatSidebarTabsOpenSetting } from "@/hooks/use-settings";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 
@@ -100,7 +100,7 @@ function GitDiffDialog({
         </DialogHeader>
         <div className="min-h-0 flex-1">
           {target && (
-            <SidePanelDiffView
+            <WorkbenchDiffView
               workspaceId={workspaceId}
               filePath={target.path}
               staged={target.staged}

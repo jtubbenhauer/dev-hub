@@ -30,8 +30,8 @@ vi.mock("@/stores/side-panel-store", () => ({
     selector({ setGitTabSelection, gitTabSelection: null }),
 }));
 
-vi.mock("@/components/chat/side-panel-diff-view", () => ({
-  SidePanelDiffView: () => <div data-testid="side-panel-diff-view" />,
+vi.mock("@/components/workbench/workbench-diff-view", () => ({
+  WorkbenchDiffView: () => <div data-testid="side-panel-diff-view" />,
 }));
 
 vi.mock("@/components/chat/git-sync-controls", () => ({

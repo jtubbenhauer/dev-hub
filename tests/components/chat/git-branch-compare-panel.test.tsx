@@ -12,8 +12,8 @@ vi.mock("@/hooks/use-git", () => ({
   useGitChangedFiles: (...args: unknown[]) => useGitChangedFilesMock(...args),
 }));
 
-vi.mock("@/components/chat/side-panel-diff-view", () => ({
-  SidePanelDiffView: (props: {
+vi.mock("@/components/workbench/workbench-diff-view", () => ({
+  WorkbenchDiffView: (props: {
     workspaceId: string;
     filePath: string;
     baseRef?: string | null;

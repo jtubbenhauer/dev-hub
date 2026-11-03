@@ -34,7 +34,7 @@ import {
 import { attachCommentToChat } from "@/lib/comment-chat-bridge";
 import { useLintOnSave } from "@/hooks/use-diagnostics";
 import type { FileTreeEntry, FileComment } from "@/types";
-import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
+import { WorkbenchDiffView } from "@/components/workbench/workbench-diff-view";
 import { FileViewToggle } from "@/components/chat/file-view-toggle";
 import { SplitPanelActiveFile } from "@/components/editor/split-panel-active-file";
 import { useEditorTabMetadataSelector } from "@/hooks/use-editor-tab-metadata";
@@ -598,7 +598,7 @@ export function SplitPanelFiles({
                   data-testid="split-panel-diff"
                 >
                   <div className="min-w-0 flex-1">
-                    <SidePanelDiffView
+                    <WorkbenchDiffView
                       workspaceId={workspaceId}
                       filePath={repoRelativeKey}
                     />

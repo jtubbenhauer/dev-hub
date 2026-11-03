@@ -72,8 +72,8 @@ vi.mock("@/stores/side-panel-store", () => {
   return { useSidePanelStore };
 });
 
-vi.mock("@/components/chat/side-panel-diff-view", () => ({
-  SidePanelDiffView: (props: {
+vi.mock("@/components/workbench/workbench-diff-view", () => ({
+  WorkbenchDiffView: (props: {
     workspaceId: string;
     filePath: string;
     staged?: boolean;
@@ -353,7 +353,7 @@ describe("GitTabPanel", () => {
 
   // ---- Inline diff screen (TODO 11) ----
 
-  it("renders the diff screen with SidePanelDiffView receiving the selection path + staged", () => {
+  it("renders the diff screen with WorkbenchDiffView receiving the selection path + staged", () => {
     storeState.gitTabSelection = {
       workspaceId: "ws-1",
       path: "src/foo.ts",
@@ -492,7 +492,7 @@ describe("GitTabPanel", () => {
     expect(setGitTabSelection).toHaveBeenCalledWith(null);
   });
 
-  it("passes staged: true to SidePanelDiffView for a staged selection", () => {
+  it("passes staged: true to WorkbenchDiffView for a staged selection", () => {
     storeState.gitTabSelection = {
       workspaceId: "ws-1",
       path: "src/foo.ts",

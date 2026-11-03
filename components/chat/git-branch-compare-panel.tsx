@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { ArrowUpDown, FolderTree, RefreshCw, X } from "lucide-react";
 
-import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
+import { WorkbenchDiffView } from "@/components/workbench/workbench-diff-view";
 import { useGitDiffDialog } from "@/components/chat/git-diff-dialog";
 import { ChangedFileList } from "@/components/git/changed-file-list";
 import { Button } from "@/components/ui/button";
@@ -307,7 +307,7 @@ export function GitBranchComparePanel({
             </span>
           </div>
           <div className="min-h-0 flex-1">
-            <SidePanelDiffView
+            <WorkbenchDiffView
               workspaceId={workspaceId}
               filePath={activeSelectedPath}
               baseRef={baseRef}

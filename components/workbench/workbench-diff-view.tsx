@@ -3,8 +3,8 @@
 import dynamic from "next/dynamic";
 import { useGitFileContent, useGitFileContentAtRef } from "@/hooks/use-git";
 
-// Heavy Monaco editor — load via next/dynamic (never a static import in chat
-// components). Mirrors components/git/pr-diff-editor.tsx.
+// Heavy Monaco editor — load via next/dynamic (never a static import here).
+// Mirrors components/git/pr-diff-editor.tsx.
 const MonacoReviewEditor = dynamic(
   () =>
     import("@/components/review/monaco-review-editor").then(
@@ -16,9 +16,10 @@ const MonacoReviewEditor = dynamic(
   },
 );
 
-// Read-only diff surface for the chat side panel (Git tab). filePath MUST be
-// repo-relative — callers guarantee this; we never forward an absolute path.
-export function SidePanelDiffView({
+// Read-only diff surface for workbench diff tabs and the chat Git panels.
+// filePath MUST be repo-relative — callers guarantee this; we never forward an
+// absolute path.
+export function WorkbenchDiffView({
   workspaceId,
   filePath,
   staged = false,

@@ -38,7 +38,7 @@ vi.mock("@/hooks/use-git", () => ({
     useGitFileContentAtRefMock(...args),
 }));
 
-import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
+import { WorkbenchDiffView } from "@/components/workbench/workbench-diff-view";
 
 interface HookResult {
   data:
@@ -80,11 +80,11 @@ beforeEach(() => {
   });
 });
 
-describe("SidePanelDiffView", () => {
+describe("WorkbenchDiffView", () => {
   it("renders loading while the hook is loading", () => {
     mockHook({ isLoading: true });
     render(
-      <SidePanelDiffView workspaceId="ws1" filePath="a.ts" staged={false} />,
+      <WorkbenchDiffView workspaceId="ws1" filePath="a.ts" staged={false} />,
     );
     expect(screen.getByTestId("diff-loading")).toBeInTheDocument();
     expect(
@@ -95,7 +95,7 @@ describe("SidePanelDiffView", () => {
   it("renders MonacoReviewEditor on success with read-only props", async () => {
     mockHook({ data: fileContent("a.ts") });
     render(
-      <SidePanelDiffView workspaceId="ws1" filePath="a.ts" staged={false} />,
+      <WorkbenchDiffView workspaceId="ws1" filePath="a.ts" staged={false} />,
     );
     await screen.findByTestId("monaco-review-editor");
     expect(capturedProps?.showToolbar).toBe(false);
@@ -110,7 +110,7 @@ describe("SidePanelDiffView", () => {
     // keepPreviousData hands us the PREVIOUS file (a.ts) while we asked for b.ts.
     mockHook({ data: fileContent("a.ts"), isPlaceholderData: true });
     render(
-      <SidePanelDiffView workspaceId="ws1" filePath="b.ts" staged={false} />,
+      <WorkbenchDiffView workspaceId="ws1" filePath="b.ts" staged={false} />,
     );
     expect(screen.getByTestId("diff-loading")).toBeInTheDocument();
     expect(
@@ -121,7 +121,7 @@ describe("SidePanelDiffView", () => {
   it("shows loading when data.path does not match filePath (placeholder false)", () => {
     mockHook({ data: fileContent("a.ts"), isPlaceholderData: false });
     render(
-      <SidePanelDiffView workspaceId="ws1" filePath="b.ts" staged={false} />,
+      <WorkbenchDiffView workspaceId="ws1" filePath="b.ts" staged={false} />,
     );
     expect(screen.getByTestId("diff-loading")).toBeInTheDocument();
     expect(
@@ -139,7 +139,7 @@ describe("SidePanelDiffView", () => {
       },
     });
     render(
-      <SidePanelDiffView workspaceId="ws1" filePath="new.ts" staged={false} />,
+      <WorkbenchDiffView workspaceId="ws1" filePath="new.ts" staged={false} />,
     );
     await screen.findByTestId("monaco-review-editor");
     const passed = capturedProps?.fileContent as {
@@ -153,7 +153,7 @@ describe("SidePanelDiffView", () => {
   it("renders the error state when error is set AND data is undefined (error-first)", () => {
     mockHook({ error: new Error("boom"), data: undefined });
     render(
-      <SidePanelDiffView workspaceId="ws1" filePath="a.ts" staged={false} />,
+      <WorkbenchDiffView workspaceId="ws1" filePath="a.ts" staged={false} />,
     );
     expect(screen.getByTestId("diff-error")).toHaveTextContent("boom");
     expect(screen.queryByTestId("diff-loading")).not.toBeInTheDocument();
@@ -165,7 +165,7 @@ describe("SidePanelDiffView", () => {
   it("renders loading when data is undefined with no error (no crash)", () => {
     mockHook({ data: undefined, error: null });
     render(
-      <SidePanelDiffView workspaceId="ws1" filePath="a.ts" staged={false} />,
+      <WorkbenchDiffView workspaceId="ws1" filePath="a.ts" staged={false} />,
     );
     expect(screen.getByTestId("diff-loading")).toBeInTheDocument();
     expect(screen.queryByTestId("diff-error")).not.toBeInTheDocument();
@@ -185,7 +185,7 @@ describe("SidePanelDiffView", () => {
       error: null,
     });
     render(
-      <SidePanelDiffView workspaceId="ws1" filePath="a.ts" baseRef="main" />,
+      <WorkbenchDiffView workspaceId="ws1" filePath="a.ts" baseRef="main" />,
     );
     await screen.findByTestId("monaco-review-editor");
     expect(useGitFileContentAtRefMock).toHaveBeenCalledWith(
@@ -200,7 +200,7 @@ describe("SidePanelDiffView", () => {
 
   it("disables the ref-based query when baseRef is not set", () => {
     mockHook({ isLoading: true });
-    render(<SidePanelDiffView workspaceId="ws1" filePath="a.ts" />);
+    render(<WorkbenchDiffView workspaceId="ws1" filePath="a.ts" />);
     expect(useGitFileContentAtRefMock).toHaveBeenCalledWith(null, "a.ts", null);
   });
 });

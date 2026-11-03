@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2, Minus, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { SidePanelDiffView } from "@/components/chat/side-panel-diff-view";
+import { WorkbenchDiffView } from "@/components/workbench/workbench-diff-view";
 import { GitSyncControls } from "@/components/chat/git-sync-controls";
 import { GitRevertDialog } from "@/components/chat/git-revert-dialog";
 import { GitRevertAction } from "@/components/chat/git-revert-action";
@@ -616,7 +616,7 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
             </Button>
           </div>
           <div className="min-h-0 flex-1">
-            <SidePanelDiffView
+            <WorkbenchDiffView
               workspaceId={workspaceId}
               filePath={selection.path}
               staged={selection.staged}

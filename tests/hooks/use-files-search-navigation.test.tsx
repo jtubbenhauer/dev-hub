@@ -3,12 +3,21 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { useFilesSearchNavigation } from "@/hooks/use-files-search-navigation";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 import { buildMatch } from "@/packages/shared/src/content-search/preview";
 import { useContentSearchStore } from "@/stores/content-search-store";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import {
+  mountFakeWorkbench,
+  type FakeWorkbenchController,
+} from "@/tests/helpers/fake-workbench-controller";
 import type { OpenFile } from "@/types";
 
+const routerPush = vi.hoisted(() => vi.fn<(href: string) => void>());
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
 vi.mock("sonner", () => ({
   toast: { warning: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
@@ -31,6 +40,7 @@ const input = {
   isMobile: false,
 };
 const fetchMock = vi.fn<typeof fetch>();
+let workbench: { controller: FakeWorkbenchController; unmount: () => void };
 const previewCases = [
   {
     path: "docs/a.md",
@@ -81,8 +91,10 @@ beforeEach(() => {
     csvPreviewPath: null,
     workspaceFileStates: {},
   });
+  workbench = mountFakeWorkbench("ws-1");
 });
 afterEach(() => {
+  workbench.unmount();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -125,6 +137,46 @@ describe("useFilesSearchNavigation", () => {
     expect(reveal).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ path: "b.ts" }),
     );
+    expect(workbench.controller.openTab).toHaveBeenCalledExactlyOnceWith({
+      kind: "file",
+      workspaceId: "ws-1",
+      path: "b.ts",
+    });
+  });
+
+  it("opens the match as a workbench file tab before revealing it", async () => {
+    // Given
+    const reveal = vi.spyOn(useEditorStore.getState(), "requestReveal");
+    const { result } = renderHook(() => useFilesSearchNavigation(input));
+    // When
+    await act(() => result.current.handleOpenMatch("src/a.ts", match));
+    // Then
+    expect(workbench.controller.openTab).toHaveBeenCalledExactlyOnceWith({
+      kind: "file",
+      workspaceId: "ws-1",
+      path: "src/a.ts",
+    });
+    const [openOrder] = workbench.controller.openTab.mock.invocationCallOrder;
+    const [revealOrder] = reveal.mock.invocationCallOrder;
+    expect(openOrder).toBeLessThan(revealOrder ?? -1);
+  });
+
+  it("navigates to the workbench file intent when the workbench is not mounted", async () => {
+    // Given
+    workbench.unmount();
+    const { result } = renderHook(() => useFilesSearchNavigation(input));
+    // When
+    await act(() => result.current.handleOpenMatch("src/a.ts", match));
+    // Then
+    expect(routerPush).toHaveBeenCalledExactlyOnceWith(
+      createWorkbenchHref({
+        open: "file",
+        workspaceId: "ws-1",
+        path: "src/a.ts",
+      }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().pendingReveal).toBeNull();
   });
 
   it.each(previewCases)(
@@ -157,6 +209,11 @@ describe("useFilesSearchNavigation", () => {
       expect(reveal).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ path: "src/b.ts" }),
       );
+      expect(workbench.controller.openTab).toHaveBeenCalledExactlyOnceWith({
+        kind: "file",
+        workspaceId: "ws-1",
+        path: "src/b.ts",
+      });
     },
   );
 
@@ -210,6 +267,11 @@ describe("useFilesSearchNavigation", () => {
       // Then
       expect(useEditorStore.getState().pendingReveal).toBeNull();
       expect(useEditorStore.getState().openFiles).toEqual(tab ? [tab] : []);
+      // An already loaded buffer opens its tab before the switch; a pending
+      // read is dropped before any tab opens.
+      expect(workbench.controller.openTab).toHaveBeenCalledTimes(
+        isVerification ? 1 : 0,
+      );
     },
   );
 

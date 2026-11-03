@@ -14,6 +14,10 @@ import { useChatFileDialogStore as store } from "@/stores/chat-file-dialog-store
 let isLspEnabled = false;
 vi.mock("@/hooks/use-settings", () => ({
   useLspEnabledSetting: () => ({ isLspEnabled }),
+  useFileTabsSetting: () => ({ isFileTabsDisabled: false, isLoading: false }),
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/components/editor/editor-switcher", () => ({

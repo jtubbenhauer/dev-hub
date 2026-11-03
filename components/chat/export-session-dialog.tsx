@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type SubmitEvent } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,9 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { openFileInSidePanel } from "@/lib/side-panel-open-file";
+import { useFileTabsSetting } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
-import { useSidePanelStore } from "@/stores/side-panel-store";
+import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
+import { useEditorStore } from "@/stores/editor-store";
 
 interface ExportSessionDialogProps {
   readonly workspaceId: string;
@@ -71,8 +73,8 @@ function parseExportResponse(isOk: boolean, payload: unknown): ExportResponse {
 }
 
 // dev-hub's take on the TUI's /export dialog: same options and defaults, but
-// the saved file opens in the side panel instead of $EDITOR, and "Open without
-// saving" shows a read-only preview instead of a throwaway editor buffer.
+// the saved file opens as a workbench tab instead of $EDITOR, and "Open
+// without saving" shows a read-only preview instead of a throwaway buffer.
 export function ExportSessionDialog({
   workspaceId,
   sessionId,
@@ -90,6 +92,8 @@ export function ExportSessionDialog({
     openWithoutSaving: false,
   });
   const [isExporting, setIsExporting] = useState(false);
+  const router = useRouter();
+  const { isFileTabsDisabled } = useFileTabsSetting();
   const [previewMarkdown, setPreviewMarkdown] = useState<string | null>(null);
 
   const trimmedFilename = filename.trim();
@@ -121,17 +125,22 @@ export function ExportSessionDialog({
         case "preview":
           setPreviewMarkdown(result.markdown);
           return;
-        case "saved":
+        case "saved": {
           toast.success(`Session exported to ${result.path}`);
           onClose();
           // A tab already showing this file would otherwise keep the old text.
-          await useSidePanelStore
+          await useEditorStore
             .getState()
             .reloadFileFromDisk(workspaceId, result.path);
-          await openFileInSidePanel(workspaceId, result.path, () =>
-            toast.error("Could not open file"),
-          );
+          const isOpened = await openFileInWorkbench({
+            workspaceId,
+            path: result.path,
+            isFileTabsDisabled,
+            navigate: (href) => router.push(href),
+          });
+          if (!isOpened) toast.error("Could not open file");
           return;
+        }
         default: {
           const unhandled: never = result;
           throw new Error(`Unhandled export result: ${String(unhandled)}`);
@@ -159,7 +168,7 @@ export function ExportSessionDialog({
               <DialogTitle>Export session transcript</DialogTitle>
               <DialogDescription>
                 Saves the full conversation as Markdown in the workspace root
-                and opens it in the side panel.
+                and opens it in a tab.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-2">

@@ -3,8 +3,12 @@ import {
   getFindInFilesPrefill,
   openFindInFiles,
 } from "@/lib/files/open-find-in-files";
+import {
+  createWorkbenchHref,
+  WORKBENCH_PATH,
+} from "@/lib/workbench/workbench-href";
 import { useContentSearchStore } from "@/stores/content-search-store";
-import { useEditorStore } from "@/stores/editor-store";
+import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 
 interface FakeMonacoEditor {
   hasTextFocus: () => boolean;
@@ -60,7 +64,7 @@ beforeEach(() => {
     sidebarView: "explorer",
     pendingFocus: false,
   });
-  useEditorStore.setState({ isFileTreeOpen: false });
+  useContextSidebarStore.setState({ isOpen: false, view: "status" });
 });
 
 afterEach(() => {
@@ -169,12 +173,17 @@ describe("getFindInFilesPrefill", () => {
 });
 
 describe("openFindInFiles", () => {
+  const SEARCH_HREF = createWorkbenchHref({
+    open: "search",
+    workspaceId: null,
+  });
+
   it("requests the search view with the prefill", () => {
     // Given
     selectDomText("needle");
 
     // When
-    openFindInFiles({ pathname: "/files", push: vi.fn() });
+    openFindInFiles({ pathname: WORKBENCH_PATH, push: vi.fn() });
 
     // Then
     const state = useContentSearchStore.getState();
@@ -183,33 +192,38 @@ describe("openFindInFiles", () => {
     expect(state.pendingFocus).toBe(true);
   });
 
-  it("opens the file tree sidebar", () => {
-    // Given the file tree is closed
+  it("opens the explorer view of the context sidebar", () => {
+    // Given the context sidebar is closed on another view
 
     // When
-    openFindInFiles({ pathname: "/files", push: vi.fn() });
+    openFindInFiles({ pathname: WORKBENCH_PATH, push: vi.fn() });
 
     // Then
-    expect(useEditorStore.getState().isFileTreeOpen).toBe(true);
+    const { isOpen, view } = useContextSidebarStore.getState();
+    expect(isOpen).toBe(true);
+    expect(view).toBe("explorer");
   });
 
-  it("navigates to /files from another page", () => {
+  it.each(["/chat", "/files", "/git"])(
+    "navigates to the workbench search intent from %s",
+    (pathname) => {
+      // Given
+      const push = vi.fn();
+
+      // When
+      openFindInFiles({ pathname, push });
+
+      // Then
+      expect(push).toHaveBeenCalledExactlyOnceWith(SEARCH_HREF);
+    },
+  );
+
+  it("does not navigate when already on the workbench", () => {
     // Given
     const push = vi.fn();
 
     // When
-    openFindInFiles({ pathname: "/chat", push });
-
-    // Then
-    expect(push).toHaveBeenCalledWith("/files");
-  });
-
-  it("does not navigate when already on /files", () => {
-    // Given
-    const push = vi.fn();
-
-    // When
-    openFindInFiles({ pathname: "/files", push });
+    openFindInFiles({ pathname: WORKBENCH_PATH, push });
 
     // Then
     expect(push).not.toHaveBeenCalled();

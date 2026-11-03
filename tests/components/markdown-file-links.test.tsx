@@ -7,7 +7,8 @@ import {
   parseFileLinkHref,
   resolveWorkspaceFilePath,
 } from "@/components/chat/file-path-code";
-import { openFileInSidePanel } from "@/lib/side-panel-open-file";
+import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 
 vi.mock("@/hooks/use-mobile", () => ({
   useIsMobile: () => false,
@@ -18,6 +19,7 @@ vi.mock("@/hooks/use-settings", () => ({
     fileOpenMode: "sidebar",
     isLoading: false,
   }),
+  useFileTabsSetting: () => ({ isFileTabsDisabled: false, isLoading: false }),
 }));
 
 vi.mock("@/stores/workspace-store", () => {
@@ -35,8 +37,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("@/lib/side-panel-open-file", () => ({
-  openFileInSidePanel: vi.fn(),
+vi.mock("@/lib/workbench/open-in-workbench", () => ({
+  openFileInWorkbench: vi.fn(async () => true),
 }));
 
 // The markdown renderer is lazy; load it once so renders are synchronous.
@@ -97,7 +99,7 @@ describe("resolveWorkspaceFilePath", () => {
 
 describe("MarkdownContent - file links", () => {
   beforeEach(() => {
-    vi.mocked(openFileInSidePanel).mockClear();
+    vi.mocked(openFileInWorkbench).mockClear();
   });
 
   it.each([
@@ -109,23 +111,35 @@ describe("MarkdownContent - file links", () => {
   ])("renders %s as an editor link", (content) => {
     const anchor = renderSingleLink(content);
     expect(anchor.getAttribute("href")).toBe(
-      "/files?open=docs%2Fopen-items.md",
+      createWorkbenchHref({
+        open: "file",
+        workspaceId: "ws-1",
+        path: "docs/open-items.md",
+      }),
     );
   });
 
-  it("opens the file in the side panel instead of navigating", async () => {
+  it("opens the file as a workbench tab instead of navigating", async () => {
     const anchor = renderSingleLink("[docs/open-items.md](docs/open-items.md)");
     await userEvent.click(anchor);
-    expect(openFileInSidePanel).toHaveBeenCalledWith(
-      "ws-1",
-      "docs/open-items.md",
-      expect.any(Function),
+    expect(openFileInWorkbench).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        workspaceId: "ws-1",
+        path: "docs/open-items.md",
+        isFileTabsDisabled: false,
+      }),
     );
   });
 
-  it("links folders to the file tree", () => {
+  it("links folders to the workbench explorer", () => {
     const anchor = renderSingleLink("[chat](components/chat/)");
-    expect(anchor.getAttribute("href")).toBe("/files?expand=components%2Fchat");
+    expect(anchor.getAttribute("href")).toBe(
+      createWorkbenchHref({
+        open: "folder",
+        workspaceId: "ws-1",
+        path: "components/chat",
+      }),
+    );
   });
 
   it("leaves external links untouched", () => {

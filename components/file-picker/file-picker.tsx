@@ -13,7 +13,8 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { openFileInSidePanel } from "@/lib/side-panel-open-file";
+import { useFileTabsSetting } from "@/hooks/use-settings";
+import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
 import {
   fuzzySearch,
   basenamePositions,
@@ -138,6 +139,7 @@ export function FilePickerDialog() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
+  const { isFileTabsDisabled } = useFileTabsSetting();
 
   // Local workspace state — only mutates global store when a file is selected
   const [pickerWorkspaceId, setPickerWorkspaceId] = useState<string | null>(
@@ -192,29 +194,28 @@ export function FilePickerDialog() {
 
   const handleSelect = useCallback(
     (match: FuzzyMatch) => {
+      const workspaceId = pickerWorkspaceId ?? activeWorkspaceId;
+      if (!workspaceId) return;
       // Switch global workspace only when actually opening a file
-      if (pickerWorkspaceId && pickerWorkspaceId !== activeWorkspaceId) {
-        setActiveWorkspaceId(pickerWorkspaceId);
+      if (workspaceId !== activeWorkspaceId) {
+        setActiveWorkspaceId(workspaceId);
       }
       close();
-      router.push(`/files?open=${encodeURIComponent(match.path)}`);
+      void openFileInWorkbench({
+        workspaceId,
+        path: match.path,
+        isFileTabsDisabled,
+        navigate: (href) => router.push(href),
+      });
     },
-    [close, router, pickerWorkspaceId, activeWorkspaceId, setActiveWorkspaceId],
-  );
-
-  const handleSelectInPanel = useCallback(
-    (match: FuzzyMatch) => {
-      const wsId = pickerWorkspaceId ?? activeWorkspaceId;
-      if (!wsId) return;
-      if (pickerWorkspaceId && pickerWorkspaceId !== activeWorkspaceId) {
-        setActiveWorkspaceId(pickerWorkspaceId);
-      }
-      close();
-      openFileInSidePanel(wsId, match.path, () =>
-        router.push(`/files?open=${encodeURIComponent(match.path)}`),
-      );
-    },
-    [close, router, pickerWorkspaceId, activeWorkspaceId, setActiveWorkspaceId],
+    [
+      close,
+      router,
+      pickerWorkspaceId,
+      activeWorkspaceId,
+      setActiveWorkspaceId,
+      isFileTabsDisabled,
+    ],
   );
 
   const handleKeyDown = useCallback(
@@ -237,11 +238,7 @@ export function FilePickerDialog() {
         case "Enter":
           e.preventDefault();
           if (results[selectedIndex]) {
-            if (e.metaKey || e.ctrlKey) {
-              handleSelectInPanel(results[selectedIndex]);
-            } else {
-              handleSelect(results[selectedIndex]);
-            }
+            handleSelect(results[selectedIndex]);
           }
           break;
         case "Escape":
@@ -269,7 +266,6 @@ export function FilePickerDialog() {
       results,
       selectedIndex,
       handleSelect,
-      handleSelectInPanel,
       close,
       workspaces,
       pickerWorkspaceId,
@@ -361,13 +357,7 @@ export function FilePickerDialog() {
                         ? "bg-accent text-accent-foreground"
                         : "hover:bg-accent/50",
                     )}
-                    onClick={(e) => {
-                      if (e.metaKey || e.ctrlKey) {
-                        handleSelectInPanel(match);
-                      } else {
-                        handleSelect(match);
-                      }
-                    }}
+                    onClick={() => handleSelect(match)}
                     onMouseEnter={() => setSelectedIndex(index)}
                   >
                     <File className="text-muted-foreground size-3.5 shrink-0" />
@@ -398,7 +388,6 @@ export function FilePickerDialog() {
         <div className="text-muted-foreground/60 flex items-center gap-3 border-t px-3 py-1.5 text-[10px]">
           <span>↑↓ navigate</span>
           <span>↵ open</span>
-          <span>⌘↵ side panel</span>
           <span>esc close</span>
           {workspaces.length > 1 && <span>tab switch workspace</span>}
         </div>

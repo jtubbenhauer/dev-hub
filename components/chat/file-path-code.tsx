@@ -5,11 +5,15 @@ import { useRouter } from "next/navigation";
 import { defaultUrlTransform } from "react-markdown";
 import { FileCode2, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { openFileInSidePanel } from "@/lib/side-panel-open-file";
-import { useChatFileOpenSetting } from "@/hooks/use-settings";
+import {
+  useChatFileOpenSetting,
+  useFileTabsSetting,
+} from "@/hooks/use-settings";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
+import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
+import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 
 const FILE_EXTENSIONS = new Set([
   ".ts",
@@ -183,21 +187,28 @@ export function resolveWorkspaceFilePath(
 
 function useOpenCodePath(path: string) {
   const router = useRouter();
-  const isMobile = useIsMobile();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { fileOpenMode } = useChatFileOpenSetting();
+  const { isFileTabsDisabled } = useFileTabsSetting();
 
   const cleanPath = stripPath(path);
   const isFolder = !isFilePath(path) && isFolderPath(path);
-  const href = isFolder
-    ? `/files?expand=${encodeURIComponent(cleanPath)}`
-    : `/files?open=${encodeURIComponent(cleanPath)}`;
+  const href = createWorkbenchHref({
+    open: isFolder ? "folder" : "file",
+    workspaceId: activeWorkspaceId,
+    path: cleanPath,
+  });
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
       e.preventDefault();
-      if (isFolder || (isMobile && fileOpenMode === "sidebar")) {
-        router.push(href);
+      if (isFolder) {
+        const controller = getWorkbenchController();
+        if (controller?.workspaceId === activeWorkspaceId) {
+          controller.revealFolder(cleanPath);
+        } else {
+          router.push(href);
+        }
         return;
       }
       if (fileOpenMode === "dialog") {
@@ -208,18 +219,25 @@ function useOpenCodePath(path: string) {
           );
         return;
       }
-      await openFileInSidePanel(activeWorkspaceId ?? "", cleanPath, () =>
-        router.push(href),
-      );
+      if (activeWorkspaceId === null) {
+        router.push(href);
+        return;
+      }
+      await openFileInWorkbench({
+        workspaceId: activeWorkspaceId,
+        path: cleanPath,
+        isFileTabsDisabled,
+        navigate: (target) => router.push(target),
+      });
     },
     [
       router,
       href,
-      isMobile,
       isFolder,
       fileOpenMode,
       cleanPath,
       activeWorkspaceId,
+      isFileTabsDisabled,
     ],
   );
 

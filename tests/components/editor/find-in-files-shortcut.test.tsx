@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render } from "@testing-library/react";
 import { FindInFilesShortcut } from "@/components/editor/find-in-files-shortcut";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 import { useContentSearchStore } from "@/stores/content-search-store";
 
 const push = vi.fn();
@@ -65,7 +66,9 @@ describe("find in files shortcut", () => {
     // Then
     expect(isSearchRequested()).toBe(true);
     expect(useContentSearchStore.getState().pattern).toBe("needle");
-    expect(push).toHaveBeenCalledWith("/files");
+    expect(push).toHaveBeenCalledWith(
+      createWorkbenchHref({ open: "search", workspaceId: null }),
+    );
     expect(event.defaultPrevented).toBe(true);
   });
 

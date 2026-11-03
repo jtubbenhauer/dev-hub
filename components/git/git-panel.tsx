@@ -90,6 +90,8 @@ import {
   useGitFileDiffs,
 } from "@/hooks/use-git";
 import { useGitFolderGrouping } from "@/hooks/use-git-folder-grouping";
+import { useFileTabsSetting } from "@/hooks/use-settings";
+import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
 import type { Workspace } from "@/types";
 
 type BottomPanel = "branches" | "log" | "stashes" | null;
@@ -120,6 +122,7 @@ interface GitPanelProps {
 
 export function GitPanel({ workspace, onClose }: GitPanelProps) {
   const router = useRouter();
+  const { isFileTabsDisabled } = useFileTabsSetting();
   const [selectedFile, setSelectedFile] = useState<string | null>(() => {
     try {
       const pickerFile = localStorage.getItem(
@@ -1159,9 +1162,12 @@ export function GitPanel({ workspace, onClose }: GitPanelProps) {
               deletions={selectedFileDiffStat?.deletions}
               onOpenInEditor={() => {
                 if (selectedFile) {
-                  router.push(
-                    `/files?open=${encodeURIComponent(selectedFile)}`,
-                  );
+                  void openFileInWorkbench({
+                    workspaceId: workspace.id,
+                    path: selectedFile,
+                    isFileTabsDisabled,
+                    navigate: (href) => router.push(href),
+                  });
                 }
               }}
             />

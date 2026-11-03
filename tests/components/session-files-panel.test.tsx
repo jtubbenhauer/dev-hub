@@ -3,20 +3,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { ChatFileOpenMode } from "@/hooks/use-settings";
 import type { MessageWithParts } from "@/lib/opencode/types";
+import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
+import { useEditorStore } from "@/stores/editor-store";
 
 const {
   mockOpenFile,
   mockRouterPush,
-  mockOpenFileInSidePanel,
-  mockSetFileViewMode,
+  mockOpenFileInWorkbench,
   mockToastError,
+  settings,
 } = vi.hoisted(() => ({
-  mockOpenFile: vi.fn().mockResolvedValue(undefined),
-  mockRouterPush: vi.fn(),
-  mockOpenFileInSidePanel: vi.fn().mockResolvedValue(undefined),
-  mockSetFileViewMode: vi.fn(),
+  mockOpenFile:
+    vi.fn<
+      (workspaceId: string, path: string, fallback: () => void) => Promise<void>
+    >(),
+  mockRouterPush: vi.fn<(href: string) => void>(),
+  mockOpenFileInWorkbench: vi.fn<
+    (input: OpenFileInWorkbenchInput) => Promise<boolean>
+  >(async () => true),
   mockToastError: vi.fn(),
+  settings: { fileOpenMode: "dialog" as ChatFileOpenMode },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -29,9 +38,10 @@ vi.mock("@/hooks/use-mobile", () => ({
 
 vi.mock("@/hooks/use-settings", () => ({
   useChatFileOpenSetting: () => ({
-    fileOpenMode: "dialog",
+    fileOpenMode: settings.fileOpenMode,
     isLoading: false,
   }),
+  useFileTabsSetting: () => ({ isFileTabsDisabled: true, isLoading: false }),
 }));
 
 vi.mock("@/stores/workspace-store", () => ({
@@ -46,19 +56,15 @@ vi.mock("@/stores/chat-file-dialog-store", () => ({
   }),
 }));
 
-vi.mock("@/stores/side-panel-store", () => ({
-  useSidePanelStore: Object.assign(vi.fn(), {
-    getState: () => ({ setFileViewMode: mockSetFileViewMode }),
-  }),
-}));
-
-vi.mock("@/lib/side-panel-open-file", () => ({
-  openFileInSidePanel: mockOpenFileInSidePanel,
+vi.mock("@/lib/workbench/open-in-workbench", () => ({
+  openFileInWorkbench: mockOpenFileInWorkbench,
 }));
 
 vi.mock("sonner", () => ({
   toast: { error: mockToastError },
 }));
+
+const VIEW_MODE_KEY = "workspace-1:src/example.ts";
 
 function makePart(filePath: string, id: string, callID: string) {
   return {
@@ -121,7 +127,9 @@ function renderPanel(message: MessageWithParts, onFileOpen = vi.fn()) {
 describe("SessionFilesPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockOpenFileInSidePanel.mockResolvedValue(undefined);
+    settings.fileOpenMode = "dialog";
+    mockOpenFileInWorkbench.mockResolvedValue(true);
+    useEditorStore.setState({ fileViewModes: {} });
   });
 
   it("closes the mobile sheet before opening a file dialog", async () => {
@@ -131,39 +139,92 @@ describe("SessionFilesPanel", () => {
 
     await waitFor(() => expect(mockOpenFile).toHaveBeenCalledOnce());
     expect(onFileOpen).toHaveBeenCalledOnce();
+    expect(mockOpenFileInWorkbench).not.toHaveBeenCalled();
   });
 
-  it("opens the file in the side panel diff mode on GitCompare click", async () => {
+  it("falls back to the workbench file intent when the dialog cannot open the file", async () => {
+    renderPanel(makeMessage());
+    fireEvent.click(screen.getByRole("button", { name: /src\/example[.]ts/ }));
+    await waitFor(() => expect(mockOpenFile).toHaveBeenCalledOnce());
+    const fallback = mockOpenFile.mock.lastCall?.[2];
+
+    fallback?.();
+
+    expect(mockRouterPush).toHaveBeenCalledExactlyOnceWith(
+      createWorkbenchHref({
+        open: "file",
+        workspaceId: "workspace-1",
+        path: "src/example.ts",
+      }),
+    );
+  });
+
+  it("closes the mobile sheet and opens a workbench tab in sidebar mode", async () => {
+    settings.fileOpenMode = "sidebar";
+    const { onFileOpen } = renderPanel(makeMessage());
+
+    fireEvent.click(screen.getByRole("button", { name: /src\/example[.]ts/ }));
+
+    await waitFor(() =>
+      expect(mockOpenFileInWorkbench).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          workspaceId: "workspace-1",
+          path: "src/example.ts",
+          isFileTabsDisabled: true,
+        }),
+      ),
+    );
+    expect(onFileOpen).toHaveBeenCalledOnce();
+    expect(mockOpenFile).not.toHaveBeenCalled();
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it("routes the opener's navigation through the router", async () => {
+    settings.fileOpenMode = "sidebar";
+    renderPanel(makeMessage());
+    fireEvent.click(screen.getByRole("button", { name: /src\/example[.]ts/ }));
+    await waitFor(() => expect(mockOpenFileInWorkbench).toHaveBeenCalledOnce());
+
+    mockOpenFileInWorkbench.mock.lastCall?.[0].navigate("/workbench?x=1");
+
+    expect(mockRouterPush).toHaveBeenCalledExactlyOnceWith("/workbench?x=1");
+  });
+
+  it("opens the file as a workbench tab in diff mode on GitCompare click", async () => {
+    let modeWhenOpening: string | undefined;
+    mockOpenFileInWorkbench.mockImplementationOnce(async () => {
+      modeWhenOpening = useEditorStore.getState().fileViewModes[VIEW_MODE_KEY];
+      return true;
+    });
     renderPanel(makeMessage());
 
     fireEvent.click(screen.getByTitle("Open in git diff"));
 
     await waitFor(() =>
-      expect(mockOpenFileInSidePanel).toHaveBeenCalledWith(
-        "workspace-1",
-        "src/example.ts",
-        expect.any(Function),
+      expect(mockOpenFileInWorkbench).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          workspaceId: "workspace-1",
+          path: "src/example.ts",
+          isFileTabsDisabled: true,
+        }),
       ),
     );
-    expect(mockSetFileViewMode).toHaveBeenCalledWith(
-      "workspace-1:src/example.ts",
-      "diff",
-    );
+    expect(modeWhenOpening).toBe("diff");
+    expect(mockOpenFile).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
-  it("does not set diff mode when opening the file fails", async () => {
-    mockOpenFileInSidePanel.mockImplementationOnce(
-      async (_workspaceId: string, _path: string, fallback: () => void) => {
-        fallback();
-      },
-    );
+  it("reports an error when the diff tab cannot be opened", async () => {
+    mockOpenFileInWorkbench.mockResolvedValueOnce(false);
     renderPanel(makeMessage());
 
     fireEvent.click(screen.getByTitle("Open in git diff"));
 
-    await waitFor(() => expect(mockToastError).toHaveBeenCalledOnce());
-    expect(mockSetFileViewMode).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledExactlyOnceWith(
+        "Could not open file",
+      ),
+    );
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 

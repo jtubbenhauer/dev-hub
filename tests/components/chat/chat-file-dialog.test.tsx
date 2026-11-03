@@ -13,6 +13,11 @@ import {
 import { downloadTextFile } from "@/lib/download-file";
 vi.mock("@/hooks/use-settings", () => ({
   useLspEnabledSetting: () => ({ isLspEnabled: false }),
+  useFileTabsSetting: () => ({ isFileTabsDisabled: false, isLoading: false }),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock("@/components/editor/editor-switcher", () => ({

@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ExternalLink, FileCode2, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,13 +20,18 @@ import { FileDownloadButton } from "@/components/editor/file-download-button";
 import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import { CsvPreviewToggle } from "@/components/editor/csv-preview";
 import { isTextEditorLanguage } from "@/lib/file-preview";
-import { useLspEnabledSetting } from "@/hooks/use-settings";
+import { useFileTabsSetting, useLspEnabledSetting } from "@/hooks/use-settings";
 import {
   buildFileSaveBody,
   resolveTabWorkspaceId,
 } from "@/lib/files/save-request";
 import { completeFileSave } from "@/lib/files/save-completion";
 import { submitFileSave } from "@/lib/files/submit-file-save";
+import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
+
+const DISCARD_CHANGES_PROMPT =
+  "You have unsaved changes. Close and discard them?";
 
 export function ChatFileDialog() {
   const isOpen = useChatFileDialogStore((state) => state.isOpen);
@@ -36,9 +42,11 @@ export function ChatFileDialog() {
   );
   const setContent = useChatFileDialogStore((state) => state.setContent);
   const { isLspEnabled } = useLspEnabledSetting();
+  const { isFileTabsDisabled } = useFileTabsSetting();
   const reset = useChatFileDialogStore((state) => state.reset);
   const [isSaving, setIsSaving] = useState(false);
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const isDirty = file !== null && file.content !== originalContent;
   const isTextFile = file !== null && isTextEditorLanguage(file.language);
@@ -46,14 +54,28 @@ export function ChatFileDialog() {
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen && isDirty) {
-        const shouldDiscard = window.confirm(
-          "You have unsaved changes. Close and discard them?",
-        );
+        const shouldDiscard = window.confirm(DISCARD_CHANGES_PROMPT);
         if (!shouldDiscard) return;
       }
       if (!nextOpen) reset();
     },
     [isDirty, reset],
+  );
+
+  const handleOpenInWorkbench = useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      if (!file) return;
+      if (isDirty && !window.confirm(DISCARD_CHANGES_PROMPT)) return;
+      reset();
+      void openFileInWorkbench({
+        workspaceId: file.workspaceId,
+        path: file.path,
+        isFileTabsDisabled,
+        navigate: (href) => router.push(href),
+      });
+    },
+    [file, isDirty, isFileTabsDisabled, reset, router],
   );
 
   const handleSave = useCallback(async () => {
@@ -116,7 +138,12 @@ export function ChatFileDialog() {
           {file && (
             <Button variant="ghost" size="sm" asChild>
               <Link
-                href={`/files?open=${encodeURIComponent(file.path)}`}
+                href={createWorkbenchHref({
+                  open: "file",
+                  workspaceId: file.workspaceId,
+                  path: file.path,
+                })}
+                onClick={handleOpenInWorkbench}
                 title="Open in full editor"
                 aria-label="Open in full editor"
                 className="px-2 sm:px-3"

@@ -12,17 +12,20 @@ import {
 import { type SessionFile } from "@/lib/chat/extract-session-files";
 import { useSessionFiles } from "@/components/chat/use-session-files";
 import type { MessageWithParts } from "@/lib/opencode/types";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { openFileInSidePanel } from "@/lib/side-panel-open-file";
-import { useChatFileOpenSetting } from "@/hooks/use-settings";
+import {
+  useChatFileOpenSetting,
+  useFileTabsSetting,
+} from "@/hooks/use-settings";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 import {
   fileViewKey,
   isOutsideRepoPath,
   toRepoRelative,
 } from "@/lib/workspace-paths";
-import { useSidePanelStore } from "@/stores/side-panel-store";
+import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
+import { useEditorStore } from "@/stores/editor-store";
 import { toast } from "sonner";
 
 const FileRow = memo(function FileRow({
@@ -35,34 +38,44 @@ const FileRow = memo(function FileRow({
   onFileOpen?: () => void;
 }) {
   const router = useRouter();
-  const isMobile = useIsMobile();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { fileOpenMode } = useChatFileOpenSetting();
+  const { isFileTabsDisabled } = useFileTabsSetting();
   const relativePath = toRepoRelative(file.path, workspacePath);
+  const href = createWorkbenchHref({
+    open: "file",
+    workspaceId: activeWorkspaceId,
+    path: relativePath,
+  });
 
   const handleClick = useCallback(async () => {
-    if (isMobile && fileOpenMode === "sidebar") {
-      router.push(`/files?open=${encodeURIComponent(relativePath)}`);
-      return;
-    }
+    // Closes a containing mobile sheet so the dialog or tab is visible.
+    onFileOpen?.();
     if (fileOpenMode === "dialog") {
-      onFileOpen?.();
       await useChatFileDialogStore
         .getState()
         .openFile(activeWorkspaceId ?? "", relativePath, () =>
-          router.push(`/files?open=${encodeURIComponent(relativePath)}`),
+          router.push(href),
         );
       return;
     }
-    await openFileInSidePanel(activeWorkspaceId ?? "", relativePath, () =>
-      router.push(`/files?open=${encodeURIComponent(relativePath)}`),
-    );
+    if (activeWorkspaceId === null) {
+      router.push(href);
+      return;
+    }
+    await openFileInWorkbench({
+      workspaceId: activeWorkspaceId,
+      path: relativePath,
+      isFileTabsDisabled,
+      navigate: (target) => router.push(target),
+    });
   }, [
     router,
+    href,
     relativePath,
-    isMobile,
     fileOpenMode,
     activeWorkspaceId,
+    isFileTabsDisabled,
     onFileOpen,
   ]);
 
@@ -70,21 +83,20 @@ const FileRow = memo(function FileRow({
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (isOutsideRepoPath(relativePath)) return; // unreachable but defensive
-      let failed = false;
-      await openFileInSidePanel(activeWorkspaceId ?? "", relativePath, () => {
-        failed = true;
-        toast.error("Could not open file");
+      if (activeWorkspaceId === null) return;
+      // Set before opening: the file tab reads its view mode when it mounts.
+      useEditorStore
+        .getState()
+        .setFileViewMode(fileViewKey(activeWorkspaceId, relativePath), "diff");
+      const isOpened = await openFileInWorkbench({
+        workspaceId: activeWorkspaceId,
+        path: relativePath,
+        isFileTabsDisabled,
+        navigate: (target) => router.push(target),
       });
-      if (!failed) {
-        useSidePanelStore
-          .getState()
-          .setFileViewMode(
-            fileViewKey(activeWorkspaceId ?? "", relativePath),
-            "diff",
-          );
-      }
+      if (!isOpened) toast.error("Could not open file");
     },
-    [relativePath, activeWorkspaceId],
+    [relativePath, activeWorkspaceId, isFileTabsDisabled, router],
   );
 
   return (

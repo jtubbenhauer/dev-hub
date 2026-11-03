@@ -1,5 +1,7 @@
+import { isWorkbenchPathname } from "@/lib/workbench/open-in-workbench";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 import { useContentSearchStore } from "@/stores/content-search-store";
-import { useEditorStore } from "@/stores/editor-store";
+import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 
 const MAX_PREFILL_LENGTH = 200;
 const SEARCHABLE_INPUT_TYPES = new Set([
@@ -62,6 +64,8 @@ export function openFindInFiles(input: {
   push: (href: string) => void;
 }): void {
   useContentSearchStore.getState().requestOpen(getFindInFilesPrefill());
-  useEditorStore.getState().setFileTreeOpen(true);
-  if (input.pathname !== "/files") input.push("/files");
+  useContextSidebarStore.getState().openView("explorer");
+  if (!isWorkbenchPathname(input.pathname)) {
+    input.push(createWorkbenchHref({ open: "search", workspaceId: null }));
+  }
 }

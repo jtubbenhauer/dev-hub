@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeAll } from "vitest";
 import { preloadMarkdownRenderers } from "@/components/markdown/lazy-markdown";
 import { render } from "@testing-library/react";
 import { MarkdownContent } from "@/components/chat/markdown-content";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 
 vi.mock("@/hooks/use-mobile", () => ({
   useIsMobile: () => false,
@@ -12,6 +13,7 @@ vi.mock("@/hooks/use-settings", () => ({
     fileOpenMode: "sidebar",
     isLoading: false,
   }),
+  useFileTabsSetting: () => ({ isFileTabsDisabled: false, isLoading: false }),
 }));
 
 vi.mock("@/stores/workspace-store", () => ({
@@ -22,8 +24,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("@/lib/side-panel-open-file", () => ({
-  openFileInSidePanel: vi.fn(),
+vi.mock("@/lib/workbench/open-in-workbench", () => ({
+  openFileInWorkbench: vi.fn(),
 }));
 
 // The markdown renderer is lazy; load it once so renders are synchronous.
@@ -60,6 +62,12 @@ describe("MarkdownContent - nested anchor prevention", () => {
 
     const anchors = container.querySelectorAll("a");
     expect(anchors).toHaveLength(1);
-    expect(anchors[0].getAttribute("href")).toMatch(/\/files\?open=/);
+    expect(anchors[0].getAttribute("href")).toBe(
+      createWorkbenchHref({
+        open: "file",
+        workspaceId: "ws-1",
+        path: "src/foo.ts",
+      }),
+    );
   });
 });

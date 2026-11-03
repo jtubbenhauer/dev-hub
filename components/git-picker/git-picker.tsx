@@ -16,6 +16,8 @@ import {
   useGitChangedFiles,
   useGitBranches,
 } from "@/hooks/use-git";
+import { useFileTabsSetting } from "@/hooks/use-settings";
+import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
 import {
   fuzzySearch,
   basenamePositions,
@@ -193,6 +195,7 @@ function GitPickerDialogContent({ close }: { close: () => void }) {
   const pathname = usePathname();
 
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { isFileTabsDisabled } = useFileTabsSetting();
 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -337,7 +340,14 @@ function GitPickerDialogContent({ close }: { close: () => void }) {
       close();
 
       if (openInEditor) {
-        router.push(`/files?open=${encodeURIComponent(file.path)}`);
+        if (activeWorkspaceId) {
+          void openFileInWorkbench({
+            workspaceId: activeWorkspaceId,
+            path: file.path,
+            isFileTabsDisabled,
+            navigate: (href) => router.push(href),
+          });
+        }
         return;
       }
 
@@ -357,7 +367,15 @@ function GitPickerDialogContent({ close }: { close: () => void }) {
         }),
       );
     },
-    [close, router, pathname, mode, effectiveBaseRef],
+    [
+      close,
+      router,
+      pathname,
+      mode,
+      effectiveBaseRef,
+      activeWorkspaceId,
+      isFileTabsDisabled,
+    ],
   );
 
   const toggleMode = useCallback(() => {

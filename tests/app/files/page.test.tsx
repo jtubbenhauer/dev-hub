@@ -18,6 +18,7 @@ import { useContentSearchStore } from "@/stores/content-search-store";
 import { buildMatch } from "@/packages/shared/src/content-search/preview";
 import type { SearchPanelProps } from "@/components/editor/search-panel";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 import type { FileTreeEntry, Workspace } from "@/types";
 
 interface LeaderRegistration {
@@ -33,9 +34,10 @@ vi.mock("sonner", () => ({
 }));
 let leaderRegistrations: LeaderRegistration[] = [];
 
+const routerPush = vi.hoisted(() => vi.fn<(href: string) => void>());
 vi.mock("next/navigation", () => ({
   useSearchParams: () => searchParams,
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush }),
 }));
 
 vi.mock("@/components/layout/authenticated-layout", () => ({
@@ -244,60 +246,7 @@ describe("FilesPage content search", () => {
     expect(screen.queryByTestId("search-panel")).not.toBeInTheDocument();
   });
 
-  it("passes the match line to the editor when a search result opens", async () => {
-    // Given
-    useContentSearchStore.setState({ sidebarView: "search" });
-    const fetchMock = vi.fn(async () =>
-      Response.json({
-        content: `first\n${searchLine}`,
-        language: "typescript",
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    renderFilesPage();
-    // When
-    await userEvent.click(screen.getByRole("button", { name: "Open match" }));
-    // Then
-    await waitFor(() =>
-      expect(screen.getByTestId("editor-switcher")).toHaveAttribute(
-        "data-reveal-line",
-        "2",
-      ),
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/files/content?workspaceId=ws-1&path=src%2Fa.ts",
-    );
-  });
-
-  it("clears markdown preview when opening a markdown search match", async () => {
-    // Given
-    useContentSearchStore.setState({ sidebarView: "search" });
-    useEditorStore.setState({ markdownPreviewPath: "notes.md" });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        Response.json({
-          content: `first\n${searchLine}`,
-          language: "markdown",
-        }),
-      ),
-    );
-    renderFilesPage();
-    // When
-    await userEvent.click(
-      screen.getByRole("button", { name: "Open markdown match" }),
-    );
-    // Then
-    await waitFor(() =>
-      expect(screen.getByTestId("editor-switcher")).toHaveAttribute(
-        "data-reveal-line",
-        "2",
-      ),
-    );
-    expect(useEditorStore.getState().markdownPreviewPath).toBeNull();
-  });
-
-  it("leaves no pending reveal when the content endpoint returns 404", async () => {
+  it("routes a search match to the workbench file intent", async () => {
     // Given
     useContentSearchStore.setState({ sidebarView: "search" });
     const fetchMock = vi.fn(async () => new Response(null, { status: 404 }));
@@ -306,9 +255,37 @@ describe("FilesPage content search", () => {
     // When
     await userEvent.click(screen.getByRole("button", { name: "Open match" }));
     // Then
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(routerPush).toHaveBeenCalledExactlyOnceWith(
+      createWorkbenchHref({
+        open: "file",
+        workspaceId: "ws-1",
+        path: "src/a.ts",
+      }),
+    );
+    expect(getContentApiCalls(fetchMock)).toHaveLength(0);
     expect(useEditorStore.getState().pendingReveal).toBeNull();
-    expect(screen.queryByTestId("editor-switcher")).not.toBeInTheDocument();
+  });
+
+  it("clears markdown preview when routing a markdown search match", async () => {
+    // Given
+    useContentSearchStore.setState({ sidebarView: "search" });
+    useEditorStore.setState({ markdownPreviewPath: "notes.md" });
+    renderFilesPage();
+    // When
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open markdown match" }),
+    );
+    // Then
+    await waitFor(() =>
+      expect(useEditorStore.getState().markdownPreviewPath).toBeNull(),
+    );
+    expect(routerPush).toHaveBeenCalledExactlyOnceWith(
+      createWorkbenchHref({
+        open: "file",
+        workspaceId: "ws-1",
+        path: "notes.md",
+      }),
+    );
   });
 
   it("restores Explorer when the filename-search leader action runs", () => {

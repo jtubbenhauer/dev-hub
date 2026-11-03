@@ -5,6 +5,11 @@ import { ChatFileDialog } from "@/components/chat/chat-file-dialog";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 vi.mock("@/hooks/use-settings", () => ({
   useLspEnabledSetting: () => ({ isLspEnabled: false }),
+  useFileTabsSetting: () => ({ isFileTabsDisabled: false, isLoading: false }),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock("@/components/editor/editor-switcher", () => ({

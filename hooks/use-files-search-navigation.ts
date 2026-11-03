@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { isSearchMatchCurrent, type ContentSearchMatch } from "@devhub/shared";
 import { toast } from "sonner";
 import { isTextEditorLanguage } from "@/lib/file-preview";
-import { loadFileIntoEditorBuffer } from "@/lib/files/load-file-into-editor-buffer";
 import { resolveTabWorkspaceId } from "@/lib/files/save-request";
+import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
 import { useContentSearchStore } from "@/stores/content-search-store";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -14,6 +15,7 @@ export function useFilesSearchNavigation(input: {
   readonly isMobile: boolean;
 }) {
   const { workspaceId, isFileTabsDisabled, isMobile } = input;
+  const router = useRouter();
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const pendingFocus = useContentSearchStore((s) => s.pendingFocus);
   const [prevPendingFocus, setPrevPendingFocus] = useState(false);
@@ -30,11 +32,12 @@ export function useFilesSearchNavigation(input: {
       const isCurrent = () =>
         token === navigationTokenRef.current &&
         useWorkspaceStore.getState().activeWorkspaceId === workspaceId;
-      const isOpened = await loadFileIntoEditorBuffer({
+      const isOpened = await openFileInWorkbench({
         workspaceId,
         path,
         isFileTabsDisabled,
         shouldCommit: isCurrent,
+        navigate: (href) => router.push(href),
       });
       if (!isOpened || !isCurrent()) return;
       const state = useEditorStore.getState();
@@ -117,7 +120,7 @@ export function useFilesSearchNavigation(input: {
       });
       if (isMobile) setIsMobileSheetOpen(false);
     },
-    [workspaceId, isFileTabsDisabled, isMobile],
+    [workspaceId, isFileTabsDisabled, isMobile, router],
   );
 
   return { handleOpenMatch, isMobileSheetOpen, setIsMobileSheetOpen };

@@ -3,16 +3,31 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { ExportSessionDialog } from "@/components/chat/export-session-dialog";
-import { openFileInSidePanel } from "@/lib/side-panel-open-file";
+import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
+import { useEditorStore } from "@/stores/editor-store";
+
+const hoisted = vi.hoisted(() => ({
+  routerPush: vi.fn<(href: string) => void>(),
+  openFileInWorkbench: vi.fn<
+    (input: OpenFileInWorkbenchInput) => Promise<boolean>
+  >(async () => true),
+}));
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
-vi.mock("@/lib/side-panel-open-file", () => ({
-  openFileInSidePanel: vi.fn(async () => undefined),
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: hoisted.routerPush }),
+}));
+vi.mock("@/hooks/use-settings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/use-settings")>()),
+  useFileTabsSetting: () => ({ isFileTabsDisabled: true, isLoading: false }),
+}));
+vi.mock("@/lib/workbench/open-in-workbench", () => ({
+  openFileInWorkbench: hoisted.openFileInWorkbench,
 }));
 
-const fetchMock = vi.fn();
+const fetchMock = vi.fn<typeof fetch>();
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -42,7 +57,10 @@ function sentBody(): unknown {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  hoisted.openFileInWorkbench.mockResolvedValue(true);
+  fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+  useEditorStore.getState().closeAllFiles();
 });
 
 afterEach(() => {
@@ -95,7 +113,7 @@ describe("ExportSessionDialog", () => {
     });
   });
 
-  it("closes and opens the saved transcript in the side panel", async () => {
+  it("closes and opens the saved transcript as a workbench tab", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(jsonResponse({ path: "session-ses_abcd.md" }));
     const { onClose } = renderDialog();
@@ -103,15 +121,80 @@ describe("ExportSessionDialog", () => {
     await user.click(screen.getByRole("button", { name: "Export" }));
 
     await waitFor(() =>
-      expect(openFileInSidePanel).toHaveBeenCalledWith(
-        "ws-1",
-        "session-ses_abcd.md",
-        expect.any(Function),
+      expect(hoisted.openFileInWorkbench).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          workspaceId: "ws-1",
+          path: "session-ses_abcd.md",
+          isFileTabsDisabled: true,
+        }),
       ),
     );
     expect(onClose).toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith(
       "Session exported to session-ses_abcd.md",
+    );
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("routes the opener's navigation through the router", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(jsonResponse({ path: "session-ses_abcd.md" }));
+    renderDialog();
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() =>
+      expect(hoisted.openFileInWorkbench).toHaveBeenCalledOnce(),
+    );
+
+    hoisted.openFileInWorkbench.mock.lastCall?.[0].navigate("/workbench?x=1");
+
+    expect(hoisted.routerPush).toHaveBeenCalledExactlyOnceWith(
+      "/workbench?x=1",
+    );
+  });
+
+  it("reloads an open buffer of the transcript before opening its tab", async () => {
+    const user = userEvent.setup();
+    useEditorStore.getState().openFile({
+      workspaceId: "ws-1",
+      path: "session-ses_abcd.md",
+      name: "session-ses_abcd.md",
+      content: "old export",
+      language: "markdown",
+      isDirty: false,
+      originalContent: "old export",
+    });
+    fetchMock.mockImplementation(async (url) =>
+      String(url).startsWith("/api/files/content")
+        ? jsonResponse({ content: "new export", language: "markdown" })
+        : jsonResponse({ path: "session-ses_abcd.md" }),
+    );
+    let contentWhenOpening: string | undefined;
+    hoisted.openFileInWorkbench.mockImplementationOnce(async () => {
+      contentWhenOpening = useEditorStore.getState().openFiles[0]?.content;
+      return true;
+    });
+    renderDialog();
+
+    await user.click(screen.getByRole("button", { name: "Export" }));
+
+    await waitFor(() =>
+      expect(hoisted.openFileInWorkbench).toHaveBeenCalledOnce(),
+    );
+    expect(contentWhenOpening).toBe("new export");
+  });
+
+  it("reports when the saved transcript cannot be opened", async () => {
+    const user = userEvent.setup();
+    hoisted.openFileInWorkbench.mockResolvedValueOnce(false);
+    fetchMock.mockResolvedValue(jsonResponse({ path: "session-ses_abcd.md" }));
+    renderDialog();
+
+    await user.click(screen.getByRole("button", { name: "Export" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledExactlyOnceWith(
+        "Could not open file",
+      ),
     );
   });
 
@@ -129,7 +212,7 @@ describe("ExportSessionDialog", () => {
 
     const preview = await screen.findByTestId("export-session-preview");
     expect(preview).toHaveTextContent("## User");
-    expect(openFileInSidePanel).not.toHaveBeenCalled();
+    expect(hoisted.openFileInWorkbench).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
 

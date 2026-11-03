@@ -1,0 +1,287 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, screen } from "@testing-library/react";
+import { Orientation, type SerializedDockview } from "dockview-react";
+
+import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
+import { useChatStore } from "@/stores/chat-store";
+import { useEditorStore } from "@/stores/editor-store";
+import { useWorkbenchStore } from "@/stores/workbench-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import {
+  createLoadedChatWorkspaceState,
+  createWorkspace,
+  renderWorkbenchView,
+  terminalCloseButtons,
+} from "./workbench-view-fixtures";
+
+// A tiny URL store: the mocked router writes it, useSearchParams reads it.
+const fakeUrl = vi.hoisted(() => {
+  let search = "";
+  const listeners = new Set<() => void>();
+  const setSearch = (nextSearch: string) => {
+    search = nextSearch;
+    for (const listener of listeners) listener();
+  };
+  const navigateTo = (href: string) =>
+    setSearch(new URL(href, "http://localhost").search.slice(1));
+  return {
+    setSearch,
+    getSearch: () => search,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    router: { replace: vi.fn(navigateTo), push: vi.fn(navigateTo) },
+  };
+});
+
+vi.mock("next/navigation", async () => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    useRouter: () => fakeUrl.router,
+    useSearchParams: () =>
+      new URLSearchParams(
+        useSyncExternalStore(fakeUrl.subscribe, fakeUrl.getSearch),
+      ),
+  };
+});
+
+vi.mock("@/components/file-picker/file-picker", () => ({
+  useFilePicker: () => ({
+    isOpen: false,
+    open: vi.fn(),
+    close: vi.fn(),
+    toggle: vi.fn(),
+  }),
+}));
+
+const initialChatState = useChatStore.getState();
+const initialWorkspaceState = useWorkspaceStore.getState();
+
+beforeEach(() => {
+  localStorage.clear();
+  fakeUrl.setSearch("");
+  fakeUrl.router.replace.mockClear();
+  fakeUrl.router.push.mockClear();
+  useWorkbenchStore.setState(useWorkbenchStore.getInitialState(), true);
+  useEditorStore.getState().closeAllFiles();
+  useWorkspaceStore.setState({
+    workspaces: [createWorkspace("w1"), createWorkspace("w2")],
+    activeWorkspaceId: "w1",
+  });
+  useChatStore.setState({
+    activeWorkspaceId: "w1",
+    activeSessionId: null,
+    workspaceStates: {},
+  });
+});
+
+afterEach(() => {
+  // Unmount first: resetting stores under a mounted view re-renders it.
+  cleanup();
+  useChatStore.setState(initialChatState, true);
+  useWorkspaceStore.setState(initialWorkspaceState, true);
+});
+
+describe("WorkbenchView", () => {
+  it("asks for a workspace when none is active", () => {
+    // Given
+    useWorkspaceStore.setState({ activeWorkspaceId: null });
+
+    // When
+    renderWorkbenchView();
+
+    // Then
+    expect(screen.getByText("Select a workspace to start")).toBeInTheDocument();
+    expect(getWorkbenchController()).toBeNull();
+  });
+
+  it("mounts the active workspace's layout", () => {
+    // When
+    renderWorkbenchView();
+
+    // Then
+    expect(getWorkbenchController()?.workspaceId).toBe("w1");
+    expect(
+      screen.getByRole("button", { name: "Close New chat" }),
+    ).toBeInTheDocument();
+  });
+
+  it("drops saved layouts of workspaces that no longer exist", () => {
+    // Given
+    const savedLayout: SerializedDockview = {
+      grid: {
+        root: { type: "branch", data: [] },
+        width: 0,
+        height: 0,
+        orientation: Orientation.HORIZONTAL,
+      },
+      panels: {},
+    };
+    useWorkbenchStore.setState({
+      layoutsByKey: { "w-deleted": savedLayout, w2: savedLayout },
+    });
+
+    // When
+    renderWorkbenchView();
+
+    // Then
+    const { layoutsByKey } = useWorkbenchStore.getState();
+    expect(layoutsByKey).not.toHaveProperty("w-deleted");
+    expect(layoutsByKey).toHaveProperty("w2");
+  });
+
+  it("hands a clean editor tab of another workspace back to its owner", () => {
+    // Given
+    useEditorStore.setState({
+      openFiles: [
+        {
+          workspaceId: "w2",
+          path: "TWO.md",
+          name: "TWO.md",
+          content: "# Two",
+          originalContent: "# Two",
+          language: "markdown",
+          isDirty: false,
+          instanceId: 1,
+        },
+      ],
+      activeFilePath: "TWO.md",
+    });
+
+    // When
+    renderWorkbenchView();
+
+    // Then
+    expect(useEditorStore.getState().openFiles).toEqual([]);
+  });
+
+  describe("URL intents", () => {
+    it("applies an intent once the layout is ready and clears the URL", () => {
+      // Given
+      fakeUrl.setSearch("open=terminal");
+
+      // When
+      renderWorkbenchView();
+
+      // Then
+      expect(terminalCloseButtons()).toHaveLength(1);
+      expect(fakeUrl.router.replace).toHaveBeenCalledWith(WORKBENCH_PATH);
+      expect(fakeUrl.getSearch()).toBe("");
+    });
+
+    it("switches to the linked workspace and applies the intent once its layout is ready", () => {
+      // Given
+      fakeUrl.setSearch("workspaceId=w2&open=terminal");
+
+      // When
+      renderWorkbenchView();
+
+      // Then
+      expect(useWorkspaceStore.getState().activeWorkspaceId).toBe("w2");
+      expect(getWorkbenchController()?.workspaceId).toBe("w2");
+      expect(terminalCloseButtons()).toHaveLength(1);
+      expect(fakeUrl.router.replace).toHaveBeenCalledTimes(1);
+      expect(fakeUrl.router.replace).toHaveBeenCalledWith(WORKBENCH_PATH);
+    });
+
+    it("drops a link to an unknown workspace without acting", () => {
+      // Given
+      fakeUrl.setSearch("workspaceId=w-deleted&open=terminal");
+
+      // When
+      renderWorkbenchView();
+
+      // Then
+      expect(fakeUrl.router.replace).toHaveBeenCalledWith(WORKBENCH_PATH);
+      expect(useWorkspaceStore.getState().activeWorkspaceId).toBe("w1");
+      expect(terminalCloseButtons()).toHaveLength(0);
+    });
+
+    it("waits for the workspace list before judging a linked workspace", () => {
+      // Given
+      useWorkspaceStore.setState({ workspaces: [], activeWorkspaceId: null });
+      fakeUrl.setSearch("workspaceId=w2&open=terminal");
+      renderWorkbenchView();
+      expect(fakeUrl.router.replace).not.toHaveBeenCalled();
+
+      // When
+      act(() => {
+        useWorkspaceStore
+          .getState()
+          .setWorkspaces([createWorkspace("w1"), createWorkspace("w2")]);
+      });
+
+      // Then
+      expect(getWorkbenchController()?.workspaceId).toBe("w2");
+      expect(terminalCloseButtons()).toHaveLength(1);
+    });
+
+    it("acts again when the same link is followed twice", () => {
+      // Given
+      fakeUrl.setSearch("open=terminal");
+      renderWorkbenchView();
+
+      // When
+      act(() => fakeUrl.setSearch("open=terminal"));
+
+      // Then
+      expect(terminalCloseButtons()).toHaveLength(2);
+      expect(fakeUrl.router.replace).toHaveBeenCalledTimes(2);
+    });
+
+    it("drops an invalid intent without opening a tab", () => {
+      // Given
+      fakeUrl.setSearch("open=file");
+
+      // When
+      renderWorkbenchView();
+
+      // Then
+      expect(fakeUrl.router.replace).toHaveBeenCalledWith(WORKBENCH_PATH);
+      expect(screen.getAllByRole("button", { name: /^Close / })).toHaveLength(
+        1,
+      );
+    });
+
+    it("selects a linked session and queues it while the session list is still loading", () => {
+      // Given
+      fakeUrl.setSearch("open=chat&sessionId=s1");
+
+      // When
+      renderWorkbenchView();
+
+      // Then
+      expect(useChatStore.getState().activeSessionId).toBe("s1");
+      expect(useWorkbenchStore.getState().pendingChatTarget).toEqual({
+        workspaceId: "w1",
+        sessionId: "s1",
+        panelId: null,
+      });
+    });
+
+    it("does not bind a session the loaded session list lacks", () => {
+      // Given
+      useChatStore.setState({
+        workspaceStates: { w1: createLoadedChatWorkspaceState() },
+      });
+      fakeUrl.setSearch("open=chat&sessionId=s-deleted");
+
+      // When
+      renderWorkbenchView();
+
+      // Then
+      expect(useChatStore.getState().activeSessionId).toBeNull();
+      expect(useWorkbenchStore.getState().pendingChatTarget).toBeNull();
+      expect(fakeUrl.router.replace).toHaveBeenCalledWith(WORKBENCH_PATH);
+      expect(useWorkbenchStore.getState().focusedPanel?.params).toEqual({
+        kind: "chat",
+        workspaceId: "w1",
+        sessionId: null,
+      });
+    });
+  });
+});

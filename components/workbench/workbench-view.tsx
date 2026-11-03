@@ -46,7 +46,7 @@ export function WorkbenchView() {
 
   useEffect(() => {
     if (layoutWorkspaceId === null) return;
-    useEditorStore.getState().releaseOtherWorkspaceTabs(layoutWorkspaceId);
+    useEditorStore.getState().releaseCleanBuffersOutside(layoutWorkspaceId);
   }, [layoutWorkspaceId]);
 
   useEffect(() => {

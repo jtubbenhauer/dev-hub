@@ -2,35 +2,21 @@ import { parseChatUrlState } from "@/lib/chat-url-state";
 import { describe, expect, it } from "vitest";
 
 describe("chat URL state", () => {
-  it("parses valid chat state from browser search params", () => {
+  it("reads the workspace and session of a chat link and ignores its list settings", () => {
     const state = parseChatUrlState(
       new URLSearchParams(
         "workspaceId=ws-2&sessionId=session-2&view=workspace&group=0&age=1d",
       ),
     );
 
-    expect(state).toEqual({
-      hasChatState: true,
-      workspaceId: "ws-2",
-      sessionId: "session-2",
-      view: "workspace",
-      groupByWorkspace: false,
-      age: "1d",
-    });
+    expect(state).toEqual({ workspaceId: "ws-2", sessionId: "session-2" });
   });
 
-  it("ignores invalid list settings at the URL boundary", () => {
+  it("treats empty ids as absent", () => {
     const state = parseChatUrlState(
-      new URLSearchParams("view=grid&group=yes&age=forever"),
+      new URLSearchParams("workspaceId=&sessionId="),
     );
 
-    expect(state).toEqual({
-      hasChatState: true,
-      workspaceId: null,
-      sessionId: null,
-      view: null,
-      groupByWorkspace: null,
-      age: null,
-    });
+    expect(state).toEqual({ workspaceId: null, sessionId: null });
   });
 });

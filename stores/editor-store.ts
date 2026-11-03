@@ -9,11 +9,15 @@ import {
 } from "@/lib/files/tab-state";
 import { resolveTabWorkspaceId } from "@/lib/files/save-request";
 import { findOwnFileBuffer } from "@/lib/files/own-file-buffer";
+import {
+  migratePersistedEditorState,
+  type DiffViewMode,
+  type PersistedEditorState,
+  type WorkspaceFileState,
+} from "@/lib/files/persisted-editor-state";
 
 let tabInstanceCounter = 0;
 let revealCounter = 0;
-
-export type DiffViewMode = "unified" | "side-by-side";
 
 export interface EditorRevealRequest {
   readonly id: number;
@@ -41,22 +45,9 @@ export type FileDiskReload =
   | "not-open"
   | "fetch-failed";
 
-interface SavedTab {
-  path: string;
-  name: string;
-  language: string;
-}
-
-interface WorkspaceFileState {
-  tabs: SavedTab[];
-  activeFilePath: string | null;
-  expandedPaths: string[];
-}
-
 interface EditorState extends ReturnType<typeof createFileContentActions> {
   openFiles: OpenFile[];
   activeFilePath: string | null;
-  isFileTreeOpen: boolean;
   diffViewMode: DiffViewMode;
   markdownPreviewPath: string | null;
   csvPreviewPath: string | null;
@@ -68,11 +59,8 @@ interface EditorState extends ReturnType<typeof createFileContentActions> {
   openFile: (file: OpenFile) => OpenFileResult;
   closeFile: (path: string) => void;
   setActiveFile: (path: string) => void;
-  cycleActiveFile: (direction: "next" | "previous") => void;
   updateFileContent: (path: string, content: string) => void;
   markFileSaved: (path: string) => void;
-  toggleFileTree: () => void;
-  setFileTreeOpen: (open: boolean) => void;
   toggleDiffViewMode: () => void;
   setDiffViewMode: (mode: DiffViewMode) => void;
   setMarkdownPreviewPath: (path: string | null) => void;
@@ -96,23 +84,14 @@ interface EditorState extends ReturnType<typeof createFileContentActions> {
   toggleExpandedPath: (workspaceId: string, path: string) => void;
   expandPathToFile: (workspaceId: string, filePath: string) => void;
   expandFolder: (workspaceId: string, folderPath: string) => void;
-  saveWorkspaceState: (workspaceId: string) => void;
-  releaseOtherWorkspaceTabs: (workspaceId: string) => void;
-  getSavedTabs: (workspaceId: string) => SavedTab[];
-  getSavedActiveFile: (workspaceId: string) => string | null;
+  releaseCleanBuffersOutside: (workspaceId: string) => void;
 }
 
 function getWsState(
   states: Record<string, WorkspaceFileState>,
   workspaceId: string,
 ): WorkspaceFileState {
-  return (
-    states[workspaceId] ?? { tabs: [], activeFilePath: null, expandedPaths: [] }
-  );
-}
-
-function toSavedTab(file: OpenFile): SavedTab {
-  return { path: file.path, name: file.name, language: file.language };
+  return states[workspaceId] ?? { expandedPaths: [] };
 }
 
 // Keys are `${workspaceId}:${path}`; workspace ids never contain a colon.
@@ -164,7 +143,6 @@ export const useEditorStore = create<EditorState>()(
       ...createFileContentActions(get, set),
       openFiles: [],
       activeFilePath: null,
-      isFileTreeOpen: true,
       diffViewMode: "unified" as DiffViewMode,
       markdownPreviewPath: null,
       csvPreviewPath: null,
@@ -222,21 +200,6 @@ export const useEditorStore = create<EditorState>()(
 
       setActiveFile: (path) => set({ activeFilePath: path }),
 
-      // Wraps around the tab list. Without an active tab, "next" lands on the
-      // first tab and "previous" on the last.
-      cycleActiveFile: (direction) => {
-        const { openFiles, activeFilePath } = get();
-        if (openFiles.length === 0) return;
-        const step = direction === "next" ? 1 : -1;
-        const activeIndex = openFiles.findIndex(
-          (f) => f.path === activeFilePath,
-        );
-        const fromIndex = activeIndex === -1 && step === -1 ? 0 : activeIndex;
-        const nextIndex =
-          (fromIndex + step + openFiles.length) % openFiles.length;
-        set({ activeFilePath: openFiles[nextIndex].path });
-      },
-
       updateFileContent: (path, content) =>
         set((state) => ({
           openFiles: state.openFiles.map((f) =>
@@ -254,10 +217,6 @@ export const useEditorStore = create<EditorState>()(
               : f,
           ),
         })),
-
-      toggleFileTree: () =>
-        set((state) => ({ isFileTreeOpen: !state.isFileTreeOpen })),
-      setFileTreeOpen: (open) => set({ isFileTreeOpen: open }),
 
       toggleDiffViewMode: () =>
         set((state) => ({
@@ -386,89 +345,34 @@ export const useEditorStore = create<EditorState>()(
           };
         }),
 
-      saveWorkspaceState: (workspaceId) =>
+      // Other workspaces' file tabs left with their layouts, so their clean
+      // buffers can go. Dirty ones stay: unsaved edits are never discarded.
+      releaseCleanBuffersOutside: (workspaceId) =>
         set((state) => {
-          const ownTabs = state.openFiles.filter(
-            (f) => resolveTabWorkspaceId(f, workspaceId) === workspaceId,
-          );
-          const existing = getWsState(state.workspaceFileStates, workspaceId);
-          return {
-            workspaceFileStates: {
-              ...state.workspaceFileStates,
-              [workspaceId]: {
-                ...existing,
-                tabs: ownTabs.map(toSavedTab),
-                activeFilePath: ownTabs.some(
-                  (f) => f.path === state.activeFilePath,
-                )
-                  ? state.activeFilePath
-                  : null,
-              },
-            },
-          };
-        }),
-
-      // Saves other workspaces' tabs for their owners and closes the clean ones.
-      // Dirty tabs stay open so unsaved edits are never discarded.
-      releaseOtherWorkspaceTabs: (workspaceId) =>
-        set((state) => {
-          const isOwnTab = (file: OpenFile) =>
-            resolveTabWorkspaceId(file, workspaceId) === workspaceId;
-          const foreignTabs = state.openFiles.filter((f) => !isOwnTab(f));
-          if (foreignTabs.length === 0) return state;
-
-          const workspaceFileStates = { ...state.workspaceFileStates };
-          const ownerIds = new Set(
-            foreignTabs.map((f) => resolveTabWorkspaceId(f, workspaceId)),
-          );
-          for (const ownerId of ownerIds) {
-            const ownerTabs = foreignTabs.filter(
-              (f) => f.workspaceId === ownerId,
-            );
-            const existing = getWsState(workspaceFileStates, ownerId);
-            workspaceFileStates[ownerId] = {
-              ...existing,
-              tabs: ownerTabs.map(toSavedTab),
-              activeFilePath: ownerTabs.some(
-                (f) => f.path === state.activeFilePath,
-              )
-                ? state.activeFilePath
-                : existing.activeFilePath,
-            };
-          }
-
           const openFiles = state.openFiles.filter(
-            (f) => f.isDirty || isOwnTab(f),
+            (file) =>
+              file.isDirty ||
+              resolveTabWorkspaceId(file, workspaceId) === workspaceId,
           );
-          const isActiveStillOpen = openFiles.some(
-            (f) => f.path === state.activeFilePath,
+          if (openFiles.length === state.openFiles.length) return state;
+          const isActiveFileOpen = openFiles.some(
+            (file) => file.path === state.activeFilePath,
           );
           return {
             openFiles,
-            workspaceFileStates,
-            activeFilePath: isActiveStillOpen
-              ? state.activeFilePath
-              : (openFiles.find(isOwnTab)?.path ?? null),
+            activeFilePath: isActiveFileOpen ? state.activeFilePath : null,
           };
         }),
-
-      getSavedTabs: (workspaceId) => {
-        return getWsState(get().workspaceFileStates, workspaceId).tabs;
-      },
-
-      getSavedActiveFile: (workspaceId) => {
-        return getWsState(get().workspaceFileStates, workspaceId)
-          .activeFilePath;
-      },
     }),
     {
       name: "dev-hub-editor",
-      storage: createUnchangedPersistStorage(),
-      partialize: (state) => ({
-        isFileTreeOpen: state.isFileTreeOpen,
+      version: 1,
+      storage: createUnchangedPersistStorage<PersistedEditorState>(),
+      partialize: (state): PersistedEditorState => ({
         diffViewMode: state.diffViewMode,
         workspaceFileStates: state.workspaceFileStates,
       }),
+      migrate: migratePersistedEditorState,
     },
   ),
 );

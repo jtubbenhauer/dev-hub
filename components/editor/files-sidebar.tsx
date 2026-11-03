@@ -1,8 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { FileTree, type FileTreeProps } from "@/components/editor/file-tree";
-import { OpenEditors } from "@/components/editor/open-editors";
 import {
   SearchPanel,
   type SearchPanelProps,
@@ -11,17 +9,13 @@ import { useContentSearchStore } from "@/stores/content-search-store";
 import { cn } from "@/lib/utils";
 
 interface FilesSidebarProps extends SearchPanelProps {
-  readonly shouldShowOpenEditors: boolean;
   readonly fileTreeProps: FileTreeProps;
-  readonly headerActions?: ReactNode;
 }
 
 export function FilesSidebar({
   workspaceId,
-  shouldShowOpenEditors,
   fileTreeProps,
   onOpenMatch,
-  headerActions,
 }: FilesSidebarProps) {
   const sidebarView = useContentSearchStore((s) => s.sidebarView);
 
@@ -48,13 +42,9 @@ export function FilesSidebar({
             </button>
           ))}
         </div>
-        {headerActions}
       </div>
       {sidebarView === "explorer" ? (
-        <>
-          {shouldShowOpenEditors && <OpenEditors />}
-          <FileTree {...fileTreeProps} />
-        </>
+        <FileTree {...fileTreeProps} />
       ) : (
         <SearchPanel workspaceId={workspaceId} onOpenMatch={onOpenMatch} />
       )}

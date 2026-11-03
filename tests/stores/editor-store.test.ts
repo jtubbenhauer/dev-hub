@@ -28,7 +28,6 @@ function resetStore() {
   useEditorStore.setState({
     openFiles: [],
     activeFilePath: null,
-    isFileTreeOpen: true,
     diffViewMode: "unified",
   });
 }
@@ -126,76 +125,6 @@ describe("closeFile", () => {
   });
 });
 
-describe("cycleActiveFile", () => {
-  beforeEach(resetStore);
-
-  function openThreeTabs() {
-    useEditorStore.getState().openFile(makeFile("a.ts"));
-    useEditorStore.getState().openFile(makeFile("b.ts"));
-    useEditorStore.getState().openFile(makeFile("c.ts"));
-  }
-
-  it("activates the following tab on next", () => {
-    openThreeTabs();
-    useEditorStore.getState().setActiveFile("a.ts");
-
-    useEditorStore.getState().cycleActiveFile("next");
-
-    expect(useEditorStore.getState().activeFilePath).toBe("b.ts");
-  });
-
-  it("activates the preceding tab on previous", () => {
-    openThreeTabs();
-    useEditorStore.getState().setActiveFile("b.ts");
-
-    useEditorStore.getState().cycleActiveFile("previous");
-
-    expect(useEditorStore.getState().activeFilePath).toBe("a.ts");
-  });
-
-  it("wraps from the last tab to the first on next", () => {
-    openThreeTabs();
-    // c.ts is active (last opened)
-
-    useEditorStore.getState().cycleActiveFile("next");
-
-    expect(useEditorStore.getState().activeFilePath).toBe("a.ts");
-  });
-
-  it("wraps from the first tab to the last on previous", () => {
-    openThreeTabs();
-    useEditorStore.getState().setActiveFile("a.ts");
-
-    useEditorStore.getState().cycleActiveFile("previous");
-
-    expect(useEditorStore.getState().activeFilePath).toBe("c.ts");
-  });
-
-  it("activates the first tab on next when no tab is active", () => {
-    openThreeTabs();
-    useEditorStore.setState({ activeFilePath: null });
-
-    useEditorStore.getState().cycleActiveFile("next");
-
-    expect(useEditorStore.getState().activeFilePath).toBe("a.ts");
-  });
-
-  it("activates the last tab on previous when no tab is active", () => {
-    openThreeTabs();
-    useEditorStore.setState({ activeFilePath: null });
-
-    useEditorStore.getState().cycleActiveFile("previous");
-
-    expect(useEditorStore.getState().activeFilePath).toBe("c.ts");
-  });
-
-  it("leaves activeFilePath null when no tabs are open", () => {
-    useEditorStore.getState().cycleActiveFile("next");
-
-    expect(useEditorStore.getState().activeFilePath).toBeNull();
-  });
-});
-
 describe("updateFileContent (dirty tracking)", () => {
   beforeEach(resetStore);
 
@@ -258,23 +187,6 @@ describe("markFileSaved", () => {
   });
 });
 
-describe("toggleFileTree / setFileTreeOpen", () => {
-  beforeEach(resetStore);
-
-  it("toggles file tree", () => {
-    expect(useEditorStore.getState().isFileTreeOpen).toBe(true);
-    useEditorStore.getState().toggleFileTree();
-    expect(useEditorStore.getState().isFileTreeOpen).toBe(false);
-    useEditorStore.getState().toggleFileTree();
-    expect(useEditorStore.getState().isFileTreeOpen).toBe(true);
-  });
-
-  it("sets file tree open state directly", () => {
-    useEditorStore.getState().setFileTreeOpen(false);
-    expect(useEditorStore.getState().isFileTreeOpen).toBe(false);
-  });
-});
-
 describe("closeAllFiles", () => {
   beforeEach(resetStore);
 
@@ -322,52 +234,26 @@ function resetWorkspaceTabs() {
   });
 }
 
-describe("saveWorkspaceState", () => {
+describe("releaseCleanBuffersOutside", () => {
   beforeEach(resetWorkspaceTabs);
 
-  it("saves only the tabs that belong to the workspace", () => {
-    // Given
-    const { openFile } = useEditorStore.getState();
-    openFile(makeOwnedFile("a.ts", "ws-A"));
-    openFile(makeFile("unowned.ts"));
-    openFile(makeOwnedFile("b.ts", "ws-B"));
-
-    // When
-    useEditorStore.getState().saveWorkspaceState("ws-A");
-
-    // Then
-    const saved = useEditorStore.getState().workspaceFileStates["ws-A"];
-    expect(saved.tabs.map((tab) => tab.path)).toEqual(["a.ts", "unowned.ts"]);
-    expect(saved.activeFilePath).toBeNull();
-  });
-});
-
-describe("releaseOtherWorkspaceTabs", () => {
-  beforeEach(resetWorkspaceTabs);
-
-  it("closes clean tabs from other workspaces and saves them for their owner", () => {
+  it("drops the clean buffers of other workspaces", () => {
     // Given
     const { openFile } = useEditorStore.getState();
     openFile(makeOwnedFile("a1.ts", "ws-A"));
+    openFile(makeOwnedFile("b1.ts", "ws-B"));
     openFile(makeOwnedFile("a2.ts", "ws-A"));
 
     // When
-    useEditorStore.getState().releaseOtherWorkspaceTabs("ws-B");
+    useEditorStore.getState().releaseCleanBuffersOutside("ws-B");
 
     // Then
-    const state = useEditorStore.getState();
-    expect(state.openFiles).toEqual([]);
-    expect(state.activeFilePath).toBeNull();
-    expect(state.workspaceFileStates["ws-A"]).toMatchObject({
-      tabs: [
-        { path: "a1.ts", name: "a1.ts", language: "typescript" },
-        { path: "a2.ts", name: "a2.ts", language: "typescript" },
-      ],
-      activeFilePath: "a2.ts",
-    });
+    expect(
+      useEditorStore.getState().openFiles.map((file) => file.path),
+    ).toEqual(["b1.ts"]);
   });
 
-  it("keeps dirty tabs from other workspaces open so edits are not lost", () => {
+  it("keeps a dirty buffer of another workspace so its edits are not lost", () => {
     // Given
     const { openFile, updateFileContent } = useEditorStore.getState();
     openFile(makeOwnedFile("a1.ts", "ws-A"));
@@ -375,36 +261,47 @@ describe("releaseOtherWorkspaceTabs", () => {
     updateFileContent("a1.ts", "unsaved edit");
 
     // When
-    useEditorStore.getState().releaseOtherWorkspaceTabs("ws-B");
+    useEditorStore.getState().releaseCleanBuffersOutside("ws-B");
 
     // Then
-    const state = useEditorStore.getState();
-    expect(state.openFiles.map((file) => file.path)).toEqual(["a1.ts"]);
-    expect(state.openFiles[0].content).toBe("unsaved edit");
+    const { openFiles } = useEditorStore.getState();
+    expect(openFiles.map((file) => file.path)).toEqual(["a1.ts"]);
+    expect(openFiles[0].content).toBe("unsaved edit");
   });
 
-  it("activates one of the workspace's own tabs when the active tab is released", () => {
+  it("clears the active file when its buffer is dropped", () => {
     // Given
     const { openFile } = useEditorStore.getState();
     openFile(makeOwnedFile("b1.ts", "ws-B"));
     openFile(makeOwnedFile("a1.ts", "ws-A"));
 
     // When
-    useEditorStore.getState().releaseOtherWorkspaceTabs("ws-B");
+    useEditorStore.getState().releaseCleanBuffersOutside("ws-B");
 
     // Then
-    const state = useEditorStore.getState();
-    expect(state.openFiles.map((file) => file.path)).toEqual(["b1.ts"]);
-    expect(state.activeFilePath).toBe("b1.ts");
+    expect(useEditorStore.getState().activeFilePath).toBeNull();
   });
 
-  it("leaves the store untouched when every tab belongs to the workspace", () => {
+  it("keeps the active file when its buffer stays open", () => {
+    // Given
+    const { openFile } = useEditorStore.getState();
+    openFile(makeOwnedFile("a1.ts", "ws-A"));
+    openFile(makeOwnedFile("b1.ts", "ws-B"));
+
+    // When
+    useEditorStore.getState().releaseCleanBuffersOutside("ws-B");
+
+    // Then
+    expect(useEditorStore.getState().activeFilePath).toBe("b1.ts");
+  });
+
+  it("leaves the store untouched when every buffer belongs to the workspace", () => {
     // Given
     useEditorStore.getState().openFile(makeOwnedFile("b1.ts", "ws-B"));
     const before = useEditorStore.getState();
 
     // When
-    useEditorStore.getState().releaseOtherWorkspaceTabs("ws-B");
+    useEditorStore.getState().releaseCleanBuffersOutside("ws-B");
 
     // Then
     expect(useEditorStore.getState()).toBe(before);

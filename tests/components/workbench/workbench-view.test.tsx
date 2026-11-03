@@ -15,6 +15,7 @@ import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkbenchStore } from "@/stores/workbench-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { OpenFile } from "@/types";
 import {
   createLoadedChatWorkspaceState,
   createWorkspace,
@@ -367,21 +368,21 @@ describe("WorkbenchView", () => {
     expect(layoutsByKey).toHaveProperty("w2");
   });
 
-  it("hands a clean editor tab of another workspace back to its owner", () => {
+  const otherWorkspaceBuffer: OpenFile = {
+    workspaceId: "w2",
+    path: "TWO.md",
+    name: "TWO.md",
+    content: "# Two",
+    originalContent: "# Two",
+    language: "markdown",
+    isDirty: false,
+    instanceId: 1,
+  };
+
+  it("drops a clean file buffer of another workspace", () => {
     // Given
     useEditorStore.setState({
-      openFiles: [
-        {
-          workspaceId: "w2",
-          path: "TWO.md",
-          name: "TWO.md",
-          content: "# Two",
-          originalContent: "# Two",
-          language: "markdown",
-          isDirty: false,
-          instanceId: 1,
-        },
-      ],
+      openFiles: [otherWorkspaceBuffer],
       activeFilePath: "TWO.md",
     });
 
@@ -390,6 +391,25 @@ describe("WorkbenchView", () => {
 
     // Then
     expect(useEditorStore.getState().openFiles).toEqual([]);
+  });
+
+  it("keeps a dirty file buffer of another workspace", () => {
+    // Given
+    const dirtyBuffer: OpenFile = {
+      ...otherWorkspaceBuffer,
+      content: "# Two, edited",
+      isDirty: true,
+    };
+    useEditorStore.setState({
+      openFiles: [dirtyBuffer],
+      activeFilePath: "TWO.md",
+    });
+
+    // When
+    renderWorkbenchView();
+
+    // Then
+    expect(useEditorStore.getState().openFiles).toEqual([dirtyBuffer]);
   });
 
   describe("URL intents", () => {

@@ -2,16 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
 import { useSessionManagement } from "@/components/chat/use-session-management";
-import { useIsMobile, useHasCoarsePointer } from "@/hooks/use-mobile";
-import type { PromptInputHandle } from "@/components/chat/prompt-input";
 import { useNewChatEngineStore } from "@/stores/new-chat-engine-store";
-import type { RefObject } from "react";
 import type { Workspace } from "@/types";
-
-vi.mock("@/hooks/use-mobile", () => ({
-  useIsMobile: vi.fn(),
-  useHasCoarsePointer: vi.fn(),
-}));
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -82,30 +74,19 @@ vi.mock("@/stores/workspace-store", () => ({
   },
 }));
 
-const nullPromptInputRef = {
-  current: null,
-} as RefObject<PromptInputHandle | null>;
-
 describe("useSessionManagement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useNewChatEngineStore.setState({ engineByWorkspace: {} });
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      cb(0);
-      return 0;
-    });
   });
 
   it("creates each chat on the engine picked for it", () => {
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     storeMocks.createSession.mockResolvedValue({ id: "omo_1" });
     const { result } = renderHook(() =>
       useSessionManagement({
         activeWorkspaceId: "ws-1",
         allWorkspaces: [makeWorkspace("ws-1"), makeWorkspace("ws-2")],
         healthStatus: "healthy",
-        promptInputRef: nullPromptInputRef,
       }),
     );
 
@@ -119,8 +100,6 @@ describe("useSessionManagement", () => {
   });
 
   it("uses the engine picked in the empty chat when the caller names none", () => {
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     storeMocks.createSession.mockResolvedValue({ id: "omo_1" });
     useNewChatEngineStore.getState().setNewChatEngine("ws-1", "omo");
     const { result } = renderHook(() =>
@@ -128,7 +107,6 @@ describe("useSessionManagement", () => {
         activeWorkspaceId: "ws-1",
         allWorkspaces: [makeWorkspace("ws-1")],
         healthStatus: "healthy",
-        promptInputRef: nullPromptInputRef,
       }),
     );
 
@@ -138,15 +116,12 @@ describe("useSessionManagement", () => {
   });
 
   it("tells the user when a chat can't be created", async () => {
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     storeMocks.createSession.mockResolvedValue(null);
     const { result } = renderHook(() =>
       useSessionManagement({
         activeWorkspaceId: "ws-1",
         allWorkspaces: [makeWorkspace("ws-1")],
         healthStatus: "healthy",
-        promptInputRef: nullPromptInputRef,
       }),
     );
 
@@ -158,8 +133,6 @@ describe("useSessionManagement", () => {
   });
 
   it("creates the picked engine's chat once a sleeping remote workspace is healthy", async () => {
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(null, { status: 200 })),
@@ -172,7 +145,6 @@ describe("useSessionManagement", () => {
           activeWorkspaceId: "ws-1",
           allWorkspaces: remoteWorkspaces,
           healthStatus,
-          promptInputRef: nullPromptInputRef,
         }),
       { initialProps: { healthStatus: "stopped" } },
     );
@@ -194,82 +166,13 @@ describe("useSessionManagement", () => {
     localStorage.clear();
   });
 
-  it("does not focus prompt input on mobile when selecting a session", () => {
-    vi.mocked(useIsMobile).mockReturnValue(true);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
-    const focusMock = vi.fn();
-    const promptInputRef = {
-      current: { focus: focusMock } as unknown as PromptInputHandle,
-    } as RefObject<PromptInputHandle | null>;
-
-    const { result } = renderHook(() =>
-      useSessionManagement({
-        activeWorkspaceId: "ws-1",
-        allWorkspaces: [],
-        healthStatus: "healthy",
-        promptInputRef,
-      }),
-    );
-
-    result.current.handleSelectSession("session-1");
-    expect(focusMock).not.toHaveBeenCalled();
-  });
-
-  it("focuses prompt input on desktop when selecting a session", () => {
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
-    const focusMock = vi.fn();
-    const promptInputRef = {
-      current: { focus: focusMock } as unknown as PromptInputHandle,
-    } as RefObject<PromptInputHandle | null>;
-
-    const { result } = renderHook(() =>
-      useSessionManagement({
-        activeWorkspaceId: "ws-1",
-        allWorkspaces: [],
-        healthStatus: "healthy",
-        promptInputRef,
-      }),
-    );
-
-    result.current.handleSelectSession("session-1");
-    expect(focusMock).toHaveBeenCalled();
-  });
-
-  it("does not focus prompt input on coarse-pointer touch devices (e.g. foldables unfolded)", () => {
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(true);
-    const focusMock = vi.fn();
-    const promptInputRef = {
-      current: { focus: focusMock } as unknown as PromptInputHandle,
-    } as RefObject<PromptInputHandle | null>;
-
-    const { result } = renderHook(() =>
-      useSessionManagement({
-        activeWorkspaceId: "ws-1",
-        allWorkspaces: [],
-        healthStatus: "healthy",
-        promptInputRef,
-      }),
-    );
-
-    result.current.handleSelectSession("session-1");
-    expect(focusMock).not.toHaveBeenCalled();
-  });
-
   it("hydrates pins for non-active workspaces in unified mode", () => {
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     localStorage.setItem("dev-hub:chat-unified-mode", "true");
     // Run the staggered non-active fetches synchronously instead of after 150ms.
     vi.stubGlobal("setTimeout", (cb: () => void) => {
       cb();
       return 0 as unknown as ReturnType<typeof setTimeout>;
     });
-
-    const promptInputRef = {
-      current: null,
-    } as RefObject<PromptInputHandle | null>;
 
     renderHook(() =>
       useSessionManagement({
@@ -279,7 +182,6 @@ describe("useSessionManagement", () => {
           makeWorkspace("ws-remote", { backend: "remote" }),
         ],
         healthStatus: "healthy",
-        promptInputRef,
       }),
     );
 
@@ -289,19 +191,13 @@ describe("useSessionManagement", () => {
 
   it("commits a pending deletion after the hook unmounts", async () => {
     vi.useFakeTimers();
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     storeMocks.removeSessionLocal.mockReturnValue({ sessionId: "session-1" });
     storeMocks.deleteSession.mockResolvedValue({ isDeleted: true });
-    const promptInputRef = {
-      current: null,
-    } as RefObject<PromptInputHandle | null>;
     const { result, unmount } = renderHook(() =>
       useSessionManagement({
         activeWorkspaceId: "ws-1",
         allWorkspaces: [],
         healthStatus: "healthy",
-        promptInputRef,
       }),
     );
 
@@ -314,23 +210,17 @@ describe("useSessionManagement", () => {
 
   it("restores an optimistic deletion when the upstream delete fails", async () => {
     vi.useFakeTimers();
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     const snapshot = { sessionId: "session-1" };
     storeMocks.removeSessionLocal.mockReturnValue(snapshot);
     storeMocks.deleteSession.mockResolvedValue({
       isDeleted: false,
       failureMessage: "Failed to delete chat",
     });
-    const promptInputRef = {
-      current: null,
-    } as RefObject<PromptInputHandle | null>;
     const { result } = renderHook(() =>
       useSessionManagement({
         activeWorkspaceId: "ws-1",
         allWorkspaces: [],
         healthStatus: "healthy",
-        promptInputRef,
       }),
     );
 
@@ -342,21 +232,15 @@ describe("useSessionManagement", () => {
 
   it("keeps same-id deletions independent across workspaces", async () => {
     vi.useFakeTimers();
-    vi.mocked(useIsMobile).mockReturnValue(false);
-    vi.mocked(useHasCoarsePointer).mockReturnValue(false);
     storeMocks.removeSessionLocal.mockImplementation(
       (sessionId: string, workspaceId: string) => ({ sessionId, workspaceId }),
     );
     storeMocks.deleteSession.mockResolvedValue({ isDeleted: true });
-    const promptInputRef = {
-      current: null,
-    } as RefObject<PromptInputHandle | null>;
     const { result } = renderHook(() =>
       useSessionManagement({
         activeWorkspaceId: "ws-1",
         allWorkspaces: [],
         healthStatus: "healthy",
-        promptInputRef,
       }),
     );
 
@@ -379,16 +263,12 @@ describe("useSessionManagement", () => {
     function renderTabSessionManagement(
       overrides: Partial<Parameters<typeof useSessionManagement>[0]> = {},
     ) {
-      vi.mocked(useIsMobile).mockReturnValue(false);
-      vi.mocked(useHasCoarsePointer).mockReturnValue(false);
       return renderHook(
         (props: Partial<Parameters<typeof useSessionManagement>[0]>) =>
           useSessionManagement({
             activeWorkspaceId: "ws-1",
             allWorkspaces: [makeWorkspace("ws-1"), makeWorkspace("ws-2")],
             healthStatus: "healthy",
-            promptInputRef: nullPromptInputRef,
-            isTabMode: true,
             ...props,
           }),
         { initialProps: overrides },
@@ -511,20 +391,6 @@ describe("useSessionManagement", () => {
 
       expect(storeMocks.createSession).toHaveBeenCalledWith("ws-1", "opencode");
       expect(onNewChatInWorkspace).not.toHaveBeenCalled();
-    });
-
-    it("leaves keyboard focus where it is after a session pick", () => {
-      const focusMock = vi.fn();
-      const promptInputRef = {
-        current: { focus: focusMock } as unknown as PromptInputHandle,
-      } as RefObject<PromptInputHandle | null>;
-      const { result } = renderTabSessionManagement({ promptInputRef });
-
-      result.current.handleSelectSession("session-1");
-      result.current.handleMobileSelectSession("session-2");
-      result.current.handleSelectUnifiedSession("session-3", "ws-2");
-
-      expect(focusMock).not.toHaveBeenCalled();
     });
   });
 });

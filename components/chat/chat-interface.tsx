@@ -433,10 +433,8 @@ function ChatInterfaceContent({
     activeWorkspaceId,
     allWorkspaces,
     healthStatus,
-    promptInputRef,
     onSessionChosen,
     onNewChatInWorkspace,
-    isTabMode: true,
   });
 
   // A workbench tab learns which session to show through onSessionChosen; the

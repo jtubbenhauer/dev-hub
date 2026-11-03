@@ -4,11 +4,6 @@ interface SessionLoadState {
   readonly sessionsLoaded: boolean;
 }
 
-interface UnifiedFallbackCandidate {
-  readonly id: string;
-  readonly workspaceId: string;
-}
-
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const ONE_WEEK_MS = 7 * ONE_DAY_MS;
 
@@ -51,17 +46,6 @@ export function isSessionListLoading(
 ): boolean {
   if (!activeWorkspaceId) return false;
   return !workspaceStates[activeWorkspaceId]?.sessionsLoaded;
-}
-
-export function getUnifiedFallbackSession<T extends UnifiedFallbackCandidate>(
-  isUnifiedMode: boolean,
-  activeSessionId: string | null,
-  sessions: readonly T[],
-  urlSessionId: string | null,
-): T | null {
-  if (!isUnifiedMode || activeSessionId || urlSessionId) return null;
-  if (sessions.length === 0) return null;
-  return sessions[0];
 }
 
 interface RootSessionCandidate {

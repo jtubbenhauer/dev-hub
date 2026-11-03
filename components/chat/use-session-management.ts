@@ -3,23 +3,18 @@ import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useChatStore } from "@/stores/chat-store";
 import { getNewChatEngineChoice } from "@/stores/new-chat-engine-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { useIsMobile, useHasCoarsePointer } from "@/hooks/use-mobile";
 import type { Workspace } from "@/types";
-import type { RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { PromptInputHandle } from "@/components/chat/prompt-input";
 
 interface UseSessionManagementArgs {
   activeWorkspaceId: string | null;
   allWorkspaces: Workspace[];
   healthStatus: string | undefined;
-  promptInputRef: RefObject<PromptInputHandle | null>;
   // Tells a workbench chat tab which session to show after a pick or create.
   onSessionChosen?: (workspaceId: string, sessionId: string) => void;
   // Opens a new chat in another workspace's layout instead of this tab.
   onNewChatInWorkspace?: (workspaceId: string, engine?: ChatEngine) => void;
-  isTabMode?: boolean;
 }
 
 interface PendingSessionCreation {
@@ -31,16 +26,9 @@ export function useSessionManagement({
   activeWorkspaceId,
   allWorkspaces,
   healthStatus,
-  promptInputRef,
   onSessionChosen,
   onNewChatInWorkspace,
-  isTabMode = false,
 }: UseSessionManagementArgs) {
-  const isMobile = useIsMobile();
-  const hasCoarsePointer = useHasCoarsePointer();
-  // A tab's pick may open in another tab, so focusing this prompt would steal
-  // the cursor from it.
-  const shouldSuppressAutoFocus = isMobile || hasCoarsePointer || isTabMode;
   const {
     setActiveSession,
     setActiveWorkspaceId,
@@ -259,25 +247,19 @@ export function useSessionManagement({
     [activeWorkspaceId, deleteSession, removeSessionLocal, restoreSessionLocal],
   );
 
+  // A pick never focuses this tab's prompt: the chosen session may open in
+  // another tab, and focusing here would steal the cursor from it.
   const handleSelectSession = useCallback(
-    (sessionId: string) => {
-      setActiveSession(sessionId);
-      if (!shouldSuppressAutoFocus) {
-        requestAnimationFrame(() => promptInputRef.current?.focus());
-      }
-    },
-    [setActiveSession, promptInputRef, shouldSuppressAutoFocus],
+    (sessionId: string) => setActiveSession(sessionId),
+    [setActiveSession],
   );
 
   const handleMobileSelectSession = useCallback(
     (sessionId: string) => {
       setActiveSession(sessionId);
       setIsMobileSessionsOpen(false);
-      if (!shouldSuppressAutoFocus) {
-        requestAnimationFrame(() => promptInputRef.current?.focus());
-      }
     },
-    [setActiveSession, promptInputRef, shouldSuppressAutoFocus],
+    [setActiveSession],
   );
 
   const handleMobileCreateSession = useCallback(
@@ -297,9 +279,6 @@ export function useSessionManagement({
       useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
       setActiveWorkspaceSession(workspaceId, sessionId);
       setIsMobileSessionsOpen(false);
-      if (!shouldSuppressAutoFocus) {
-        requestAnimationFrame(() => promptInputRef.current?.focus());
-      }
 
       if (isSleeping) {
         toast("Waking workspace…", {
@@ -313,8 +292,6 @@ export function useSessionManagement({
       activeWorkspaceId,
       setActiveWorkspaceSession,
       fetchSessions,
-      promptInputRef,
-      shouldSuppressAutoFocus,
     ],
   );
 

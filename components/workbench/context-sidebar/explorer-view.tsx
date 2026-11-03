@@ -91,7 +91,6 @@ export function ExplorerView({ workspaceId }: ContextSidebarViewProps) {
     >
       <FilesSidebar
         workspaceId={workspaceId}
-        shouldShowOpenEditors={false}
         onOpenMatch={handleOpenMatch}
         fileTreeProps={{
           workspaceId,

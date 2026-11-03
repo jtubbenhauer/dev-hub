@@ -12,12 +12,10 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { RefObject } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as pinnedSessionsRoute from "@/app/api/workspaces/[id]/pinned-sessions/route";
 import { isMessageVisible } from "@/components/chat/message";
-import type { PromptInputHandle } from "@/components/chat/prompt-input";
 import { QuestionBanner } from "@/components/chat/question-banner";
 import { RunningSubAgentsBanner } from "@/components/chat/running-sub-agents-banner";
 import { SessionList } from "@/components/chat/session-list";
@@ -46,18 +44,11 @@ vi.mock("@/lib/db", () => ({
     return mocks.database.current;
   },
 }));
-vi.mock("@/hooks/use-mobile", () => ({
-  useIsMobile: () => false,
-  useHasCoarsePointer: () => false,
-}));
 
 const USER_ID = "user-omo";
 const OMO_IN_USE_TOAST = "Session is open in another omo client";
 const EMPTY_SESSIONS: Record<string, Session> = {};
 const EMPTY_PINNED_SESSION_IDS: Set<string> = new Set();
-const PROMPT_INPUT_REF: RefObject<PromptInputHandle | null> = {
-  current: null,
-};
 
 type FetchHandler = (url: URL, init: RequestInit | undefined) => Response;
 
@@ -161,7 +152,6 @@ function OmoSessionListHarness({
       activeWorkspaceId: workspaceId,
       allWorkspaces: [],
       healthStatus: "healthy",
-      promptInputRef: PROMPT_INPUT_REF,
     });
   return (
     <SessionList

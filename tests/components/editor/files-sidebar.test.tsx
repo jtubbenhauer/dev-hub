@@ -1,15 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { FilesSidebar } from "@/components/editor/files-sidebar";
 import type { FileTreeProps } from "@/components/editor/file-tree";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { useContentSearchStore } from "@/stores/content-search-store";
 import { useEditorStore } from "@/stores/editor-store";
 
-// The tree has its own tests; this file covers what the sidebar stacks above it.
+// The tree and the search panel have their own tests; this file covers which
+// one the sidebar shows.
 vi.mock("@/components/editor/file-tree", () => ({
   FileTree: () => <div data-testid="file-tree" />,
+}));
+
+vi.mock("@/components/editor/search-panel", () => ({
+  SearchPanel: () => <div data-testid="search-panel" />,
 }));
 
 const fileTreeProps: FileTreeProps = {
@@ -22,16 +27,13 @@ const fileTreeProps: FileTreeProps = {
   onSearchResultClick: vi.fn(),
 };
 
-function renderFilesSidebar(shouldShowOpenEditors: boolean) {
+function renderFilesSidebar() {
   return render(
-    <TooltipProvider>
-      <FilesSidebar
-        workspaceId="ws-1"
-        shouldShowOpenEditors={shouldShowOpenEditors}
-        fileTreeProps={fileTreeProps}
-        onOpenMatch={vi.fn()}
-      />
-    </TooltipProvider>,
+    <FilesSidebar
+      workspaceId="ws-1"
+      fileTreeProps={fileTreeProps}
+      onOpenMatch={vi.fn()}
+    />,
   );
 }
 
@@ -61,25 +63,26 @@ afterEach(() => {
 });
 
 describe("FilesSidebar", () => {
-  it("lists the open editors above the tree when asked to", () => {
+  it("shows only the tree in the explorer view, even with open file buffers", () => {
     // When
-    renderFilesSidebar(true);
+    renderFilesSidebar();
 
     // Then
-    expect(
-      screen.getByRole("button", { name: /Open Editors/ }),
-    ).toBeInTheDocument();
     expect(screen.getByTestId("file-tree")).toBeInTheDocument();
-  });
-
-  it("shows only the tree when the open editors list is not wanted", () => {
-    // When
-    renderFilesSidebar(false);
-
-    // Then
     expect(
       screen.queryByRole("button", { name: /Open Editors/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("file-tree")).toBeInTheDocument();
+  });
+
+  it("shows the search panel instead of the tree in the search view", async () => {
+    // Given
+    renderFilesSidebar();
+
+    // When
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    // Then
+    expect(screen.getByTestId("search-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("file-tree")).not.toBeInTheDocument();
   });
 });

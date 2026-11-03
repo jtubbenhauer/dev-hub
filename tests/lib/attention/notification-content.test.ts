@@ -11,6 +11,7 @@ import {
   truncateNotificationText,
 } from "@/lib/attention/notification-content";
 import type { PermissionRequest, QuestionRequest } from "@/lib/opencode/types";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 
 const sharedInput = {
   workspaceId: "ws-1",
@@ -18,6 +19,12 @@ const sharedInput = {
   rootSessionId: "root-1",
   rootTitle: "QA Root",
 };
+
+const ROOT_CHAT_HREF = createWorkbenchHref({
+  open: "chat",
+  workspaceId: "ws-1",
+  sessionId: "root-1",
+});
 
 function createPermission(
   overrides: Partial<PermissionRequest> = {},
@@ -65,7 +72,7 @@ describe("buildFinishedNotification", () => {
       title: "QA Root finished",
       body: "QA Workspace · Ready for your next message",
       tag: "devhub-finished-root-1",
-      targetHref: "/chat?workspaceId=ws-1&sessionId=root-1",
+      targetHref: ROOT_CHAT_HREF,
     });
   });
 
@@ -115,7 +122,7 @@ describe("buildPermissionNotification", () => {
       title: "Approval needed: QA Root",
       body: 'QA Workspace · Subagent "QA Child" wants bash: git push origin main',
       tag: "devhub-permission-perm-1",
-      targetHref: "/chat?workspaceId=ws-1&sessionId=root-1",
+      targetHref: ROOT_CHAT_HREF,
     });
   });
 
@@ -228,7 +235,7 @@ describe("buildQuestionNotification", () => {
       title: "Question from QA Root",
       body: "QA Workspace · Which branch?",
       tag: "devhub-question-q-1",
-      targetHref: "/chat?workspaceId=ws-1&sessionId=root-1",
+      targetHref: ROOT_CHAT_HREF,
     });
   });
 
@@ -297,7 +304,11 @@ describe("buildErrorNotification", () => {
       title: "Error in QA Workspace",
       body: "QA Workspace · An error occurred.",
       tag: "devhub-error-workspace-ws-1",
-      targetHref: "/chat?workspaceId=ws-1",
+      targetHref: createWorkbenchHref({
+        open: "chat",
+        workspaceId: "ws-1",
+        sessionId: null,
+      }),
     });
   });
 
@@ -325,7 +336,7 @@ describe("buildErrorNotification", () => {
       title: "Error in QA Root",
       body: "QA Workspace · Rate limit hit",
       tag: "devhub-error-root-1",
-      targetHref: "/chat?workspaceId=ws-1&sessionId=root-1",
+      targetHref: ROOT_CHAT_HREF,
     });
   });
 

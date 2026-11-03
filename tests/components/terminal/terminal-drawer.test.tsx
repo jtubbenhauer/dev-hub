@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { toast } from "sonner";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,6 +7,7 @@ import { useTerminalStore } from "@/stores/terminal-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { TerminalHandle } from "@/components/terminal/terminal-panel";
 import type { TerminalSessionInfo } from "@/lib/terminal/terminal-protocol";
+import type { OpenChatInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
 import type { Workspace } from "@/types";
 
 interface CapturedPanelProps {
@@ -46,6 +48,17 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() },
+}));
+
+const workbenchOpeners = vi.hoisted(() => ({
+  openChatInWorkbench: vi.fn<(input: OpenChatInWorkbenchInput) => void>(),
+}));
+
+vi.mock("@/lib/workbench/open-in-workbench", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/lib/workbench/open-in-workbench")
+  >()),
+  openChatInWorkbench: workbenchOpeners.openChatInWorkbench,
 }));
 
 let resolveResponse: { ok: boolean; body: unknown };
@@ -265,22 +278,79 @@ describe("TerminalDrawer", () => {
     ).toHaveTextContent("· node");
   });
 
-  it("sends the selected output to the chat input", async () => {
-    await openDrawerWithPanel();
+  function selectTerminalOutput(selection: string) {
     capturedPanelProps?.onReady?.({
       write: vi.fn(),
       focus: vi.fn(),
       blur: vi.fn(),
-      getSelection: () => "npm ERR! missing script",
+      getSelection: () => selection,
     });
+  }
+
+  it("sends the selected output to the chat input", async () => {
+    await openDrawerWithPanel();
+    selectTerminalOutput("npm ERR! missing script");
     fireEvent.click(
       screen.getByRole("button", { name: "Send selection to chat" }),
     );
     expect(
       localStorage.getItem("devhub:pending-terminal-output:ws-1"),
     ).toContain("npm ERR! missing script");
-    expect(mockPush).toHaveBeenCalledWith("/chat");
     expect(useTerminalStore.getState().isOpen).toBe(false);
+  });
+
+  it("opens the workspace's chat in the workbench after sending", async () => {
+    // Given
+    await openDrawerWithPanel();
+    selectTerminalOutput("npm ERR! missing script");
+
+    // When
+    fireEvent.click(
+      screen.getByRole("button", { name: "Send selection to chat" }),
+    );
+
+    // Then
+    expect(workbenchOpeners.openChatInWorkbench).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      sessionId: null,
+      navigate: expect.any(Function),
+    });
+  });
+
+  it("navigates through the Next router when the workbench must load", async () => {
+    // Given
+    await openDrawerWithPanel();
+    selectTerminalOutput("npm ERR! missing script");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Send selection to chat" }),
+    );
+    const openerInput = workbenchOpeners.openChatInWorkbench.mock.lastCall?.[0];
+
+    // When
+    openerInput?.navigate("/workbench?workspaceId=ws-1&open=chat");
+
+    // Then
+    expect(mockPush).toHaveBeenCalledWith(
+      "/workbench?workspaceId=ws-1&open=chat",
+    );
+  });
+
+  it("asks for a selection and stays put when no output is selected", async () => {
+    // Given
+    await openDrawerWithPanel();
+    selectTerminalOutput("  ");
+
+    // When
+    fireEvent.click(
+      screen.getByRole("button", { name: "Send selection to chat" }),
+    );
+
+    // Then
+    expect(toast.info).toHaveBeenCalledWith(
+      "Select some terminal output first",
+    );
+    expect(workbenchOpeners.openChatInWorkbench).not.toHaveBeenCalled();
+    expect(useTerminalStore.getState().isOpen).toBe(true);
   });
 
   it("toggles maximized from the toolbar", async () => {

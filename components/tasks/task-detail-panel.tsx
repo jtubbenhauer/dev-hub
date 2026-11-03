@@ -42,6 +42,7 @@ import {
 } from "@/hooks/use-clickup";
 import { useWorkspaceProviders } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { toast } from "sonner";
 import type {
@@ -220,7 +221,11 @@ function LinkedWorkspaceRow({
         </Badge>
       </button>
       <Link
-        href="/chat"
+        href={createWorkbenchHref({
+          open: "chat",
+          workspaceId: workspace.id,
+          sessionId: null,
+        })}
         onClick={() => setActiveWorkspaceId(workspace.id)}
         className="text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 rounded p-1 transition-colors"
         title="Open chat"

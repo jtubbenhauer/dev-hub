@@ -60,6 +60,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, WORKSPACE_PRESET_COLORS } from "@/lib/utils";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 import { TaskPicker } from "@/components/task-picker/task-picker";
 import {
   DropdownMenu,
@@ -315,7 +316,11 @@ export function WorkspaceCard({
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
             <Link
-              href="/chat"
+              href={createWorkbenchHref({
+                open: "chat",
+                workspaceId: workspace.id,
+                sessionId: null,
+              })}
               onClick={(event) => {
                 event.stopPropagation();
                 if (healthStatus === "suspended" && !isResuming) {
@@ -343,7 +348,10 @@ export function WorkspaceCard({
               Git
             </Link>
             <Link
-              href={`/terminal?workspace=${workspace.id}`}
+              href={createWorkbenchHref({
+                open: "terminal",
+                workspaceId: workspace.id,
+              })}
               onClick={(event) => {
                 event.stopPropagation();
                 if (healthStatus === "suspended" && !isResuming) {

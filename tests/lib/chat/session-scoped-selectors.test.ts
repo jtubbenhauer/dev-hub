@@ -6,6 +6,7 @@ import {
   EMPTY_TODOS,
   listOnScreenSessionIds,
   listVisibleSessionsToRefetch,
+  listVisibleSessions,
   planMessageCacheEviction,
   removeVisibleSession,
   selectSessionMessages,
@@ -466,6 +467,21 @@ describe("visible session registry", () => {
 
     // Then
     expect(visibleSessionIdsInWorkspace(keys, "ws-1")).toEqual(["sess-a"]);
+  });
+
+  it("lists every visible session with its workspace", () => {
+    // Given
+    const keys = addVisibleSession(
+      addVisibleSession({}, WS, "sess-a"),
+      "ws-2",
+      "sess:b",
+    );
+
+    // Then
+    expect(listVisibleSessions(keys)).toEqual([
+      { workspaceId: WS, sessionId: "sess-a" },
+      { workspaceId: "ws-2", sessionId: "sess:b" },
+    ]);
   });
 });
 

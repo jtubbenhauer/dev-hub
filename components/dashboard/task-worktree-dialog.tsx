@@ -17,6 +17,7 @@ import {
 import { GitFork, FolderGit2, Loader2, Plus, Link, X } from "lucide-react";
 import { useCreateWorktree, useWorktreeSymlinks } from "@/hooks/use-git";
 import { sanitizeBranchName } from "@/lib/utils";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { usePendingChatStore } from "@/stores/pending-chat-store";
 import type { ClickUpTask, Workspace, LinkedTaskMeta } from "@/types";
@@ -146,7 +147,13 @@ export function TaskWorktreeDialog({
             setPendingChat({ workspaceId: newWorkspace.id, message });
             onOpenChange(false);
             resetState();
-            router.push("/chat");
+            router.push(
+              createWorkbenchHref({
+                open: "chat",
+                workspaceId: newWorkspace.id,
+                sessionId: null,
+              }),
+            );
           } else {
             onOpenChange(false);
             resetState();

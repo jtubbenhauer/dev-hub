@@ -2,10 +2,12 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AttentionBridge } from "@/components/layout/attention-bridge";
+import { visibleSessionKey } from "@/lib/chat/session-scoped-selectors";
 import {
   navigateToNotificationTarget,
   setNotificationNavigator,
 } from "@/lib/notifications";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import { attentionKey, useAttentionStore } from "@/stores/attention-store";
 import { useChatStore, type WorkspaceState } from "@/stores/chat-store";
 
@@ -73,6 +75,7 @@ beforeEach(() => {
   window.history.replaceState({}, "", "/chat");
   useAttentionStore.setState({ unseenFinishedKeys: [] });
   useChatStore.setState({
+    visibleSessionKeys: {},
     activeWorkspaceId: "ws-1",
     activeSessionId: "s-1",
     workspaceStates: {
@@ -89,6 +92,7 @@ afterEach(() => {
   cleanup();
   setNotificationNavigator(null);
   useChatStore.setState({
+    visibleSessionKeys: {},
     activeWorkspaceId: null,
     activeSessionId: null,
     workspaceStates: {},
@@ -207,6 +211,89 @@ describe("AttentionBridge unseen clearing", () => {
     window.dispatchEvent(new Event("focus"));
     document.dispatchEvent(new Event("visibilitychange"));
 
+    expect(unseenKeys()).toEqual([attentionKey("ws-1", "s-2")]);
+  });
+
+  it("clears a visible session's unseen key on the workbench", () => {
+    // Given
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    window.history.replaceState({}, "", WORKBENCH_PATH);
+    useChatStore.setState({
+      visibleSessionKeys: { [visibleSessionKey("ws-1", "s-2")]: 1 },
+    });
+    seedUnseen("s-2");
+
+    // When
+    render(<AttentionBridge />);
+
+    // Then
+    expect(unseenKeys()).toEqual([]);
+  });
+
+  it("clears the root key of a visible child session", () => {
+    // Given
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    window.history.replaceState({}, "", WORKBENCH_PATH);
+    useChatStore.setState({
+      activeSessionId: "s-2",
+      visibleSessionKeys: { [visibleSessionKey("ws-1", "child-1")]: 1 },
+    });
+    seedUnseen("s-1", "child-1");
+
+    // When
+    render(<AttentionBridge />);
+
+    // Then
+    expect(unseenKeys()).toEqual([]);
+  });
+
+  it("clears visible sessions of a workspace other than the active one", () => {
+    // Given
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    window.history.replaceState({}, "", WORKBENCH_PATH);
+    useChatStore.setState({
+      visibleSessionKeys: { [visibleSessionKey("ws-2", "s-9")]: 1 },
+    });
+    useAttentionStore.setState({
+      unseenFinishedKeys: [attentionKey("ws-2", "s-9")],
+    });
+
+    // When
+    render(<AttentionBridge />);
+
+    // Then
+    expect(unseenKeys()).toEqual([]);
+  });
+
+  it("clears a session's unseen key once it becomes visible", () => {
+    // Given
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    window.history.replaceState({}, "", WORKBENCH_PATH);
+    render(<AttentionBridge />);
+    seedUnseen("s-2");
+
+    // When
+    act(() => {
+      useChatStore.getState().registerVisibleSession("ws-1", "s-2");
+    });
+
+    // Then
+    expect(unseenKeys()).toEqual([]);
+  });
+
+  it("keeps a visible session's unseen key outside the chat views", () => {
+    // Given
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    window.history.replaceState({}, "", "/git");
+    render(<AttentionBridge />);
+    seedUnseen("s-2");
+
+    // When
+    act(() => {
+      useChatStore.getState().registerVisibleSession("ws-1", "s-2");
+    });
+
+    // Then
     expect(unseenKeys()).toEqual([attentionKey("ws-1", "s-2")]);
   });
 });

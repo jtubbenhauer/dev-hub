@@ -176,6 +176,19 @@ export function visibleSessionIdsInWorkspace(
     .map((key) => key.slice(workspacePrefix.length));
 }
 
+// Inverse of visibleSessionKey(); workspace ids never contain ":".
+export function listVisibleSessions(
+  visibleSessionKeys: VisibleSessionKeys,
+): SessionRef[] {
+  return Object.keys(visibleSessionKeys).map((key) => {
+    const separatorIndex = key.indexOf(":");
+    return {
+      workspaceId: key.slice(0, separatorIndex),
+      sessionId: key.slice(separatorIndex + 1),
+    };
+  });
+}
+
 export function addVisibleSession(
   visibleSessionKeys: VisibleSessionKeys,
   workspaceId: string,

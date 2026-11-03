@@ -7,8 +7,17 @@ import {
   useSessionPicker,
 } from "@/components/session-picker/session-picker";
 import type { ChatEngine } from "@/lib/engine/types";
+import {
+  registerWorkbenchController,
+  type WorkbenchController,
+} from "@/lib/workbench/workbench-controller-registry";
+import {
+  createWorkbenchHref,
+  WORKBENCH_PATH,
+} from "@/lib/workbench/workbench-href";
 import { useChatStore } from "@/stores/chat-store";
 import { useNewChatEngineStore } from "@/stores/new-chat-engine-store";
+import { useWorkbenchStore } from "@/stores/workbench-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 // Mock next/navigation
@@ -104,6 +113,20 @@ function resetStores() {
     activeWorkspaceId: null,
     workspaces: [],
   });
+  useWorkbenchStore.setState({ pendingChatTarget: null });
+}
+
+function createFakeController(workspaceId: string): WorkbenchController {
+  return {
+    workspaceId,
+    openTab: vi.fn(() => "tab-opened"),
+    openNewTerminal: vi.fn(() => "tab-terminal"),
+    openNewChat: vi.fn(() => "tab-chat"),
+    closeTabs: vi.fn(),
+    focusMostRecent: vi.fn(() => false),
+    openContextSidebar: vi.fn(),
+    revealFolder: vi.fn(),
+  };
 }
 
 // Helper to open the picker via the context hook
@@ -131,10 +154,16 @@ globalThis.ResizeObserver = class {
 Element.prototype.scrollIntoView = () => {};
 
 describe("SessionPickerDialog", () => {
+  const controllerCleanups: (() => void)[] = [];
+
   beforeEach(() => {
     resetStores();
     mockPush.mockClear();
     mockPathname.mockReturnValue("/chat");
+  });
+
+  afterEach(() => {
+    for (const cleanup of controllerCleanups.splice(0)) cleanup();
   });
 
   it("does not render dialog content when closed", () => {
@@ -248,7 +277,7 @@ describe("SessionPickerDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("navigates to the selected chat session from another page", async () => {
+  it("navigates to the selected session's workbench chat from another page", async () => {
     mockPathname.mockReturnValue("/git");
     seedStores([makeSession("s1", "My Session", 2000)]);
     renderPicker();
@@ -257,11 +286,15 @@ describe("SessionPickerDialog", () => {
     await userEvent.click(screen.getByText("My Session"));
 
     expect(mockPush).toHaveBeenCalledWith(
-      "/chat?workspaceId=ws-1&sessionId=s1",
+      createWorkbenchHref({
+        open: "chat",
+        workspaceId: "ws-1",
+        sessionId: "s1",
+      }),
     );
   });
 
-  it("updates the selected session URL when already on chat", async () => {
+  it("moves the legacy chat page to the selected session's workbench chat", async () => {
     mockPathname.mockReturnValue("/chat");
     seedStores([makeSession("s1", "My Session", 2000)]);
     renderPicker();
@@ -270,8 +303,34 @@ describe("SessionPickerDialog", () => {
     await userEvent.click(screen.getByText("My Session"));
 
     expect(mockPush).toHaveBeenCalledWith(
-      "/chat?workspaceId=ws-1&sessionId=s1",
+      createWorkbenchHref({
+        open: "chat",
+        workspaceId: "ws-1",
+        sessionId: "s1",
+      }),
     );
+  });
+
+  it("targets the session's chat tab without navigating when the workbench is mounted", async () => {
+    // Given
+    mockPathname.mockReturnValue(WORKBENCH_PATH);
+    seedStores([makeSession("s1", "My Session", 2000)]);
+    controllerCleanups.push(
+      registerWorkbenchController(createFakeController("ws-1")),
+    );
+    renderPicker();
+    await userEvent.click(screen.getByText("Open Picker"));
+
+    // When
+    await userEvent.click(screen.getByText("My Session"));
+
+    // Then
+    expect(useWorkbenchStore.getState().pendingChatTarget).toEqual({
+      workspaceId: "ws-1",
+      sessionId: "s1",
+      panelId: null,
+    });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("keyboard navigates with ArrowDown and selects with Enter", async () => {

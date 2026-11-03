@@ -9,11 +9,11 @@ import {
   createContext,
   useContext,
 } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useChatStore } from "@/stores/chat-store";
 import { getNewChatEngineChoice } from "@/stores/new-chat-engine-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { createChatHref } from "@/lib/chat-url-state";
+import { openChatInWorkbench } from "@/lib/workbench/open-in-workbench";
 import { fuzzySearch, type FuzzyMatch } from "@/lib/fuzzy-match";
 import {
   Dialog,
@@ -141,14 +141,11 @@ function formatRelativeTime(timestamp: number): string {
 export function SessionPickerDialog() {
   const { isOpen, close } = useSessionPicker();
   const router = useRouter();
-  const pathname = usePathname();
 
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const workspaceStates = useChatStore((s) => s.workspaceStates);
   const activeSessionId = useChatStore((s) => s.activeSessionId);
-  const setActiveSession = useChatStore((s) => s.setActiveSession);
-  const setActiveWorkspaceId = useChatStore((s) => s.setActiveWorkspaceId);
   const createSession = useChatStore((s) => s.createSession);
 
   const [query, setQuery] = useState("");
@@ -249,39 +246,33 @@ export function SessionPickerDialog() {
     }
   }, [selectedIndex]);
 
-  const navigateToChat = useCallback(() => {
-    if (!pathname.startsWith("/chat")) {
-      router.push("/chat");
-    }
-  }, [pathname, router]);
-
   const handleSelectSession = useCallback(
     (entry: SessionEntry) => {
-      if (entry.workspaceId !== activeWorkspaceId) {
-        useWorkspaceStore.getState().setActiveWorkspaceId(entry.workspaceId);
-        setActiveWorkspaceId(entry.workspaceId);
-      }
-      setActiveSession(entry.session.id);
       close();
-      router.push(
-        createChatHref({
-          workspaceId: entry.workspaceId,
-          sessionId: entry.session.id,
-        }),
-      );
+      openChatInWorkbench({
+        workspaceId: entry.workspaceId,
+        sessionId: entry.session.id,
+        navigate: (href) => router.push(href),
+      });
     },
-    [activeWorkspaceId, setActiveWorkspaceId, setActiveSession, close, router],
+    [close, router],
   );
 
   const handleNewSession = useCallback(async () => {
     if (!activeWorkspaceId) return;
     close();
-    navigateToChat();
-    await createSession(
+    const session = await createSession(
       activeWorkspaceId,
       getNewChatEngineChoice(activeWorkspaceId),
     );
-  }, [activeWorkspaceId, close, navigateToChat, createSession]);
+    if (session) {
+      openChatInWorkbench({
+        workspaceId: activeWorkspaceId,
+        sessionId: session.id,
+        navigate: (href) => router.push(href),
+      });
+    }
+  }, [activeWorkspaceId, close, createSession, router]);
 
   const handleSelect = useCallback(
     (index: number) => {

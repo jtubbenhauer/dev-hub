@@ -8,6 +8,7 @@ import type { Workspace } from "@/types";
 import { playSoundForEvent, type SoundEventType } from "@/lib/sounds";
 import { showBrowserNotification } from "@/lib/notifications";
 import { requestGitStatusRefresh } from "@/lib/git/git-status-refresh";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 import {
   _resetModuleCaches,
   resetTurnCompletionTracker,
@@ -290,7 +291,11 @@ describe("finished notifications", () => {
       title: "Session sess-root finished",
       body: "QA Workspace · Ready for your next message",
       tag: ROOT_FINISHED_TAG,
-      targetHref: "/chat?workspaceId=ws-1&sessionId=sess-root",
+      targetHref: createWorkbenchHref({
+        open: "chat",
+        workspaceId: "ws-1",
+        sessionId: "sess-root",
+      }),
     });
     expect(vi.mocked(playSoundForEvent).mock.calls).toEqual([["agent"]]);
     expect(unseenKeys()).toEqual(["ws-1:sess-root"]);

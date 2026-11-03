@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { WorkspaceCard } from "@/components/workspace/workspace-card";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Workspace } from "@/types";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -198,5 +199,45 @@ describe("WorkspaceCard Status", () => {
 
     expect(mockResume).not.toHaveBeenCalled();
     expect(mockSetActiveWorkspaceId).toHaveBeenCalledWith("ws-1");
+  });
+});
+
+describe("WorkspaceCard links", () => {
+  it("links Chat to the workspace's chat in the workbench", () => {
+    // When
+    renderWithProviders(
+      <WorkspaceCard
+        workspace={mockWorkspace}
+        onDelete={vi.fn()}
+        isDeleting={false}
+      />,
+    );
+
+    // Then
+    expect(screen.getByRole("link", { name: /Chat/i })).toHaveAttribute(
+      "href",
+      createWorkbenchHref({
+        open: "chat",
+        workspaceId: "ws-1",
+        sessionId: null,
+      }),
+    );
+  });
+
+  it("links Terminal to a terminal in the workspace's workbench", () => {
+    // When
+    renderWithProviders(
+      <WorkspaceCard
+        workspace={mockWorkspace}
+        onDelete={vi.fn()}
+        isDeleting={false}
+      />,
+    );
+
+    // Then
+    expect(screen.getByRole("link", { name: /Terminal/i })).toHaveAttribute(
+      "href",
+      createWorkbenchHref({ open: "terminal", workspaceId: "ws-1" }),
+    );
   });
 });

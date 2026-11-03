@@ -26,6 +26,7 @@ import {
   FolderGit2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 import type { Workspace } from "@/types";
 
 export function WorkspaceOverview() {
@@ -225,7 +226,11 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
 
         <div className="flex items-center gap-3 pt-0.5">
           <Link
-            href="/chat"
+            href={createWorkbenchHref({
+              open: "chat",
+              workspaceId: workspace.id,
+              sessionId: null,
+            })}
             onClick={() => setActiveWorkspaceId(workspace.id)}
             className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
           >

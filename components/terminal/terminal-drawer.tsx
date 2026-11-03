@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertCircle,
@@ -38,6 +38,7 @@ import {
   queueTerminalOutputForChat,
 } from "@/lib/terminal-chat-bridge";
 import { cn } from "@/lib/utils";
+import { openChatInWorkbench } from "@/lib/workbench/open-in-workbench";
 
 const TerminalPanel = dynamic(() =>
   import("./terminal-panel").then((mod) => mod.TerminalPanel),
@@ -61,7 +62,6 @@ function drawerHeight(isMaximized: boolean, heightPx: number | null): string {
 
 export function TerminalDrawer() {
   const router = useRouter();
-  const pathname = usePathname();
   const isOpen = useTerminalStore((s) => s.isOpen);
   const isMaximized = useTerminalStore((s) => s.isMaximized);
   const drawerHeightPx = useTerminalStore((s) => s.drawerHeightPx);
@@ -233,7 +233,11 @@ export function TerminalDrawer() {
       formatTerminalOutputForChat(selection, activeTab?.title ?? "Terminal"),
     );
     useTerminalStore.getState().setOpen(false);
-    if (!pathname.startsWith("/chat")) router.push("/chat");
+    openChatInWorkbench({
+      workspaceId: activeWorkspaceId,
+      sessionId: null,
+      navigate: (href) => router.push(href),
+    });
     toast.success("Terminal output added to the chat input");
   };
 

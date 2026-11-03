@@ -1,6 +1,6 @@
-import { createChatHref } from "@/lib/chat-url-state";
 import type { BrowserNotificationContent } from "@/lib/notifications";
 import type { PermissionRequest, QuestionRequest } from "@/lib/opencode/types";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 
 export const NOTIFICATION_BODY_MAX_LENGTH = 180;
 export const NOTIFICATION_PATTERN_MAX_LENGTH = 60;
@@ -69,7 +69,8 @@ export function buildFinishedNotification(
     title: `${titleOrUntitled(input.rootTitle)} finished`,
     body: buildBody(input.workspaceName, "Ready for your next message"),
     tag: `devhub-finished-${input.rootSessionId}`,
-    targetHref: createChatHref({
+    targetHref: createWorkbenchHref({
+      open: "chat",
       workspaceId: input.workspaceId,
       sessionId: input.rootSessionId,
     }),
@@ -102,7 +103,8 @@ export function buildPermissionNotification(
       `${requester} wants ${describePermission(input.permission)}`,
     ),
     tag: `devhub-permission-${input.permission.id}`,
-    targetHref: createChatHref({
+    targetHref: createWorkbenchHref({
+      open: "chat",
       workspaceId: input.workspaceId,
       sessionId: input.rootSessionId,
     }),
@@ -130,7 +132,8 @@ export function buildQuestionNotification(
       `${prefix}${describeQuestion(input.question)}`,
     ),
     tag: `devhub-question-${input.question.id}`,
-    targetHref: createChatHref({
+    targetHref: createWorkbenchHref({
+      open: "chat",
       workspaceId: input.workspaceId,
       sessionId: input.rootSessionId,
     }),
@@ -153,7 +156,8 @@ export function buildErrorNotification(
     tag: input.rootSessionId
       ? `devhub-error-${input.rootSessionId}`
       : `devhub-error-workspace-${input.workspaceId}`,
-    targetHref: createChatHref({
+    targetHref: createWorkbenchHref({
+      open: "chat",
       workspaceId: input.workspaceId,
       sessionId: input.rootSessionId,
     }),

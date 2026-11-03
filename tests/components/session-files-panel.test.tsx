@@ -6,7 +6,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ChatFileOpenMode } from "@/hooks/use-settings";
 import type { MessageWithParts } from "@/lib/opencode/types";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
-import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
+import {
+  createWorkbenchHref,
+  WORKBENCH_PATH,
+} from "@/lib/workbench/workbench-href";
 import { useEditorStore } from "@/stores/editor-store";
 
 const {
@@ -185,9 +188,13 @@ describe("SessionFilesPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /src\/example[.]ts/ }));
     await waitFor(() => expect(mockOpenFileInWorkbench).toHaveBeenCalledOnce());
 
-    mockOpenFileInWorkbench.mock.lastCall?.[0].navigate("/workbench?x=1");
+    mockOpenFileInWorkbench.mock.lastCall?.[0].navigate(
+      `${WORKBENCH_PATH}?x=1`,
+    );
 
-    expect(mockRouterPush).toHaveBeenCalledExactlyOnceWith("/workbench?x=1");
+    expect(mockRouterPush).toHaveBeenCalledExactlyOnceWith(
+      `${WORKBENCH_PATH}?x=1`,
+    );
   });
 
   it("opens the file as a workbench tab in diff mode on GitCompare click", async () => {

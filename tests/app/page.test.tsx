@@ -14,9 +14,9 @@ vi.mock("@/components/chat/chat-file-dialog", () => ({
   ChatFileDialog: () => <div data-testid="chat-file-dialog" />,
 }));
 
-import WorkbenchPage from "@/app/workbench/page";
+import WorkbenchPage from "@/app/page";
 
-describe("workbench page", () => {
+describe("landing page", () => {
   it("loads the workbench next to the chat file dialog inside the authenticated layout", async () => {
     // When
     render(<WorkbenchPage />);

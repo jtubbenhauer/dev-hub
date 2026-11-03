@@ -29,7 +29,6 @@ import {
   useChatStore,
   type WorkspaceState,
 } from "@/stores/chat-store";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
@@ -64,7 +63,7 @@ vi.mock("@/hooks/use-workspace-engine", () => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => "/workbench",
+  usePathname: () => "/",
 }));
 // The composer is covered by its own tests; here it only forwards sends and
 // slash commands to the chat it belongs to.
@@ -97,7 +96,6 @@ vi.mock("@/components/chat/prompt-input", () => ({
 
 const initialChatState = useChatStore.getState();
 const initialWorkspaceState = useWorkspaceStore.getState();
-const initialSidePanelState = useSidePanelStore.getState();
 
 const BUSY: SessionStatus = { type: "busy" };
 
@@ -269,7 +267,6 @@ function tabProps(
     isFocused: false,
     isLastFocusedChat: false,
     isVisible: true,
-    legacyPageMode: false,
     ...overrides,
   };
 }
@@ -330,7 +327,6 @@ beforeEach(() => {
         : new Response("[]"),
     ),
   );
-  useSidePanelStore.setState({ isOpen: false });
 });
 
 // Unmount before resetting the stores: a mounted chat would otherwise run its
@@ -342,7 +338,6 @@ afterEach(() => {
   localStorage.clear();
   useChatStore.setState(initialChatState, true);
   useWorkspaceStore.setState(initialWorkspaceState, true);
-  useSidePanelStore.setState(initialSidePanelState, true);
   _resetModuleCaches();
 });
 
@@ -540,25 +535,8 @@ describe("ChatInterface hooks inside its tab", () => {
   });
 });
 
-describe("ChatInterface legacy page mode", () => {
-  it("keeps the side panel toggle on the legacy chat page", () => {
-    seedStores({ activeSessionId: "s1" });
-
-    renderWithProviders(
-      <ChatInterface
-        {...tabProps("legacy-chat-page", {
-          sessionId: "s1",
-          isFocused: true,
-          isLastFocusedChat: true,
-          legacyPageMode: true,
-        })}
-      />,
-    );
-
-    expect(screen.getByTestId("split-panel-toggle")).toBeInTheDocument();
-  });
-
-  it("leaves the side panel out of a workbench chat tab", () => {
+describe("ChatInterface without the legacy side panel", () => {
+  it("renders no side panel toggle", () => {
     seedStores({ activeSessionId: "s1" });
 
     renderWithProviders(
@@ -570,28 +548,20 @@ describe("ChatInterface legacy page mode", () => {
     expect(screen.queryByTestId("split-panel-toggle")).not.toBeInTheDocument();
   });
 
-  it.each([
-    { mode: "the legacy chat page", legacyPageMode: true, isOpen: true },
-    { mode: "a workbench chat tab", legacyPageMode: false, isOpen: false },
-  ])(
-    "Cmd+\\ opens the side panel only on $mode",
-    ({ legacyPageMode, isOpen }) => {
-      seedStores({ activeSessionId: "s1" });
-      renderWithProviders(
-        <ChatInterface
-          {...tabProps("tab-a", {
-            sessionId: "s1",
-            isFocused: true,
-            legacyPageMode,
-          })}
-        />,
-      );
+  it("leaves Cmd+\\ to the workbench", () => {
+    seedStores({ activeSessionId: "s1" });
+    renderWithProviders(
+      <ChatInterface
+        {...tabProps("tab-a", { sessionId: "s1", isFocused: true })}
+      />,
+    );
 
-      act(() => {
-        fireEvent.keyDown(window, { key: "\\", metaKey: true });
-      });
+    // fireEvent returns false once a listener calls preventDefault.
+    const wasDefaultAllowed = fireEvent.keyDown(window, {
+      key: "\\",
+      metaKey: true,
+    });
 
-      expect(useSidePanelStore.getState().isOpen).toBe(isOpen);
-    },
-  );
+    expect(wasDefaultAllowed).toBe(true);
+  });
 });

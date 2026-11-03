@@ -3,15 +3,16 @@ import type { LeaderAction, LeaderBindingsMap } from "@/types/leader-key";
 // All built-in actions. Handlers are registered at runtime by page components.
 export const BUILTIN_ACTIONS: LeaderAction[] = [
   // Global navigation
-  { id: "nav:chat", label: "Go to Chat", page: "global" },
-  { id: "nav:files", label: "Go to Files", page: "global" },
+  { id: "nav:workbench", label: "Go to Workbench", page: "global" },
+  { id: "nav:chat", label: "Focus chat tab", page: "global" },
+  { id: "nav:files", label: "Focus file tab", page: "global" },
   { id: "nav:git", label: "Go to Git", page: "global" },
   { id: "nav:prs", label: "Go to PRs", page: "global" },
   { id: "nav:tasks", label: "Go to Tasks", page: "global" },
   { id: "nav:dashboard", label: "Go to Dashboard", page: "global" },
   { id: "nav:repos", label: "Go to Repos", page: "global" },
   { id: "nav:settings", label: "Go to Settings", page: "global" },
-  { id: "nav:terminal", label: "Go to Terminal", page: "global" },
+  { id: "nav:terminal", label: "Focus terminal tab", page: "global" },
   {
     id: "global:command-palette",
     label: "Open command palette",
@@ -134,6 +135,7 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
 
 export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   // Global navigation
+  "nav:workbench": "g w",
   "nav:chat": "g c",
   "nav:files": "g f",
   "nav:git": "g g",

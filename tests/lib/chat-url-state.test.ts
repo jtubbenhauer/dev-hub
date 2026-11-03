@@ -1,30 +1,7 @@
-import { createChatHref, parseChatUrlState } from "@/lib/chat-url-state";
+import { parseChatUrlState } from "@/lib/chat-url-state";
 import { describe, expect, it } from "vitest";
 
 describe("chat URL state", () => {
-  it("creates a canonical href with the selected session and list settings", () => {
-    const href = createChatHref({
-      workspaceId: "workspace one",
-      sessionId: "session/one",
-      view: "unified",
-      groupByWorkspace: true,
-      age: "1w",
-    });
-
-    expect(href).toBe(
-      "/chat?workspaceId=workspace+one&sessionId=session%2Fone&view=unified&group=1&age=1w",
-    );
-  });
-
-  it("omits optional list settings for cross-page session links", () => {
-    const href = createChatHref({
-      workspaceId: "ws-1",
-      sessionId: "session-1",
-    });
-
-    expect(href).toBe("/chat?workspaceId=ws-1&sessionId=session-1");
-  });
-
   it("parses valid chat state from browser search params", () => {
     const state = parseChatUrlState(
       new URLSearchParams(

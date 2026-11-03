@@ -26,23 +26,16 @@ import {
 } from "@/components/chat/streaming-indicator";
 import { ChatCommandsRegistrar } from "@/components/chat/chat-commands-registrar";
 import { useChatTabSessionEffects } from "@/components/chat/use-chat-tab-session-effects";
-import { useChatUrlState } from "@/components/chat/use-chat-url-state";
 import { useChatScrollMemory } from "@/components/chat/use-chat-scroll-memory";
 import { useSessionManagement } from "@/components/chat/use-session-management";
 import { useSessionNavigation } from "@/components/chat/use-session-navigation";
 import { useSessionListActivity } from "@/components/chat/use-session-list-activity";
 import { useRefocusPromptOnTerminalClose } from "@/components/chat/use-refocus-prompt-on-terminal-close";
-import { TaskProgressPanel } from "@/components/chat/task-progress";
-import { McpStatusPanel } from "@/components/chat/mcp-status";
-import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { RunningSubAgentsBanner } from "@/components/chat/running-sub-agents-banner";
-import { WorkspaceContextPanel } from "@/components/chat/workspace-context-panel";
 import { ActiveChatEngineBadge } from "@/components/chat/chat-engine-badge";
 import { SessionBackgroundChip } from "@/components/chat/session-background-chip";
 import { SessionBackgroundBanner } from "@/components/chat/session-background-banner";
 import { NewChatMenu } from "@/components/chat/new-chat-menu";
-import { SidePanel } from "@/components/chat/side-panel";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 import { getNewChatEngineChoice } from "@/stores/new-chat-engine-store";
 import { Button } from "@/components/ui/button";
 import { VscodeIcon } from "@/components/ui/vscode-icon";
@@ -70,13 +63,11 @@ import { getQueuedUserMessageIds } from "@/lib/chat/queued-messages";
 import {
   selectSessionMessages,
   selectSessionStreamingStatus,
-  selectSessionTodos,
 } from "@/lib/chat/session-scoped-selectors";
 import type { ChatEngine } from "@/lib/engine/types";
 import {
   countRootSessions,
   filterSessionsByAge,
-  getUnifiedFallbackSession,
   isSessionListLoading,
   parseSessionAgeFilter,
   type SessionAgeFilter,
@@ -104,7 +95,6 @@ import {
   MessageCircleQuestion,
   MessageSquare,
   MoreHorizontal,
-  PanelRight,
   PanelTop,
   Plus,
   RotateCw,
@@ -114,7 +104,6 @@ import {
   X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { Virtuoso } from "react-virtuoso";
@@ -149,7 +138,6 @@ export interface ChatInterfaceProps {
   readonly isFocused: boolean;
   readonly isLastFocusedChat: boolean;
   readonly isVisible: boolean;
-  readonly legacyPageMode: boolean;
   readonly onSessionChosen?: (workspaceId: string, sessionId: string) => void;
   readonly onNewChatInWorkspace?: (
     workspaceId: string,
@@ -191,7 +179,6 @@ function ChatInterfaceContent({
   sessionId: activeSessionId,
   isFocused,
   isVisible,
-  legacyPageMode,
   onSessionChosen,
   onNewChatInWorkspace,
 }: ChatInterfaceProps) {
@@ -281,18 +268,8 @@ function ChatInterfaceContent({
       shouldCollapseFinishedThinking,
     ],
   );
-  const { width: sidePanelWidth, handleDragStart: handleSidePanelDragStart } =
-    useResizablePanel({
-      minWidth: 400,
-      maxWidth: () => Math.max(1400, window.innerWidth * 0.75),
-      defaultWidth: 500,
-      storageKey: "dev-hub:split-panel-width",
-      reverse: true,
-    });
-  const isSidePanelOpen = useSidePanelStore((s) => s.isOpen);
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false);
   const [, setHasPlanFiles] = useState(false);
-  const [isMobileRightPanelOpen, setIsMobileRightPanelOpen] = useState(false);
   const [isEditingSessionNote, setIsEditingSessionNote] = useState(false);
   const [sessionNoteValue, setSessionNoteValue] = useState("");
   const sessionNoteInputRef = useRef<HTMLInputElement>(null);
@@ -319,7 +296,6 @@ function ChatInterfaceContent({
     [allWorkspaces, activeWorkspaceId],
   );
   const activeWorkspaceName = activeWorkspace?.name ?? "";
-  const activeWorkspacePath = activeWorkspace?.path ?? "";
 
   const activeWorkspaceColor = useMemo(() => {
     if (!activeWorkspaceId) return undefined;
@@ -460,58 +436,9 @@ function ChatInterfaceContent({
     promptInputRef,
     onSessionChosen,
     onNewChatInWorkspace,
-    isTabMode: !legacyPageMode,
+    isTabMode: true,
   });
 
-  const { pushChatState } = useChatUrlState({
-    activeWorkspaceId,
-    activeSessionId,
-    workspaceIds,
-    isUnifiedMode,
-    groupByWorkspace,
-    sessionAgeFilter,
-    onToggleUnifiedMode: handleToggleUnifiedMode,
-    onToggleGroupByWorkspace: handleToggleGroupByWorkspace,
-    onSetSessionAgeFilter: handleSetSessionAgeFilter,
-    isEnabled: legacyPageMode,
-  });
-
-  const handleSelectSessionWithUrl = useCallback(
-    (sessionId: string) => {
-      handleSelectSession(sessionId);
-      pushChatState({ sessionId });
-    },
-    [handleSelectSession, pushChatState],
-  );
-  const handleMobileSelectSessionWithUrl = useCallback(
-    (sessionId: string) => {
-      handleMobileSelectSession(sessionId);
-      pushChatState({ sessionId });
-    },
-    [handleMobileSelectSession, pushChatState],
-  );
-  const handleSelectUnifiedSessionWithUrl = useCallback(
-    (sessionId: string, workspaceId: string) => {
-      handleSelectUnifiedSession(sessionId, workspaceId);
-      pushChatState({ sessionId, workspaceId });
-    },
-    [handleSelectUnifiedSession, pushChatState],
-  );
-  const handleToggleUnifiedModeWithUrl = useCallback(() => {
-    handleToggleUnifiedMode();
-    pushChatState({ view: isUnifiedMode ? "workspace" : "unified" });
-  }, [handleToggleUnifiedMode, isUnifiedMode, pushChatState]);
-  const handleToggleGroupByWorkspaceWithUrl = useCallback(() => {
-    handleToggleGroupByWorkspace();
-    pushChatState({ groupByWorkspace: !groupByWorkspace });
-  }, [groupByWorkspace, handleToggleGroupByWorkspace, pushChatState]);
-  const handleSetSessionAgeFilterWithUrl = useCallback(
-    (filter: SessionAgeFilter) => {
-      handleSetSessionAgeFilter(filter);
-      pushChatState({ age: filter });
-    },
-    [handleSetSessionAgeFilter, pushChatState],
-  );
   // A workbench tab learns which session to show through onSessionChosen; the
   // chosen session may open in another tab.
   const handleSelectSessionInTab = useCallback(
@@ -535,15 +462,6 @@ function ChatInterfaceContent({
     },
     [handleSelectUnifiedSession, onSessionChosen],
   );
-  const handleSelectSessionFromList = legacyPageMode
-    ? handleSelectSessionWithUrl
-    : handleSelectSessionInTab;
-  const handleMobileSelectSessionFromList = legacyPageMode
-    ? handleMobileSelectSessionWithUrl
-    : handleMobileSelectSessionInTab;
-  const handleSelectUnifiedSessionFromList = legacyPageMode
-    ? handleSelectUnifiedSessionWithUrl
-    : handleSelectUnifiedSessionInTab;
 
   // combine's result is structurally shared, so the map keeps its identity
   // until a branch changes; the raw results array is new on every render.
@@ -618,11 +536,6 @@ function ChatInterfaceContent({
     ? unifiedStatuses
     : activeWsSessionStatuses;
   const lastViewedAt = isUnifiedMode ? unifiedLastViewed : activeWsLastViewedAt;
-  const selectTodos = useMemo(
-    () => selectSessionTodos(activeWorkspaceId, activeSessionId),
-    [activeWorkspaceId, activeSessionId],
-  );
-  const activeTodos = useChatStore(selectTodos);
   const fetchSessionTodos = useChatStore((state) => state.fetchSessionTodos);
   const {
     taskProgressBySessionId,
@@ -649,20 +562,6 @@ function ChatInterfaceContent({
       filterSessionsByAge(unifiedSessions, sessionAgeFilter, unifiedPinnedIds),
     [unifiedSessions, sessionAgeFilter, unifiedPinnedIds],
   );
-  const urlSessionId = useSearchParams().get("sessionId") || null;
-  const unifiedFallbackSession = getUnifiedFallbackSession(
-    isUnifiedMode,
-    activeSessionId,
-    filteredUnifiedSessions,
-    urlSessionId,
-  );
-  useEffect(() => {
-    if (!unifiedFallbackSession) return;
-    pushChatState({
-      sessionId: unifiedFallbackSession.id,
-      workspaceId: unifiedFallbackSession.workspaceId,
-    });
-  }, [pushChatState, unifiedFallbackSession]);
   const unifiedSessionNotes = useChatStore(getUnifiedSessionNotes);
   const activeSessionNotes = useChatStore(getActiveSessionNotes);
   const sessionNotes = isUnifiedMode ? unifiedSessionNotes : activeSessionNotes;
@@ -851,25 +750,6 @@ function ChatInterfaceContent({
     setShowJumpToBottom(false);
     setIsEditingSessionNote(false);
   }, [activeSessionId]);
-
-  useEffect(() => {
-    if (!legacyPageMode) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
-        e.preventDefault();
-        useSidePanelStore.getState().togglePanel();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [legacyPageMode]);
-
-  useEffect(() => {
-    if (!legacyPageMode) return;
-    if (isMobile && isSidePanelOpen) {
-      useSidePanelStore.getState().closePanel();
-    }
-  }, [legacyPageMode, isMobile, isSidePanelOpen]);
 
   const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
     setShowJumpToBottom(!atBottom);
@@ -1185,7 +1065,7 @@ function ChatInterfaceContent({
       }}
       labels={{
         isPlanPanelOpen,
-        isSidePanelOpen,
+        isSidePanelOpen: false,
         showThinking,
         showToolCalls,
         showTokens,
@@ -1256,7 +1136,7 @@ function ChatInterfaceContent({
     mode: "unified" as const,
     sessions: filteredUnifiedSessions,
     sessionAgeFilter,
-    onSetSessionAgeFilter: handleSetSessionAgeFilterWithUrl,
+    onSetSessionAgeFilter: handleSetSessionAgeFilter,
     workspaceNames,
     workspaceBranches,
     workspaceColors,
@@ -1281,9 +1161,9 @@ function ChatInterfaceContent({
     onSetSessionNote: handleSetSessionNote,
     onClearSessionNote: handleClearSessionNote,
     isUnifiedMode,
-    onToggleMode: handleToggleUnifiedModeWithUrl,
+    onToggleMode: handleToggleUnifiedMode,
     groupByWorkspace,
-    onToggleGroupByWorkspace: handleToggleGroupByWorkspaceWithUrl,
+    onToggleGroupByWorkspace: handleToggleGroupByWorkspace,
     workspaceOrder,
     onWorkspaceOrderChange: handleWorkspaceOrderChange,
     expandedWorkspaces,
@@ -1312,7 +1192,7 @@ function ChatInterfaceContent({
     onSetSessionNote: handleSetSessionNote,
     onClearSessionNote: handleClearSessionNote,
     isUnifiedMode,
-    onToggleMode: handleToggleUnifiedModeWithUrl,
+    onToggleMode: handleToggleUnifiedMode,
   };
 
   return (
@@ -1327,76 +1207,18 @@ function ChatInterfaceContent({
           {isUnifiedMode ? (
             <SessionList
               {...sharedUnifiedProps}
-              onSelectSession={handleSelectUnifiedSessionFromList}
+              onSelectSession={handleSelectUnifiedSessionInTab}
               onCreateSession={handleMobileCreateSession}
             />
           ) : (
             <SessionList
               {...sharedWorkspaceProps}
-              onSelectSession={handleMobileSelectSessionFromList}
+              onSelectSession={handleMobileSelectSessionInTab}
               onCreateSession={handleMobileCreateSession}
             />
           )}
         </SheetContent>
       </Sheet>
-
-      {/* Mobile right panel sheet */}
-      {legacyPageMode && (
-        <Sheet
-          open={isMobileRightPanelOpen}
-          onOpenChange={setIsMobileRightPanelOpen}
-        >
-          <SheetContent
-            side="right"
-            className="w-72 p-0"
-            showCloseButton={false}
-          >
-            <SheetHeader className="sr-only">
-              <SheetTitle>Side Panel</SheetTitle>
-            </SheetHeader>
-            <div className="h-full overflow-y-auto">
-              {activeWorkspaceId && activeWorkspace && (
-                <WorkspaceContextPanel
-                  workspaceId={activeWorkspaceId}
-                  workspace={activeWorkspace}
-                />
-              )}
-              {activeTodos.length > 0 && (
-                <>
-                  <div className="border-t px-3 py-2">
-                    <span className="text-muted-foreground text-xs font-medium">
-                      Task Progress
-                    </span>
-                  </div>
-                  <div className="px-3 pb-3">
-                    <TaskProgressPanel todos={activeTodos} />
-                  </div>
-                </>
-              )}
-              <div className="border-t px-3 py-2">
-                <span className="text-muted-foreground text-xs font-medium">
-                  MCP Servers
-                </span>
-              </div>
-              <div className="px-3 pb-3">
-                <McpStatusPanel />
-              </div>
-              <div className="border-t px-3 py-2">
-                <span className="text-muted-foreground text-xs font-medium">
-                  Session Files
-                </span>
-              </div>
-              <div className="px-3 pb-3">
-                <SessionFilesPanel
-                  messages={activeMessagesRaw}
-                  workspacePath={activeWorkspacePath}
-                  onFileOpen={() => setIsMobileRightPanelOpen(false)}
-                />
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
-      )}
 
       {/* Session sidebar — hidden on mobile by default */}
       {isSessionListOpen && (
@@ -1412,13 +1234,13 @@ function ChatInterfaceContent({
             {isUnifiedMode ? (
               <SessionList
                 {...sharedUnifiedProps}
-                onSelectSession={handleSelectUnifiedSessionFromList}
+                onSelectSession={handleSelectUnifiedSessionInTab}
                 onCreateSession={handleCreateSession}
               />
             ) : (
               <SessionList
                 {...sharedWorkspaceProps}
-                onSelectSession={handleSelectSessionFromList}
+                onSelectSession={handleSelectSessionInTab}
                 onCreateSession={handleCreateSession}
               />
             )}
@@ -1509,22 +1331,6 @@ function ChatInterfaceContent({
               <ScrollText className="size-4" />
             </Button>
 
-            {legacyPageMode && (
-              <div className="hidden md:flex">
-                <Button
-                  size="icon-sm"
-                  variant={isSidePanelOpen ? "secondary" : "outline"}
-                  data-testid="split-panel-toggle"
-                  onClick={() => {
-                    useSidePanelStore.getState().togglePanel();
-                  }}
-                  title="Side panel"
-                >
-                  <PanelRight className="size-4" />
-                </Button>
-              </div>
-            )}
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -1600,18 +1406,6 @@ function ChatInterfaceContent({
                 <Plus className="size-4" />
               </Button>
             </NewChatMenu>
-
-            {legacyPageMode && (
-              <Button
-                size="icon-sm"
-                variant="outline"
-                onClick={() => setIsMobileRightPanelOpen(true)}
-                title="Side panel"
-                className="md:hidden"
-              >
-                <PanelRight className="size-4" />
-              </Button>
-            )}
           </div>
 
           {/* Session note banner */}
@@ -1961,19 +1755,6 @@ function ChatInterfaceContent({
           />
         </div>
       </ChatDisplayContext.Provider>
-
-      {legacyPageMode && isSidePanelOpen && activeWorkspace ? (
-        <SidePanel
-          width={sidePanelWidth}
-          handleDragStart={handleSidePanelDragStart}
-          workspaceId={activeWorkspaceId ?? ""}
-          workspace={activeWorkspace}
-          activeTodos={activeTodos}
-          messages={activeMessagesRaw}
-          workspacePath={activeWorkspacePath}
-          onEscape={() => promptInputRef.current?.focus()}
-        />
-      ) : null}
 
       {isExportDialogOpen && activeWorkspaceId && activeSessionId ? (
         <ExportSessionDialog

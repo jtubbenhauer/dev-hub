@@ -7,6 +7,7 @@ import {
   legacyFilesSearchToHref,
   legacyTerminalSearchToHref,
   parseWorkbenchIntent,
+  toUrlSearchParams,
   type WorkbenchIntent,
 } from "@/lib/workbench/workbench-href";
 
@@ -21,6 +22,12 @@ function pathnameOf(href: string): string {
 function intentOf(href: string): WorkbenchIntent | null {
   return parseWorkbenchIntent(searchParamsOf(href));
 }
+
+describe("WORKBENCH_PATH", () => {
+  it("is the landing page", () => {
+    expect(WORKBENCH_PATH).toBe("/");
+  });
+});
 
 describe("createWorkbenchHref", () => {
   it("returns the bare workbench path when the intent is null", () => {
@@ -239,5 +246,31 @@ describe("legacyTerminalSearchToHref", () => {
     const href = legacyTerminalSearchToHref(new URLSearchParams());
 
     expect(intentOf(href)).toEqual({ open: "terminal", workspaceId: null });
+  });
+});
+
+describe("toUrlSearchParams", () => {
+  it("copies string values", () => {
+    const params = toUrlSearchParams({ workspace: "w9", open: "a b.ts" });
+
+    expect(params.toString()).toBe("workspace=w9&open=a+b.ts");
+  });
+
+  it("takes the first value of a repeated key", () => {
+    const params = toUrlSearchParams({ open: ["README.md", "b.ts"] });
+
+    expect(params.getAll("open")).toEqual(["README.md"]);
+  });
+
+  it("skips undefined values and empty arrays", () => {
+    const params = toUrlSearchParams({ open: undefined, expand: [] });
+
+    expect(params.toString()).toBe("");
+  });
+
+  it("keeps empty strings so the legacy parsers can treat them as absent", () => {
+    const params = toUrlSearchParams({ workspace: "" });
+
+    expect(params.has("workspace")).toBe(true);
   });
 });

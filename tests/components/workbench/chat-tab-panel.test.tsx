@@ -15,6 +15,7 @@ import { ChatTabPanel } from "@/components/workbench/tabs/chat-tab-panel";
 import type { Session } from "@/lib/opencode/types";
 import type { OpenWorkspaceTabInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
 import type { WorkbenchTabParams } from "@/lib/workbench/tab-descriptors";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import {
   _resetModuleCaches,
   useChatStore,
@@ -190,7 +191,6 @@ describe("ChatTabPanel", () => {
       isFocused: false,
       isVisible: true,
       isLastFocusedChat: true,
-      legacyPageMode: false,
     });
     expect(chatPropsOf(RIGHT_TAB)).toMatchObject({
       tabId: RIGHT_TAB,
@@ -353,11 +353,11 @@ describe("ChatTabPanel", () => {
     if (!openerInput) throw new Error("expected the new-chat opener call");
 
     // When
-    openerInput.navigate("/workbench?workspaceId=w2&open=new-chat");
+    openerInput.navigate(`${WORKBENCH_PATH}?workspaceId=w2&open=new-chat`);
 
     // Then
     expect(routerPushMock).toHaveBeenCalledExactlyOnceWith(
-      "/workbench?workspaceId=w2&open=new-chat",
+      `${WORKBENCH_PATH}?workspaceId=w2&open=new-chat`,
     );
     expect(useNewChatEngineStore.getState().engineByWorkspace).toEqual({});
   });

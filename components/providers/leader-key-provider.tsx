@@ -16,6 +16,7 @@ import type {
   ActivationKeyConfig,
 } from "@/types/leader-key";
 import { DEFAULT_LEADER_BINDINGS } from "@/lib/leader-key-defaults";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import {
   matchesActivationKey,
   DEFAULT_ACTIVATION_KEY,
@@ -63,12 +64,11 @@ interface LeaderKeyProviderProps {
 }
 
 function pageFromPathname(pathname: string): string {
-  if (pathname === "/" || pathname.startsWith("/dashboard")) return "dashboard";
-  if (pathname.startsWith("/chat")) return "chat";
+  if (pathname === WORKBENCH_PATH) return "workbench";
+  if (pathname.startsWith("/dashboard")) return "dashboard";
   if (pathname.startsWith("/git")) return "git";
   if (pathname.startsWith("/workspaces")) return "repos";
   if (pathname.startsWith("/settings")) return "settings";
-  if (pathname.startsWith("/files")) return "files";
   if (pathname.startsWith("/tasks")) return "tasks";
   return "unknown";
 }

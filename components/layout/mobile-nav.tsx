@@ -2,31 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  MessageSquare,
-  FileCode2,
-  GitMerge,
-  GitBranch,
-  Github,
-  Terminal,
-  Settings,
-  CheckSquare,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKeyboardVisible } from "@/hooks/use-keyboard-visible";
-
-const mobileNavItems = [
-  { href: "/", label: "Dash", icon: LayoutDashboard },
-  { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/files", label: "Files", icon: FileCode2 },
-  { href: "/git", label: "Git", icon: GitMerge },
-  { href: "/prs", label: "PRs", icon: Github },
-  { href: "/terminal", label: "Term", icon: Terminal },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare },
-  { href: "/workspaces", label: "Repos", icon: GitBranch },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
+import { isNavItemActive, NAV_ITEMS } from "@/components/layout/nav-items";
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -36,9 +14,8 @@ export function MobileNav() {
 
   return (
     <nav className="bg-background fixed right-0 bottom-0 left-0 z-50 flex h-16 items-center justify-around border-t md:hidden">
-      {mobileNavItems.map((item) => {
-        const isActive =
-          item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+      {NAV_ITEMS.map((item) => {
+        const isActive = isNavItemActive(item.href, pathname);
 
         return (
           <Link

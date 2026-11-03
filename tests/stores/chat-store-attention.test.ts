@@ -8,7 +8,10 @@ import type { Workspace } from "@/types";
 import { playSoundForEvent, type SoundEventType } from "@/lib/sounds";
 import { showBrowserNotification } from "@/lib/notifications";
 import { requestGitStatusRefresh } from "@/lib/git/git-status-refresh";
-import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
+import {
+  createWorkbenchHref,
+  WORKBENCH_PATH,
+} from "@/lib/workbench/workbench-href";
 import {
   _resetModuleCaches,
   resetTurnCompletionTracker,
@@ -266,7 +269,7 @@ beforeEach(() => {
   resetTurnCompletionTracker();
   vi.useFakeTimers();
   vi.spyOn(document, "hasFocus").mockReturnValue(false);
-  window.history.replaceState({}, "", "/");
+  window.history.replaceState({}, "", "/dashboard");
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -413,7 +416,7 @@ describe("finished notifications", () => {
       activeSessionId: "sess-root",
     });
     vi.mocked(document.hasFocus).mockReturnValue(true);
-    window.history.replaceState({}, "", "/chat");
+    window.history.replaceState({}, "", WORKBENCH_PATH);
 
     // When
     emit("session.idle", { sessionID: "sess-root" });

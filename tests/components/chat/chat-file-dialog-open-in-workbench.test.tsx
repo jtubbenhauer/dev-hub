@@ -3,7 +3,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ChatFileDialog } from "@/components/chat/chat-file-dialog";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
-import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
+import {
+  createWorkbenchHref,
+  WORKBENCH_PATH,
+} from "@/lib/workbench/workbench-href";
 import { useChatFileDialogStore } from "@/stores/chat-file-dialog-store";
 
 const hoisted = vi.hoisted(() => ({
@@ -100,11 +103,13 @@ describe("ChatFileDialog full editor link", () => {
     fireEvent.click(openDialogWith("saved content"));
 
     // When
-    hoisted.openFileInWorkbench.mock.lastCall?.[0].navigate("/workbench?x=1");
+    hoisted.openFileInWorkbench.mock.lastCall?.[0].navigate(
+      `${WORKBENCH_PATH}?x=1`,
+    );
 
     // Then
     expect(hoisted.routerPush).toHaveBeenCalledExactlyOnceWith(
-      "/workbench?x=1",
+      `${WORKBENCH_PATH}?x=1`,
     );
   });
 

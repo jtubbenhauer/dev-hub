@@ -7,13 +7,16 @@ import {
   navigateToNotificationTarget,
   setNotificationNavigator,
 } from "@/lib/notifications";
-import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
+import {
+  createWorkbenchHref,
+  WORKBENCH_PATH,
+} from "@/lib/workbench/workbench-href";
 import { attentionKey, useAttentionStore } from "@/stores/attention-store";
 import { useChatStore, type WorkspaceState } from "@/stores/chat-store";
 
 const navigation = vi.hoisted(() => ({
   push: vi.fn(),
-  pathname: "/chat",
+  pathname: "/",
 }));
 
 vi.mock("next/navigation", () => ({
@@ -21,7 +24,11 @@ vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
 }));
 
-const TARGET_HREF = "/chat?workspaceId=ws-1&sessionId=s-1";
+const TARGET_HREF = createWorkbenchHref({
+  open: "chat",
+  workspaceId: "ws-1",
+  sessionId: "s-1",
+});
 
 function makeSession(id: string, parentID?: string) {
   return {
@@ -71,8 +78,8 @@ function unseenKeys(): readonly string[] {
 
 beforeEach(() => {
   navigation.push.mockReset();
-  navigation.pathname = "/chat";
-  window.history.replaceState({}, "", "/chat");
+  navigation.pathname = WORKBENCH_PATH;
+  window.history.replaceState({}, "", WORKBENCH_PATH);
   useAttentionStore.setState({ unseenFinishedKeys: [] });
   useChatStore.setState({
     visibleSessionKeys: {},
@@ -175,21 +182,24 @@ describe("AttentionBridge unseen clearing", () => {
     expect(unseenKeys()).toEqual([]);
   });
 
-  it("clears nothing when the current path is not /chat", () => {
-    vi.spyOn(document, "hasFocus").mockReturnValue(true);
-    window.history.replaceState({}, "", "/git");
-    seedUnseen("s-1", "s-2");
-    render(<AttentionBridge />);
+  it.each(["/git", "/chat"])(
+    "clears nothing when the current path is %s",
+    (pathname) => {
+      vi.spyOn(document, "hasFocus").mockReturnValue(true);
+      window.history.replaceState({}, "", pathname);
+      seedUnseen("s-1", "s-2");
+      render(<AttentionBridge />);
 
-    act(() => {
-      useChatStore.setState({ activeSessionId: "s-2" });
-    });
+      act(() => {
+        useChatStore.setState({ activeSessionId: "s-2" });
+      });
 
-    expect(unseenKeys()).toEqual([
-      attentionKey("ws-1", "s-1"),
-      attentionKey("ws-1", "s-2"),
-    ]);
-  });
+      expect(unseenKeys()).toEqual([
+        attentionKey("ws-1", "s-1"),
+        attentionKey("ws-1", "s-2"),
+      ]);
+    },
+  );
 
   it("clears the root key when the active session is a child", () => {
     vi.spyOn(document, "hasFocus").mockReturnValue(true);

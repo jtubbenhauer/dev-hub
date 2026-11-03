@@ -77,6 +77,13 @@ export function useWorkbenchIntent({
     (state) => state.layoutReadyWorkspaceId,
   );
   const { isFileTabsDisabled } = useFileTabsSetting();
+  // Every applied intent targets the active workspace (a linked one is
+  // switched to first), so its session list is the one a chat link needs.
+  const isActiveSessionListLoaded = useChatStore(
+    (state) =>
+      activeWorkspaceId !== null &&
+      state.workspaceStates[activeWorkspaceId]?.sessionsLoaded === true,
+  );
   const lastProcessedQueryRef = useRef("");
 
   useEffect(() => {
@@ -114,6 +121,14 @@ export function useWorkbenchIntent({
 
     const workspaceId = intent.workspaceId ?? activeWorkspaceId;
     if (workspaceId === null || layoutReadyWorkspaceId !== workspaceId) return;
+    // Only a loaded session list can tell a dead session id from a live one.
+    if (
+      intent.open === "chat" &&
+      intent.sessionId !== null &&
+      !isActiveSessionListLoaded
+    ) {
+      return;
+    }
     const controller = getWorkbenchController();
     if (controller?.workspaceId !== workspaceId) return;
     applyWorkbenchIntent(
@@ -128,6 +143,7 @@ export function useWorkbenchIntent({
     finishIntent();
   }, [
     activeWorkspaceId,
+    isActiveSessionListLoaded,
     isFileTabsDisabled,
     layoutReadyWorkspaceId,
     queryString,

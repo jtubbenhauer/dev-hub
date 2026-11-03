@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { LeaderKeyProvider } from "@/components/providers/leader-key-provider";
+import {
+  LeaderKeyProvider,
+  useLeaderKey,
+} from "@/components/providers/leader-key-provider";
 import { WhichKeyPanel } from "@/components/leader-key/which-key-panel";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import type { LeaderBindingsMap } from "@/types/leader-key";
 
+const navigation = vi.hoisted(() => ({ pathname: "/" }));
+
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/files",
+  usePathname: () => navigation.pathname,
 }));
 
 const nextTab = vi.fn();
@@ -181,5 +186,40 @@ describe("LeaderKeyProvider repeat window", () => {
     waitMs(1000);
 
     expect(screen.queryByText("Next tab")).not.toBeInTheDocument();
+  });
+});
+
+function ActivePageProbe() {
+  const { activePage } = useLeaderKey();
+  return <output aria-label="Active leader page">{activePage}</output>;
+}
+
+describe("LeaderKeyProvider active page", () => {
+  afterEach(() => {
+    navigation.pathname = "/";
+  });
+
+  it.each([
+    { pathname: "/", page: "workbench" },
+    { pathname: "/dashboard", page: "dashboard" },
+    { pathname: "/git", page: "git" },
+    { pathname: "/workspaces", page: "repos" },
+    { pathname: "/chat", page: "unknown" },
+    { pathname: "/files", page: "unknown" },
+  ])("resolves $pathname to the $page page", ({ pathname, page }) => {
+    // Given
+    navigation.pathname = pathname;
+
+    // When
+    render(
+      <LeaderKeyProvider bindings={bindings}>
+        <ActivePageProbe />
+      </LeaderKeyProvider>,
+    );
+
+    // Then
+    expect(
+      screen.getByRole("status", { name: "Active leader page" }),
+    ).toHaveTextContent(page);
   });
 });

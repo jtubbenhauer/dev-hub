@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { ExportSessionDialog } from "@/components/chat/export-session-dialog";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import { useEditorStore } from "@/stores/editor-store";
 
 const hoisted = vi.hoisted(() => ({
@@ -145,10 +146,12 @@ describe("ExportSessionDialog", () => {
       expect(hoisted.openFileInWorkbench).toHaveBeenCalledOnce(),
     );
 
-    hoisted.openFileInWorkbench.mock.lastCall?.[0].navigate("/workbench?x=1");
+    hoisted.openFileInWorkbench.mock.lastCall?.[0].navigate(
+      `${WORKBENCH_PATH}?x=1`,
+    );
 
     expect(hoisted.routerPush).toHaveBeenCalledExactlyOnceWith(
-      "/workbench?x=1",
+      `${WORKBENCH_PATH}?x=1`,
     );
   });
 

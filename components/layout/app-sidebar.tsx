@@ -2,18 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  MessageSquare,
-  FileCode2,
-  GitMerge,
-  GitBranch,
-  GitCompare,
-  Github,
-  Terminal,
-  Settings,
-  CheckSquare,
-} from "lucide-react";
+import { GitCompare } from "lucide-react";
 import { useMemo, useRef } from "react";
 import { useCommand } from "@/hooks/use-command";
 import { useLeaderAction } from "@/hooks/use-leader-action";
@@ -24,6 +13,9 @@ import { useTaskPicker } from "@/components/task-picker/task-picker";
 import { useGitPicker } from "@/components/git-picker/git-picker";
 import { useWorkspacePicker } from "@/components/workspace-picker/workspace-picker";
 import { openFindInFiles } from "@/lib/files/open-find-in-files";
+import { focusRecentInWorkbench } from "@/lib/workbench/open-in-workbench";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
+import { isNavItemActive, NAV_ITEMS } from "@/components/layout/nav-items";
 import {
   Sidebar,
   SidebarContent,
@@ -32,18 +24,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-
-const navItems = [
-  { href: "/", label: "Dash", icon: LayoutDashboard },
-  { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/files", label: "Files", icon: FileCode2 },
-  { href: "/git", label: "Git", icon: GitMerge },
-  { href: "/prs", label: "PRs", icon: Github },
-  { href: "/terminal", label: "Term", icon: Terminal },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare },
-  { href: "/workspaces", label: "Repos", icon: GitBranch },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -57,14 +37,14 @@ export function AppSidebar() {
 
   const navCommands = useMemo(
     () =>
-      navItems.map((item) => ({
+      NAV_ITEMS.map((item) => ({
         id: `nav:${item.href}`,
         label: `Go to ${item.label}`,
         group: "Navigation",
         icon: item.icon,
         onSelect: () => router.push(item.href),
       })),
-    // router is stable; navItems is module-level constant
+    // router is stable; NAV_ITEMS is a module-level constant
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -107,31 +87,40 @@ export function AppSidebar() {
   const openWorkspacePickerRef = useRef(openWorkspacePicker);
   openWorkspacePickerRef.current = openWorkspacePicker;
 
-  const globalLeaderActions = useMemo(
-    () => [
+  const globalLeaderActions = useMemo(() => {
+    const navigate = (href: string) => routerRef.current.push(href);
+    return [
+      {
+        action: {
+          id: "nav:workbench",
+          label: "Go to Workbench",
+          page: "global" as const,
+        },
+        handler: () => navigate(WORKBENCH_PATH),
+      },
       {
         action: {
           id: "nav:chat",
-          label: "Go to Chat",
+          label: "Focus chat tab",
           page: "global" as const,
         },
-        handler: () => routerRef.current.push("/chat"),
+        handler: () => focusRecentInWorkbench({ kind: "chat", navigate }),
       },
       {
         action: {
           id: "nav:files",
-          label: "Go to Files",
+          label: "Focus file tab",
           page: "global" as const,
         },
-        handler: () => routerRef.current.push("/files"),
+        handler: () => focusRecentInWorkbench({ kind: "file", navigate }),
       },
       {
         action: { id: "nav:git", label: "Go to Git", page: "global" as const },
-        handler: () => routerRef.current.push("/git"),
+        handler: () => navigate("/git"),
       },
       {
         action: { id: "nav:prs", label: "Go to PRs", page: "global" as const },
-        handler: () => routerRef.current.push("/prs"),
+        handler: () => navigate("/prs"),
       },
       {
         action: {
@@ -139,7 +128,7 @@ export function AppSidebar() {
           label: "Go to Tasks",
           page: "global" as const,
         },
-        handler: () => routerRef.current.push("/tasks"),
+        handler: () => navigate("/tasks"),
       },
       {
         action: {
@@ -147,7 +136,7 @@ export function AppSidebar() {
           label: "Go to Dashboard",
           page: "global" as const,
         },
-        handler: () => routerRef.current.push("/"),
+        handler: () => navigate("/dashboard"),
       },
       {
         action: {
@@ -155,7 +144,7 @@ export function AppSidebar() {
           label: "Go to Repos",
           page: "global" as const,
         },
-        handler: () => routerRef.current.push("/workspaces"),
+        handler: () => navigate("/workspaces"),
       },
       {
         action: {
@@ -163,7 +152,7 @@ export function AppSidebar() {
           label: "Go to Settings",
           page: "global" as const,
         },
-        handler: () => routerRef.current.push("/settings"),
+        handler: () => navigate("/settings"),
       },
       {
         action: {
@@ -188,10 +177,7 @@ export function AppSidebar() {
           page: "global" as const,
         },
         handler: () =>
-          openFindInFiles({
-            pathname: pathnameRef.current,
-            push: (href) => routerRef.current.push(href),
-          }),
+          openFindInFiles({ pathname: pathnameRef.current, push: navigate }),
       },
       {
         action: {
@@ -228,14 +214,13 @@ export function AppSidebar() {
       {
         action: {
           id: "nav:terminal",
-          label: "Go to Terminal",
+          label: "Focus terminal tab",
           page: "global" as const,
         },
-        handler: () => routerRef.current.push("/terminal"),
+        handler: () => focusRecentInWorkbench({ kind: "terminal", navigate }),
       },
-    ],
-    [],
-  );
+    ];
+  }, []);
 
   useLeaderAction(globalLeaderActions);
 
@@ -244,11 +229,8 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup className="p-2">
           <SidebarMenu className="gap-1">
-            {navItems.map((item) => {
-              const isActive =
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(item.href);
+            {NAV_ITEMS.map((item) => {
+              const isActive = isNavItemActive(item.href, pathname);
               return (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton

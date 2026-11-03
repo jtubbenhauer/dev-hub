@@ -110,3 +110,40 @@ describe("leader-key-defaults file tab actions", () => {
     expect(collisions).toEqual([]);
   });
 });
+
+describe("leader-key-defaults workbench navigation", () => {
+  it("adds a global nav:workbench action bound to 'g w'", () => {
+    const workbenchAction = BUILTIN_ACTIONS.find(
+      (action) => action.id === "nav:workbench",
+    );
+
+    expect(workbenchAction).toEqual({
+      id: "nav:workbench",
+      label: "Go to Workbench",
+      page: "global",
+    });
+    expect(DEFAULT_LEADER_BINDINGS["nav:workbench"]).toBe("g w");
+  });
+
+  it("does not map any other action to 'g w'", () => {
+    const collisions = Object.entries(DEFAULT_LEADER_BINDINGS).filter(
+      ([id, keys]) => keys === "g w" && id !== "nav:workbench",
+    );
+
+    expect(collisions).toEqual([]);
+  });
+
+  it.each([
+    { id: "nav:chat", label: "Focus chat tab", keys: "g c" },
+    { id: "nav:files", label: "Focus file tab", keys: "g f" },
+    { id: "nav:terminal", label: "Focus terminal tab", keys: "g m" },
+  ])(
+    "keeps $id on '$keys' as a global '$label' action",
+    ({ id, label, keys }) => {
+      const action = BUILTIN_ACTIONS.find((candidate) => candidate.id === id);
+
+      expect(action).toEqual({ id, label, page: "global" });
+      expect(DEFAULT_LEADER_BINDINGS[id]).toBe(keys);
+    },
+  );
+});

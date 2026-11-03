@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { GitPanel } from "@/components/git/git-panel";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import type { GitStatusResult, Workspace } from "@/types";
 
 const hoisted = vi.hoisted(() => {
@@ -165,11 +166,13 @@ describe("GitPanel open in editor", () => {
     );
 
     // When
-    hoisted.openFileInWorkbench.mock.lastCall?.[0].navigate("/workbench?x=1");
+    hoisted.openFileInWorkbench.mock.lastCall?.[0].navigate(
+      `${WORKBENCH_PATH}?x=1`,
+    );
 
     // Then
     expect(hoisted.routerPush).toHaveBeenCalledExactlyOnceWith(
-      "/workbench?x=1",
+      `${WORKBENCH_PATH}?x=1`,
     );
   });
 });

@@ -9,6 +9,7 @@ import type { ContextSidebar } from "@/components/workbench/context-sidebar/cont
 import { getLspOpenFileHandler } from "@/lib/lsp/client/navigation-registry";
 import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
 import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
+import type { Session } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
 import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 import { useEditorStore } from "@/stores/editor-store";
@@ -105,6 +106,17 @@ vi.mock("@/components/workbench/context-sidebar/context-sidebar", async () => {
 
 const initialChatState = useChatStore.getState();
 const initialWorkspaceState = useWorkspaceStore.getState();
+
+function makeSession(id: string): Session {
+  return {
+    id,
+    projectID: "project",
+    directory: "/workspaces/w1",
+    title: `Session ${id}`,
+    version: "1",
+    time: { created: 1, updated: 1 },
+  };
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -413,12 +425,24 @@ describe("WorkbenchView", () => {
       );
     });
 
-    it("selects a linked session and opens its tab while the session list is still loading", () => {
+    it("waits for the session list before opening a linked session's tab", () => {
       // Given
       fakeUrl.setSearch("open=chat&sessionId=s1");
+      renderWorkbenchView();
+      expect(useChatStore.getState().activeSessionId).toBeNull();
+      expect(fakeUrl.router.replace).not.toHaveBeenCalled();
 
       // When
-      renderWorkbenchView();
+      act(() => {
+        useChatStore.setState({
+          workspaceStates: {
+            w1: {
+              ...createLoadedChatWorkspaceState(),
+              sessions: { s1: makeSession("s1") },
+            },
+          },
+        });
+      });
 
       // Then
       expect(useChatStore.getState().activeSessionId).toBe("s1");
@@ -428,6 +452,32 @@ describe("WorkbenchView", () => {
         workspaceId: "w1",
         sessionId: "s1",
       });
+      expect(fakeUrl.router.replace).toHaveBeenCalledWith(WORKBENCH_PATH);
+    });
+
+    it("drops a linked session the session list turns out to lack", () => {
+      // Given
+      fakeUrl.setSearch("open=chat&sessionId=does-not-exist");
+      renderWorkbenchView();
+
+      // When
+      act(() => {
+        useChatStore.setState({
+          workspaceStates: { w1: createLoadedChatWorkspaceState() },
+        });
+      });
+
+      // Then
+      expect(useChatStore.getState().activeSessionId).toBeNull();
+      expect(fakeUrl.router.replace).toHaveBeenCalledWith(WORKBENCH_PATH);
+      expect(useWorkbenchStore.getState().focusedPanel?.params).toEqual({
+        kind: "chat",
+        workspaceId: "w1",
+        sessionId: null,
+      });
+      expect(screen.getAllByRole("button", { name: /^Close / })).toHaveLength(
+        1,
+      );
     });
 
     it("does not bind a session the loaded session list lacks", () => {

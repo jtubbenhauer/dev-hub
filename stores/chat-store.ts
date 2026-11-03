@@ -368,7 +368,7 @@ function isRootSessionOnScreen(
   rootSessionId: string,
 ): boolean {
   if (typeof window === "undefined") return false;
-  if (!["/chat", WORKBENCH_PATH].includes(window.location.pathname)) {
+  if (window.location.pathname !== WORKBENCH_PATH) {
     return false;
   }
   if (document.visibilityState !== "visible" || !document.hasFocus()) {

@@ -90,7 +90,6 @@ function ChatTabBody({ api, containerApi, params }: ChatTabBodyProps) {
       isFocused={isFocused}
       isVisible={isVisible}
       isLastFocusedChat={isLastFocusedChat}
-      legacyPageMode={false}
       onSessionChosen={handleSessionChosen}
       onNewChatInWorkspace={handleNewChatInWorkspace}
     />

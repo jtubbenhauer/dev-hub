@@ -3,7 +3,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { FilePathCode } from "@/components/chat/file-path-code";
 import type { ChatFileOpenMode } from "@/hooks/use-settings";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
-import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
+import {
+  createWorkbenchHref,
+  WORKBENCH_PATH,
+} from "@/lib/workbench/workbench-href";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { mountFakeWorkbench } from "@/tests/helpers/fake-workbench-controller";
 
@@ -122,11 +125,11 @@ describe("FilePathCode open mode", () => {
     const input = hoisted.openFileInWorkbench.mock.lastCall?.[0];
 
     // When
-    input?.navigate("/workbench?open=file&path=x");
+    input?.navigate(`${WORKBENCH_PATH}?open=file&path=x`);
 
     // Then
     expect(hoisted.routerPush).toHaveBeenCalledWith(
-      "/workbench?open=file&path=x",
+      `${WORKBENCH_PATH}?open=file&path=x`,
     );
   });
 

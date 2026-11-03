@@ -12,8 +12,6 @@ import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import { useAttentionStore } from "@/stores/attention-store";
 import { useChatStore } from "@/stores/chat-store";
 
-const CHAT_VIEW_PATHNAMES: readonly string[] = ["/chat", WORKBENCH_PATH];
-
 function listOnScreenChatSessions(): SessionRef[] {
   const { activeWorkspaceId, activeSessionId, visibleSessionKeys } =
     useChatStore.getState();
@@ -28,7 +26,7 @@ function listOnScreenChatSessions(): SessionRef[] {
 }
 
 export function clearVisibleChatSessionsUnseen(): void {
-  if (!CHAT_VIEW_PATHNAMES.includes(window.location.pathname)) return;
+  if (window.location.pathname !== WORKBENCH_PATH) return;
   if (document.visibilityState !== "visible") return;
   if (!document.hasFocus()) return;
 

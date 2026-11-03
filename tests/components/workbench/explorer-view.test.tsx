@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ExplorerView } from "@/components/workbench/context-sidebar/explorer-view";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import { useContentSearchStore } from "@/stores/content-search-store";
 import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 import { useEditorStore } from "@/stores/editor-store";
@@ -115,11 +116,11 @@ describe("ExplorerView", () => {
     if (!navigate) throw new Error("expected the opener to receive navigate");
 
     // When
-    navigate("/workbench?open=file&path=a.ts");
+    navigate(`${WORKBENCH_PATH}?open=file&path=a.ts`);
 
     // Then
     expect(doubles.push).toHaveBeenCalledExactlyOnceWith(
-      "/workbench?open=file&path=a.ts",
+      `${WORKBENCH_PATH}?open=file&path=a.ts`,
     );
   });
 

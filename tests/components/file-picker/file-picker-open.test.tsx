@@ -8,6 +8,7 @@ import {
   useFilePicker,
 } from "@/components/file-picker/file-picker";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
 
@@ -163,11 +164,13 @@ describe("FilePickerDialog opening a file", () => {
     await user.keyboard("{Enter}");
 
     // When
-    hoisted.openFileInWorkbench.mock.lastCall?.[0].navigate("/workbench?x=1");
+    hoisted.openFileInWorkbench.mock.lastCall?.[0].navigate(
+      `${WORKBENCH_PATH}?x=1`,
+    );
 
     // Then
     expect(hoisted.routerPush).toHaveBeenCalledExactlyOnceWith(
-      "/workbench?x=1",
+      `${WORKBENCH_PATH}?x=1`,
     );
   });
 });

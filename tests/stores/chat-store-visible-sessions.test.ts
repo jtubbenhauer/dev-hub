@@ -427,6 +427,22 @@ describe("finished turns of sessions shown on the workbench", () => {
     // Then
     expect(unseenKeys()).toEqual(["ws-1:sess-root"]);
   });
+
+  it("marks a finished active root unseen on the legacy chat path", () => {
+    // Given
+    seedWorkspace([rootSession], { "sess-root": BUSY });
+    useChatStore.setState({
+      activeWorkspaceId: WS,
+      activeSessionId: "sess-root",
+    });
+    window.history.replaceState({}, "", "/chat");
+
+    // When
+    finishRootTurn();
+
+    // Then
+    expect(unseenKeys()).toEqual(["ws-1:sess-root"]);
+  });
 });
 
 describe("getStreamingStatus", () => {

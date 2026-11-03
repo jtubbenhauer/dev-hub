@@ -1,6 +1,10 @@
 import { parseChatUrlState } from "@/lib/chat-url-state";
 
-export const WORKBENCH_PATH = "/workbench";
+export const WORKBENCH_PATH = "/";
+
+export type SearchParamsRecord = Readonly<
+  Record<string, string | readonly string[] | undefined>
+>;
 
 export type WorkbenchIntent =
   | {
@@ -137,4 +141,14 @@ export function legacyTerminalSearchToHref(params: URLSearchParams): string {
     open: "terminal",
     workspaceId: readNonEmptySearchParam(params, "workspace"),
   });
+}
+
+// Next hands pages their query as a record; repeated keys keep the first value.
+export function toUrlSearchParams(record: SearchParamsRecord): URLSearchParams {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(record)) {
+    const firstValue = typeof value === "string" ? value : value?.[0];
+    if (firstValue !== undefined) searchParams.set(key, firstValue);
+  }
+  return searchParams;
 }

@@ -6,6 +6,7 @@ import { DockviewReact, type DockviewApi } from "dockview-react";
 import { DiffTabPanel } from "@/components/workbench/tabs/diff-tab-panel";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
 import type { DiffTabParams } from "@/lib/workbench/tab-descriptors";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 
 interface CapturedDiffViewProps {
   readonly workspaceId: string;
@@ -236,11 +237,11 @@ describe("DiffTabPanel", () => {
     const [input] = openFileInWorkbenchMock.mock.lastCall ?? [];
 
     // When
-    act(() => input?.navigate("/workbench?open=file"));
+    act(() => input?.navigate(`${WORKBENCH_PATH}?open=file`));
 
     // Then
     expect(routerPushMock).toHaveBeenCalledExactlyOnceWith(
-      "/workbench?open=file",
+      `${WORKBENCH_PATH}?open=file`,
     );
   });
 

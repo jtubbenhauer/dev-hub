@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import type { FocusRecentInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
 
 const mockPathname = vi.fn(() => "/");
 const pushMock = vi.fn();
@@ -54,6 +55,15 @@ const mockOpenFindInFiles = vi.fn();
 vi.mock("@/lib/files/open-find-in-files", () => ({
   openFindInFiles: (...args: unknown[]) => mockOpenFindInFiles(...args),
 }));
+const workbenchOpeners = vi.hoisted(() => ({
+  focusRecentInWorkbench: vi.fn<(input: FocusRecentInWorkbenchInput) => void>(),
+}));
+vi.mock("@/lib/workbench/open-in-workbench", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/lib/workbench/open-in-workbench")
+  >()),
+  focusRecentInWorkbench: workbenchOpeners.focusRecentInWorkbench,
+}));
 
 globalThis.ResizeObserver = class {
   observe() {}
@@ -75,11 +85,44 @@ Object.defineProperty(window, "matchMedia", {
   })),
 });
 
+interface LeaderRegistration {
+  readonly action: { readonly id: string; readonly label: string };
+  readonly handler: () => void;
+}
+
+const NAV_LINKS = [
+  { label: "Work", href: "/" },
+  { label: "Dash", href: "/dashboard" },
+  { label: "Git", href: "/git" },
+  { label: "PRs", href: "/prs" },
+  { label: "Tasks", href: "/tasks" },
+  { label: "Repos", href: "/workspaces" },
+  { label: "Settings", href: "/settings" },
+];
+
 function renderSidebar() {
   return render(
     <SidebarProvider>
       <AppSidebar />
     </SidebarProvider>,
+  );
+}
+
+function leaderRegistrations(): LeaderRegistration[] {
+  return mockUseLeaderAction.mock.calls[0][0];
+}
+
+function leaderHandler(actionId: string): () => void {
+  const registration = leaderRegistrations().find(
+    (candidate) => candidate.action.id === actionId,
+  );
+  if (!registration) throw new Error(`${actionId} was never registered`);
+  return registration.handler;
+}
+
+function activeNavLabels(): string[] {
+  return Array.from(document.querySelectorAll("[data-active='true']")).map(
+    (element) => element.textContent ?? "",
   );
 }
 
@@ -89,70 +132,99 @@ describe("AppSidebar", () => {
     mockUseCommand.mockClear();
     mockUseLeaderAction.mockClear();
     pushMock.mockClear();
+    workbenchOpeners.focusRecentInWorkbench.mockClear();
   });
 
-  it("renders all 9 navigation items with correct labels", () => {
+  it("renders the Work, Dash, Git, PRs, Tasks, Repos and Settings links in order", () => {
     renderSidebar();
 
-    const labels = [
-      "Dash",
-      "Chat",
-      "Files",
-      "Git",
-      "Term",
-      "Tasks",
-      "Repos",
-      "Settings",
-      "PRs",
-      "Tasks",
-      "Repos",
-      "Settings",
-    ];
-    for (const label of labels) {
-      expect(screen.getByText(label)).toBeInTheDocument();
-    }
+    const links = screen.getAllByRole("link").map((link) => ({
+      label: link.textContent,
+      href: link.getAttribute("href"),
+    }));
+    expect(links).toEqual(NAV_LINKS);
   });
 
-  it("renders a link to /prs with label PRs", () => {
+  it.each([
+    { pathname: "/", activeLabel: "Work" },
+    { pathname: "/dashboard", activeLabel: "Dash" },
+    { pathname: "/git", activeLabel: "Git" },
+    { pathname: "/workspaces/ws-1", activeLabel: "Repos" },
+  ])(
+    "marks only $activeLabel active when pathname is $pathname",
+    ({ pathname, activeLabel }) => {
+      mockPathname.mockReturnValue(pathname);
+
+      renderSidebar();
+
+      expect(activeNavLabels()).toEqual([activeLabel]);
+    },
+  );
+
+  it("offers a palette command for every navigation link", () => {
     renderSidebar();
 
-    const prsLink = screen
-      .getAllByRole("link")
-      .find((el) => el.getAttribute("href") === "/prs");
-    expect(prsLink).toBeTruthy();
-    expect(prsLink).toHaveTextContent("PRs");
+    const commands: { id: string; onSelect: () => void }[] =
+      mockUseCommand.mock.calls[0][0];
+    commands.find((command) => command.id === "nav:/dashboard")?.onSelect();
+
+    expect(commands.map((command) => command.id)).toEqual(
+      NAV_LINKS.map((link) => `nav:${link.href}`),
+    );
+    expect(pushMock).toHaveBeenCalledExactlyOnceWith("/dashboard");
   });
 
-  it("registers a nav:prs leader action that routes to /prs", () => {
+  it.each([
+    { actionId: "nav:workbench", href: "/" },
+    { actionId: "nav:dashboard", href: "/dashboard" },
+    { actionId: "nav:prs", href: "/prs" },
+  ])("routes the $actionId leader action to $href", ({ actionId, href }) => {
     renderSidebar();
 
-    const registrations = mockUseLeaderAction.mock.calls[0][0] as {
-      action: { id: string };
-      handler: () => void;
-    }[];
-    const prsAction = registrations.find((r) => r.action.id === "nav:prs");
-    expect(prsAction).toBeTruthy();
+    leaderHandler(actionId)();
 
-    prsAction?.handler();
-    expect(pushMock).toHaveBeenCalledWith("/prs");
+    expect(pushMock).toHaveBeenCalledExactlyOnceWith(href);
+  });
+
+  it.each([
+    { actionId: "nav:chat", kind: "chat" },
+    { actionId: "nav:files", kind: "file" },
+    { actionId: "nav:terminal", kind: "terminal" },
+  ] as const)(
+    "focuses the most recent $kind tab from the $actionId leader action",
+    ({ actionId, kind }) => {
+      renderSidebar();
+
+      leaderHandler(actionId)();
+
+      expect(workbenchOpeners.focusRecentInWorkbench).toHaveBeenCalledOnce();
+      expect(
+        workbenchOpeners.focusRecentInWorkbench.mock.lastCall?.[0].kind,
+      ).toBe(kind);
+      expect(pushMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("routes the focus opener's navigation through the router", () => {
+    renderSidebar();
+    leaderHandler("nav:terminal")();
+
+    workbenchOpeners.focusRecentInWorkbench.mock.lastCall?.[0].navigate(
+      "/?open=terminal",
+    );
+
+    expect(pushMock).toHaveBeenCalledExactlyOnceWith("/?open=terminal");
   });
 
   it("registers a global:find-in-files leader action with the current pathname", () => {
-    mockPathname.mockReturnValue("/chat");
+    mockPathname.mockReturnValue("/git");
     mockOpenFindInFiles.mockClear();
     renderSidebar();
 
-    const registrations: {
-      action: { id: string };
-      handler: () => void;
-    }[] = mockUseLeaderAction.mock.calls[0][0];
-    const findAction = registrations.find(
-      (r) => r.action.id === "global:find-in-files",
-    );
-    findAction?.handler();
+    leaderHandler("global:find-in-files")();
 
     expect(mockOpenFindInFiles).toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: "/chat" }),
+      expect.objectContaining({ pathname: "/git" }),
     );
   });
 
@@ -171,45 +243,11 @@ describe("AppSidebar", () => {
     renderSidebar();
 
     const labels = screen.getAllByText(
-      /^(Dash|Chat|Files|Git|PRs|Term|Tasks|Repos|Settings)$/,
+      /^(Work|Dash|Git|PRs|Tasks|Repos|Settings)$/,
     );
+    expect(labels).toHaveLength(NAV_LINKS.length);
     for (const label of labels) {
       expect(label).toHaveClass("text-[10px]");
     }
-  });
-
-  it("marks Chat nav item as active when pathname is /chat", () => {
-    mockPathname.mockReturnValue("/chat");
-    renderSidebar();
-
-    // data-active="true" is set by SidebarMenuButton when isActive prop is true
-    const activeButtons = document.querySelectorAll("[data-active='true']");
-    const chatActive = Array.from(activeButtons).some((el) =>
-      el.textContent?.includes("Chat"),
-    );
-    expect(chatActive).toBe(true);
-  });
-
-  it("marks Dash active but NOT Chat when pathname is /", () => {
-    mockPathname.mockReturnValue("/");
-    renderSidebar();
-
-    const activeButtons = document.querySelectorAll("[data-active='true']");
-    const dashActive = Array.from(activeButtons).some((el) =>
-      el.textContent?.includes("Dash"),
-    );
-    const chatActive = Array.from(activeButtons).some((el) =>
-      el.textContent?.includes("Chat"),
-    );
-
-    expect(dashActive).toBe(true);
-    expect(chatActive).toBe(false);
-  });
-
-  it("calls useCommand and useLeaderAction hooks on render", () => {
-    renderSidebar();
-
-    expect(mockUseCommand).toHaveBeenCalled();
-    expect(mockUseLeaderAction).toHaveBeenCalled();
   });
 });

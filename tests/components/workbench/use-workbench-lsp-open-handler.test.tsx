@@ -7,6 +7,7 @@ import { useWorkbenchLspOpenHandler } from "@/components/workbench/use-workbench
 import { SETTINGS_KEYS } from "@/hooks/use-settings";
 import { getLspOpenFileHandler } from "@/lib/lsp/client/navigation-registry";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import { useWorkbenchStore } from "@/stores/workbench-store";
 
 const { openFileInWorkbenchMock, routerPushMock } = vi.hoisted(() => ({
@@ -90,11 +91,13 @@ describe("useWorkbenchLspOpenHandler", () => {
     const [input] = openFileInWorkbenchMock.mock.lastCall ?? [];
 
     // When
-    input?.navigate("/workbench?workspaceId=w1&open=file&path=src%2Fb.ts");
+    input?.navigate(
+      `${WORKBENCH_PATH}?workspaceId=w1&open=file&path=src%2Fb.ts`,
+    );
 
     // Then
     expect(routerPushMock).toHaveBeenCalledExactlyOnceWith(
-      "/workbench?workspaceId=w1&open=file&path=src%2Fb.ts",
+      `${WORKBENCH_PATH}?workspaceId=w1&open=file&path=src%2Fb.ts`,
     );
   });
 

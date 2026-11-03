@@ -9,6 +9,7 @@ import {
 import type { ChatEngine } from "@/lib/engine/types";
 import type { Session } from "@/lib/opencode/types";
 import type { OpenChatInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import { useChatStore, type WorkspaceState } from "@/stores/chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace } from "@/types";
@@ -223,10 +224,10 @@ describe("SessionPickerDialog workbench opening", () => {
     const openerInput = workbenchOpeners.openChatInWorkbench.mock.lastCall?.[0];
 
     // When
-    openerInput?.navigate("/workbench?open=chat");
+    openerInput?.navigate(`${WORKBENCH_PATH}?open=chat`);
 
     // Then
-    expect(navigation.push).toHaveBeenCalledWith("/workbench?open=chat");
+    expect(navigation.push).toHaveBeenCalledWith(`${WORKBENCH_PATH}?open=chat`);
   });
 
   it("waits for the new session before opening it", async () => {

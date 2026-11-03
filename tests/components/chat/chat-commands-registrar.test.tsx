@@ -53,7 +53,7 @@ vi.mock("@/hooks/use-workspace-engine", () => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => "/workbench",
+  usePathname: () => "/",
 }));
 
 interface PromptInputStubProps {
@@ -189,7 +189,6 @@ function tabProps(
     isFocused: false,
     isLastFocusedChat: false,
     isVisible: true,
-    legacyPageMode: false,
     ...overrides,
   };
 }

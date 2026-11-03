@@ -31,6 +31,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { QuickAction } from "@/types";
+import { createWorkbenchHref } from "@/lib/workbench/workbench-href";
 
 const DEFAULT_ACTIONS: QuickAction[] = [
   {
@@ -38,7 +39,11 @@ const DEFAULT_ACTIONS: QuickAction[] = [
     label: "Open Chat",
     icon: "MessageSquare",
     type: "navigate",
-    target: "/chat",
+    target: createWorkbenchHref({
+      open: "chat",
+      workspaceId: null,
+      sessionId: null,
+    }),
   },
   {
     id: "default-files",

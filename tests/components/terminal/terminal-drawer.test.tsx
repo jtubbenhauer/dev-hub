@@ -8,6 +8,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { TerminalHandle } from "@/components/terminal/terminal-panel";
 import type { TerminalSessionInfo } from "@/lib/terminal/terminal-protocol";
 import type { OpenChatInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
+import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import type { Workspace } from "@/types";
 
 interface CapturedPanelProps {
@@ -327,11 +328,11 @@ describe("TerminalDrawer", () => {
     const openerInput = workbenchOpeners.openChatInWorkbench.mock.lastCall?.[0];
 
     // When
-    openerInput?.navigate("/workbench?workspaceId=ws-1&open=chat");
+    openerInput?.navigate(`${WORKBENCH_PATH}?workspaceId=ws-1&open=chat`);
 
     // Then
     expect(mockPush).toHaveBeenCalledWith(
-      "/workbench?workspaceId=ws-1&open=chat",
+      `${WORKBENCH_PATH}?workspaceId=ws-1&open=chat`,
     );
   });
 

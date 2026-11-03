@@ -2,14 +2,6 @@ import type { SessionAgeFilter } from "@/lib/session-filters";
 
 export type ChatListView = "unified" | "workspace";
 
-export interface ChatHrefState {
-  readonly workspaceId: string | null;
-  readonly sessionId: string | null;
-  readonly view?: ChatListView;
-  readonly groupByWorkspace?: boolean;
-  readonly age?: SessionAgeFilter;
-}
-
 export interface ParsedChatUrlState {
   readonly hasChatState: boolean;
   readonly workspaceId: string | null;
@@ -33,20 +25,6 @@ function getNonEmptySearchParam(
 ): string | null {
   const value = searchParams.get(key);
   return value ? value : null;
-}
-
-export function createChatHref(state: ChatHrefState): string {
-  const searchParams = new URLSearchParams();
-  if (state.workspaceId) searchParams.set("workspaceId", state.workspaceId);
-  if (state.sessionId) searchParams.set("sessionId", state.sessionId);
-  if (state.view) searchParams.set("view", state.view);
-  if (state.groupByWorkspace !== undefined) {
-    searchParams.set("group", state.groupByWorkspace ? "1" : "0");
-  }
-  if (state.age) searchParams.set("age", state.age);
-
-  const query = searchParams.toString();
-  return query ? `/chat?${query}` : "/chat";
 }
 
 export function parseChatUrlState(

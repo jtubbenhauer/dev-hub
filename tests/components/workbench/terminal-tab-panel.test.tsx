@@ -101,6 +101,7 @@ function renderTerminalWorkbench(): TerminalWorkbench {
     layoutApi,
     workspaceId: WORKSPACE_ID,
     endTerminalSession: vi.fn(),
+    isMobile: false,
   });
   return { layoutApi, controller };
 }

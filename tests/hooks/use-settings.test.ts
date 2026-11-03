@@ -5,11 +5,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_CHAT_FILE_OPEN_MODE,
   resolveChatFileOpenMode,
+  SETTINGS_KEYS,
   TERMINAL_FONT_OPTIONS,
   terminalFontFamily,
   useSettings,
   useSettingsMutation,
+  useWorkbenchChordsSetting,
 } from "@/hooks/use-settings";
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
 
 function createQueryWrapper() {
   const queryClient = new QueryClient({
@@ -108,6 +114,91 @@ describe("terminalFontFamily", () => {
       value: "jetbrains-mono-nerd",
       label: "JetBrains Mono Nerd Font",
       fontFamily: "JetBrainsMonoNerdFontMono, monospace",
+    });
+  });
+});
+
+function stubSettingsFetch(settings: Record<string, unknown>) {
+  const fetchMock = vi.fn(
+    async (_input: RequestInfo | URL, init?: RequestInit) =>
+      Response.json(init?.method === "PUT" ? { ok: true } : settings),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+describe("useWorkbenchChordsSetting", () => {
+  it("stores the switch under the workbench-chords-enabled key", () => {
+    expect(SETTINGS_KEYS.WORKBENCH_CHORDS_ENABLED).toBe(
+      "workbench-chords-enabled",
+    );
+  });
+
+  it("is on while the settings are still loading", () => {
+    // Given
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+
+    // When
+    const { result } = renderHook(() => useWorkbenchChordsSetting(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    // Then
+    expect(result.current.isEnabled).toBe(true);
+  });
+
+  it("is on when the switch was never saved", async () => {
+    // Given
+    const fetchMock = stubSettingsFetch({});
+
+    // When
+    const { result } = renderHook(() => useWorkbenchChordsSetting(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    // Then
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(result.current.isEnabled).toBe(true);
+  });
+
+  it("is off once the switch is saved as false", async () => {
+    // Given
+    stubSettingsFetch({ "workbench-chords-enabled": false });
+
+    // When
+    const { result } = renderHook(() => useWorkbenchChordsSetting(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    // Then
+    await waitFor(() => expect(result.current.isEnabled).toBe(false));
+  });
+
+  it("saves the switch when it is turned off", async () => {
+    // Given
+    const fetchMock = stubSettingsFetch({});
+    const { result } = renderHook(() => useWorkbenchChordsSetting(), {
+      wrapper: createQueryWrapper(),
+    });
+
+    // When
+    act(() => result.current.setIsEnabled(false));
+
+    // Then
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.find(([, init]) => init?.method === "PUT"),
+      ).toBeDefined(),
+    );
+    const putCall = fetchMock.mock.calls.find(
+      ([, init]) => init?.method === "PUT",
+    );
+    expect(JSON.parse(String(putCall?.[1]?.body))).toEqual({
+      key: "workbench-chords-enabled",
+      value: false,
     });
   });
 });

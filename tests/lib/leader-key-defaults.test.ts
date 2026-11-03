@@ -64,50 +64,73 @@ describe("leader-key-defaults global:find-in-files", () => {
   });
 });
 
-describe("leader-key-defaults file tab actions", () => {
-  const tabActionIds = ["files:next-tab", "files:prev-tab", "files:close-tab"];
+describe("leader-key-defaults workbench remap", () => {
+  it.each([
+    { id: "workbench:next-tab", keys: "]" },
+    { id: "workbench:prev-tab", keys: "[" },
+    { id: "workbench:focus-tab-1", keys: "1" },
+    { id: "workbench:focus-tab-2", keys: "2" },
+    { id: "workbench:focus-tab-3", keys: "3" },
+    { id: "workbench:focus-tab-4", keys: "4" },
+    { id: "workbench:focus-tab-5", keys: "5" },
+    { id: "workbench:focus-tab-6", keys: "6" },
+    { id: "workbench:focus-tab-7", keys: "7" },
+    { id: "workbench:focus-tab-8", keys: "8" },
+    { id: "workbench:focus-tab-9", keys: "9" },
+    { id: "workbench:close-tab", keys: "q" },
+    { id: "workbench:split-right", keys: "|" },
+    { id: "workbench:split-down", keys: "-" },
+    { id: "workbench:move-tab-right", keys: ">" },
+    { id: "workbench:move-tab-left", keys: "<" },
+    { id: "workbench:focus-group-left", keys: "H" },
+    { id: "workbench:focus-group-right", keys: "L" },
+    { id: "workbench:focus-group-up", keys: "K" },
+    { id: "workbench:focus-group-down", keys: "J" },
+    { id: "workbench:new-terminal", keys: "o t" },
+    { id: "workbench:new-chat", keys: "o c" },
+    { id: "workbench:toggle-context-sidebar", keys: "B" },
+  ])("binds the workbench action $id to $keys", ({ id, keys }) => {
+    const action = BUILTIN_ACTIONS.find((candidate) => candidate.id === id);
 
-  it("binds next, previous and close tab to ], [ and q", () => {
-    expect(DEFAULT_LEADER_BINDINGS).toMatchObject({
-      "files:next-tab": "]",
-      "files:prev-tab": "[",
-      "files:close-tab": "q",
-    });
+    expect(action?.page).toBe("workbench");
+    expect(DEFAULT_LEADER_BINDINGS[id]).toBe(keys);
   });
 
-  it("lists them as files-page actions with only next and previous repeatable", () => {
-    const tabActions = BUILTIN_ACTIONS.filter((action) =>
-      tabActionIds.includes(action.id),
-    ).map(({ id, page, isRepeatable }) => ({
-      id,
-      page,
-      isRepeatable: isRepeatable === true,
-    }));
+  it("makes only next and previous tab repeatable among workbench actions", () => {
+    const repeatableWorkbenchIds = BUILTIN_ACTIONS.filter(
+      (action) => action.page === "workbench" && action.isRepeatable === true,
+    ).map((action) => action.id);
 
-    expect(tabActions).toEqual([
-      { id: "files:next-tab", page: "files", isRepeatable: true },
-      { id: "files:prev-tab", page: "files", isRepeatable: true },
-      { id: "files:close-tab", page: "files", isRepeatable: false },
+    expect(repeatableWorkbenchIds).toEqual([
+      "workbench:next-tab",
+      "workbench:prev-tab",
     ]);
   });
 
-  it("does not share a first key with any other files-page or global binding", () => {
-    const pageByActionId = new Map(
-      BUILTIN_ACTIONS.map((action) => [action.id, action.page]),
-    );
-    const tabKeys = tabActionIds.map((id) => DEFAULT_LEADER_BINDINGS[id]);
+  it.each(["files:next-tab", "files:prev-tab", "files:close-tab"])(
+    "drops the superseded %s from both lists",
+    (actionId) => {
+      const builtinIds = BUILTIN_ACTIONS.map((action) => action.id);
 
-    const collisions = Object.entries(DEFAULT_LEADER_BINDINGS).filter(
-      ([actionId, keys]) => {
-        const page = pageByActionId.get(actionId);
-        const isReachableOnFilesPage = page === "files" || page === "global";
-        if (tabActionIds.includes(actionId) || !isReachableOnFilesPage)
-          return false;
-        return tabKeys.includes(keys.split(" ")[0]);
-      },
-    );
+      expect(builtinIds).not.toContain(actionId);
+      expect(DEFAULT_LEADER_BINDINGS).not.toHaveProperty(actionId);
+    },
+  );
 
-    expect(collisions).toEqual([]);
+  it("moves the first and last user message jumps to { and }", () => {
+    expect(DEFAULT_LEADER_BINDINGS).toMatchObject({
+      "chat:first-user-message": "{",
+      "chat:last-user-message": "}",
+    });
+  });
+
+  it.each([
+    { id: "files:save", keys: "S" },
+    { id: "files:focus-search", keys: "i" },
+    { id: "files:focus-tree", keys: "h" },
+    { id: "files:focus-editor", keys: "l" },
+  ])("keeps the file tab action $id on $keys", ({ id, keys }) => {
+    expect(DEFAULT_LEADER_BINDINGS[id]).toBe(keys);
   });
 });
 
@@ -166,4 +189,76 @@ describe("leader-key-defaults consistency", () => {
 
     expect(unboundActions).toEqual([]);
   });
+});
+
+// Only the focused tab registers chat:* or files:*, so on the workbench route
+// one of these sets is live at a time next to the workbench and global actions.
+const CONCURRENT_PAGE_SETS = [
+  {
+    name: "global, workbench and chat",
+    pages: ["global", "workbench", "chat"],
+  },
+  {
+    name: "global, workbench and files",
+    pages: ["global", "workbench", "files"],
+  },
+];
+
+function keySequencesForPages(pages: readonly string[]) {
+  const pageByActionId = new Map(
+    BUILTIN_ACTIONS.map((action) => [action.id, action.page]),
+  );
+  return Object.entries(DEFAULT_LEADER_BINDINGS)
+    .filter(([actionId]) => pages.includes(pageByActionId.get(actionId) ?? ""))
+    .map(([actionId, keys]) => ({
+      actionId,
+      sequence: keys.split(" ").filter(Boolean),
+    }));
+}
+
+function isStrictPrefix(
+  shorter: readonly string[],
+  longer: readonly string[],
+): boolean {
+  return (
+    shorter.length < longer.length &&
+    shorter.every((key, index) => longer[index] === key)
+  );
+}
+
+describe("leader-key-defaults concurrently registered actions", () => {
+  it.each(CONCURRENT_PAGE_SETS)(
+    "gives no two $name actions the same key sequence",
+    ({ pages }) => {
+      const actionIdsBySequence = new Map<string, string[]>();
+      for (const { actionId, sequence } of keySequencesForPages(pages)) {
+        const sequenceKey = sequence.join(" ");
+        actionIdsBySequence.set(sequenceKey, [
+          ...(actionIdsBySequence.get(sequenceKey) ?? []),
+          actionId,
+        ]);
+      }
+
+      const sharedSequences = [...actionIdsBySequence.entries()].filter(
+        ([, actionIds]) => actionIds.length > 1,
+      );
+
+      expect(sharedSequences).toEqual([]);
+    },
+  );
+
+  it.each(CONCURRENT_PAGE_SETS)(
+    "never makes one $name binding a strict prefix of another",
+    ({ pages }) => {
+      const sequences = keySequencesForPages(pages);
+
+      const prefixPairs = sequences.flatMap((shorter) =>
+        sequences
+          .filter((longer) => isStrictPrefix(shorter.sequence, longer.sequence))
+          .map((longer) => `${shorter.actionId} -> ${longer.actionId}`),
+      );
+
+      expect(prefixPairs).toEqual([]);
+    },
+  );
 });

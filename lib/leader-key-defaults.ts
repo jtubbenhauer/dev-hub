@@ -29,6 +29,65 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "global:task-picker", label: "Open task picker", page: "global" },
   { id: "global:git-picker", label: "Open git files picker", page: "global" },
 
+  // Workbench (registered by WorkbenchView, so only on the workbench route)
+  {
+    id: "workbench:next-tab",
+    label: "Next tab",
+    page: "workbench",
+    isRepeatable: true,
+  },
+  {
+    id: "workbench:prev-tab",
+    label: "Previous tab",
+    page: "workbench",
+    isRepeatable: true,
+  },
+  { id: "workbench:focus-tab-1", label: "Go to tab 1", page: "workbench" },
+  { id: "workbench:focus-tab-2", label: "Go to tab 2", page: "workbench" },
+  { id: "workbench:focus-tab-3", label: "Go to tab 3", page: "workbench" },
+  { id: "workbench:focus-tab-4", label: "Go to tab 4", page: "workbench" },
+  { id: "workbench:focus-tab-5", label: "Go to tab 5", page: "workbench" },
+  { id: "workbench:focus-tab-6", label: "Go to tab 6", page: "workbench" },
+  { id: "workbench:focus-tab-7", label: "Go to tab 7", page: "workbench" },
+  { id: "workbench:focus-tab-8", label: "Go to tab 8", page: "workbench" },
+  { id: "workbench:focus-tab-9", label: "Go to last tab", page: "workbench" },
+  { id: "workbench:close-tab", label: "Close tab", page: "workbench" },
+  { id: "workbench:split-right", label: "Split right", page: "workbench" },
+  { id: "workbench:split-down", label: "Split down", page: "workbench" },
+  {
+    id: "workbench:move-tab-right",
+    label: "Move tab right",
+    page: "workbench",
+  },
+  { id: "workbench:move-tab-left", label: "Move tab left", page: "workbench" },
+  {
+    id: "workbench:focus-group-left",
+    label: "Focus group left",
+    page: "workbench",
+  },
+  {
+    id: "workbench:focus-group-right",
+    label: "Focus group right",
+    page: "workbench",
+  },
+  {
+    id: "workbench:focus-group-up",
+    label: "Focus group above",
+    page: "workbench",
+  },
+  {
+    id: "workbench:focus-group-down",
+    label: "Focus group below",
+    page: "workbench",
+  },
+  { id: "workbench:new-terminal", label: "New terminal", page: "workbench" },
+  { id: "workbench:new-chat", label: "New chat", page: "workbench" },
+  {
+    id: "workbench:toggle-context-sidebar",
+    label: "Toggle context sidebar",
+    page: "workbench",
+  },
+
   // Chat page
   { id: "chat:switch-model", label: "Switch model", page: "chat" },
   { id: "chat:switch-agent", label: "Switch agent", page: "chat" },
@@ -80,19 +139,6 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
   { id: "files:focus-search", label: "Focus file search", page: "files" },
   { id: "files:focus-tree", label: "Focus file tree", page: "files" },
   { id: "files:focus-editor", label: "Focus editor", page: "files" },
-  {
-    id: "files:next-tab",
-    label: "Next tab",
-    page: "files",
-    isRepeatable: true,
-  },
-  {
-    id: "files:prev-tab",
-    label: "Previous tab",
-    page: "files",
-    isRepeatable: true,
-  },
-  { id: "files:close-tab", label: "Close tab", page: "files" },
 
   // Git page
   { id: "git:toggle-reviewed", label: "Toggle file reviewed", page: "git" },
@@ -152,14 +198,36 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "global:task-picker": "t",
   "global:git-picker": "d",
 
+  // Workbench
+  "workbench:next-tab": "]",
+  "workbench:prev-tab": "[",
+  "workbench:focus-tab-1": "1",
+  "workbench:focus-tab-2": "2",
+  "workbench:focus-tab-3": "3",
+  "workbench:focus-tab-4": "4",
+  "workbench:focus-tab-5": "5",
+  "workbench:focus-tab-6": "6",
+  "workbench:focus-tab-7": "7",
+  "workbench:focus-tab-8": "8",
+  "workbench:focus-tab-9": "9",
+  "workbench:close-tab": "q",
+  "workbench:split-right": "|",
+  "workbench:split-down": "-",
+  "workbench:move-tab-right": ">",
+  "workbench:move-tab-left": "<",
+  "workbench:focus-group-left": "H",
+  "workbench:focus-group-right": "L",
+  "workbench:focus-group-up": "K",
+  "workbench:focus-group-down": "J",
+  "workbench:new-terminal": "o t",
+  "workbench:new-chat": "o c",
+  "workbench:toggle-context-sidebar": "B",
+
   // Files page
   "files:save": "S",
   "files:focus-search": "i",
   "files:focus-tree": "h",
   "files:focus-editor": "l",
-  "files:next-tab": "]",
-  "files:prev-tab": "[",
-  "files:close-tab": "q",
 
   // Chat page
   "chat:switch-model": "m",
@@ -176,8 +244,8 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "chat:toggle-timestamps": "z",
   "chat:next-user-message": "j",
   "chat:prev-user-message": "k",
-  "chat:first-user-message": "[",
-  "chat:last-user-message": "]",
+  "chat:first-user-message": "{",
+  "chat:last-user-message": "}",
 
   // Git page
   "git:toggle-reviewed": "r",

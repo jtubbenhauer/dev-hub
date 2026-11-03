@@ -22,6 +22,7 @@ function createFakeController(hasRecentChat: boolean) {
     focusMostRecent: vi.fn((): boolean => hasRecentChat),
     openContextSidebar: vi.fn(),
     revealFolder: vi.fn(),
+    runCommand: vi.fn(),
   } satisfies WorkbenchController;
 }
 

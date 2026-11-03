@@ -79,6 +79,7 @@ function setUp(seed: FakeLayoutSeed = singleGroup([chatPanel])) {
     layoutApi,
     workspaceId: WORKSPACE_ID,
     endTerminalSession,
+    isMobile: false,
   });
   return { layoutApi, controller, endTerminalSession };
 }

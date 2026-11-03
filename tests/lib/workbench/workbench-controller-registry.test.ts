@@ -15,6 +15,7 @@ function createController(workspaceId: string): WorkbenchController {
     focusMostRecent: () => false,
     openContextSidebar: () => {},
     revealFolder: () => {},
+    runCommand: () => {},
   };
 }
 

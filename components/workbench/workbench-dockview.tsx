@@ -64,6 +64,7 @@ export function WorkbenchDockview({
         layoutApi,
         workspaceId,
         endTerminalSession,
+        isMobile,
       }),
     );
 

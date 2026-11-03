@@ -53,6 +53,7 @@ function createFakeController(
     ),
     openContextSidebar: vi.fn(),
     revealFolder: vi.fn(),
+    runCommand: vi.fn(),
   } satisfies WorkbenchController;
 }
 

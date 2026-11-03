@@ -21,32 +21,36 @@ const closeTab = vi.fn();
 const tabActions = [
   {
     action: {
-      id: "files:next-tab",
+      id: "workbench:next-tab",
       label: "Next tab",
-      page: "files",
+      page: "workbench",
       isRepeatable: true,
     },
     handler: nextTab,
   },
   {
     action: {
-      id: "files:prev-tab",
+      id: "workbench:prev-tab",
       label: "Previous tab",
-      page: "files",
+      page: "workbench",
       isRepeatable: true,
     },
     handler: previousTab,
   },
   {
-    action: { id: "files:close-tab", label: "Close tab", page: "files" },
+    action: {
+      id: "workbench:close-tab",
+      label: "Close tab",
+      page: "workbench",
+    },
     handler: closeTab,
   },
 ];
 
 const bindings: LeaderBindingsMap = {
-  "files:next-tab": "]",
-  "files:prev-tab": "[",
-  "files:close-tab": "q",
+  "workbench:next-tab": "]",
+  "workbench:prev-tab": "[",
+  "workbench:close-tab": "q",
 };
 
 function TabActions() {
@@ -221,5 +225,68 @@ describe("LeaderKeyProvider active page", () => {
     expect(
       screen.getByRole("status", { name: "Active leader page" }),
     ).toHaveTextContent(page);
+  });
+});
+
+const jumpToLastUserMessage = vi.fn();
+const saveFile = vi.fn();
+
+// What a focused chat tab and a focused file tab register on the workbench.
+const focusedTabActions = [
+  {
+    action: {
+      id: "chat:last-user-message",
+      label: "Jump to last user message",
+      page: "chat",
+    },
+    handler: jumpToLastUserMessage,
+  },
+  {
+    action: { id: "files:save", label: "Save file", page: "files" },
+    handler: saveFile,
+  },
+];
+
+function FocusedTabActions() {
+  useLeaderAction(focusedTabActions);
+  return null;
+}
+
+describe("LeaderKeyProvider page-scoped actions on the workbench", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    navigation.pathname = "/";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    { keys: ["]"], handler: nextTab },
+    { keys: ["}"], handler: jumpToLastUserMessage },
+    { keys: ["S"], handler: saveFile },
+  ])("fires the action registered for leader $keys", ({ keys, handler }) => {
+    // Given
+    render(
+      <LeaderKeyProvider
+        bindings={{
+          ...bindings,
+          "chat:last-user-message": "}",
+          "files:save": "S",
+        }}
+      >
+        <TabActions />
+        <FocusedTabActions />
+      </LeaderKeyProvider>,
+    );
+    pressLeader();
+
+    // When
+    for (const key of keys) press(key);
+
+    // Then
+    expect(handler).toHaveBeenCalledOnce();
   });
 });

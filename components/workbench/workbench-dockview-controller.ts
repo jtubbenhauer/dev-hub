@@ -12,9 +12,17 @@ import {
   nextTerminalTitle,
   type WorkbenchTabParams,
 } from "@/lib/workbench/tab-descriptors";
-import { openOrFocusTab } from "@/lib/workbench/workbench-commands";
+import {
+  cycleTab,
+  focusAdjacentGroup,
+  focusTabNumber,
+  moveActivePanelToAdjacentGroup,
+  openOrFocusTab,
+  splitActiveGroup,
+} from "@/lib/workbench/workbench-commands";
 import type {
   FocusableWorkbenchTabKind,
+  WorkbenchCommand,
   WorkbenchController,
   WorkbenchTabTarget,
 } from "@/lib/workbench/workbench-controller-registry";
@@ -28,6 +36,7 @@ export interface WorkbenchDockviewControllerInput {
   readonly layoutApi: WorkbenchLayoutApi;
   readonly workspaceId: string;
   readonly endTerminalSession: EndTerminalSession;
+  readonly isMobile: boolean;
 }
 
 function currentTabTitle(params: WorkbenchTabParams): string {
@@ -63,6 +72,49 @@ function focusMostRecentTab(
   if (!targetPanel) return false;
   layoutApi.activatePanel(targetPanel.id);
   return true;
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled workbench command: ${JSON.stringify(value)}`);
+}
+
+// A phone shows a single group, so splits and tab moves are ignored there.
+function runWorkbenchCommand(
+  input: WorkbenchDockviewControllerInput,
+  command: WorkbenchCommand,
+): void {
+  const { layoutApi, endTerminalSession, isMobile } = input;
+  switch (command.type) {
+    case "cycle":
+      cycleTab(layoutApi, command.direction);
+      return;
+    case "focus-number":
+      focusTabNumber(layoutApi, command.n);
+      return;
+    case "focus-group":
+      focusAdjacentGroup(layoutApi, command.direction);
+      return;
+    case "split":
+      if (!isMobile) splitActiveGroup(layoutApi, command.direction);
+      return;
+    case "move-tab":
+      if (!isMobile) {
+        moveActivePanelToAdjacentGroup(layoutApi, command.direction);
+      }
+      return;
+    case "close-active": {
+      const activePanelId = layoutApi.getActivePanelId();
+      if (activePanelId === null) return;
+      requestCloseTab({
+        layoutApi,
+        panelId: activePanelId,
+        endTerminalSession,
+      });
+      return;
+    }
+    default:
+      assertNever(command);
+  }
 }
 
 export function createWorkbenchDockviewController(
@@ -111,5 +163,6 @@ export function createWorkbenchDockviewController(
       useEditorStore.getState().expandFolder(workspaceId, path);
       useContextSidebarStore.getState().openView("explorer");
     },
+    runCommand: (command) => runWorkbenchCommand(input, command),
   };
 }

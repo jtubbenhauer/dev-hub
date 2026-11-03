@@ -445,6 +445,36 @@ describe("moveActivePanelToAdjacentGroup", () => {
     expect(api.mutations).toContain("movePanelToGroup");
   });
 
+  it("drops the adjacent group's lone launcher once a tab moves in", () => {
+    // Given
+    const api = createFakeLayoutApi({
+      groups: [
+        {
+          id: "g1",
+          rect: rect(0, 0),
+          panels: [filePanel("a"), filePanel("b")],
+        },
+        {
+          id: "g2",
+          rect: rect(100, 0),
+          panels: [{ id: "launcher", params: launcherParams }],
+        },
+      ],
+      activeGroupId: "g1",
+    });
+    api.activatePanel("b");
+
+    // When
+    moveActivePanelToAdjacentGroup(api, "right");
+
+    // Then
+    expect(api.getGroups().map((entry) => entry.panelIds)).toEqual([
+      ["a"],
+      ["b"],
+    ]);
+    expect(api.getActivePanelId()).toBe("b");
+  });
+
   it("moves right into a new group keeping the panel id when none exists", () => {
     const api = singleGroupApi(["a", "b"], "b");
 

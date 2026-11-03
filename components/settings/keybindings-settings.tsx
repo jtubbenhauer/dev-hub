@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { WorkbenchShortcutsCard } from "@/components/settings/workbench-shortcuts-card";
 import {
   Accordion,
   AccordionContent,
@@ -56,13 +57,14 @@ import type {
 
 const PAGE_LABELS: Record<string, string> = {
   global: "Global",
+  workbench: "Workbench",
   chat: "Chat",
   files: "Files",
   git: "Git",
   tasks: "Tasks",
 };
 
-const PAGE_ORDER = ["global", "chat", "files", "git", "tasks"];
+const PAGE_ORDER = ["global", "workbench", "chat", "files", "git", "tasks"];
 
 export function KeybindingsSettings() {
   const { bindings, isLoading: isLoadingBindings } = useLeaderKeyBindings();
@@ -386,6 +388,8 @@ export function KeybindingsSettings() {
           </Accordion>
         </CardContent>
       </Card>
+
+      <WorkbenchShortcutsCard />
     </div>
   );
 }

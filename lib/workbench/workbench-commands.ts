@@ -174,7 +174,10 @@ export function moveActivePanelToAdjacentGroup(
     direction,
   );
   if (adjacentGroup) {
+    const loneLauncherId = findLoneLauncherId(api, adjacentGroup);
     api.movePanelToGroup({ panelId: activePanelId, groupId: adjacentGroup.id });
+    // The moved tab replaces the placeholder, as openOrFocusTab does.
+    if (loneLauncherId !== null) api.removePanel(loneLauncherId);
     return;
   }
   // A lone panel moved beside its own group would just recreate the same layout.

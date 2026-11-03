@@ -29,6 +29,7 @@ function createFakeController() {
     focusMostRecent: vi.fn(() => false),
     openContextSidebar: vi.fn(),
     revealFolder: vi.fn(),
+    runCommand: vi.fn(),
   } satisfies WorkbenchController;
 }
 

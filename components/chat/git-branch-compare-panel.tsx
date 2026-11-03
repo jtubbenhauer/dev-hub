@@ -262,6 +262,7 @@ export function GitBranchComparePanel({
               emptyMessage={`No differences from ${baseRef}`}
               onSelectFile={handleSelectFile}
               onToggleReviewed={handleToggleReviewed}
+              isKeyboardNavigationEnabled={false}
             />
           </>
         )}

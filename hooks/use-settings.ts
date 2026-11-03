@@ -79,6 +79,7 @@ export const SETTINGS_KEYS = {
   LSP_ENABLED: "lsp-enabled",
   CODE_LENS_ENABLED: CODE_LENS_ENABLED_SETTING_KEY,
   MINIMAP_ENABLED: MINIMAP_ENABLED_SETTING_KEY,
+  WORKBENCH_CHORDS_ENABLED: "workbench-chords-enabled",
 } as const;
 
 export type EditorType = "monaco" | "neovim";
@@ -560,6 +561,30 @@ export function useMinimapSetting(): {
   // Default: true (only an explicit false hides the minimap)
   const isMinimapEnabled = data?.[SETTINGS_KEYS.MINIMAP_ENABLED] !== false;
   return { isMinimapEnabled, isLoading };
+}
+
+export function useWorkbenchChordsSetting(): {
+  isEnabled: boolean;
+  isSaving: boolean;
+  setIsEnabled: (isEnabled: boolean) => void;
+} {
+  const { data } = useSettings();
+  const mutation = useSettingsMutation();
+  // Default: true (only an explicit false turns the direct key combos off)
+  const isEnabled = data?.[SETTINGS_KEYS.WORKBENCH_CHORDS_ENABLED] !== false;
+  const setIsEnabled = (nextIsEnabled: boolean) =>
+    mutation.mutate(
+      { key: SETTINGS_KEYS.WORKBENCH_CHORDS_ENABLED, value: nextIsEnabled },
+      {
+        onSuccess: () =>
+          toast.success(
+            nextIsEnabled
+              ? "Workbench shortcuts enabled"
+              : "Workbench shortcuts disabled",
+          ),
+      },
+    );
+  return { isEnabled, isSaving: mutation.isPending, setIsEnabled };
 }
 
 export function useExternalEditorSetting(): {

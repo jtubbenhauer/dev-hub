@@ -1,4 +1,8 @@
 import type { WorkbenchTabParams } from "@/lib/workbench/tab-descriptors";
+import type {
+  WorkbenchGroupDirection,
+  WorkbenchTabNumber,
+} from "@/lib/workbench/workbench-shortcuts";
 import type { ContextSidebarView } from "@/stores/context-sidebar-store";
 
 export type FocusableWorkbenchTabKind = "chat" | "file" | "terminal";
@@ -7,6 +11,18 @@ export type FocusableWorkbenchTabKind = "chat" | "file" | "terminal";
 export interface WorkbenchTabTarget {
   readonly groupId: string | null;
 }
+
+// Keyboard-driven layout commands, shared by the chords and the leader keys.
+export type WorkbenchCommand =
+  | { readonly type: "cycle"; readonly direction: "next" | "previous" }
+  | { readonly type: "focus-number"; readonly n: WorkbenchTabNumber }
+  | {
+      readonly type: "focus-group";
+      readonly direction: WorkbenchGroupDirection;
+    }
+  | { readonly type: "split"; readonly direction: "right" | "below" }
+  | { readonly type: "move-tab"; readonly direction: "left" | "right" }
+  | { readonly type: "close-active" };
 
 export interface WorkbenchController {
   readonly workspaceId: string;
@@ -17,6 +33,7 @@ export interface WorkbenchController {
   focusMostRecent(kind: FocusableWorkbenchTabKind): boolean;
   openContextSidebar(view: ContextSidebarView): void;
   revealFolder(path: string): void;
+  runCommand(command: WorkbenchCommand): void;
 }
 
 let registeredController: WorkbenchController | null = null;

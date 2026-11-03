@@ -126,6 +126,7 @@ function createFakeController(workspaceId: string): WorkbenchController {
     focusMostRecent: vi.fn(() => false),
     openContextSidebar: vi.fn(),
     revealFolder: vi.fn(),
+    runCommand: vi.fn(),
   };
 }
 

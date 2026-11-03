@@ -65,6 +65,19 @@ vi.mock("@/components/file-picker/file-picker", () => ({
   }),
 }));
 
+type LeaderRegistrations = Parameters<
+  typeof import("@/hooks/use-leader-action").useLeaderAction
+>[0];
+
+// The leader provider has its own tests; this records what the view registers.
+const leaderActions = vi.hoisted(() => ({
+  useLeaderAction: vi.fn((_registrations: LeaderRegistrations) => {}),
+}));
+
+vi.mock("@/hooks/use-leader-action", () => ({
+  useLeaderAction: leaderActions.useLeaderAction,
+}));
+
 const chatEffectsHost = vi.hoisted(() => ({
   latestProps: null as ComponentProps<typeof WorkspaceChatEffectsHost> | null,
 }));
@@ -128,6 +141,7 @@ beforeEach(() => {
   fakeUrl.setSearch("");
   fakeUrl.router.replace.mockClear();
   fakeUrl.router.push.mockClear();
+  leaderActions.useLeaderAction.mockClear();
   useWorkbenchStore.setState(useWorkbenchStore.getInitialState(), true);
   useContextSidebarStore.setState(
     useContextSidebarStore.getInitialState(),
@@ -256,6 +270,47 @@ describe("WorkbenchView", () => {
       isOpen: true,
       isMobileSheetOpen: true,
     });
+  });
+
+  it("switches to the next tab on Ctrl+Shift+] through the mounted layout", () => {
+    // Given
+    renderWorkbenchView();
+    act(() => {
+      getWorkbenchController()?.openNewTerminal();
+    });
+
+    // When
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "BracketRight",
+          ctrlKey: true,
+          shiftKey: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    // Then
+    expect(useWorkbenchStore.getState().focusedPanel?.params.kind).toBe("chat");
+  });
+
+  it("registers the workbench leader actions while mounted", () => {
+    // When
+    renderWorkbenchView();
+
+    // Then
+    const registeredActionIds =
+      leaderActions.useLeaderAction.mock.lastCall?.[0].map(
+        (registration) => registration.action.id,
+      );
+    expect(registeredActionIds).toEqual(
+      expect.arrayContaining([
+        "workbench:next-tab",
+        "workbench:new-terminal",
+        "workbench:toggle-context-sidebar",
+      ]),
+    );
   });
 
   it("routes go-to-definition from file tab editors while mounted", () => {

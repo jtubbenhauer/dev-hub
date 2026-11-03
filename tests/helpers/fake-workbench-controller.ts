@@ -3,6 +3,7 @@ import type { WorkbenchTabParams } from "@/lib/workbench/tab-descriptors";
 import {
   registerWorkbenchController,
   type FocusableWorkbenchTabKind,
+  type WorkbenchCommand,
   type WorkbenchController,
 } from "@/lib/workbench/workbench-controller-registry";
 import type { ContextSidebarView } from "@/stores/context-sidebar-store";
@@ -20,6 +21,7 @@ export function createFakeWorkbenchController(workspaceId: string) {
     ),
     openContextSidebar: vi.fn<(view: ContextSidebarView) => void>(),
     revealFolder: vi.fn<(path: string) => void>(),
+    runCommand: vi.fn<(command: WorkbenchCommand) => void>(),
   } satisfies WorkbenchController;
 }
 

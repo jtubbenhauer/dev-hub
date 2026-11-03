@@ -4,8 +4,9 @@ import { useEffect } from "react";
 import { FolderOpen } from "lucide-react";
 import { WorkspaceChatEffectsHost } from "@/components/chat/workspace-chat-effects-host";
 import { ContextSidebar } from "@/components/workbench/context-sidebar/context-sidebar";
-import { useContextSidebarShortcut } from "@/components/workbench/use-context-sidebar-shortcut";
+import { useWorkbenchChords } from "@/components/workbench/use-workbench-chords";
 import { useWorkbenchIntent } from "@/components/workbench/use-workbench-intent";
+import { useWorkbenchLeaderActions } from "@/components/workbench/use-workbench-leader-actions";
 import { useWorkbenchLspOpenHandler } from "@/components/workbench/use-workbench-lsp-open-handler";
 import { WorkbenchDockview } from "@/components/workbench/workbench-dockview";
 import { WorkbenchModeProvider } from "@/components/workbench/workbench-mode-context";
@@ -57,7 +58,8 @@ export function WorkbenchView() {
 
   useWorkbenchIntent({ activeWorkspaceId, workspaces });
   useWorkbenchLspOpenHandler(layoutWorkspaceId);
-  useContextSidebarShortcut({ isMobile: isMobile === true });
+  useWorkbenchChords();
+  useWorkbenchLeaderActions();
 
   // Waiting for the breakpoint keeps a phone from mounting (and later saving) a
   // desktop layout first.

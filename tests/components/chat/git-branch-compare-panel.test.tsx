@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -160,6 +160,20 @@ describe("GitBranchComparePanel", () => {
 
     // Then
     expect(onSelectFile).toHaveBeenCalledExactlyOnceWith("src/a.ts", "main");
+  });
+
+  it("leaves j typed outside a text field to the rest of the workbench", () => {
+    // Given
+    const onSelectFile = vi.fn<OnSelectFile>();
+    renderPanel(onSelectFile);
+
+    // When
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "j" }));
+    });
+
+    // Then
+    expect(onSelectFile).not.toHaveBeenCalled();
   });
 
   it("opens the diff dialog with the base ref in dialog mode", async () => {

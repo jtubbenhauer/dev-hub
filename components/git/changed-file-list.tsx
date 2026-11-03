@@ -48,6 +48,8 @@ interface ChangedFileListProps {
   onToggleFolder: (folderPath: string) => void;
   onSelectFile: (file: string) => void;
   onToggleReviewed: (path: string) => void;
+  // Window-wide j/k; off for lists without a selection to move from.
+  isKeyboardNavigationEnabled?: boolean;
 }
 
 export function ChangedFileList({
@@ -62,6 +64,7 @@ export function ChangedFileList({
   onToggleFolder,
   onSelectFile,
   onToggleReviewed,
+  isKeyboardNavigationEnabled = true,
 }: ChangedFileListProps) {
   const tree = useMemo(
     () => buildFileTree(files, sortMode === "name-desc" ? "desc" : "asc"),
@@ -112,9 +115,10 @@ export function ChangedFileList({
   );
 
   useEffect(() => {
+    if (!isKeyboardNavigationEnabled) return;
     window.addEventListener("keydown", handleKeyboard);
     return () => window.removeEventListener("keydown", handleKeyboard);
-  }, [handleKeyboard]);
+  }, [handleKeyboard, isKeyboardNavigationEnabled]);
 
   const renderFileRow = (
     file: ReviewChangedFile,

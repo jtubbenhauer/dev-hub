@@ -17,6 +17,7 @@ interface RenderOptions {
   collapsedFolders?: Set<string>;
   onSelectFile?: (path: string) => void;
   onToggleFolder?: (path: string) => void;
+  isKeyboardNavigationEnabled?: boolean;
 }
 
 function renderList(options: RenderOptions = {}) {
@@ -27,6 +28,7 @@ function renderList(options: RenderOptions = {}) {
     collapsedFolders = new Set<string>(),
     onSelectFile = vi.fn(),
     onToggleFolder = vi.fn(),
+    isKeyboardNavigationEnabled,
   } = options;
 
   render(
@@ -42,6 +44,7 @@ function renderList(options: RenderOptions = {}) {
         onToggleFolder={onToggleFolder}
         onSelectFile={onSelectFile}
         onToggleReviewed={vi.fn()}
+        isKeyboardNavigationEnabled={isKeyboardNavigationEnabled}
       />
     </TooltipProvider>,
   );
@@ -147,6 +150,24 @@ describe("ChangedFileList", () => {
     });
 
     expect(onSelectFile).toHaveBeenCalledWith("src/b.ts");
+  });
+
+  it("leaves j to the page when keyboard navigation is turned off", () => {
+    // Given
+    const onSelectFile = vi.fn();
+    renderList({
+      selectedFile: "src/a.ts",
+      onSelectFile,
+      isKeyboardNavigationEnabled: false,
+    });
+
+    // When
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "j" }));
+    });
+
+    // Then
+    expect(onSelectFile).not.toHaveBeenCalled();
   });
 
   it("shows the empty message when there are no files", () => {

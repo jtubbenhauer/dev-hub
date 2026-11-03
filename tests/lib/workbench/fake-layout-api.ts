@@ -255,6 +255,10 @@ export function createFakeLayoutApi(
     movePanelToNewGroup: ({ panelId, referenceGroupId, direction }) => {
       mutations.push("movePanelToNewGroup");
       const panel = requirePanel(panelId);
+      const source = requireGroup(panel.groupId);
+      // dockview 8.8.3 ignores moving a group's only panel to that group's own edge.
+      if (source.id === referenceGroupId && source.panelIds.length === 1)
+        return;
       const created = createGroupBeside(referenceGroupId, direction);
       detachPanelFromGroup(panel);
       attachPanelToGroup(panel, created);

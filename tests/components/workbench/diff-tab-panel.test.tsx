@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { DockviewReact } from "dockview-react";
+import { DockviewReact, type DockviewApi } from "dockview-react";
 
 import { DiffTabPanel } from "@/components/workbench/tabs/diff-tab-panel";
 import type { OpenFileInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
@@ -58,6 +58,45 @@ function renderDiffTab(params: DiffTabParams) {
       />
     </div>,
   );
+}
+
+// Two diff tabs in one group; the last added is the shown one.
+function renderTwoDiffTabsInOneGroup(): DockviewApi {
+  const readyApis: DockviewApi[] = [];
+  render(
+    <div style={{ width: 800, height: 600 }}>
+      <DockviewReact
+        components={{ diff: DiffTabPanel }}
+        defaultRenderer="always"
+        onReady={(event) => {
+          for (const path of ["src/a.ts", "src/b.ts"]) {
+            event.api.addPanel({
+              id: `diff-${path}`,
+              component: "diff",
+              params: {
+                kind: "diff",
+                workspaceId: "ws-1",
+                path,
+                source: "working",
+                baseRef: null,
+              } satisfies DiffTabParams,
+              title: path,
+            });
+          }
+          readyApis.push(event.api);
+        }}
+      />
+    </div>,
+  );
+  const [api] = readyApis;
+  if (!api) throw new Error("DockviewReact never fired onReady");
+  return api;
+}
+
+function mountedDiffViewPaths(): string[] {
+  return screen
+    .queryAllByTestId("workbench-diff-view")
+    .map((element) => element.textContent ?? "");
 }
 
 function lastDiffViewProps(): CapturedDiffViewProps | undefined {
@@ -203,5 +242,26 @@ describe("DiffTabPanel", () => {
     expect(routerPushMock).toHaveBeenCalledExactlyOnceWith(
       "/workbench?open=file",
     );
+  });
+
+  // Monaco's diff panes force `visibility: visible`, so a hidden tab's diff
+  // would paint through dockview's hidden overlay.
+  it("mounts the diff view only for the tab its group shows", () => {
+    // Given / When
+    renderTwoDiffTabsInOneGroup();
+
+    // Then
+    expect(mountedDiffViewPaths()).toEqual(["src/b.ts"]);
+  });
+
+  it("moves the mounted diff view to the tab that becomes shown", () => {
+    // Given
+    const api = renderTwoDiffTabsInOneGroup();
+
+    // When
+    act(() => api.getPanel("diff-src/a.ts")?.api.setActive());
+
+    // Then
+    expect(mountedDiffViewPaths()).toEqual(["src/a.ts"]);
   });
 });

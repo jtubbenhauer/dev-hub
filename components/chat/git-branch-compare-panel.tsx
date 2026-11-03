@@ -29,8 +29,8 @@ import {
   type SortMode,
 } from "@/lib/git-panel-logic";
 import { cn } from "@/lib/utils";
+import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 import { useGitReviewStore } from "@/stores/git-review-store";
-import { useSidePanelStore } from "@/stores/side-panel-store";
 
 import type { GitBranch } from "@/types";
 
@@ -45,15 +45,17 @@ export function getDefaultCompareBranch(
 
 export function GitBranchComparePanel({
   workspaceId,
+  onSelectFile,
 }: {
   workspaceId: string;
+  onSelectFile?: (path: string, baseRef: string) => void;
 }) {
   const { data: branches, isLoading: isBranchesLoading } =
     useGitBranches(workspaceId);
-  const storedBaseRef = useSidePanelStore(
+  const storedBaseRef = useContextSidebarStore(
     (s) => s.branchCompareBaseRefs[workspaceId] ?? null,
   );
-  const setBranchCompareBaseRef = useSidePanelStore(
+  const setBranchCompareBaseRef = useContextSidebarStore(
     (s) => s.setBranchCompareBaseRef,
   );
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -133,6 +135,10 @@ export function GitBranchComparePanel({
       openDiffDialog(path, false, baseRef);
       return;
     }
+    if (onSelectFile) {
+      onSelectFile(path, baseRef);
+      return;
+    }
     setSelectedPath(path);
   };
 
@@ -153,8 +159,9 @@ export function GitBranchComparePanel({
     );
   }
 
+  // flex-1 wins in a flex parent (sidebar); the side panel uses the calc.
   return (
-    <div className="flex h-[calc(100%-2.5rem)] flex-col">
+    <div className="flex h-[calc(100%-2.5rem)] min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-1.5 border-b px-2 py-1.5">
         <Select value={baseRef ?? ""} onValueChange={handleBaseRefChange}>
           <SelectTrigger

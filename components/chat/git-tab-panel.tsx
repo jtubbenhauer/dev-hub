@@ -106,7 +106,13 @@ function isActivateKey(e: React.KeyboardEvent): boolean {
   return e.key === "Enter" || e.key === " ";
 }
 
-export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
+export function GitTabPanel({
+  workspaceId,
+  onSelectFile,
+}: {
+  workspaceId: string;
+  onSelectFile?: (selection: { path: string; staged: boolean }) => void;
+}) {
   const queryClient = useQueryClient();
   const { data: status } = useGitStatus(workspaceId);
   const fileDiffs = useGitFileDiffs(workspaceId);
@@ -323,17 +329,12 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
     );
   }, [commitMessage, stageMutate, commitMutate, invalidateFreshness]);
 
-  const selectRow = useCallback(
-    (row: GitRow) => {
-      if (isDialogMode) return openDiffDialog(row.path, row.staged);
-      setGitTabSelection({
-        workspaceId,
-        path: row.path,
-        staged: row.section === "staged",
-      });
-    },
-    [isDialogMode, openDiffDialog, workspaceId, setGitTabSelection],
-  );
+  const selectRow = (row: GitRow) => {
+    if (isDialogMode) return openDiffDialog(row.path, row.staged);
+    const selection = { path: row.path, staged: row.section === "staged" };
+    if (onSelectFile) return onSelectFile(selection);
+    setGitTabSelection({ workspaceId, ...selection });
+  };
 
   const selectionWorkspaceId = gitTabSelection?.workspaceId;
   const selectionPath = gitTabSelection?.path;
@@ -375,7 +376,7 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
   const hasValidSelection =
     !!gitTabSelection && gitTabSelection.workspaceId === workspaceId;
 
-  const selection = hasValidSelection ? gitTabSelection : null;
+  const selection = hasValidSelection && !onSelectFile ? gitTabSelection : null;
 
   // ---- List states ----
   if (!status) {
@@ -398,8 +399,9 @@ export function GitTabPanel({ workspaceId }: { workspaceId: string }) {
   const canStageAllAndCommit =
     commitMessage.trim().length > 0 && dirtyCount > 0;
 
+  // flex-1 wins in a flex parent (sidebar); the side panel uses the calc.
   return (
-    <div className="flex h-[calc(100%-2.5rem)] flex-col">
+    <div className="flex h-[calc(100%-2.5rem)] min-h-0 flex-1 flex-col">
       <div
         className={
           selection

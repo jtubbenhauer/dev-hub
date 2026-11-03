@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WorkbenchDiffView } from "@/components/workbench/workbench-diff-view";
 import { WorkbenchPanelFrame } from "@/components/workbench/workbench-panel-frame";
+import { useWorkbenchPanelState } from "@/components/workbench/use-workbench-panel-state";
 import { useFileTabsSetting } from "@/hooks/use-settings";
 import { openFileInWorkbench } from "@/lib/workbench/open-in-workbench";
 import type {
@@ -76,13 +77,19 @@ function DiffTabBody({ params }: { readonly params: DiffTabParams }) {
   );
 }
 
+// Monaco's diff panes force `visibility: visible`, which would paint a hidden
+// tab through dockview's hidden overlay, so only the shown tab mounts a diff.
 export function DiffTabPanel({
   api,
+  containerApi,
   params,
 }: IDockviewPanelProps<WorkbenchTabParams>) {
+  const { isVisible } = useWorkbenchPanelState(api, containerApi);
   return (
     <WorkbenchPanelFrame api={api}>
-      {params.kind === "diff" ? <DiffTabBody params={params} /> : null}
+      {params.kind === "diff" && isVisible ? (
+        <DiffTabBody params={params} />
+      ) : null}
     </WorkbenchPanelFrame>
   );
 }

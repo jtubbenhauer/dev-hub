@@ -38,8 +38,12 @@ import {
   GitBranchComparePanel,
   getDefaultCompareBranch,
 } from "@/components/chat/git-branch-compare-panel";
+import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 import { useGitReviewStore } from "@/stores/git-review-store";
-import { useSidePanelStore } from "@/stores/side-panel-store";
+
+// Radix Select's trigger asks for pointer capture, which jsdom lacks.
+HTMLElement.prototype.hasPointerCapture = () => false;
+HTMLElement.prototype.releasePointerCapture = () => {};
 
 function makeBranch(name: string, current = false): GitBranch {
   return { name, current, commit: "abc", label: "", linkedWorkTree: false };
@@ -61,19 +65,31 @@ function mockChangedFiles(
   });
 }
 
-function renderPanel() {
+type OnSelectFile = (path: string, baseRef: string) => void;
+
+function renderPanel(onSelectFile?: OnSelectFile) {
   return render(
     <TooltipProvider>
-      <GitBranchComparePanel workspaceId="ws-1" />
+      <GitBranchComparePanel workspaceId="ws-1" onSelectFile={onSelectFile} />
     </TooltipProvider>,
   );
 }
+
+// The base ref lives in the context sidebar store in both modes.
+const PANEL_MODES: { mode: string; onSelectFile: OnSelectFile | undefined }[] =
+  [
+    { mode: "side panel", onSelectFile: undefined },
+    { mode: "workbench sidebar", onSelectFile: vi.fn<OnSelectFile>() },
+  ];
 
 beforeEach(() => {
   vi.clearAllMocks();
   isDialogMode = false;
   localStorage.clear();
-  useSidePanelStore.setState({ branchCompareBaseRefs: {} });
+  useContextSidebarStore.setState(
+    useContextSidebarStore.getInitialState(),
+    true,
+  );
   useGitReviewStore.setState({ reviewedFiles: {} });
   useGitBranchesMock.mockReturnValue({
     data: [makeBranch("feature", true), makeBranch("main"), makeBranch("dev")],
@@ -111,21 +127,56 @@ describe("GitBranchComparePanel", () => {
     expect(screen.getByText(/feature/)).toBeInTheDocument();
   });
 
-  it("uses the stored base branch for the workspace when it still exists", () => {
-    useSidePanelStore.setState({ branchCompareBaseRefs: { "ws-1": "dev" } });
-    renderPanel();
+  it.each(PANEL_MODES)(
+    "uses the stored base branch for the workspace when it still exists ($mode)",
+    ({ onSelectFile }) => {
+      // Given
+      useContextSidebarStore.setState({
+        branchCompareBaseRefs: { "ws-1": "dev" },
+      });
 
-    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "dev");
-  });
+      // When
+      renderPanel(onSelectFile);
 
-  it("falls back to the default when the stored base branch is gone", () => {
-    useSidePanelStore.setState({
-      branchCompareBaseRefs: { "ws-1": "deleted-branch" },
-    });
-    renderPanel();
+      // Then
+      expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "dev");
+    },
+  );
 
-    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "main");
-  });
+  it.each(PANEL_MODES)(
+    "falls back to the default when the stored base branch is gone ($mode)",
+    ({ onSelectFile }) => {
+      // Given
+      useContextSidebarStore.setState({
+        branchCompareBaseRefs: { "ws-1": "deleted-branch" },
+      });
+
+      // When
+      renderPanel(onSelectFile);
+
+      // Then
+      expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "main");
+    },
+  );
+
+  it.each(PANEL_MODES)(
+    "stores the picked base branch for the workspace ($mode)",
+    async ({ onSelectFile }) => {
+      // Given
+      const user = userEvent.setup();
+      renderPanel(onSelectFile);
+
+      // When
+      await user.click(screen.getByTestId("compare-base-select"));
+      await user.click(await screen.findByRole("option", { name: "dev" }));
+
+      // Then
+      expect(useContextSidebarStore.getState().branchCompareBaseRefs).toEqual({
+        "ws-1": "dev",
+      });
+      expect(useGitChangedFilesMock).toHaveBeenLastCalledWith("ws-1", "dev");
+    },
+  );
 
   it("opens the branch diff for a file and closes it again", async () => {
     const user = userEvent.setup();
@@ -259,5 +310,37 @@ describe("GitBranchComparePanel", () => {
     expect(
       useGitReviewStore.getState().reviewedFiles["ws-1:branch:main"],
     ).toHaveLength(1);
+  });
+});
+
+describe("GitBranchComparePanel with onSelectFile (list-only mode)", () => {
+  it("hands a clicked file and the base branch to onSelectFile instead of the inline diff", async () => {
+    // Given
+    const onSelectFile = vi.fn<OnSelectFile>();
+    renderPanel(onSelectFile);
+
+    // When
+    await userEvent.setup().click(screen.getByText("a.ts"));
+
+    // Then
+    expect(onSelectFile).toHaveBeenCalledExactlyOnceWith("src/a.ts", "main");
+    expect(screen.queryByTestId("compare-diff-screen")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("side-panel-diff-view"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("still opens the diff dialog in dialog mode", async () => {
+    // Given
+    isDialogMode = true;
+    const onSelectFile = vi.fn<OnSelectFile>();
+    renderPanel(onSelectFile);
+
+    // When
+    await userEvent.setup().click(screen.getByText("new.ts"));
+
+    // Then
+    expect(openDiffDialog).toHaveBeenCalledWith("src/new.ts", false, "main");
+    expect(onSelectFile).not.toHaveBeenCalled();
   });
 });

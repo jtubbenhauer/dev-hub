@@ -626,6 +626,43 @@ describe("FileTabPanel editor/diff toggle", () => {
     expect(await screen.findByTestId("monaco-editor")).toBeInTheDocument();
     expect(screen.queryByTestId("workbench-diff-view")).not.toBeInTheDocument();
   });
+
+  // Monaco's diff panes force `visibility: visible`, so a hidden tab's diff
+  // would paint through dockview's hidden overlay.
+  it("keeps the diff unmounted while another tab of its group is shown", async () => {
+    // Given
+    doubles.gitStatus.current = createGitStatus({ unstaged: ["src/a.ts"] });
+    useEditorStore.setState({ fileViewModes: { "ws1:src/a.ts": "diff" } });
+    seedBuffers(createFileBuffer("src/a.ts"), createFileBuffer("src/b.ts"));
+
+    // When
+    renderFileTabs([
+      { panelId: "tab-a", path: "src/a.ts" },
+      { panelId: "tab-b", path: "src/b.ts" },
+    ]);
+    await screen.findByTestId("monaco-editor");
+
+    // Then
+    expect(screen.queryByTestId("workbench-diff-view")).not.toBeInTheDocument();
+  });
+
+  it("mounts the diff once its tab is shown", async () => {
+    // Given
+    doubles.gitStatus.current = createGitStatus({ unstaged: ["src/a.ts"] });
+    useEditorStore.setState({ fileViewModes: { "ws1:src/a.ts": "diff" } });
+    seedBuffers(createFileBuffer("src/a.ts"), createFileBuffer("src/b.ts"));
+    const { api } = renderFileTabs([
+      { panelId: "tab-a", path: "src/a.ts" },
+      { panelId: "tab-b", path: "src/b.ts" },
+    ]);
+    await screen.findByTestId("monaco-editor");
+
+    // When
+    act(() => api.getPanel("tab-a")?.api.setActive());
+
+    // Then
+    expect(screen.getByTestId("workbench-diff-view")).toBeInTheDocument();
+  });
 });
 
 describe("FileTabPanel with Neovim", () => {

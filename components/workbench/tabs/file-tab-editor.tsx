@@ -106,7 +106,7 @@ function FileTabTextBody({
 }
 
 export function FileTabEditor(props: FileTabEditorProps) {
-  const { api, workspaceId, path, language, isFocused } = props;
+  const { api, workspaceId, path, language, isFocused, isVisible } = props;
   const panelId = api.id;
   const editorHandleRef = useRef<EditorHandle>(null);
   const { save, isSaving } = useFileTabSave(workspaceId, path);
@@ -142,13 +142,15 @@ export function FileTabEditor(props: FileTabEditorProps) {
           />
         );
       case "diff":
-        return (
+        // Monaco's diff panes force `visibility: visible` and would paint
+        // through dockview's hidden overlay, so a hidden tab drops its diff.
+        return isVisible ? (
           <WorkbenchDiffView
             workspaceId={workspaceId}
             filePath={path}
             staged={viewMode.isStagedDiff}
           />
-        );
+        ) : null;
       case "text":
         return (
           <FileTabTextBody

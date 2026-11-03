@@ -18,10 +18,10 @@ import {
   Wrench,
 } from "lucide-react";
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 
-interface ChatCommandRefs {
+export interface ChatCommandRefs {
   handleCreateSession: RefObject<() => void>;
   setIsPlanPanelOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
   setIsSessionListOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
@@ -34,7 +34,7 @@ interface ChatCommandRefs {
   jumpToLastUserMessage: RefObject<() => void>;
 }
 
-interface ChatCommandLabels {
+export interface ChatCommandLabels {
   isPlanPanelOpen: boolean;
   isSidePanelOpen: boolean;
   showThinking: boolean;
@@ -44,12 +44,13 @@ interface ChatCommandLabels {
   shouldCollapseFinishedThinking: boolean;
 }
 
-interface ChatCommandSetters {
+export interface ChatCommandSetters {
   setShowThinking: Dispatch<SetStateAction<boolean>>;
   setShowToolCalls: Dispatch<SetStateAction<boolean>>;
   setShowTokens: Dispatch<SetStateAction<boolean>>;
   setShowTimestamps: Dispatch<SetStateAction<boolean>>;
   setShouldCollapseFinishedThinking: Dispatch<SetStateAction<boolean>>;
+  setIsVariantSelectorOpen: Dispatch<SetStateAction<boolean>>;
 }
 
 export function useChatCommands(
@@ -57,14 +58,13 @@ export function useChatCommands(
   labels: ChatCommandLabels,
   setters: ChatCommandSetters,
 ) {
-  const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
-
   const {
     setShowThinking,
     setShowToolCalls,
     setShowTokens,
     setShowTimestamps,
     setShouldCollapseFinishedThinking,
+    setIsVariantSelectorOpen,
   } = setters;
 
   // React useState setters are stable — no refs needed
@@ -371,6 +371,7 @@ export function useChatCommands(
     toggleToolCalls,
     toggleTokens,
     toggleTimestamps,
+    setIsVariantSelectorOpen,
     refs.setIsModelSelectorOpen,
     refs.setIsAgentSelectorOpen,
     refs.handleCreateSession,
@@ -384,6 +385,4 @@ export function useChatCommands(
   ]);
 
   useLeaderAction(chatLeaderActions);
-
-  return { isVariantSelectorOpen, setIsVariantSelectorOpen };
 }

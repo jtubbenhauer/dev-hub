@@ -62,4 +62,38 @@ describe("useRefocusPromptOnTerminalClose", () => {
 
     expect(focus).not.toHaveBeenCalled();
   });
+
+  it("does not focus while disabled, so an unfocused chat tab keeps out", () => {
+    // Given
+    const focus = vi.fn();
+    renderHook(() =>
+      useRefocusPromptOnTerminalClose({ current: { focus } }, false),
+    );
+    useTerminalStore.getState().setOpen(true);
+
+    // When
+    useTerminalStore.getState().setOpen(false);
+
+    // Then
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it("focuses once the chat becomes enabled", () => {
+    // Given
+    const focus = vi.fn();
+    const promptInputRef = { current: { focus } };
+    const { rerender } = renderHook(
+      ({ isEnabled }) =>
+        useRefocusPromptOnTerminalClose(promptInputRef, isEnabled),
+      { initialProps: { isEnabled: false } },
+    );
+    rerender({ isEnabled: true });
+    useTerminalStore.getState().setOpen(true);
+
+    // When
+    useTerminalStore.getState().setOpen(false);
+
+    // Then
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
 });

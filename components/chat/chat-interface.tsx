@@ -24,7 +24,7 @@ import {
   EMPTY_COMPONENTS,
   STREAMING_COMPONENTS,
 } from "@/components/chat/streaming-indicator";
-import { useChatCommands } from "@/components/chat/use-chat-commands";
+import { ChatCommandsRegistrar } from "@/components/chat/chat-commands-registrar";
 import { useChatTabSessionEffects } from "@/components/chat/use-chat-tab-session-effects";
 import { useChatUrlState } from "@/components/chat/use-chat-url-state";
 import { useChatScrollMemory } from "@/components/chat/use-chat-scroll-memory";
@@ -298,6 +298,7 @@ function ChatInterfaceContent({
   const sessionNoteInputRef = useRef<HTMLInputElement>(null);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
+  const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const promptInputRef = useRef<PromptInputHandle>(null);
@@ -306,7 +307,8 @@ function ChatInterfaceContent({
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const visibleRangeRef = useRef({ startIndex: 0, endIndex: 0 });
   const lastJumpedUserIdxRef = useRef<number | null>(null);
-  useRefocusPromptOnTerminalClose(promptInputRef);
+  const isChatKeyboardOwner = useIsChatKeyboardOwner();
+  useRefocusPromptOnTerminalClose(promptInputRef, isChatKeyboardOwner);
 
   const { restart: restartOpencode, isRestarting } =
     useOpencodeRestart(activeWorkspaceId);
@@ -1166,38 +1168,41 @@ function ChatInterfaceContent({
   const handleJumpToLastUserMessageRef = useRef(handleJumpToLastUserMessage);
   handleJumpToLastUserMessageRef.current = handleJumpToLastUserMessage;
 
-  const { isVariantSelectorOpen, setIsVariantSelectorOpen } = useChatCommands(
-    {
-      handleCreateSession: handleCreateSessionRef,
-      setIsPlanPanelOpen: setIsPlanPanelOpenRef,
-      setIsSessionListOpen: setIsSessionListOpenRef,
-      setIsModelSelectorOpen: setIsModelSelectorOpenRef,
-      setIsAgentSelectorOpen: setIsAgentSelectorOpenRef,
-      promptInput: promptInputRef,
-      jumpToNextUserMessage: handleJumpToNextUserMessageRef,
-      jumpToPrevUserMessage: handleJumpToPrevUserMessageRef,
-      jumpToFirstUserMessage: handleJumpToFirstUserMessageRef,
-      jumpToLastUserMessage: handleJumpToLastUserMessageRef,
-    },
-    {
-      isPlanPanelOpen,
-      isSidePanelOpen,
-      showThinking,
-      showToolCalls,
-      showTokens,
-      showTimestamps,
-      shouldCollapseFinishedThinking,
-    },
-    {
-      setShowThinking,
-      setShowToolCalls,
-      setShowTokens,
-      setShowTimestamps,
-      setShouldCollapseFinishedThinking,
-    },
-  );
+  // Leader and palette commands are keyed by id: only the focused chat owns them.
+  const chatCommandsRegistrar = isFocused ? (
+    <ChatCommandsRegistrar
+      refs={{
+        handleCreateSession: handleCreateSessionRef,
+        setIsPlanPanelOpen: setIsPlanPanelOpenRef,
+        setIsSessionListOpen: setIsSessionListOpenRef,
+        setIsModelSelectorOpen: setIsModelSelectorOpenRef,
+        setIsAgentSelectorOpen: setIsAgentSelectorOpenRef,
+        promptInput: promptInputRef,
+        jumpToNextUserMessage: handleJumpToNextUserMessageRef,
+        jumpToPrevUserMessage: handleJumpToPrevUserMessageRef,
+        jumpToFirstUserMessage: handleJumpToFirstUserMessageRef,
+        jumpToLastUserMessage: handleJumpToLastUserMessageRef,
+      }}
+      labels={{
+        isPlanPanelOpen,
+        isSidePanelOpen,
+        showThinking,
+        showToolCalls,
+        showTokens,
+        showTimestamps,
+        shouldCollapseFinishedThinking,
+      }}
+      setters={{
+        setShowThinking,
+        setShowToolCalls,
+        setShowTokens,
+        setShowTimestamps,
+        setShouldCollapseFinishedThinking,
+        setIsVariantSelectorOpen,
+      }}
+    />
+  ) : null;
 
-  const isChatKeyboardOwner = useIsChatKeyboardOwner();
   const { handleModelChange } = useSessionNavigation({
     orderedAgents,
     selectedAgent,
@@ -1237,6 +1242,7 @@ function ChatInterfaceContent({
   if (!activeWorkspaceId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+        {chatCommandsRegistrar}
         <AlertCircle className="text-muted-foreground/50 size-12" />
         <h3 className="text-lg font-medium">No workspace selected</h3>
         <p className="text-muted-foreground max-w-md text-sm">
@@ -1311,6 +1317,7 @@ function ChatInterfaceContent({
 
   return (
     <div data-chat-interface className="flex h-full min-h-0 w-full min-w-0">
+      {chatCommandsRegistrar}
       {/* Mobile session sheet */}
       <Sheet open={isMobileSessionsOpen} onOpenChange={setIsMobileSessionsOpen}>
         <SheetContent side="left" className="w-72 p-0" showCloseButton={false}>

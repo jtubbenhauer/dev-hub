@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Save, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIsChatKeyboardOwner } from "@/components/chat/chat-tab-context";
 import { EditorSwitcher } from "@/components/editor/editor-switcher";
 import { MarkdownPreviewToggle } from "@/components/editor/markdown-preview";
 import {
@@ -183,9 +184,10 @@ export function PlanPanel({
     onClose();
   }, [isDirty, onClose]);
 
-  // Close panel on Escape key
+  // Close panel on Escape key; in the workbench only the focused chat tab's.
+  const isChatKeyboardOwner = useIsChatKeyboardOwner();
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !isChatKeyboardOwner) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -197,7 +199,7 @@ export function PlanPanel({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, handleClose]);
+  }, [isOpen, isChatKeyboardOwner, handleClose]);
 
   if (!isOpen) return null;
 

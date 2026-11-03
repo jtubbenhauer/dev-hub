@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { FolderOpen } from "lucide-react";
+import { WorkspaceChatEffectsHost } from "@/components/chat/workspace-chat-effects-host";
 import { ContextSidebarSlot } from "@/components/workbench/context-sidebar-slot";
 import { useWorkbenchIntent } from "@/components/workbench/use-workbench-intent";
 import { WorkbenchDockview } from "@/components/workbench/workbench-dockview";
@@ -21,6 +22,13 @@ function selectActiveWorkspace(state: {
       (workspace) => workspace.id === state.activeWorkspaceId,
     ) ?? null
   );
+}
+
+// A chat the workspace effects start (e.g. a worktree's plan) opens in a tab.
+function requestStartedChatTarget(workspaceId: string, sessionId: string) {
+  useWorkbenchStore
+    .getState()
+    .requestChatTarget({ workspaceId, sessionId, panelId: null });
 }
 
 export function WorkbenchView() {
@@ -63,6 +71,7 @@ export function WorkbenchView() {
 
   return (
     <div className="flex h-full min-h-0">
+      <WorkspaceChatEffectsHost onSessionStarted={requestStartedChatTarget} />
       <div className="min-w-0 flex-1">
         <WorkbenchDockview
           key={`${layoutWorkspaceId}:${isMobile}`}

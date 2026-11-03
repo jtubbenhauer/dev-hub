@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, screen } from "@testing-library/react";
 import { Orientation, type SerializedDockview } from "dockview-react";
+import type { ComponentProps } from "react";
+
+import type { WorkspaceChatEffectsHost } from "@/components/chat/workspace-chat-effects-host";
 
 import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
 import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
@@ -58,6 +61,24 @@ vi.mock("@/components/file-picker/file-picker", () => ({
   }),
 }));
 
+const chatEffectsHost = vi.hoisted(() => ({
+  latestProps: null as ComponentProps<typeof WorkspaceChatEffectsHost> | null,
+}));
+
+// Each chat tab's body is covered by its own tests.
+vi.mock("@/components/chat/chat-interface", () => ({
+  ChatInterface: () => <div data-testid="chat-interface" />,
+}));
+
+vi.mock("@/components/chat/workspace-chat-effects-host", () => ({
+  WorkspaceChatEffectsHost: (
+    props: ComponentProps<typeof WorkspaceChatEffectsHost>,
+  ) => {
+    chatEffectsHost.latestProps = props;
+    return <div data-testid="workspace-chat-effects" />;
+  },
+}));
+
 const initialChatState = useChatStore.getState();
 const initialWorkspaceState = useWorkspaceStore.getState();
 
@@ -82,6 +103,7 @@ beforeEach(() => {
 afterEach(() => {
   // Unmount first: resetting stores under a mounted view re-renders it.
   cleanup();
+  chatEffectsHost.latestProps = null;
   useChatStore.setState(initialChatState, true);
   useWorkspaceStore.setState(initialWorkspaceState, true);
 });
@@ -108,6 +130,32 @@ describe("WorkbenchView", () => {
     expect(
       screen.getByRole("button", { name: "Close New chat" }),
     ).toBeInTheDocument();
+  });
+
+  it("runs the workspace chat effects once next to the layout", () => {
+    // When
+    renderWorkbenchView();
+
+    // Then
+    expect(screen.getAllByTestId("workspace-chat-effects")).toHaveLength(1);
+  });
+
+  it("opens a chat tab for a session the workspace chat effects started", () => {
+    // Given
+    renderWorkbenchView();
+    const onSessionStarted = chatEffectsHost.latestProps?.onSessionStarted;
+    if (!onSessionStarted) throw new Error("expected an onSessionStarted prop");
+
+    // When
+    act(() => onSessionStarted("w1", "s7"));
+
+    // Then
+    expect(useWorkbenchStore.getState().pendingChatTarget).toBeNull();
+    expect(useWorkbenchStore.getState().focusedPanel?.params).toEqual({
+      kind: "chat",
+      workspaceId: "w1",
+      sessionId: "s7",
+    });
   });
 
   it("drops saved layouts of workspaces that no longer exist", () => {
@@ -247,7 +295,7 @@ describe("WorkbenchView", () => {
       );
     });
 
-    it("selects a linked session and queues it while the session list is still loading", () => {
+    it("selects a linked session and opens its tab while the session list is still loading", () => {
       // Given
       fakeUrl.setSearch("open=chat&sessionId=s1");
 
@@ -256,10 +304,11 @@ describe("WorkbenchView", () => {
 
       // Then
       expect(useChatStore.getState().activeSessionId).toBe("s1");
-      expect(useWorkbenchStore.getState().pendingChatTarget).toEqual({
+      expect(useWorkbenchStore.getState().pendingChatTarget).toBeNull();
+      expect(useWorkbenchStore.getState().focusedPanel?.params).toEqual({
+        kind: "chat",
         workspaceId: "w1",
         sessionId: "s1",
-        panelId: null,
       });
     });
 

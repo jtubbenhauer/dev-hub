@@ -9,6 +9,10 @@ import {
   type DockviewApi,
   type DockviewReadyEvent,
 } from "dockview-react";
+import {
+  startChatTargetSync,
+  syncGlobalChatSessionToTab,
+} from "@/components/workbench/chat-target-sync";
 import { createDockviewLayoutApi } from "@/components/workbench/dockview-layout-api";
 import { DEVHUB_DOCKVIEW_THEME } from "@/components/workbench/dockview-theme";
 import { WORKBENCH_PANEL_COMPONENTS } from "@/components/workbench/tab-registry";
@@ -88,9 +92,13 @@ export function WorkbenchDockview({
       if (panelRef.params.kind === "file") {
         useEditorStore.getState().setActiveFile(panelRef.params.path);
       }
+      if (panelRef.params.kind === "chat") {
+        syncGlobalChatSessionToTab(workspaceId, panelRef.params.sessionId);
+      }
     });
 
     useWorkbenchStore.getState().setLayoutReadyWorkspaceId(workspaceId);
+    const stopChatTargetSync = startChatTargetSync({ layoutApi, workspaceId });
 
     // Runs before DockviewReact disposes the instance (parent cleanups run first).
     return () => {
@@ -98,15 +106,17 @@ export function WorkbenchDockview({
       saveLayoutNow();
       layoutSubscription.dispose();
       activePanelSubscription.dispose();
+      stopChatTargetSync();
       unregisterController();
       useWorkbenchStore.getState().setFocusedPanel(null);
       useWorkbenchStore.getState().setLayoutReadyWorkspaceId(null);
     };
   }, [api, workspaceId, isMobile, endTerminalSession]);
 
+  // `isolate` keeps dockview's z-index 99 sashes under app overlays (drawer).
   return (
     <WorkbenchModeProvider isMobile={isMobile}>
-      <div className="h-full w-full">
+      <div className="isolate h-full w-full">
         <DockviewReact
           theme={DEVHUB_DOCKVIEW_THEME}
           components={WORKBENCH_PANEL_COMPONENTS}

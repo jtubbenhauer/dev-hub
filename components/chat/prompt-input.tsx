@@ -18,6 +18,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIsChatEventTarget } from "@/components/chat/chat-tab-context";
 import { FilePicker } from "@/components/chat/file-picker";
 import {
   CommandPicker,
@@ -124,6 +125,15 @@ function saveDraftsToStorage(drafts: Map<string, SessionDraft>): void {
 }
 
 const sessionDrafts = loadDraftsFromStorage();
+
+function withNewCommentChips(
+  current: CommentChip[],
+  incoming: CommentChip[],
+): CommentChip[] {
+  const existingIds = new Set(current.map((chip) => chip.id));
+  const newChips = incoming.filter((chip) => !existingIds.has(chip.id));
+  return newChips.length > 0 ? [...current, ...newChips] : current;
+}
 
 interface SelectedModel {
   providerID: string;
@@ -352,17 +362,22 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       [],
     );
 
-    // Pick up any pending comment chips on mount and when the workspace changes
-    const [prevWorkspaceId, setPrevWorkspaceId] = useState<string | null>(null);
-    if (prevWorkspaceId !== workspaceId) {
-      setPrevWorkspaceId(workspaceId);
-      if (workspaceId) {
-        const chips = getPendingCommentChips(workspaceId);
+    // Only the last focused chat tab takes queued comment chips and terminal
+    // output: on mount, on a workspace change, and whenever it becomes that tab.
+    const isChatEventTarget = useIsChatEventTarget();
+    const pickupWorkspaceId = isChatEventTarget ? workspaceId : null;
+    const [prevPickupWorkspaceId, setPrevPickupWorkspaceId] = useState<
+      string | null
+    >(null);
+    if (prevPickupWorkspaceId !== pickupWorkspaceId) {
+      setPrevPickupWorkspaceId(pickupWorkspaceId);
+      if (pickupWorkspaceId) {
+        const chips = getPendingCommentChips(pickupWorkspaceId);
         if (chips.length > 0) {
-          setSelectedComments(chips);
-          clearPendingCommentChips(workspaceId);
+          setSelectedComments((prev) => withNewCommentChips(prev, chips));
+          clearPendingCommentChips(pickupWorkspaceId);
         }
-        const terminalOutput = takePendingTerminalOutput(workspaceId);
+        const terminalOutput = takePendingTerminalOutput(pickupWorkspaceId);
         if (terminalOutput) {
           setValue((prev) => appendToComposerText(prev, terminalOutput));
         }
@@ -370,7 +385,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
     }
 
     useEffect(() => {
-      if (!workspaceId) return;
+      if (!workspaceId || !isChatEventTarget) return;
       const handleTerminalOutput = () => {
         const terminalOutput = takePendingTerminalOutput(workspaceId);
         if (!terminalOutput) return;
@@ -392,20 +407,16 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
           TERMINAL_OUTPUT_TO_CHAT_EVENT,
           handleTerminalOutput,
         );
-    }, [workspaceId]);
+    }, [workspaceId, isChatEventTarget]);
 
     useEffect(() => {
-      if (!workspaceId) return;
+      if (!workspaceId || !isChatEventTarget) return;
 
       const handleAttach = () => {
         if (!workspaceId) return;
         const incoming = getPendingCommentChips(workspaceId);
         if (incoming.length > 0) {
-          setSelectedComments((prev) => {
-            const existingIds = new Set(prev.map((c) => c.id));
-            const newChips = incoming.filter((c) => !existingIds.has(c.id));
-            return newChips.length > 0 ? [...prev, ...newChips] : prev;
-          });
+          setSelectedComments((prev) => withNewCommentChips(prev, incoming));
           clearPendingCommentChips(workspaceId);
         }
       };
@@ -435,7 +446,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         window.removeEventListener("detach-comment-from-chat", handleDetach);
         window.removeEventListener("update-comment-in-chat", handleUpdate);
       };
-    }, [workspaceId]);
+    }, [workspaceId, isChatEventTarget]);
 
     const autoResize = useCallback(() => {
       const textarea = textareaRef.current;

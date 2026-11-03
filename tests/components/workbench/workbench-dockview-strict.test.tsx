@@ -19,6 +19,15 @@ vi.mock("@/components/file-picker/file-picker", () => ({
   }),
 }));
 
+// Every layout opens a chat tab; its chat body is covered by its own tests.
+vi.mock("@/components/chat/chat-interface", () => ({
+  ChatInterface: () => <div data-testid="chat-interface" />,
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
+
 const WORKSPACE_ID = "w1";
 
 const activeChatParams = {

@@ -32,6 +32,7 @@ function renderChatCommands() {
   return renderHook(() => {
     const [shouldCollapseFinishedThinking, setShouldCollapseFinishedThinking] =
       useState(false);
+    const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false);
     useChatCommands(
       {
         handleCreateSession: { current: vi.fn() },
@@ -60,9 +61,10 @@ function renderChatCommands() {
         setShowTokens: vi.fn(),
         setShowTimestamps: vi.fn(),
         setShouldCollapseFinishedThinking,
+        setIsVariantSelectorOpen,
       },
     );
-    return shouldCollapseFinishedThinking;
+    return { shouldCollapseFinishedThinking, isVariantSelectorOpen };
   });
 }
 
@@ -74,14 +76,14 @@ function getLatestCollapseCommand(): RegisteredCommand {
   return command;
 }
 
-function getLatestCollapseLeaderAction(): RegisteredLeaderAction {
+function getLatestLeaderAction(actionId: string): RegisteredLeaderAction {
   const registrations = (mockUseLeaderAction.mock.lastCall?.[0] ??
     []) as RegisteredLeaderAction[];
   const registration = registrations.find(
-    ({ action }) => action.id === COLLAPSE_COMMAND_ID,
+    ({ action }) => action.id === actionId,
   );
   if (!registration) {
-    throw new Error(`${COLLAPSE_COMMAND_ID} leader action is not registered`);
+    throw new Error(`${actionId} leader action is not registered`);
   }
   return registration;
 }
@@ -98,22 +100,47 @@ describe("collapse finished thinking toggle", () => {
 
     act(() => getLatestCollapseCommand().onSelect());
 
-    expect(result.current).toBe(true);
+    expect(result.current.shouldCollapseFinishedThinking).toBe(true);
     expect(localStorage.getItem(COLLAPSE_STORAGE_KEY)).toBe("true");
     expect(getLatestCollapseCommand().label).toBe("Expand Finished Thinking");
 
     act(() => getLatestCollapseCommand().onSelect());
 
-    expect(result.current).toBe(false);
+    expect(result.current.shouldCollapseFinishedThinking).toBe(false);
     expect(localStorage.getItem(COLLAPSE_STORAGE_KEY)).toBe("false");
   });
 
   it("can also be toggled with a leader key action", () => {
     const { result } = renderChatCommands();
 
-    act(() => getLatestCollapseLeaderAction().handler());
+    act(() => getLatestLeaderAction(COLLAPSE_COMMAND_ID).handler());
 
-    expect(result.current).toBe(true);
+    expect(result.current.shouldCollapseFinishedThinking).toBe(true);
     expect(localStorage.getItem(COLLAPSE_STORAGE_KEY)).toBe("true");
+  });
+});
+
+describe("variant selector toggle", () => {
+  it("opens the chat's variant selector through its setter", () => {
+    // Given
+    const { result } = renderChatCommands();
+
+    // When
+    act(() => getLatestLeaderAction("chat:toggle-variant").handler());
+
+    // Then
+    expect(result.current.isVariantSelectorOpen).toBe(true);
+  });
+
+  it("closes an open variant selector on the next toggle", () => {
+    // Given
+    const { result } = renderChatCommands();
+    act(() => getLatestLeaderAction("chat:toggle-variant").handler());
+
+    // When
+    act(() => getLatestLeaderAction("chat:toggle-variant").handler());
+
+    // Then
+    expect(result.current.isVariantSelectorOpen).toBe(false);
   });
 });

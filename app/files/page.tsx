@@ -394,7 +394,7 @@ function FilesContent() {
     activeFile !== null && isTextEditorLanguage(activeFile.language);
   const sidebarProps = {
     workspaceId: activeWorkspaceId,
-    isFileTabsDisabled,
+    shouldShowOpenEditors: !isFileTabsDisabled,
     onOpenMatch: handleOpenMatch,
     fileTreeProps: {
       workspaceId: activeWorkspaceId,

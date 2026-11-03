@@ -4,34 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { WorkbenchView } from "@/components/workbench/workbench-view";
 import type { WorkspaceState } from "@/stores/chat-store";
-import type { Workspace } from "@/types";
 
-export function createWorkspace(id: string): Workspace {
-  return {
-    id,
-    userId: "user-1",
-    name: `Workspace ${id}`,
-    path: `/home/user/dev/${id}`,
-    type: "repo",
-    parentRepoPath: null,
-    packageManager: "pnpm",
-    quickCommands: null,
-    backend: "local",
-    provider: null,
-    opencodeUrl: null,
-    agentUrl: null,
-    providerMeta: null,
-    shellCommand: null,
-    sshTarget: null,
-    sshPath: null,
-    worktreeSymlinks: null,
-    linkedTaskId: null,
-    linkedTaskMeta: null,
-    color: null,
-    createdAt: new Date("2025-01-01"),
-    lastAccessedAt: new Date("2025-01-01"),
-  };
-}
+export { createWorkspace } from "./workspace-fixture";
 
 export function createLoadedChatWorkspaceState(): WorkspaceState {
   return {

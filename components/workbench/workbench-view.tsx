@@ -3,10 +3,12 @@
 import { useEffect } from "react";
 import { FolderOpen } from "lucide-react";
 import { WorkspaceChatEffectsHost } from "@/components/chat/workspace-chat-effects-host";
-import { ContextSidebarSlot } from "@/components/workbench/context-sidebar-slot";
+import { ContextSidebar } from "@/components/workbench/context-sidebar/context-sidebar";
+import { useContextSidebarShortcut } from "@/components/workbench/use-context-sidebar-shortcut";
 import { useWorkbenchIntent } from "@/components/workbench/use-workbench-intent";
 import { useWorkbenchLspOpenHandler } from "@/components/workbench/use-workbench-lsp-open-handler";
 import { WorkbenchDockview } from "@/components/workbench/workbench-dockview";
+import { WorkbenchModeProvider } from "@/components/workbench/workbench-mode-context";
 import { useIsMobileResolved } from "@/hooks/use-is-mobile-resolved";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkbenchStore } from "@/stores/workbench-store";
@@ -55,12 +57,13 @@ export function WorkbenchView() {
 
   useWorkbenchIntent({ activeWorkspaceId, workspaces });
   useWorkbenchLspOpenHandler(layoutWorkspaceId);
+  useContextSidebarShortcut({ isMobile: isMobile === true });
 
   // Waiting for the breakpoint keeps a phone from mounting (and later saving) a
   // desktop layout first.
   if (isMobile === null) return null;
 
-  if (layoutWorkspaceId === null) {
+  if (activeWorkspace === null) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
         <FolderOpen className="text-muted-foreground/40 h-10 w-10" />
@@ -72,16 +75,21 @@ export function WorkbenchView() {
   }
 
   return (
-    <div className="flex h-full min-h-0">
-      <WorkspaceChatEffectsHost onSessionStarted={requestStartedChatTarget} />
-      <div className="min-w-0 flex-1">
-        <WorkbenchDockview
-          key={`${layoutWorkspaceId}:${isMobile}`}
-          workspaceId={layoutWorkspaceId}
-          isMobile={isMobile}
+    <WorkbenchModeProvider isMobile={isMobile}>
+      <div className="flex h-full min-h-0">
+        <WorkspaceChatEffectsHost onSessionStarted={requestStartedChatTarget} />
+        <div className="min-w-0 flex-1">
+          <WorkbenchDockview
+            key={`${activeWorkspace.id}:${isMobile}`}
+            workspaceId={activeWorkspace.id}
+            isMobile={isMobile}
+          />
+        </div>
+        <ContextSidebar
+          workspaceId={activeWorkspace.id}
+          workspace={activeWorkspace}
         />
       </div>
-      <ContextSidebarSlot />
-    </div>
+    </WorkbenchModeProvider>
   );
 }

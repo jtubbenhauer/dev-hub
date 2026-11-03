@@ -3,6 +3,7 @@ import {
   Columns2,
   FileCode2,
   MessageSquare,
+  PanelRight,
   Plus,
   Rows2,
   TerminalSquare,
@@ -20,6 +21,7 @@ import { createDockviewLayoutApi } from "@/components/workbench/dockview-layout-
 import { useIsWorkbenchMobile } from "@/components/workbench/workbench-mode-context";
 import { splitActiveGroup } from "@/lib/workbench/workbench-commands";
 import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
+import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 
 export function WorkbenchGroupActions({
   containerApi,
@@ -68,9 +70,18 @@ export function WorkbenchGroupActions({
             <FileCode2 />
             Open file…
           </DropdownMenuItem>
-          {!isMobile && (
+          <DropdownMenuSeparator />
+          {isMobile ? (
+            <DropdownMenuItem
+              onSelect={() =>
+                useContextSidebarStore.getState().setMobileSheetOpen(true)
+              }
+            >
+              <PanelRight />
+              Panels
+            </DropdownMenuItem>
+          ) : (
             <>
-              <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => splitGroup("right")}>
                 <Columns2 />
                 Split right

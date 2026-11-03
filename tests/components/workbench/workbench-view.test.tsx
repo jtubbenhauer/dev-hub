@@ -4,11 +4,13 @@ import { Orientation, type SerializedDockview } from "dockview-react";
 import type { ComponentProps } from "react";
 
 import type { WorkspaceChatEffectsHost } from "@/components/chat/workspace-chat-effects-host";
+import type { ContextSidebar } from "@/components/workbench/context-sidebar/context-sidebar";
 
 import { getLspOpenFileHandler } from "@/lib/lsp/client/navigation-registry";
 import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
 import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import { useChatStore } from "@/stores/chat-store";
+import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 import { useEditorStore } from "@/stores/editor-store";
 import { useWorkbenchStore } from "@/stores/workbench-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -80,15 +82,45 @@ vi.mock("@/components/chat/workspace-chat-effects-host", () => ({
   },
 }));
 
+const contextSidebarDouble = vi.hoisted(() => ({
+  latestProps: null as ComponentProps<typeof ContextSidebar> | null,
+}));
+
+// The sidebar has its own tests; this stub reports what the view hands it.
+vi.mock("@/components/workbench/context-sidebar/context-sidebar", async () => {
+  const { useIsWorkbenchMobile } =
+    await import("@/components/workbench/workbench-mode-context");
+  return {
+    ContextSidebar: (props: ComponentProps<typeof ContextSidebar>) => {
+      contextSidebarDouble.latestProps = props;
+      return (
+        <div
+          data-testid="context-sidebar"
+          data-mobile={String(useIsWorkbenchMobile())}
+        />
+      );
+    },
+  };
+});
+
 const initialChatState = useChatStore.getState();
 const initialWorkspaceState = useWorkspaceStore.getState();
 
 beforeEach(() => {
   localStorage.clear();
+  // Terminal tabs resolve their pty over fetch; a pending answer keeps them quiet.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => new Promise<Response>(() => {})),
+  );
   fakeUrl.setSearch("");
   fakeUrl.router.replace.mockClear();
   fakeUrl.router.push.mockClear();
   useWorkbenchStore.setState(useWorkbenchStore.getInitialState(), true);
+  useContextSidebarStore.setState(
+    useContextSidebarStore.getInitialState(),
+    true,
+  );
   useEditorStore.getState().closeAllFiles();
   useWorkspaceStore.setState({
     workspaces: [createWorkspace("w1"), createWorkspace("w2")],
@@ -105,6 +137,8 @@ afterEach(() => {
   // Unmount first: resetting stores under a mounted view re-renders it.
   cleanup();
   chatEffectsHost.latestProps = null;
+  contextSidebarDouble.latestProps = null;
+  vi.unstubAllGlobals();
   useChatStore.setState(initialChatState, true);
   useWorkspaceStore.setState(initialWorkspaceState, true);
 });
@@ -139,6 +173,77 @@ describe("WorkbenchView", () => {
 
     // Then
     expect(screen.getAllByTestId("workspace-chat-effects")).toHaveLength(1);
+  });
+
+  it("renders the context sidebar for the active workspace", () => {
+    // When
+    renderWorkbenchView();
+
+    // Then
+    expect(contextSidebarDouble.latestProps).toEqual({
+      workspaceId: "w1",
+      workspace: expect.objectContaining({ id: "w1" }),
+    });
+    expect(screen.getByTestId("context-sidebar")).toHaveAttribute(
+      "data-mobile",
+      "false",
+    );
+  });
+
+  it("tells the context sidebar when it runs on a phone", () => {
+    // Given
+    vi.stubGlobal("innerWidth", 390);
+
+    // When
+    renderWorkbenchView();
+
+    // Then
+    expect(screen.getByTestId("context-sidebar")).toHaveAttribute(
+      "data-mobile",
+      "true",
+    );
+  });
+
+  it("hides the context sidebar on Cmd+Backslash", () => {
+    // Given
+    renderWorkbenchView();
+
+    // When
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "Backslash",
+          metaKey: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    // Then
+    expect(useContextSidebarStore.getState().isOpen).toBe(false);
+  });
+
+  it("opens the context sidebar sheet on Cmd+Backslash on a phone", () => {
+    // Given
+    vi.stubGlobal("innerWidth", 390);
+    renderWorkbenchView();
+
+    // When
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "Backslash",
+          metaKey: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    // Then
+    expect(useContextSidebarStore.getState()).toMatchObject({
+      isOpen: true,
+      isMobileSheetOpen: true,
+    });
   });
 
   it("routes go-to-definition from file tab editors while mounted", () => {

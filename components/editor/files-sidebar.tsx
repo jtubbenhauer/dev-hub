@@ -11,14 +11,14 @@ import { useContentSearchStore } from "@/stores/content-search-store";
 import { cn } from "@/lib/utils";
 
 interface FilesSidebarProps extends SearchPanelProps {
-  readonly isFileTabsDisabled: boolean;
+  readonly shouldShowOpenEditors: boolean;
   readonly fileTreeProps: FileTreeProps;
   readonly headerActions?: ReactNode;
 }
 
 export function FilesSidebar({
   workspaceId,
-  isFileTabsDisabled,
+  shouldShowOpenEditors,
   fileTreeProps,
   onOpenMatch,
   headerActions,
@@ -52,7 +52,7 @@ export function FilesSidebar({
       </div>
       {sidebarView === "explorer" ? (
         <>
-          {!isFileTabsDisabled && <OpenEditors />}
+          {shouldShowOpenEditors && <OpenEditors />}
           <FileTree {...fileTreeProps} />
         </>
       ) : (

@@ -8,6 +8,7 @@ import { WorkbenchDockview } from "@/components/workbench/workbench-dockview";
 import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
 import { useChatStore } from "@/stores/chat-store";
 import { useEditorStore } from "@/stores/editor-store";
+import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 import { layoutStorageKey, useWorkbenchStore } from "@/stores/workbench-store";
 
 vi.mock("@/components/file-picker/file-picker", () => ({
@@ -70,6 +71,10 @@ function savedPanelKinds(layoutKey: string): (string | undefined)[] {
 beforeEach(() => {
   localStorage.clear();
   useWorkbenchStore.setState(useWorkbenchStore.getInitialState(), true);
+  useContextSidebarStore.setState(
+    useContextSidebarStore.getInitialState(),
+    true,
+  );
   useEditorStore.getState().closeAllFiles();
   useChatStore.setState({
     activeWorkspaceId: WORKSPACE_ID,
@@ -295,6 +300,40 @@ describe("WorkbenchDockview under React.StrictMode", () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("menuitem", { name: "Split right" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the context sidebar sheet from the mobile group menu's Panels item", async () => {
+    // Given
+    renderStrictWorkbench(true);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Group actions" }),
+    );
+
+    // When
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Panels" }),
+    );
+
+    // Then
+    expect(useContextSidebarStore.getState().isMobileSheetOpen).toBe(true);
+  });
+
+  it("offers no Panels item in the desktop group menu", async () => {
+    // Given
+    renderStrictWorkbench();
+
+    // When
+    await userEvent.click(
+      screen.getByRole("button", { name: "Group actions" }),
+    );
+
+    // Then
+    expect(
+      await screen.findByRole("menuitem", { name: "Split right" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: "Panels" }),
     ).not.toBeInTheDocument();
   });
 });

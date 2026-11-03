@@ -24,8 +24,11 @@ interface PersistedContextSidebarState {
 
 interface ContextSidebarState extends PersistedContextSidebarState {
   focusRequest: ContextSidebarFocusTarget | null;
+  // Session-only, so the persisted desktop `isOpen` never opens the sheet.
+  isMobileSheetOpen: boolean;
 
   setOpen: (isOpen: boolean) => void;
+  setMobileSheetOpen: (isMobileSheetOpen: boolean) => void;
   toggle: () => void;
   setView: (view: ContextSidebarView) => void;
   openView: (view: ContextSidebarView) => void;
@@ -60,8 +63,11 @@ export const useContextSidebarStore = create<ContextSidebarState>()(
       view: DEFAULT_VIEW,
       branchCompareBaseRefs: {},
       focusRequest: null,
+      isMobileSheetOpen: false,
 
       setOpen: (isOpen) => set({ isOpen }),
+
+      setMobileSheetOpen: (isMobileSheetOpen) => set({ isMobileSheetOpen }),
 
       toggle: () => set((state) => ({ isOpen: !state.isOpen })),
 

@@ -28,6 +28,10 @@ describe("defaults", () => {
     expect(state.branchCompareBaseRefs).toEqual({});
     expect(state.focusRequest).toBeNull();
   });
+
+  it("starts with the mobile sheet closed", () => {
+    expect(useContextSidebarStore.getState().isMobileSheetOpen).toBe(false);
+  });
 });
 
 describe("open state", () => {
@@ -41,6 +45,29 @@ describe("open state", () => {
     expect(useContextSidebarStore.getState().isOpen).toBe(false);
     useContextSidebarStore.getState().toggle();
     expect(useContextSidebarStore.getState().isOpen).toBe(true);
+  });
+});
+
+describe("mobile sheet", () => {
+  it("setMobileSheetOpen sets isMobileSheetOpen without touching isOpen", () => {
+    // Given
+    useContextSidebarStore.getState().setOpen(false);
+
+    // When
+    useContextSidebarStore.getState().setMobileSheetOpen(true);
+
+    // Then
+    const state = useContextSidebarStore.getState();
+    expect(state.isMobileSheetOpen).toBe(true);
+    expect(state.isOpen).toBe(false);
+  });
+
+  it("toggle flips the desktop isOpen only", () => {
+    // When
+    useContextSidebarStore.getState().toggle();
+
+    // Then
+    expect(useContextSidebarStore.getState().isMobileSheetOpen).toBe(false);
   });
 });
 
@@ -115,6 +142,33 @@ describe("persistence", () => {
       view: "compare",
       branchCompareBaseRefs: { a: "main" },
     });
+  });
+
+  it("never persists isMobileSheetOpen", () => {
+    // When
+    useContextSidebarStore.getState().setMobileSheetOpen(true);
+
+    // Then
+    expect(readPersistedJson().state).not.toHaveProperty("isMobileSheetOpen");
+  });
+
+  it("keeps the mobile sheet closed when storage claims it was open", async () => {
+    // Given
+    localStorage.setItem(
+      PERSIST_NAME,
+      JSON.stringify({
+        version: 1,
+        state: { isOpen: true, view: "changes", isMobileSheetOpen: true },
+      }),
+    );
+
+    // When
+    await useContextSidebarStore.persist.rehydrate();
+
+    // Then
+    const state = useContextSidebarStore.getState();
+    expect(state.isOpen).toBe(true);
+    expect(state.isMobileSheetOpen).toBe(false);
   });
 
   it("restores valid persisted values on rehydrate", async () => {

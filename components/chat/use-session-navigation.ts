@@ -15,6 +15,8 @@ interface UseSessionNavigationArgs {
   activeSessionId: string | null;
   activeWorkspaceId: string | null;
   setSelectedModel: Dispatch<SetStateAction<SelectedModel | null>>;
+  // Side-by-side chats each mount this hook; only the focused one takes keys.
+  isKeyboardOwner?: boolean;
 }
 
 interface UseSessionNavigationResult {
@@ -28,6 +30,7 @@ export function useSessionNavigation({
   activeSessionId,
   activeWorkspaceId,
   setSelectedModel,
+  isKeyboardOwner = true,
 }: UseSessionNavigationArgs): UseSessionNavigationResult {
   const { clearSessionModel, setSessionAgent, setSessionModel } =
     useChatStore.getState();
@@ -71,6 +74,7 @@ export function useSessionNavigation({
   );
 
   useEffect(() => {
+    if (!isKeyboardOwner) return;
     // Ctrl+. next agent, Ctrl+Shift+. previous. Uses e.code because Shift
     // turns "." into ">" on most layouts.
     const handleAgentCycle = (e: KeyboardEvent) => {
@@ -105,7 +109,7 @@ export function useSessionNavigation({
 
     window.addEventListener("keydown", handleAgentCycle);
     return () => window.removeEventListener("keydown", handleAgentCycle);
-  }, [clearSessionModel]);
+  }, [clearSessionModel, isKeyboardOwner]);
 
   return { handleModelChange };
 }

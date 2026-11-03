@@ -45,6 +45,7 @@ import { engineForSessionId, type ChatEngine } from "@/lib/engine/types";
 import type { Session, SessionStatus } from "@/lib/opencode/types";
 import { useChatStore, type SessionWithWorkspace } from "@/stores/chat-store";
 import { ChatEngineBadge } from "@/components/chat/chat-engine-badge";
+import { useChatViewWorkspaceId } from "@/components/chat/chat-tab-context";
 import {
   NewChatEngineMenuItems,
   NewChatMenu,
@@ -147,9 +148,8 @@ export const SessionList = memo(function SessionList(props: SessionListProps) {
     sessionNotes,
     onClearSessionNote,
   } = props;
-  const activeChatWorkspaceId = useChatStore(
-    (state) => state.activeWorkspaceId,
-  );
+  // New chats from this list are created in the workspace it shows.
+  const activeChatWorkspaceId = useChatViewWorkspaceId();
 
   const sortedSessions = useMemo(() => {
     if (props.mode === "workspace") {

@@ -1,4 +1,8 @@
 import {
+  ChatTabProvider,
+  type ChatTabContextValue,
+} from "@/components/chat/chat-tab-context";
+import {
   STREAMING_COMPONENTS,
   StreamingIndicator,
 } from "@/components/chat/streaming-indicator";
@@ -137,5 +141,60 @@ describe("StreamingIndicator", () => {
       screen.queryByText("1 subagent recently active"),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Thinking...")).toBeInTheDocument();
+  });
+
+  it("shows a background chat tab's own session activity in its footer", () => {
+    const now = Date.now();
+    const makeSession = (id: string, parentID?: string) => ({
+      id,
+      parentID,
+      projectID: "project",
+      directory: "/workspace",
+      title: id,
+      version: "1",
+      time: { created: now, updated: now },
+    });
+    useChatStore.setState({
+      activeWorkspaceId: "ws-a",
+      activeSessionId: "focused",
+      workspaceStates: {
+        "ws-a": {
+          sessions: {
+            focused: makeSession("focused"),
+            background: makeSession("background"),
+            child: makeSession("child", "background"),
+          },
+          sessionsLoaded: true,
+          messages: { focused: [], background: [] },
+          optimisticMessageIds: {},
+          sessionStatuses: { child: { type: "busy" } },
+          permissions: [],
+          questions: [],
+          todos: {},
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+        },
+      },
+    });
+    const backgroundTab: ChatTabContextValue = {
+      tabId: "tab-background",
+      workspaceId: "ws-a",
+      sessionId: "background",
+      isFocused: false,
+      isLastFocusedChat: false,
+      isVisible: true,
+    };
+
+    render(
+      <ChatTabProvider value={backgroundTab}>
+        <STREAMING_COMPONENTS.Footer />
+      </ChatTabProvider>,
+    );
+
+    expect(screen.getByText("1 subagent working")).toBeInTheDocument();
   });
 });

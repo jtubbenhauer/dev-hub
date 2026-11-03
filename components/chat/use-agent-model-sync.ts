@@ -108,6 +108,14 @@ export function useAgentModelSync({
   useEffect(() => {
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
+  // The chat this hook serves, which in a background tab is not the global
+  // active session. Refs keep the effects below from re-running on a switch.
+  const sessionIdRef = useRef(activeSessionId);
+  const workspaceIdRef = useRef(activeWorkspaceId);
+  useEffect(() => {
+    sessionIdRef.current = activeSessionId;
+    workspaceIdRef.current = activeWorkspaceId;
+  }, [activeSessionId, activeWorkspaceId]);
 
   const isVariantListCurrent =
     selectedModel !== null &&
@@ -122,8 +130,8 @@ export function useAgentModelSync({
 
     const agent = primaryAgents.find((a) => a.name === selectedAgent);
 
-    const { activeSessionId: currentSessionId, getSessionModel: getModel } =
-      useChatStore.getState();
+    const currentSessionId = sessionIdRef.current;
+    const { getSessionModel: getModel } = useChatStore.getState();
     const hasStoredModel = currentSessionId
       ? !!getModel(currentSessionId)
       : false;
@@ -140,12 +148,10 @@ export function useAgentModelSync({
     // Agent config can advertise a variant not in the model's variant map → API error
     if (agentChanged) {
       const agentVariant = agent?.variant ?? null;
-      const {
-        activeSessionId: sid,
-        activeWorkspaceId: wsId,
-        setSessionVariant: storeVariant,
-        clearSessionVariant,
-      } = useChatStore.getState();
+      const sid = sessionIdRef.current;
+      const wsId = workspaceIdRef.current;
+      const { setSessionVariant: storeVariant, clearSessionVariant } =
+        useChatStore.getState();
       if (
         agentVariant &&
         isVariantListCurrent &&
@@ -180,11 +186,9 @@ export function useAgentModelSync({
       !availableVariantValues.includes(selectedVariant)
     ) {
       setSelectedVariant(null);
-      const {
-        activeSessionId: sessionId,
-        activeWorkspaceId: workspaceId,
-        clearSessionVariant,
-      } = useChatStore.getState();
+      const sessionId = sessionIdRef.current;
+      const workspaceId = workspaceIdRef.current;
+      const { clearSessionVariant } = useChatStore.getState();
       if (sessionId && workspaceId) {
         clearSessionVariant(sessionId, workspaceId);
       }

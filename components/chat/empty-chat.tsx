@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  useChatViewSessionId,
+  useChatViewWorkspaceId,
+} from "@/components/chat/chat-tab-context";
 import { NEW_CHAT_ENGINE_LABELS } from "@/components/chat/new-chat-menu";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +12,6 @@ import {
 } from "@/hooks/use-active-chat-engine";
 import { CHAT_ENGINES } from "@/lib/engine/types";
 import { cn } from "@/lib/utils";
-import { useChatStore } from "@/stores/chat-store";
 import { useNewChatEngineStore } from "@/stores/new-chat-engine-store";
 
 const suggestions = [
@@ -23,10 +26,8 @@ interface EmptyChatProps {
 }
 
 export function EmptyChat({ onSend }: EmptyChatProps) {
-  const activeWorkspaceId = useChatStore((state) => state.activeWorkspaceId);
-  const hasActiveSession = useChatStore(
-    (state) => state.activeSessionId !== null,
-  );
+  const activeWorkspaceId = useChatViewWorkspaceId();
+  const hasActiveSession = useChatViewSessionId() !== null;
   const { engine, isLoading } = useActiveChatEngine(activeWorkspaceId);
   const engineName = isLoading ? "" : engine === "omo" ? "OmO " : "OpenCode ";
   return (

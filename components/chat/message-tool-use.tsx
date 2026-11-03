@@ -13,6 +13,7 @@ import {
 import AnsiToHtml from "ansi-to-html";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
+import { useChatViewWorkspaceId } from "@/components/chat/chat-tab-context";
 import { SubAgentDialog } from "@/components/chat/sub-agent-dialog";
 import { SessionTaskProgressIndicator } from "@/components/chat/session-task-progress";
 import type { Todo, ToolPart } from "@/lib/opencode/types";
@@ -183,7 +184,7 @@ function AgentToolCall({ part, nested }: { part: ToolPart; nested?: boolean }) {
   );
   const childSessionId = childSessionIds[0] ?? null;
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
-  const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId);
+  const activeWorkspaceId = useChatViewWorkspaceId();
 
   const storeSessionId = useChatStore((s) => {
     if (childSessionId) return null;
@@ -344,7 +345,7 @@ function ToolOutput({
 }) {
   const [showAll, setShowAll] = useState(false);
   const [isLoadingFull, setIsLoadingFull] = useState(false);
-  const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId);
+  const activeWorkspaceId = useChatViewWorkspaceId();
   const loadFullToolOutput = useChatStore((s) => s.loadFullToolOutput);
 
   const truncation = getPartTruncation(part);
@@ -424,7 +425,7 @@ function ToolError({ part }: { part: ToolPart }) {
 
   const [showAll, setShowAll] = useState(false);
   const [isLoadingFull, setIsLoadingFull] = useState(false);
-  const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId);
+  const activeWorkspaceId = useChatViewWorkspaceId();
   const loadFullToolOutput = useChatStore((s) => s.loadFullToolOutput);
 
   if (state.status !== "error") return null;

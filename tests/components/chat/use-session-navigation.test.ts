@@ -35,7 +35,10 @@ describe("useSessionNavigation", () => {
     vi.clearAllMocks();
   });
 
-  function renderWithChatInput(setSelectedAgent = vi.fn()) {
+  function renderWithChatInput(
+    setSelectedAgent = vi.fn(),
+    keyboardOwnership: { isKeyboardOwner?: boolean } = {},
+  ) {
     const chatInterface = document.createElement("div");
     chatInterface.dataset.chatInterface = "";
     const input = document.createElement("input");
@@ -53,6 +56,7 @@ describe("useSessionNavigation", () => {
         activeSessionId: "session-1",
         activeWorkspaceId: "workspace-1",
         setSelectedModel: vi.fn(),
+        ...keyboardOwnership,
       }),
     );
     const pressKey = (init: KeyboardEventInit) => {
@@ -120,6 +124,20 @@ describe("useSessionNavigation", () => {
     pressKey({ key: ".", code: "Period" });
 
     expect(setSelectedAgent).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("leaves Ctrl+. to the focused chat when this chat does not own the keyboard", () => {
+    const { setSelectedAgent, pressKey, cleanup } = renderWithChatInput(
+      vi.fn(),
+      { isKeyboardOwner: false },
+    );
+
+    const event = pressKey({ key: ".", code: "Period", ctrlKey: true });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(setSelectedAgent).not.toHaveBeenCalled();
+    expect(storeMocks.setSessionAgent).not.toHaveBeenCalled();
     cleanup();
   });
 });

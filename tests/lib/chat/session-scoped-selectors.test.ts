@@ -10,6 +10,7 @@ import {
   removeVisibleSession,
   selectSessionMessages,
   selectSessionStatus,
+  selectSessionStreamingStatus,
   selectSessionTodos,
   visibleSessionIdsInWorkspace,
   visibleSessionKey,
@@ -347,6 +348,65 @@ describe("session selectors", () => {
       expect(selected.status).toBeNull();
     },
   );
+});
+
+describe("selectSessionStreamingStatus", () => {
+  const busyState = chatState({
+    activeWorkspaceId: WS,
+    activeSessionId: "sess-a",
+    workspaceStates: {
+      [WS]: workspaceState({
+        sessions: { "sess-a": session("sess-a"), "sess-b": session("sess-b") },
+        sessionStatuses: { "sess-a": BUSY, "sess-b": IDLE },
+      }),
+    },
+  });
+
+  it("reports the selected session's own status, not the active one's", () => {
+    expect(selectSessionStreamingStatus(WS, "sess-b")(busyState)).toBe("idle");
+  });
+
+  it("reports streaming for a busy session", () => {
+    expect(selectSessionStreamingStatus(WS, "sess-a")(busyState)).toBe(
+      "streaming",
+    );
+  });
+
+  it("reports the streaming error for the active session", () => {
+    // Given
+    const state = { ...busyState, streamingError: "Provider failed" };
+
+    // Then
+    expect(selectSessionStreamingStatus(WS, "sess-a")(state)).toBe("error");
+  });
+
+  it("keeps the streaming error out of a session that is not active", () => {
+    // Given
+    const state = { ...busyState, streamingError: "Provider failed" };
+
+    // Then
+    expect(selectSessionStreamingStatus(WS, "sess-b")(state)).toBe("idle");
+  });
+
+  it("reports the streaming error for a new chat that is the active chat", () => {
+    // Given
+    const state = chatState({
+      activeWorkspaceId: WS,
+      activeSessionId: null,
+      streamingError: "Couldn't start",
+    });
+
+    // Then
+    expect(selectSessionStreamingStatus(WS, null)(state)).toBe("error");
+  });
+
+  it("reports idle for a new chat while another chat is active", () => {
+    // Given
+    const state = { ...busyState, streamingError: "Provider failed" };
+
+    // Then
+    expect(selectSessionStreamingStatus(WS, null)(state)).toBe("idle");
+  });
 });
 
 describe("visible session registry", () => {

@@ -3,6 +3,10 @@ import { join } from "node:path";
 import { render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  ChatTabProvider,
+  type ChatTabContextValue,
+} from "@/components/chat/chat-tab-context";
 import { useSessionFiles } from "@/components/chat/use-session-files";
 import { SessionFilesPanel } from "@/components/chat/session-files-panel";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -395,6 +399,60 @@ describe("SessionFilesPanel unloaded-history hint", () => {
     expect(
       screen.getByTestId("session-files-unloaded-hint"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("useSessionFiles in a chat tab", () => {
+  it("aggregates the tab session's sub-agents, not the focused chat's", () => {
+    chatState.activeSessionId = "parent";
+    chatState.workspaceStates[WORKSPACE_ID] = {
+      sessions: {
+        parent: makeSession("parent", "", 1),
+        child: makeSession("child", "parent", 2),
+        "tab-parent": makeSession("tab-parent", "", 3),
+        "tab-child": makeSession("tab-child", "tab-parent", 4),
+      },
+      messages: {
+        child: [
+          makeToolMessage({
+            sessionID: "child",
+            messageID: "c1",
+            tool: "edit",
+            filePath: "/workspace/src/focused.ts",
+          }),
+        ],
+        "tab-child": [
+          makeToolMessage({
+            sessionID: "tab-child",
+            messageID: "t1",
+            tool: "edit",
+            filePath: "/workspace/src/tab.ts",
+          }),
+        ],
+      },
+    };
+    chatState.hasMoreBeforeBySession = {
+      [`${WORKSPACE_ID}:child`]: false,
+      [`${WORKSPACE_ID}:tab-child`]: false,
+    };
+    const chatTab: ChatTabContextValue = {
+      tabId: "tab-1",
+      workspaceId: WORKSPACE_ID,
+      sessionId: "tab-parent",
+      isFocused: false,
+      isLastFocusedChat: false,
+      isVisible: true,
+    };
+
+    const { result } = renderHook(() => useSessionFiles([]), {
+      wrapper: ({ children }) => (
+        <ChatTabProvider value={chatTab}>{children}</ChatTabProvider>
+      ),
+    });
+
+    expect(result.current.files.map((file) => file.path)).toEqual([
+      "/workspace/src/tab.ts",
+    ]);
   });
 });
 

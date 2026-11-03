@@ -20,6 +20,7 @@ vi.mock("sonner", () => ({
 const storeMocks = vi.hoisted(() => ({
   setActiveSession: vi.fn(),
   setActiveWorkspaceId: vi.fn(),
+  setActiveWorkspaceSession: vi.fn(),
   fetchSessions: vi.fn(),
   createSession: vi.fn(),
   deleteSession: vi.fn(),
@@ -71,11 +72,13 @@ function makeWorkspace(
   };
 }
 
+const workspaceStoreMocks = vi.hoisted(() => ({
+  setActiveWorkspaceId: vi.fn(),
+}));
+
 vi.mock("@/stores/workspace-store", () => ({
   useWorkspaceStore: {
-    getState: vi.fn(() => ({
-      setActiveWorkspaceId: vi.fn(),
-    })),
+    getState: vi.fn(() => workspaceStoreMocks),
   },
 }));
 
@@ -370,5 +373,158 @@ describe("useSessionManagement", () => {
       "shared-session",
       "ws-2",
     );
+  });
+
+  describe("in a workbench chat tab", () => {
+    function renderTabSessionManagement(
+      overrides: Partial<Parameters<typeof useSessionManagement>[0]> = {},
+    ) {
+      vi.mocked(useIsMobile).mockReturnValue(false);
+      vi.mocked(useHasCoarsePointer).mockReturnValue(false);
+      return renderHook(
+        (props: Partial<Parameters<typeof useSessionManagement>[0]>) =>
+          useSessionManagement({
+            activeWorkspaceId: "ws-1",
+            allWorkspaces: [makeWorkspace("ws-1"), makeWorkspace("ws-2")],
+            healthStatus: "healthy",
+            promptInputRef: nullPromptInputRef,
+            isTabMode: true,
+            ...props,
+          }),
+        { initialProps: overrides },
+      );
+    }
+
+    it("tells the tab which session a new chat created", async () => {
+      storeMocks.createSession.mockResolvedValue({ id: "omo_1" });
+      const onSessionChosen = vi.fn();
+      const { result } = renderTabSessionManagement({ onSessionChosen });
+
+      act(() => result.current.handleCreateSession("omo"));
+
+      await waitFor(() =>
+        expect(onSessionChosen).toHaveBeenCalledExactlyOnceWith(
+          "ws-1",
+          "omo_1",
+        ),
+      );
+    });
+
+    it("reports a chat created from the mobile list", async () => {
+      storeMocks.createSession.mockResolvedValue({ id: "ses_mobile" });
+      const onSessionChosen = vi.fn();
+      const { result } = renderTabSessionManagement({ onSessionChosen });
+
+      act(() => result.current.handleMobileCreateSession());
+
+      await waitFor(() =>
+        expect(onSessionChosen).toHaveBeenCalledWith("ws-1", "ses_mobile"),
+      );
+    });
+
+    it("does not report a chat that could not be created", async () => {
+      storeMocks.createSession.mockResolvedValue(null);
+      const onSessionChosen = vi.fn();
+      const { result } = renderTabSessionManagement({ onSessionChosen });
+
+      act(() => result.current.handleCreateSession("omo"));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith("Couldn't create a new chat"),
+      );
+      expect(onSessionChosen).not.toHaveBeenCalled();
+    });
+
+    it("reports the chat created once a sleeping remote workspace is healthy", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 200 })),
+      );
+      storeMocks.createSession.mockResolvedValue({ id: "ses_remote" });
+      const onSessionChosen = vi.fn();
+      const remoteWorkspaces = [makeWorkspace("ws-1", { backend: "remote" })];
+      const { result, rerender } = renderTabSessionManagement({
+        allWorkspaces: remoteWorkspaces,
+        healthStatus: "stopped",
+        onSessionChosen,
+      });
+
+      act(() => result.current.handleCreateSession("opencode"));
+      expect(onSessionChosen).not.toHaveBeenCalled();
+
+      rerender({
+        allWorkspaces: remoteWorkspaces,
+        healthStatus: "healthy",
+        onSessionChosen,
+      });
+
+      await waitFor(() =>
+        expect(onSessionChosen).toHaveBeenCalledWith("ws-1", "ses_remote"),
+      );
+    });
+
+    it("hands a new chat in another workspace to the workbench instead of creating it", () => {
+      const onNewChatInWorkspace = vi.fn();
+      const { result } = renderTabSessionManagement({ onNewChatInWorkspace });
+
+      act(() => result.current.handleCreateSessionInWorkspace("ws-2", "omo"));
+
+      expect(onNewChatInWorkspace).toHaveBeenCalledExactlyOnceWith(
+        "ws-2",
+        "omo",
+      );
+      expect(storeMocks.createSession).not.toHaveBeenCalled();
+      expect(workspaceStoreMocks.setActiveWorkspaceId).not.toHaveBeenCalled();
+      expect(storeMocks.setActiveWorkspaceId).not.toHaveBeenCalled();
+    });
+
+    it("wakes a sleeping remote workspace before handing its new chat over", () => {
+      const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+      const onNewChatInWorkspace = vi.fn();
+      const { result } = renderTabSessionManagement({
+        allWorkspaces: [
+          makeWorkspace("ws-1"),
+          makeWorkspace("ws-2", { backend: "remote" }),
+        ],
+        healthStatus: undefined,
+        onNewChatInWorkspace,
+      });
+
+      act(() => result.current.handleCreateSessionInWorkspace("ws-2", "omo"));
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/workspaces/ws-2/start", {
+        method: "POST",
+      });
+      expect(onNewChatInWorkspace).toHaveBeenCalledWith("ws-2", "omo");
+      expect(storeMocks.createSession).not.toHaveBeenCalled();
+    });
+
+    it("still creates a chat in its own workspace", () => {
+      storeMocks.createSession.mockResolvedValue({ id: "ses_1" });
+      const onNewChatInWorkspace = vi.fn();
+      const { result } = renderTabSessionManagement({ onNewChatInWorkspace });
+
+      act(() =>
+        result.current.handleCreateSessionInWorkspace("ws-1", "opencode"),
+      );
+
+      expect(storeMocks.createSession).toHaveBeenCalledWith("ws-1", "opencode");
+      expect(onNewChatInWorkspace).not.toHaveBeenCalled();
+    });
+
+    it("leaves keyboard focus where it is after a session pick", () => {
+      const focusMock = vi.fn();
+      const promptInputRef = {
+        current: { focus: focusMock } as unknown as PromptInputHandle,
+      } as RefObject<PromptInputHandle | null>;
+      const { result } = renderTabSessionManagement({ promptInputRef });
+
+      result.current.handleSelectSession("session-1");
+      result.current.handleMobileSelectSession("session-2");
+      result.current.handleSelectUnifiedSession("session-3", "ws-2");
+
+      expect(focusMock).not.toHaveBeenCalled();
+    });
   });
 });

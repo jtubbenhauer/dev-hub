@@ -19,6 +19,8 @@ export interface UseChatUrlStateOptions {
   readonly onToggleUnifiedMode: () => void;
   readonly onToggleGroupByWorkspace: () => void;
   readonly onSetSessionAgeFilter: (filter: SessionAgeFilter) => void;
+  // Workbench chat tabs leave the URL to the workbench.
+  readonly isEnabled?: boolean;
 }
 
 export interface ChatUrlStateController {
@@ -56,9 +58,11 @@ export function useChatUrlState(
     onToggleUnifiedMode,
     onToggleGroupByWorkspace,
     onSetSessionAgeFilter,
+    isEnabled = true,
   } = options;
 
   useEffect(() => {
+    if (!isEnabled) return;
     const urlState = parseChatUrlState(new URLSearchParams(searchParamsString));
     const applicationKey = `${searchParamsString}\u0000${urlState.workspaceId ?? activeWorkspaceId ?? ""}\u0000${urlState.sessionId ?? activeSessionId ?? ""}`;
     if (lastAppliedSearchParamsRef.current === applicationKey) return;
@@ -152,6 +156,7 @@ export function useChatUrlState(
     activeSessionId,
     activeWorkspaceId,
     groupByWorkspace,
+    isEnabled,
     isUnifiedMode,
     onSetSessionAgeFilter,
     onToggleGroupByWorkspace,
@@ -163,6 +168,7 @@ export function useChatUrlState(
   ]);
 
   useEffect(() => {
+    if (!isEnabled) return;
     const urlState = parseChatUrlState(new URLSearchParams(searchParamsString));
     if (isApplyingUrlRef.current) {
       if (activeSessionId === urlState.sessionId) {
@@ -197,6 +203,7 @@ export function useChatUrlState(
     activeSessionId,
     activeWorkspaceId,
     groupByWorkspace,
+    isEnabled,
     isUnifiedMode,
     router,
     searchParamsString,
@@ -205,6 +212,7 @@ export function useChatUrlState(
 
   const pushChatState = useCallback(
     (updates: Partial<ChatHrefState>) => {
+      if (!isEnabled) return;
       if (updates.sessionId) {
         pendingSessionIdRef.current = updates.sessionId;
       }
@@ -227,6 +235,7 @@ export function useChatUrlState(
     [
       activeWorkspaceId,
       groupByWorkspace,
+      isEnabled,
       isUnifiedMode,
       router,
       sessionAgeFilter,

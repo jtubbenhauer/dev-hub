@@ -15,6 +15,11 @@ interface UseSessionManagementArgs {
   allWorkspaces: Workspace[];
   healthStatus: string | undefined;
   promptInputRef: RefObject<PromptInputHandle | null>;
+  // Tells a workbench chat tab which session to show after a pick or create.
+  onSessionChosen?: (workspaceId: string, sessionId: string) => void;
+  // Opens a new chat in another workspace's layout instead of this tab.
+  onNewChatInWorkspace?: (workspaceId: string, engine?: ChatEngine) => void;
+  isTabMode?: boolean;
 }
 
 interface PendingSessionCreation {
@@ -27,10 +32,15 @@ export function useSessionManagement({
   allWorkspaces,
   healthStatus,
   promptInputRef,
+  onSessionChosen,
+  onNewChatInWorkspace,
+  isTabMode = false,
 }: UseSessionManagementArgs) {
   const isMobile = useIsMobile();
   const hasCoarsePointer = useHasCoarsePointer();
-  const shouldSuppressAutoFocus = isMobile || hasCoarsePointer;
+  // A tab's pick may open in another tab, so focusing this prompt would steal
+  // the cursor from it.
+  const shouldSuppressAutoFocus = isMobile || hasCoarsePointer || isTabMode;
   const {
     setActiveSession,
     setActiveWorkspaceId,
@@ -82,6 +92,12 @@ export function useSessionManagement({
     }
   });
   const [isMobileSessionsOpen, setIsMobileSessionsOpen] = useState(false);
+  // A ref keeps createChat stable, so the pending-creation effect below never
+  // re-runs (and creates a second chat) because the caller's callback changed.
+  const onSessionChosenRef = useRef(onSessionChosen);
+  useEffect(() => {
+    onSessionChosenRef.current = onSessionChosen;
+  }, [onSessionChosen]);
 
   const resumeWorkspace = useCallback(async (workspaceId: string) => {
     try {
@@ -108,7 +124,12 @@ export function useSessionManagement({
         workspaceId,
         engine ?? getNewChatEngineChoice(workspaceId),
       );
-      if (!session) toast.error("Couldn't create a new chat");
+      if (!session) {
+        toast.error("Couldn't create a new chat");
+        return null;
+      }
+      onSessionChosenRef.current?.(workspaceId, session.id);
+      return session;
     },
     [createSession],
   );
@@ -159,11 +180,22 @@ export function useSessionManagement({
 
   const handleCreateSessionInWorkspace = useCallback(
     (workspaceId: string, engine?: ChatEngine) => {
+      const ws = allWorkspaces.find((w) => w.id === workspaceId);
+      const isResumeNeeded =
+        ws?.backend === "remote" && healthStatus !== "healthy";
+
+      // Switching workspaces remounts the workbench layout and unmounts this
+      // tab, so a pending creation here would never run.
+      if (onNewChatInWorkspace && workspaceId !== activeWorkspaceId) {
+        if (isResumeNeeded) void resumeWorkspace(workspaceId);
+        onNewChatInWorkspace(workspaceId, engine);
+        return;
+      }
+
       useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
       setActiveWorkspaceId(workspaceId);
 
-      const ws = allWorkspaces.find((w) => w.id === workspaceId);
-      if (ws?.backend === "remote" && healthStatus !== "healthy") {
+      if (isResumeNeeded) {
         setPendingSessionCreation({ workspaceId, engine });
         resumeWorkspace(workspaceId);
         return;
@@ -172,10 +204,12 @@ export function useSessionManagement({
       void createChat(workspaceId, engine);
     },
     [
+      activeWorkspaceId,
       setActiveWorkspaceId,
       allWorkspaces,
       healthStatus,
       createChat,
+      onNewChatInWorkspace,
       resumeWorkspace,
     ],
   );

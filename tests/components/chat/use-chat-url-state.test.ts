@@ -274,4 +274,54 @@ describe("useChatUrlState", () => {
       "/chat?workspaceId=ws-1&sessionId=session-auto&view=workspace&group=0&age=all",
     );
   });
+
+  describe("when disabled for a workbench chat tab", () => {
+    it("leaves a bare URL alone", () => {
+      renderHook(() =>
+        useChatUrlState({ ...createOptions(), isEnabled: false }),
+      );
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("does not apply session state from the URL", () => {
+      mockSearch =
+        "workspaceId=ws-2&sessionId=session-2&view=unified&group=1&age=1w";
+      const options = { ...createOptions(), isEnabled: false };
+
+      renderHook(() => useChatUrlState(options));
+
+      expect(mockWorkspaceState.setActiveWorkspaceId).not.toHaveBeenCalled();
+      expect(mockChatState.setActiveSession).not.toHaveBeenCalled();
+      expect(options.onToggleUnifiedMode).not.toHaveBeenCalled();
+    });
+
+    it("does not push a session created outside the URL navigation handlers", () => {
+      mockSearch =
+        "workspaceId=ws-1&sessionId=session-1&view=workspace&group=0&age=all";
+      let options: UseChatUrlStateOptions = {
+        ...createOptions(),
+        isEnabled: false,
+      };
+      const { rerender } = renderHook(() => useChatUrlState(options));
+
+      mockChatState.activeSessionId = "session-new";
+      mockChatState.workspaceStates["ws-1"].sessions["session-new"] = {};
+      options = { ...options, activeSessionId: "session-new" };
+      rerender();
+
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("makes pushChatState a no-op", () => {
+      const { result } = renderHook(() =>
+        useChatUrlState({ ...createOptions(), isEnabled: false }),
+      );
+
+      act(() => result.current.pushChatState({ sessionId: "session-2" }));
+
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useChatTab } from "@/components/chat/chat-tab-context";
 import { useWorkspaceEngine } from "@/hooks/use-workspace-engine";
 import { engineForSessionId, type ChatEngine } from "@/lib/engine/types";
 import { useChatStore } from "@/stores/chat-store";
@@ -21,15 +22,23 @@ export function useNewChatEngine(workspaceId: string | null): ChatEngineResult {
   return workspaceDefault;
 }
 
+// A chat tab showing this workspace owns the answer, so a background tab never
+// takes the engine of the chat that is focused (the global active session).
 export function useActiveChatEngine(
   workspaceId: string | null,
 ): ChatEngineResult {
-  const activeSessionId = useChatStore((state) =>
-    workspaceId !== null && state.activeWorkspaceId === workspaceId
+  const chatTab = useChatTab();
+  const isTabWorkspace =
+    chatTab !== null && chatTab.workspaceId === workspaceId;
+  const globalSessionId = useChatStore((state) =>
+    !isTabWorkspace &&
+    workspaceId !== null &&
+    state.activeWorkspaceId === workspaceId
       ? state.activeSessionId
       : null,
   );
   const newChatEngine = useNewChatEngine(workspaceId);
+  const activeSessionId = isTabWorkspace ? chatTab.sessionId : globalSessionId;
   if (activeSessionId !== null) {
     return { engine: engineForSessionId(activeSessionId), isLoading: false };
   }

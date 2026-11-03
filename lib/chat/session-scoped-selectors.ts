@@ -56,6 +56,9 @@ type OnScreenSource = Pick<
 type RefetchSource = OnScreenSource &
   Pick<SessionScopedChatState, "sseWorkspaceIds">;
 
+type SessionStreamingStatusSource = StreamingStatusSource &
+  Pick<SessionScopedChatState, "activeWorkspaceId" | "activeSessionId">;
+
 export function computeStreamingStatus(
   state: StreamingStatusSource,
   workspaceId: string,
@@ -133,6 +136,26 @@ export function selectSessionStatus(
     return (
       state.workspaceStates[workspaceId]?.sessionStatuses[sessionId] ?? null
     );
+  };
+}
+
+// The streaming error belongs to the active chat, which may be a new chat
+// without a session yet; every other session reports its own status.
+export function selectSessionStreamingStatus(
+  workspaceId: string | null,
+  sessionId: string | null,
+): (state: SessionStreamingStatusSource) => StreamingStatus {
+  return (state) => {
+    const isActiveSession =
+      state.activeWorkspaceId === workspaceId &&
+      state.activeSessionId === sessionId;
+    if (!workspaceId || !sessionId) {
+      return isActiveSession && state.streamingError ? "error" : "idle";
+    }
+    return computeStreamingStatus(state, workspaceId, sessionId, {
+      isActiveSession,
+      now: Date.now(),
+    });
   };
 }
 

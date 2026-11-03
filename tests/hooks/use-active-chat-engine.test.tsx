@@ -1,9 +1,14 @@
 import { act, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   useActiveChatEngine,
   useNewChatEngine,
 } from "@/hooks/use-active-chat-engine";
+import {
+  ChatTabProvider,
+  type ChatTabContextValue,
+} from "@/components/chat/chat-tab-context";
 import { useChatStore } from "@/stores/chat-store";
 import { useNewChatEngineStore } from "@/stores/new-chat-engine-store";
 
@@ -14,6 +19,21 @@ vi.mock("@/hooks/use-workspace-engine", () => ({
 }));
 
 const initialChatState = useChatStore.getState();
+
+const openCodeTab: ChatTabContextValue = {
+  tabId: "tab-1",
+  workspaceId: "ws-1",
+  sessionId: "ses_tab",
+  isFocused: false,
+  isLastFocusedChat: false,
+  isVisible: true,
+};
+
+function chatTabWrapper(value: ChatTabContextValue) {
+  return function ChatTabWrapper({ children }: { children: ReactNode }) {
+    return <ChatTabProvider value={value}>{children}</ChatTabProvider>;
+  };
+}
 
 beforeEach(() => {
   useWorkspaceEngineMock.mockReturnValue({
@@ -110,5 +130,47 @@ describe("useActiveChatEngine", () => {
     });
 
     expect(result.current.engine).toBe("omo");
+  });
+
+  describe("inside a chat tab", () => {
+    it("uses the tab's OpenCode chat while the workspace's active chat is omo", () => {
+      useChatStore.setState({
+        activeWorkspaceId: "ws-1",
+        activeSessionId: "omo_active",
+      });
+
+      const { result } = renderHook(() => useActiveChatEngine("ws-1"), {
+        wrapper: chatTabWrapper(openCodeTab),
+      });
+
+      expect(result.current).toEqual({ engine: "opencode", isLoading: false });
+    });
+
+    it("uses the engine picked for the next chat in a new-chat tab", () => {
+      useNewChatEngineStore.getState().setNewChatEngine("ws-1", "omo");
+      useChatStore.setState({
+        activeWorkspaceId: "ws-1",
+        activeSessionId: "ses_active",
+      });
+
+      const { result } = renderHook(() => useActiveChatEngine("ws-1"), {
+        wrapper: chatTabWrapper({ ...openCodeTab, sessionId: null }),
+      });
+
+      expect(result.current).toEqual({ engine: "omo", isLoading: false });
+    });
+
+    it("keeps the global active chat for a workspace the tab does not show", () => {
+      useChatStore.setState({
+        activeWorkspaceId: "ws-2",
+        activeSessionId: "omo_active",
+      });
+
+      const { result } = renderHook(() => useActiveChatEngine("ws-2"), {
+        wrapper: chatTabWrapper(openCodeTab),
+      });
+
+      expect(result.current).toEqual({ engine: "omo", isLoading: false });
+    });
   });
 });

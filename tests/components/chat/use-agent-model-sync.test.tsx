@@ -394,6 +394,50 @@ describe("useAgentModelSync", () => {
     expect(useChatStore.getState().getSessionVariant("sess-a")).toBeNull();
   });
 
+  describe("for a chat tab that is not the focused chat", () => {
+    it("clears an invalid restored variant on the tab's session, not the focused one", () => {
+      seedWorkspace({
+        activeSessionId: "sess-a",
+        sessionAgents: { "sess-b": "code" },
+        sessionModels: { "sess-b": testModel },
+        sessionVariants: { "sess-a": "max", "sess-b": "max" },
+      });
+
+      renderHook((props: HarnessProps) => useHarness(props), {
+        initialProps: {
+          activeSessionId: "sess-b",
+          initialModel: testModel,
+          variants: ["low"],
+          variantsModel: testModel,
+        },
+      });
+
+      const { getSessionVariant } = useChatStore.getState();
+      expect(getSessionVariant("sess-b")).toBeNull();
+      expect(getSessionVariant("sess-a")).toBe("max");
+    });
+
+    it("resets the variant of the tab's session when the user changes its agent", () => {
+      seedWorkspace({
+        activeSessionId: "sess-a",
+        sessionAgents: { "sess-b": "code" },
+        sessionVariants: { "sess-a": "max", "sess-b": "max" },
+      });
+      const { result } = renderHook(
+        (props: HarnessProps) => useHarness(props),
+        { initialProps: { activeSessionId: "sess-b", variants: noVariants } },
+      );
+
+      act(() => {
+        result.current.setSelectedAgent("build");
+      });
+
+      const { getSessionVariant } = useChatStore.getState();
+      expect(getSessionVariant("sess-b")).toBeNull();
+      expect(getSessionVariant("sess-a")).toBe("max");
+    });
+  });
+
   describe("an omo chat this browser saved no choice for", () => {
     const haiku = {
       providerID: "anthropic-subscription",

@@ -1,11 +1,19 @@
 "use client";
 
+import {
+  useChatViewSessionId,
+  useChatViewWorkspaceId,
+} from "@/components/chat/chat-tab-context";
 import { formatRetryLabel } from "@/lib/chat/streaming-label";
 import {
   formatDescendantActivity,
   getDescendantActivity,
   type DescendantActivityCounts,
 } from "@/lib/chat/descendant-activity";
+import {
+  selectSessionMessages,
+  selectSessionStatus,
+} from "@/lib/chat/session-scoped-selectors";
 import {
   Popover,
   PopoverContent,
@@ -110,10 +118,18 @@ export const StreamingIndicator = memo(function StreamingIndicator({
 
 const VirtuosoFooter = memo(function VirtuosoFooter() {
   const [now, setNow] = useState(Date.now);
-  const messages = useChatStore((s) => s.getActiveSessionMessages());
-  const sessionStatus = useChatStore((s) => s.getActiveSessionStatus());
-  const activeSessionId = useChatStore((s) => s.activeSessionId);
-  const activeWorkspaceId = useChatStore((s) => s.activeWorkspaceId);
+  const activeSessionId = useChatViewSessionId();
+  const activeWorkspaceId = useChatViewWorkspaceId();
+  const selectMessages = useMemo(
+    () => selectSessionMessages(activeWorkspaceId, activeSessionId),
+    [activeWorkspaceId, activeSessionId],
+  );
+  const selectStatus = useMemo(
+    () => selectSessionStatus(activeWorkspaceId, activeSessionId),
+    [activeWorkspaceId, activeSessionId],
+  );
+  const messages = useChatStore(selectMessages);
+  const sessionStatus = useChatStore(selectStatus);
   const workspace = useChatStore((s) =>
     activeWorkspaceId ? s.workspaceStates[activeWorkspaceId] : undefined,
   );

@@ -1,6 +1,10 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
+import {
+  ChatTabProvider,
+  type ChatTabContextValue,
+} from "@/components/chat/chat-tab-context";
 import { MessageToolUse } from "@/components/chat/message-tool-use";
 import type { ToolPart } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
@@ -123,5 +127,69 @@ describe("MessageToolUse - sub-agent task progress", () => {
     expect(
       screen.getByRole("progressbar", { name: "1 of 2 tasks completed" }),
     ).toBeInTheDocument();
+  });
+
+  it("reads the sub-agent's progress from the chat tab's workspace", () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => [] });
+    useChatStore.setState({
+      activeWorkspaceId: "ws-focused",
+      workspaceStates: {
+        "ws-tab": {
+          sessions: {},
+          sessionsLoaded: true,
+          messages: {},
+          optimisticMessageIds: {},
+          sessionStatuses: {},
+          permissions: [],
+          questions: [],
+          todos: {
+            "child-1": [
+              {
+                id: "todo-1",
+                content: "Done",
+                status: "completed",
+                priority: "high",
+              },
+            ],
+          },
+          sessionAgents: {},
+          sessionModels: {},
+          sessionVariants: {},
+          lastViewedAt: {},
+          pinnedSessionIds: new Set(),
+          sessionNotes: {},
+        },
+      },
+    });
+    const chatTab: ChatTabContextValue = {
+      tabId: "tab-1",
+      workspaceId: "ws-tab",
+      sessionId: "parent-1",
+      isFocused: false,
+      isLastFocusedChat: false,
+      isVisible: true,
+    };
+    const part = {
+      id: "part-agent",
+      sessionID: "parent-1",
+      messageID: "msg-1",
+      type: "tool",
+      tool: "task",
+      state: {
+        status: "running",
+        input: { description: "Review implementation" },
+        metadata: { sessionId: "child-1" },
+      },
+    } as unknown as ToolPart;
+
+    render(
+      <ChatTabProvider value={chatTab}>
+        <MessageToolUse part={part} />
+      </ChatTabProvider>,
+    );
+
+    expect(screen.getByText("1/1")).toBeInTheDocument();
   });
 });

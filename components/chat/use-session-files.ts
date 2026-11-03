@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { useChatViewSessionId } from "@/components/chat/chat-tab-context";
 import {
   extractSessionFilesMulti,
   type SessionFile,
@@ -25,7 +26,7 @@ export function useSessionFiles(
   messages: MessageWithParts[],
 ): UseSessionFilesResult {
   const workspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const activeSessionId = useChatStore((s) => s.activeSessionId);
+  const activeSessionId = useChatViewSessionId();
   const sessions = useChatStore((s) =>
     workspaceId ? s.workspaceStates[workspaceId]?.sessions : undefined,
   );

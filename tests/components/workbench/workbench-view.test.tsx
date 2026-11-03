@@ -5,6 +5,7 @@ import type { ComponentProps } from "react";
 
 import type { WorkspaceChatEffectsHost } from "@/components/chat/workspace-chat-effects-host";
 
+import { getLspOpenFileHandler } from "@/lib/lsp/client/navigation-registry";
 import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
 import { WORKBENCH_PATH } from "@/lib/workbench/workbench-href";
 import { useChatStore } from "@/stores/chat-store";
@@ -138,6 +139,18 @@ describe("WorkbenchView", () => {
 
     // Then
     expect(screen.getAllByTestId("workspace-chat-effects")).toHaveLength(1);
+  });
+
+  it("routes go-to-definition from file tab editors while mounted", () => {
+    // Given
+    const view = renderWorkbenchView();
+    expect(getLspOpenFileHandler("files-page")).toBeDefined();
+
+    // When
+    view.unmount();
+
+    // Then
+    expect(getLspOpenFileHandler("files-page")).toBeUndefined();
   });
 
   it("opens a chat tab for a session the workspace chat effects started", () => {

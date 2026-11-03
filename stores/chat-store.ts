@@ -38,6 +38,7 @@ import {
 import { createRecentIdSet } from "@/lib/attention/recent-id-set";
 import { toast } from "sonner";
 import { extractFilePathFromToolPart } from "@/lib/chat/extract-tool-file-path";
+import { findOwnFileBuffer } from "@/lib/files/own-file-buffer";
 import { getTodoUpdatedAt } from "@/lib/chat/todo-updated-at";
 import {
   mergeTailWindow,
@@ -45,6 +46,7 @@ import {
   mergeFullMessage,
   dropSupersededOptimistic,
 } from "@/lib/opencode/merge-messages";
+import { useEditorStore, type FileDiskReload } from "@/stores/editor-store";
 import { useSidePanelStore } from "@/stores/side-panel-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { getOmoPermissionPreset } from "@/stores/omo-permission-preset-store";
@@ -866,6 +868,30 @@ function reconcileWorkspacePrompts(
   return request;
 }
 
+// Agent edits arrive in bursts, so each buffer reloads once after the last.
+function scheduleAgentEditReload(
+  timerKey: string,
+  filePath: string,
+  reload: () => Promise<FileDiskReload>,
+): void {
+  const existing = reloadDebounceTimers.get(timerKey);
+  if (existing) clearTimeout(existing);
+  reloadDebounceTimers.set(
+    timerKey,
+    setTimeout(() => {
+      reloadDebounceTimers.delete(timerKey);
+      void reload().then((status) => {
+        if (status === "dirty-skipped") {
+          const filename = filePath.split("/").pop() ?? filePath;
+          toast.warning(
+            `File ${filename} was modified externally. Save or discard your changes to see the update.`,
+          );
+        }
+      });
+    }, 500),
+  );
+}
+
 function flushPendingPartUpdates(
   set: (fn: (state: ChatState) => Partial<ChatState>) => void,
 ): void {
@@ -948,26 +974,18 @@ function flushPendingPartUpdates(
           wsPath && rawFilePath.startsWith(wsPrefix)
             ? rawFilePath.slice(wsPrefix.length)
             : rawFilePath;
+        // Before the side-panel check, which skips files the side panel lacks.
+        if (
+          findOwnFileBuffer(useEditorStore.getState().openFiles, wsId, filePath)
+        ) {
+          scheduleAgentEditReload(`editor:${wsId}:${filePath}`, filePath, () =>
+            useEditorStore.getState().reloadFileFromDisk(wsId, filePath),
+          );
+        }
         const { openFiles } = useSidePanelStore.getState();
         if (!openFiles.some((f) => f.path === filePath)) continue;
-        const existing = reloadDebounceTimers.get(filePath);
-        if (existing) clearTimeout(existing);
-        reloadDebounceTimers.set(
-          filePath,
-          setTimeout(() => {
-            reloadDebounceTimers.delete(filePath);
-            useSidePanelStore
-              .getState()
-              .reloadFileFromDisk(wsId, filePath)
-              .then((status) => {
-                if (status === "dirty-skipped") {
-                  const filename = filePath.split("/").pop() ?? filePath;
-                  toast.warning(
-                    `File ${filename} was modified externally. Save or discard your changes to see the update.`,
-                  );
-                }
-              });
-          }, 500),
+        scheduleAgentEditReload(filePath, filePath, () =>
+          useSidePanelStore.getState().reloadFileFromDisk(wsId, filePath),
         );
       }
     }

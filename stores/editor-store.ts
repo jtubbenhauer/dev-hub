@@ -8,6 +8,7 @@ import {
   type OpenFileResult,
 } from "@/lib/files/tab-state";
 import { resolveTabWorkspaceId } from "@/lib/files/save-request";
+import { findOwnFileBuffer } from "@/lib/files/own-file-buffer";
 
 let tabInstanceCounter = 0;
 let revealCounter = 0;
@@ -31,6 +32,15 @@ export type CleanTabRefresh =
   | "dirty-skipped"
   | "not-open";
 
+export type FileViewMode = "editor" | "diff";
+
+export type FileDiskReload =
+  | "reloaded"
+  | "unchanged"
+  | "dirty-skipped"
+  | "not-open"
+  | "fetch-failed";
+
 interface SavedTab {
   path: string;
   name: string;
@@ -52,6 +62,8 @@ interface EditorState extends ReturnType<typeof createFileContentActions> {
   csvPreviewPath: string | null;
   workspaceFileStates: Record<string, WorkspaceFileState>;
   pendingReveal: EditorRevealRequest | null;
+  // Keyed `${workspaceId}:${path}`; session-only, never persisted.
+  fileViewModes: Record<string, FileViewMode>;
 
   openFile: (file: OpenFile) => OpenFileResult;
   closeFile: (path: string) => void;
@@ -74,6 +86,11 @@ interface EditorState extends ReturnType<typeof createFileContentActions> {
     path: string,
     content: string,
   ) => CleanTabRefresh;
+  setFileViewMode: (key: string, mode: FileViewMode) => void;
+  reloadFileFromDisk: (
+    workspaceId: string,
+    path: string,
+  ) => Promise<FileDiskReload>;
 
   getExpandedPaths: (workspaceId: string) => Set<string>;
   toggleExpandedPath: (workspaceId: string, path: string) => void;
@@ -98,6 +115,49 @@ function toSavedTab(file: OpenFile): SavedTab {
   return { path: file.path, name: file.name, language: file.language };
 }
 
+// Keys are `${workspaceId}:${path}`; workspace ids never contain a colon.
+function withoutViewModesOfPath(
+  fileViewModes: Record<string, FileViewMode>,
+  path: string,
+): Record<string, FileViewMode> {
+  const keysOfPath = Object.keys(fileViewModes).filter(
+    (key) => key.slice(key.indexOf(":") + 1) === path,
+  );
+  if (keysOfPath.length === 0) return fileViewModes;
+  const remaining = { ...fileViewModes };
+  for (const key of keysOfPath) delete remaining[key];
+  return remaining;
+}
+
+function isFileContentBody(
+  value: unknown,
+): value is { readonly content: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "content" in value &&
+    typeof value.content === "string"
+  );
+}
+
+// Null when the file can't be read (missing, refused, malformed reply).
+async function fetchDiskContent(
+  workspaceId: string,
+  path: string,
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `/api/files/content?workspaceId=${encodeURIComponent(workspaceId)}&path=${encodeURIComponent(path)}`,
+    );
+    if (!response.ok) return null;
+    const body: unknown = await response.json();
+    return isFileContentBody(body) ? body.content : null;
+  } catch (error) {
+    if (error instanceof Error) return null;
+    throw error;
+  }
+}
+
 export const useEditorStore = create<EditorState>()(
   persist(
     (set, get) => ({
@@ -110,6 +170,7 @@ export const useEditorStore = create<EditorState>()(
       csvPreviewPath: null,
       workspaceFileStates: {},
       pendingReveal: null,
+      fileViewModes: {},
 
       openFile: (file) => {
         const existing = get().openFiles.find((f) => f.path === file.path);
@@ -152,7 +213,11 @@ export const useEditorStore = create<EditorState>()(
           }
         }
 
-        set({ openFiles: nextFiles, activeFilePath: nextActive });
+        set({
+          openFiles: nextFiles,
+          activeFilePath: nextActive,
+          fileViewModes: withoutViewModesOfPath(get().fileViewModes, path),
+        });
       },
 
       setActiveFile: (path) => set({ activeFilePath: path }),
@@ -245,6 +310,26 @@ export const useEditorStore = create<EditorState>()(
           ),
         });
         return "replaced";
+      },
+
+      setFileViewMode: (key, mode) =>
+        set((state) => ({
+          fileViewModes: { ...state.fileViewModes, [key]: mode },
+        })),
+
+      // Re-checks after the read: edits typed meanwhile are never overwritten.
+      reloadFileFromDisk: async (workspaceId, path) => {
+        const buffer = findOwnFileBuffer(get().openFiles, workspaceId, path);
+        if (!buffer) return "not-open";
+        if (buffer.isDirty) return "dirty-skipped";
+        const content = await fetchDiskContent(workspaceId, path);
+        if (content === null) return "fetch-failed";
+        const refresh = get().refreshCleanTabFromDisk(
+          workspaceId,
+          path,
+          content,
+        );
+        return refresh === "replaced" ? "reloaded" : refresh;
       },
 
       getExpandedPaths: (workspaceId) => {

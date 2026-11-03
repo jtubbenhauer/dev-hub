@@ -2,6 +2,7 @@ import type { FunctionComponent } from "react";
 import type { IDockviewPanelProps } from "dockview-react";
 import { ChatTabPanel } from "@/components/workbench/tabs/chat-tab-panel";
 import { DiffTabPanel } from "@/components/workbench/tabs/diff-tab-panel";
+import { FileTabPanel } from "@/components/workbench/tabs/file-tab-panel";
 import { TerminalTabPanel } from "@/components/workbench/tabs/terminal-tab-panel";
 import { LauncherPanel } from "@/components/workbench/workbench-launcher";
 import { WorkbenchPanelFrame } from "@/components/workbench/workbench-panel-frame";
@@ -30,7 +31,7 @@ export const WORKBENCH_PANEL_COMPONENTS: Record<
   FunctionComponent<IDockviewPanelProps<WorkbenchTabParams>>
 > = {
   terminal: TerminalTabPanel,
-  file: WorkbenchPlaceholderPanel,
+  file: FileTabPanel,
   chat: ChatTabPanel,
   diff: DiffTabPanel,
   launcher: LauncherPanel,

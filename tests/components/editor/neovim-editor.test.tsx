@@ -360,6 +360,36 @@ describe("NeovimEditor", () => {
 
       expect(mockHandle.write).not.toHaveBeenCalledWith(":e src/first.ts\r");
     });
+
+    it("opens its own file when it mounts on the session another editor left", async () => {
+      // Given
+      const previousOwner = await setupWithTerminal("src/foo.ts");
+      act(() =>
+        capturedOnReady?.({
+          write: vi.fn(),
+          focus: vi.fn(),
+          blur: vi.fn(),
+          getSelection: vi.fn(() => ""),
+        }),
+      );
+      previousOwner.unmount();
+      const nextOwnerHandle: TerminalHandle = {
+        write: vi.fn(),
+        focus: vi.fn(),
+        blur: vi.fn(),
+        getSelection: vi.fn(() => ""),
+      };
+      await setupWithTerminal("src/bar.ts");
+
+      // When
+      act(() => capturedOnReady?.(nextOwnerHandle));
+
+      // Then
+      expect(capturedSessionId).toBe("nvim-file-editor");
+      await vi.waitFor(() => {
+        expect(nextOwnerHandle.write).toHaveBeenCalledWith(":e src/bar.ts\r");
+      });
+    });
   });
 
   describe("shell command construction", () => {

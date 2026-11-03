@@ -148,6 +148,10 @@ import {
   resetTurnCompletionTracker,
 } from "../../stores/chat-store";
 import { subscribeToGitStatusRefresh } from "@/lib/git/git-status-refresh";
+import { toast } from "sonner";
+import { useEditorStore, type FileDiskReload } from "@/stores/editor-store";
+import { useSidePanelStore } from "@/stores/side-panel-store";
+import type { OpenFile } from "@/types";
 
 async function flushMicrotasks(ticks = 8) {
   for (let i = 0; i < ticks; i++) await Promise.resolve();
@@ -5954,5 +5958,157 @@ describe("memory management — LRU and sessionSourceWorkspace", () => {
     ).toBe(wsMessagesSnapshot);
 
     expect(useChatStore.getState().workspaceStates["ws-other"]).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Agent-edit auto-reload of open file buffers
+// ---------------------------------------------------------------------------
+
+describe("agent-edit auto-reload", () => {
+  type SidePanelReload = Awaited<
+    ReturnType<
+      ReturnType<typeof useSidePanelStore.getState>["reloadFileFromDisk"]
+    >
+  >;
+  const realEditorReload = useEditorStore.getState().reloadFileFromDisk;
+  const realSidePanelReload = useSidePanelStore.getState().reloadFileFromDisk;
+  const editorReload =
+    vi.fn<(workspaceId: string, path: string) => Promise<FileDiskReload>>();
+  const sidePanelReload =
+    vi.fn<(workspaceId: string, path: string) => Promise<SidePanelReload>>();
+
+  function openBuffer(workspaceId: string, path: string): OpenFile {
+    return {
+      workspaceId,
+      path,
+      name: path.split("/").pop() ?? path,
+      content: "before",
+      originalContent: "before",
+      language: "typescript",
+      isDirty: false,
+    };
+  }
+
+  function emitCompletedWrite(filePath: string) {
+    useChatStore.getState().handleEvent(
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "part-write",
+            sessionID: "sess-a",
+            messageID: "msg-1",
+            type: "tool",
+            callID: "call-1",
+            tool: "write",
+            state: {
+              status: "completed",
+              input: { filePath },
+              output: "",
+              title: "",
+              metadata: {},
+              time: { start: 1, end: 2 },
+            },
+          },
+        },
+      },
+      "ws-a",
+    );
+  }
+
+  beforeEach(() => {
+    resetStore();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    editorReload.mockReset().mockResolvedValue("reloaded");
+    sidePanelReload.mockReset().mockResolvedValue("reloaded");
+    useEditorStore.setState({
+      openFiles: [openBuffer("ws-a", "src/a.ts")],
+      reloadFileFromDisk: editorReload,
+    });
+    useSidePanelStore.setState({
+      openFiles: [openBuffer("ws-a", "src/a.ts")],
+      reloadFileFromDisk: sidePanelReload,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    useEditorStore.setState({
+      openFiles: [],
+      reloadFileFromDisk: realEditorReload,
+    });
+    useSidePanelStore.setState({
+      openFiles: [],
+      reloadFileFromDisk: realSidePanelReload,
+    });
+  });
+
+  it("reloads the editor buffer and the side panel tab of the same edited file", async () => {
+    // Given
+    emitCompletedWrite("src/a.ts");
+
+    // When
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Then
+    expect(editorReload).toHaveBeenCalledExactlyOnceWith("ws-a", "src/a.ts");
+    expect(sidePanelReload).toHaveBeenCalledExactlyOnceWith("ws-a", "src/a.ts");
+  });
+
+  it("reloads an editor buffer the side panel does not hold", async () => {
+    // Given
+    useSidePanelStore.setState({ openFiles: [] });
+    emitCompletedWrite("src/a.ts");
+
+    // When
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Then
+    expect(editorReload).toHaveBeenCalledExactlyOnceWith("ws-a", "src/a.ts");
+    expect(sidePanelReload).not.toHaveBeenCalled();
+  });
+
+  it("debounces repeated edits of a file into one editor reload", async () => {
+    // Given
+    emitCompletedWrite("src/a.ts");
+    await vi.advanceTimersByTimeAsync(300);
+    emitCompletedWrite("src/a.ts");
+
+    // When
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Then
+    expect(editorReload).toHaveBeenCalledOnce();
+  });
+
+  it("leaves an editor buffer that another workspace opened alone", async () => {
+    // Given
+    useEditorStore.setState({ openFiles: [openBuffer("ws-b", "src/a.ts")] });
+    emitCompletedWrite("src/a.ts");
+
+    // When
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Then
+    expect(editorReload).not.toHaveBeenCalled();
+  });
+
+  it("warns once when the edited editor buffer has unsaved changes", async () => {
+    // Given
+    const warning = vi.spyOn(toast, "warning");
+    useSidePanelStore.setState({ openFiles: [] });
+    editorReload.mockResolvedValue("dirty-skipped");
+    emitCompletedWrite("src/a.ts");
+
+    // When
+    await vi.advanceTimersByTimeAsync(500);
+    await flushMicrotasks();
+
+    // Then
+    expect(warning).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining("a.ts"),
+    );
   });
 });

@@ -24,6 +24,11 @@ vi.mock("@/components/chat/chat-interface", () => ({
   ChatInterface: () => <div data-testid="chat-interface" />,
 }));
 
+// File tab bodies need the leader-key provider; they have their own tests.
+vi.mock("@/components/workbench/tabs/file-tab-panel", () => ({
+  FileTabPanel: () => <div data-testid="file-tab" />,
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));

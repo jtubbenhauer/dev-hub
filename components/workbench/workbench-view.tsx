@@ -5,6 +5,7 @@ import { FolderOpen } from "lucide-react";
 import { WorkspaceChatEffectsHost } from "@/components/chat/workspace-chat-effects-host";
 import { ContextSidebarSlot } from "@/components/workbench/context-sidebar-slot";
 import { useWorkbenchIntent } from "@/components/workbench/use-workbench-intent";
+import { useWorkbenchLspOpenHandler } from "@/components/workbench/use-workbench-lsp-open-handler";
 import { WorkbenchDockview } from "@/components/workbench/workbench-dockview";
 import { useIsMobileResolved } from "@/hooks/use-is-mobile-resolved";
 import { useEditorStore } from "@/stores/editor-store";
@@ -53,6 +54,7 @@ export function WorkbenchView() {
   }, [workspaces]);
 
   useWorkbenchIntent({ activeWorkspaceId, workspaces });
+  useWorkbenchLspOpenHandler(layoutWorkspaceId);
 
   // Waiting for the breakpoint keeps a phone from mounting (and later saving) a
   // desktop layout first.

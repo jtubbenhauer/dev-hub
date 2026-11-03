@@ -93,16 +93,18 @@ describe("active editor reveal routing", () => {
   };
 
   it.each([{ path: "b.ts" }, { workspaceId: "other" }])(
-    "passes null when the request differs by %j",
+    "passes null and keeps the request pending when it differs by %j",
     (override) => {
       // Given
-      useEditorStore.setState({ pendingReveal: { ...request, ...override } });
+      const otherFileRequest = { ...request, ...override };
+      useEditorStore.setState({ pendingReveal: otherFileRequest });
       // When
       render(<FilesActiveEditor {...props} />);
       // Then
       expect(
         switcher.mock.calls.every(([value]) => value.revealRequest === null),
       ).toBe(true);
+      expect(useEditorStore.getState().pendingReveal).toEqual(otherFileRequest);
     },
   );
 
@@ -121,7 +123,7 @@ describe("active editor reveal routing", () => {
   });
 
   it.each([{ filePath: "b.ts" }, { workspaceId: "other" }])(
-    "clears a pending request when the active editor changes %j",
+    "keeps a pending request for its own editor when this editor changes %j",
     (override) => {
       // Given
       useEditorStore.setState({ pendingReveal: request });
@@ -129,7 +131,7 @@ describe("active editor reveal routing", () => {
       // When
       view.rerender(<FilesActiveEditor {...props} {...override} />);
       // Then
-      expect(useEditorStore.getState().pendingReveal).toBeNull();
+      expect(useEditorStore.getState().pendingReveal).toEqual(request);
       expect(switcher).toHaveBeenLastCalledWith(
         expect.objectContaining({ revealRequest: null }),
       );

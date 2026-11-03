@@ -78,42 +78,40 @@ function assertNever(value: never): never {
   throw new Error(`Unhandled workbench command: ${JSON.stringify(value)}`);
 }
 
+// Returns the tab the command showed, which then takes the keyboard focus.
 // A phone shows a single group, so splits and tab moves are ignored there.
 function runWorkbenchCommand(
   input: WorkbenchDockviewControllerInput,
   command: WorkbenchCommand,
-): void {
+): string | null {
   const { layoutApi, endTerminalSession, isMobile } = input;
   switch (command.type) {
     case "cycle":
-      cycleTab(layoutApi, command.direction);
-      return;
+      return cycleTab(layoutApi, command.direction);
     case "focus-number":
-      focusTabNumber(layoutApi, command.n);
-      return;
+      return focusTabNumber(layoutApi, command.n);
     case "focus-group":
-      focusAdjacentGroup(layoutApi, command.direction);
-      return;
+      return focusAdjacentGroup(layoutApi, command.direction) === null
+        ? null
+        : layoutApi.getActivePanelId();
     case "split":
-      if (!isMobile) splitActiveGroup(layoutApi, command.direction);
-      return;
+      return isMobile ? null : splitActiveGroup(layoutApi, command.direction);
     case "move-tab":
-      if (!isMobile) {
-        moveActivePanelToAdjacentGroup(layoutApi, command.direction);
-      }
-      return;
+      return isMobile
+        ? null
+        : moveActivePanelToAdjacentGroup(layoutApi, command.direction);
     case "close-active": {
       const activePanelId = layoutApi.getActivePanelId();
-      if (activePanelId === null) return;
-      requestCloseTab({
+      if (activePanelId === null) return null;
+      const isClosed = requestCloseTab({
         layoutApi,
         panelId: activePanelId,
         endTerminalSession,
       });
-      return;
+      return isClosed ? layoutApi.getActivePanelId() : null;
     }
     default:
-      assertNever(command);
+      return assertNever(command);
   }
 }
 
@@ -163,6 +161,11 @@ export function createWorkbenchDockviewController(
       useEditorStore.getState().expandFolder(workspaceId, path);
       useContextSidebarStore.getState().openView("explorer");
     },
-    runCommand: (command) => runWorkbenchCommand(input, command),
+    // Keyboard only (chords, leader): dockview never moves the DOM focus itself.
+    runCommand: (command) => {
+      const shownPanelId = runWorkbenchCommand(input, command);
+      if (shownPanelId === null) return;
+      useWorkbenchStore.getState().requestPanelFocus(shownPanelId);
+    },
   };
 }

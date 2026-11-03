@@ -93,27 +93,33 @@ export function openOrFocusTab(
 export function cycleTab(
   api: WorkbenchLayoutApi,
   direction: "next" | "previous",
-): void {
+): string | null {
   const activeGroup = getActiveGroup(api);
-  if (!activeGroup || activeGroup.panelIds.length === 0) return;
+  if (!activeGroup || activeGroup.panelIds.length === 0) return null;
   const { panelIds, activePanelId } = activeGroup;
   const step = direction === "next" ? 1 : -1;
   const activeIndex = panelIds.findIndex((id) => id === activePanelId);
   const fromIndex = activeIndex === -1 && step === -1 ? 0 : activeIndex;
   const nextIndex = (fromIndex + step + panelIds.length) % panelIds.length;
-  api.activatePanel(panelIds[nextIndex]);
+  const nextPanelId = panelIds[nextIndex];
+  api.activatePanel(nextPanelId);
+  return nextPanelId;
 }
 
-export function focusTabNumber(api: WorkbenchLayoutApi, tabNumber: number) {
-  if (!Number.isInteger(tabNumber)) return;
-  if (tabNumber < 1 || tabNumber > LAST_TAB_NUMBER) return;
+export function focusTabNumber(
+  api: WorkbenchLayoutApi,
+  tabNumber: number,
+): string | null {
+  if (!Number.isInteger(tabNumber)) return null;
+  if (tabNumber < 1 || tabNumber > LAST_TAB_NUMBER) return null;
   const activeGroup = getActiveGroup(api);
-  if (!activeGroup) return;
+  if (!activeGroup) return null;
   const { panelIds } = activeGroup;
   const targetPanelId =
     tabNumber === LAST_TAB_NUMBER ? panelIds.at(-1) : panelIds[tabNumber - 1];
-  if (targetPanelId === undefined) return;
+  if (targetPanelId === undefined) return null;
   api.activatePanel(targetPanelId);
+  return targetPanelId;
 }
 
 function findGroupWorkspaceId(
@@ -161,13 +167,14 @@ export function focusAdjacentGroup(
   return adjacentGroup.id;
 }
 
+// Returns the moved tab, or null when nothing moved.
 export function moveActivePanelToAdjacentGroup(
   api: WorkbenchLayoutApi,
   direction: "left" | "right",
-): void {
+): string | null {
   const activeGroup = getActiveGroup(api);
   const activePanelId = activeGroup?.activePanelId ?? null;
-  if (!activeGroup || activePanelId === null) return;
+  if (!activeGroup || activePanelId === null) return null;
   const adjacentGroup = pickAdjacentGroup(
     api.getGroups(),
     activeGroup.id,
@@ -178,15 +185,16 @@ export function moveActivePanelToAdjacentGroup(
     api.movePanelToGroup({ panelId: activePanelId, groupId: adjacentGroup.id });
     // The moved tab replaces the placeholder, as openOrFocusTab does.
     if (loneLauncherId !== null) api.removePanel(loneLauncherId);
-    return;
+    return activePanelId;
   }
   // A lone panel moved beside its own group would just recreate the same layout.
-  if (direction === "left" || activeGroup.panelIds.length < 2) return;
+  if (direction === "left" || activeGroup.panelIds.length < 2) return null;
   api.movePanelToNewGroup({
     panelId: activePanelId,
     referenceGroupId: activeGroup.id,
     direction: "right",
   });
+  return activePanelId;
 }
 
 export type ChatTargetResolution =

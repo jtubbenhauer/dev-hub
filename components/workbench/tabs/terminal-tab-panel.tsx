@@ -6,6 +6,7 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { TerminalHandle } from "@/components/terminal/terminal-panel";
 import { useWorkbenchPanelState } from "@/components/workbench/use-workbench-panel-state";
+import { useWorkbenchPanelFocusTarget } from "@/components/workbench/workbench-panel-focus";
 import { WorkbenchPanelFrame } from "@/components/workbench/workbench-panel-frame";
 import {
   terminalFontFamily,
@@ -46,15 +47,18 @@ function TerminalTabBody({ params, isFocused }: TerminalTabBodyProps) {
   const handleTerminalReady = useCallback((handle: TerminalHandle) => {
     terminalHandleRef.current = handle;
   }, []);
+  const focusTerminal = useCallback(
+    () => terminalHandleRef.current?.focus(),
+    [],
+  );
+  useWorkbenchPanelFocusTarget(focusTerminal);
 
   // Next frame: the tab's own mousedown focus and dockview's overlay reveal land first.
   useEffect(() => {
     if (!isFocused) return;
-    const frame = requestAnimationFrame(() =>
-      terminalHandleRef.current?.focus(),
-    );
+    const frame = requestAnimationFrame(focusTerminal);
     return () => cancelAnimationFrame(frame);
-  }, [isFocused]);
+  }, [isFocused, focusTerminal]);
 
   if (error) {
     return (

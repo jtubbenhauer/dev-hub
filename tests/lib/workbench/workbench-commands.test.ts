@@ -257,6 +257,28 @@ describe("cycleTab", () => {
 
     expect(api.mutations).toEqual([]);
   });
+
+  it("returns the tab it activates", () => {
+    // Given
+    const api = singleGroupApi(["a", "b", "c"], "c");
+
+    // When
+    const activatedPanelId = cycleTab(api, "next");
+
+    // Then
+    expect(activatedPanelId).toBe("a");
+  });
+
+  it("returns null without an active group", () => {
+    // Given
+    const api = createFakeLayoutApi();
+
+    // When
+    const activatedPanelId = cycleTab(api, "next");
+
+    // Then
+    expect(activatedPanelId).toBeNull();
+  });
 });
 
 describe("focusTabNumber", () => {
@@ -292,6 +314,28 @@ describe("focusTabNumber", () => {
     focusTabNumber(api, 10);
 
     expect(api.mutations).toEqual([]);
+  });
+
+  it("returns the tab it activates", () => {
+    // Given
+    const api = singleGroupApi(["a", "b", "c"], "a");
+
+    // When
+    const activatedPanelId = focusTabNumber(api, 2);
+
+    // Then
+    expect(activatedPanelId).toBe("b");
+  });
+
+  it("returns null when the group has no tab N", () => {
+    // Given
+    const api = singleGroupApi(["a", "b", "c"], "a");
+
+    // When
+    const activatedPanelId = focusTabNumber(api, 5);
+
+    // Then
+    expect(activatedPanelId).toBeNull();
   });
 });
 
@@ -504,6 +548,50 @@ describe("moveActivePanelToAdjacentGroup", () => {
     moveActivePanelToAdjacentGroup(api, "right");
 
     expect(api.mutations).toEqual([]);
+  });
+
+  it("returns the tab it moves into the adjacent group", () => {
+    // Given
+    const api = createFakeLayoutApi({
+      groups: [
+        {
+          id: "g1",
+          rect: rect(0, 0),
+          panels: [filePanel("a"), filePanel("b")],
+          activePanelId: "b",
+        },
+        { id: "g2", rect: rect(100, 0), panels: [filePanel("c")] },
+      ],
+      activeGroupId: "g1",
+    });
+
+    // When
+    const movedPanelId = moveActivePanelToAdjacentGroup(api, "right");
+
+    // Then
+    expect(movedPanelId).toBe("b");
+  });
+
+  it("returns the tab it moves into a new group", () => {
+    // Given
+    const api = singleGroupApi(["a", "b"], "a");
+
+    // When
+    const movedPanelId = moveActivePanelToAdjacentGroup(api, "right");
+
+    // Then
+    expect(movedPanelId).toBe("a");
+  });
+
+  it("returns null when no tab moves", () => {
+    // Given
+    const api = singleGroupApi(["a"]);
+
+    // When
+    const movedPanelId = moveActivePanelToAdjacentGroup(api, "right");
+
+    // Then
+    expect(movedPanelId).toBeNull();
   });
 });
 

@@ -12,6 +12,7 @@ import {
   type FileTabViewMode,
 } from "@/components/workbench/tabs/use-file-tab-view-mode";
 import { WorkbenchDiffView } from "@/components/workbench/workbench-diff-view";
+import { useWorkbenchPanelFocusTarget } from "@/components/workbench/workbench-panel-focus";
 import { useEditorTypeSetting } from "@/hooks/use-settings";
 import { isTextEditorLanguage } from "@/lib/file-preview";
 import {
@@ -118,16 +119,19 @@ export function FileTabEditor(props: FileTabEditorProps) {
       useEditorStore.getState().updateFileContent(path, content),
     [path],
   );
+  // A preview or diff body has no editor; the panel frame takes the focus then.
+  const focusEditor = useCallback(() => editorHandleRef.current?.focus(), []);
+  useWorkbenchPanelFocusTarget(focusEditor);
 
   useEffect(() => {
     if (!isFocused) return;
     setFocusedFileTabCommands({
       tabId: panelId,
       save: handleSave,
-      focusEditor: () => editorHandleRef.current?.focus(),
+      focusEditor,
     });
     return () => clearFocusedFileTabCommands(panelId);
-  }, [isFocused, handleSave, panelId]);
+  }, [isFocused, handleSave, panelId, focusEditor]);
 
   const renderBody = (bodyKind: FileTabBodyKind) => {
     switch (bodyKind) {

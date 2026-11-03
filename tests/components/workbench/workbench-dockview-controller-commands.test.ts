@@ -266,3 +266,139 @@ describe("WorkbenchController.runCommand", () => {
     expect(layoutApi.mutations).toEqual([]);
   });
 });
+
+// dockview moves the active tab but never DOM focus, so every keyboard command
+// that shows a tab asks that tab to take the keyboard focus.
+describe("WorkbenchController.runCommand keyboard focus", () => {
+  function focusRequestPanelId(): string | null {
+    return useWorkbenchStore.getState().panelFocusRequest;
+  }
+
+  it("asks the active tab of the group it focuses for keyboard focus", () => {
+    // Given
+    const { controller } = setUp();
+
+    // When
+    controller.runCommand({ type: "focus-group", direction: "right" });
+
+    // Then
+    expect(focusRequestPanelId()).toBe(diffPanel.id);
+  });
+
+  it("asks the launcher of a new split for keyboard focus", () => {
+    // Given
+    const { layoutApi, controller } = setUp();
+
+    // When
+    controller.runCommand({ type: "split", direction: "right" });
+
+    // Then
+    const launcherPanel = layoutApi
+      .getPanels()
+      .find((panel) => panel.params.kind === "launcher");
+    expect(focusRequestPanelId()).toBe(launcherPanel?.id);
+  });
+
+  it.each([
+    {
+      name: "cycle",
+      command: { type: "cycle", direction: "next" } as const,
+      focusedPanelId: filePanel.id,
+    },
+    {
+      name: "tab number",
+      command: { type: "focus-number", n: 3 } as const,
+      focusedPanelId: terminalPanel.id,
+    },
+  ])(
+    "asks the tab a $name shows for keyboard focus",
+    ({ command, focusedPanelId }) => {
+      // Given
+      const { controller } = setUp();
+
+      // When
+      controller.runCommand(command);
+
+      // Then
+      expect(focusRequestPanelId()).toBe(focusedPanelId);
+    },
+  );
+
+  it("asks a moved tab for keyboard focus in its new group", () => {
+    // Given
+    const { controller } = setUp({ seed: twoGroupLayout(filePanel.id) });
+
+    // When
+    controller.runCommand({ type: "move-tab", direction: "right" });
+
+    // Then
+    expect(focusRequestPanelId()).toBe(filePanel.id);
+  });
+
+  it("asks the tab shown after a close for keyboard focus", () => {
+    // Given
+    const { controller } = setUp({ seed: twoGroupLayout(terminalPanel.id) });
+
+    // When
+    controller.runCommand({ type: "close-active" });
+
+    // Then
+    expect(focusRequestPanelId()).toBe(filePanel.id);
+  });
+
+  it.each([
+    {
+      name: "there is no group on that side",
+      command: { type: "focus-group", direction: "left" } as const,
+    },
+    {
+      name: "the group has no tab N",
+      command: { type: "focus-number", n: 5 } as const,
+    },
+  ])("leaves keyboard focus alone when $name", ({ command }) => {
+    // Given
+    const { controller } = setUp();
+
+    // When
+    controller.runCommand(command);
+
+    // Then
+    expect(focusRequestPanelId()).toBeNull();
+  });
+
+  it("leaves keyboard focus alone when a dirty tab is kept open", () => {
+    // Given
+    useEditorStore.setState({
+      openFiles: [
+        {
+          workspaceId: WORKSPACE_ID,
+          path: filePanel.params.path,
+          name: "a.ts",
+          content: "edited",
+          originalContent: "original",
+          language: "typescript",
+          isDirty: true,
+        },
+      ],
+    });
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { controller } = setUp({ seed: twoGroupLayout(filePanel.id) });
+
+    // When
+    controller.runCommand({ type: "close-active" });
+
+    // Then
+    expect(focusRequestPanelId()).toBeNull();
+  });
+
+  it("leaves keyboard focus alone for a split on a phone", () => {
+    // Given
+    const { controller } = setUp({ isMobile: true });
+
+    // When
+    controller.runCommand({ type: "split", direction: "right" });
+
+    // Then
+    expect(focusRequestPanelId()).toBeNull();
+  });
+});

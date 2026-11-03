@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DockviewReact, type DockviewApi } from "dockview-react";
 
@@ -54,6 +54,7 @@ vi.stubGlobal(
 import { WORKBENCH_PANEL_COMPONENTS } from "@/components/workbench/tab-registry";
 import { createWorkbenchDockviewController } from "@/components/workbench/workbench-dockview-controller";
 import { WorkbenchTabHeader } from "@/components/workbench/workbench-tab-header";
+import { useWorkbenchStore } from "@/stores/workbench-store";
 import { createActDockviewLayoutApi } from "./probe-dockview";
 
 const WORKSPACE_ID = "w1";
@@ -178,6 +179,7 @@ function createTerminalHandle() {
 }
 
 beforeEach(() => {
+  useWorkbenchStore.setState(useWorkbenchStore.getInitialState(), true);
   terminalPanelProps.clear();
   resolveReply = { status: 200, body: RESOLVED_CONFIG };
   serverSessions = [];
@@ -282,6 +284,27 @@ describe("TerminalTabPanel", () => {
 
     // When
     workbench.layoutApi.activatePanel(firstPanelId);
+
+    // Then
+    expect(handle.focus).toHaveBeenCalledOnce();
+  });
+
+  it("focuses its terminal when a keyboard command asks the tab for focus", async () => {
+    // Given
+    const workbench = renderTerminalWorkbench();
+    const panelId = workbench.controller.openNewTerminal();
+    const terminal = await waitFor(() => {
+      const props = terminalPanelProps.get(
+        terminalSessionIdOf(workbench.layoutApi, panelId),
+      );
+      if (!props) throw new Error("TerminalPanel not mounted yet");
+      return props;
+    });
+    const handle = createTerminalHandle();
+    terminal.onReady?.(handle);
+
+    // When
+    act(() => useWorkbenchStore.getState().requestPanelFocus(panelId));
 
     // Then
     expect(handle.focus).toHaveBeenCalledOnce();

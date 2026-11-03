@@ -40,6 +40,8 @@ interface WorkbenchState extends PersistedWorkbenchState {
   focusedPanel: FocusedWorkbenchPanel | null;
   layoutReadyWorkspaceId: string | null;
   pendingChatTarget: PendingChatTarget | null;
+  // The tab whose content should take the DOM focus after a keyboard command.
+  panelFocusRequest: string | null;
 
   saveLayout: (key: string, layout: SerializedDockview) => void;
   getLayout: (key: string) => SerializedDockview | null;
@@ -53,6 +55,8 @@ interface WorkbenchState extends PersistedWorkbenchState {
   setLayoutReadyWorkspaceId: (workspaceId: string | null) => void;
   requestChatTarget: (target: PendingChatTarget) => void;
   takePendingChatTarget: (workspaceId: string) => PendingChatTarget | null;
+  requestPanelFocus: (panelId: string) => void;
+  takePanelFocusRequest: (panelId: string) => boolean;
   pruneWorkspaces: (knownWorkspaceIds: readonly string[]) => void;
 }
 
@@ -161,6 +165,7 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       focusedPanel: null,
       layoutReadyWorkspaceId: null,
       pendingChatTarget: null,
+      panelFocusRequest: null,
 
       saveLayout: (key, layout) =>
         set((state) => ({
@@ -252,6 +257,14 @@ export const useWorkbenchStore = create<WorkbenchState>()(
         if (target === null || target.workspaceId !== workspaceId) return null;
         set({ pendingChatTarget: null });
         return target;
+      },
+
+      requestPanelFocus: (panelFocusRequest) => set({ panelFocusRequest }),
+
+      takePanelFocusRequest: (panelId) => {
+        if (get().panelFocusRequest !== panelId) return false;
+        set({ panelFocusRequest: null });
+        return true;
       },
 
       pruneWorkspaces: (knownWorkspaceIds) =>

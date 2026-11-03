@@ -265,6 +265,55 @@ describe("pendingChatTarget queue", () => {
   });
 });
 
+describe("panel focus request", () => {
+  it("gives the requested panel its focus request", () => {
+    // Given
+    useWorkbenchStore.getState().requestPanelFocus("tab-1");
+
+    // When
+    const isTaken = useWorkbenchStore.getState().takePanelFocusRequest("tab-1");
+
+    // Then
+    expect(isTaken).toBe(true);
+    expect(useWorkbenchStore.getState().panelFocusRequest).toBeNull();
+  });
+
+  it("gives a focus request out only once", () => {
+    // Given
+    useWorkbenchStore.getState().requestPanelFocus("tab-1");
+    useWorkbenchStore.getState().takePanelFocusRequest("tab-1");
+
+    // When
+    const isTaken = useWorkbenchStore.getState().takePanelFocusRequest("tab-1");
+
+    // Then
+    expect(isTaken).toBe(false);
+  });
+
+  it("keeps a request for another panel", () => {
+    // Given
+    useWorkbenchStore.getState().requestPanelFocus("tab-1");
+
+    // When
+    const isTaken = useWorkbenchStore.getState().takePanelFocusRequest("tab-2");
+
+    // Then
+    expect(isTaken).toBe(false);
+    expect(useWorkbenchStore.getState().panelFocusRequest).toBe("tab-1");
+  });
+
+  it("replaces an earlier request with the latest one", () => {
+    // Given
+    useWorkbenchStore.getState().requestPanelFocus("tab-1");
+
+    // When
+    useWorkbenchStore.getState().requestPanelFocus("tab-2");
+
+    // Then
+    expect(useWorkbenchStore.getState().panelFocusRequest).toBe("tab-2");
+  });
+});
+
 describe("pruneWorkspaces", () => {
   it("removes layouts of unknown workspaces, desktop and mobile", () => {
     const { saveLayout } = useWorkbenchStore.getState();
@@ -349,6 +398,7 @@ describe("persistence", () => {
       sessionId: "ses-1",
       panelId: null,
     });
+    state.requestPanelFocus("tab-1");
 
     const persisted = readPersistedJson();
     expect(persisted.version).toBe(1);
@@ -360,6 +410,7 @@ describe("persistence", () => {
     expect(persistedState).not.toHaveProperty("focusedPanel");
     expect(persistedState).not.toHaveProperty("pendingChatTarget");
     expect(persistedState).not.toHaveProperty("layoutReadyWorkspaceId");
+    expect(persistedState).not.toHaveProperty("panelFocusRequest");
   });
 
   it("restores valid layouts and last focused entries on rehydrate", async () => {
@@ -407,6 +458,7 @@ describe("persistence", () => {
             sessionId: "s",
             panelId: null,
           },
+          panelFocusRequest: "tab-1",
         },
       }),
     );
@@ -416,6 +468,7 @@ describe("persistence", () => {
     expect(state.lastFocusedPanelByWorkspace).toEqual({});
     expect(state.focusedPanel).toBeNull();
     expect(state.pendingChatTarget).toBeNull();
+    expect(state.panelFocusRequest).toBeNull();
   });
 
   it("falls back to defaults when the persisted state is not an object", () => {

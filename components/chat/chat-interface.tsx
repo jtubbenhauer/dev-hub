@@ -37,6 +37,7 @@ import { SessionBackgroundChip } from "@/components/chat/session-background-chip
 import { SessionBackgroundBanner } from "@/components/chat/session-background-banner";
 import { NewChatMenu } from "@/components/chat/new-chat-menu";
 import { getNewChatEngineChoice } from "@/stores/new-chat-engine-store";
+import { useWorkbenchPanelFocusTarget } from "@/components/workbench/workbench-panel-focus";
 import { Button } from "@/components/ui/button";
 import { VscodeIcon } from "@/components/ui/vscode-icon";
 import {
@@ -286,6 +287,11 @@ function ChatInterfaceContent({
   const lastJumpedUserIdxRef = useRef<number | null>(null);
   const isChatKeyboardOwner = useIsChatKeyboardOwner();
   useRefocusPromptOnTerminalClose(promptInputRef, isChatKeyboardOwner);
+  const focusPromptInput = useCallback(
+    () => promptInputRef.current?.focus(),
+    [],
+  );
+  useWorkbenchPanelFocusTarget(focusPromptInput);
 
   const { restart: restartOpencode, isRestarting } =
     useOpencodeRestart(activeWorkspaceId);

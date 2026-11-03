@@ -7,11 +7,13 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import type { DockviewApi } from "dockview-react";
 import { toast } from "sonner";
 
 import type { MonacoEditorHandle } from "@/components/editor/monaco-editor";
 import { FileTabPanel } from "@/components/workbench/tabs/file-tab-panel";
 import { WORKBENCH_PANEL_COMPONENTS } from "@/components/workbench/tab-registry";
+import { createWorkbenchDockviewController } from "@/components/workbench/workbench-dockview-controller";
 import { IMAGE_LANGUAGE, PDF_LANGUAGE } from "@/lib/file-preview";
 import { getFocusedFileTabCommands } from "@/lib/workbench/focused-file-tab-commands";
 import { useContentSearchStore } from "@/stores/content-search-store";
@@ -26,7 +28,9 @@ import {
   fileTabParams,
   renderFileTabs,
   WORKSPACE_ID,
+  type FileTabSpec,
 } from "./file-tab-fixtures";
+import { createActDockviewLayoutApi } from "./probe-dockview";
 
 interface DiffViewProps {
   readonly workspaceId: string;
@@ -853,5 +857,55 @@ describe("FileTabPanel leader actions", () => {
       view: "explorer",
       focusRequest: "file-search",
     });
+  });
+});
+
+describe("FileTabPanel keyboard focus", () => {
+  function createController(api: DockviewApi) {
+    return createWorkbenchDockviewController({
+      layoutApi: createActDockviewLayoutApi(api),
+      workspaceId: WORKSPACE_ID,
+      endTerminalSession: vi.fn(),
+      isMobile: false,
+    });
+  }
+
+  async function renderEditors(specs: readonly FileTabSpec[]) {
+    seedBuffers(createFileBuffer("a.ts"), createFileBuffer("b.ts"));
+    const { api } = renderFileTabs(specs);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("monaco-editor")).toHaveLength(2),
+    );
+    return createController(api);
+  }
+
+  it("focuses the editor of the file tab a keyboard command moves to", async () => {
+    // Given
+    const controller = await renderEditors([
+      { panelId: "tab-a", path: "a.ts" },
+      { panelId: "tab-b", path: "b.ts", isBeside: true },
+    ]);
+
+    // When
+    act(() =>
+      controller.runCommand({ type: "focus-group", direction: "left" }),
+    );
+
+    // Then
+    expect(doubles.focusedEditorPaths).toEqual(["a.ts"]);
+  });
+
+  it("focuses the editor of the file tab a keyboard command cycles to", async () => {
+    // Given
+    const controller = await renderEditors([
+      { panelId: "tab-a", path: "a.ts" },
+      { panelId: "tab-b", path: "b.ts" },
+    ]);
+
+    // When
+    act(() => controller.runCommand({ type: "cycle", direction: "next" }));
+
+    // Then
+    expect(doubles.focusedEditorPaths).toEqual(["a.ts"]);
   });
 });

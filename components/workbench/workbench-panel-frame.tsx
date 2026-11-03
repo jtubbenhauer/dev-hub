@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 import type { DockviewPanelApi } from "dockview-react";
+import {
+  useWorkbenchPanelFocusRequest,
+  WorkbenchPanelFocusTargetContext,
+} from "@/components/workbench/workbench-panel-focus";
 
 interface WorkbenchPanelFrameProps {
   readonly api: DockviewPanelApi;
@@ -11,14 +15,21 @@ export function WorkbenchPanelFrame({
   api,
   children,
 }: WorkbenchPanelFrameProps) {
+  const { frameRef, registerFocusTarget } = useWorkbenchPanelFocusRequest(
+    api.id,
+  );
   return (
-    <div
-      className="h-full min-h-0"
-      onPointerDownCapture={() => {
-        if (!api.isActive) api.setActive();
-      }}
-    >
-      {children}
-    </div>
+    <WorkbenchPanelFocusTargetContext.Provider value={registerFocusTarget}>
+      <div
+        ref={frameRef}
+        tabIndex={-1}
+        className="h-full min-h-0 outline-none"
+        onPointerDownCapture={() => {
+          if (!api.isActive) api.setActive();
+        }}
+      >
+        {children}
+      </div>
+    </WorkbenchPanelFocusTargetContext.Provider>
   );
 }

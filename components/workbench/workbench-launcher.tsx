@@ -1,4 +1,9 @@
-import { useCallback, useSyncExternalStore, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useRef,
+  useSyncExternalStore,
+  type KeyboardEvent,
+} from "react";
 import type {
   DockviewPanelApi,
   IDockviewPanelProps,
@@ -12,6 +17,7 @@ import {
 } from "lucide-react";
 import { useFilePicker } from "@/components/file-picker/file-picker";
 import { Button } from "@/components/ui/button";
+import { useWorkbenchPanelFocusTarget } from "@/components/workbench/workbench-panel-focus";
 import { WorkbenchPanelFrame } from "@/components/workbench/workbench-panel-frame";
 import type { WorkbenchTabParams } from "@/lib/workbench/tab-descriptors";
 import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
@@ -51,6 +57,13 @@ interface WorkbenchLauncherProps {
 
 export function WorkbenchLauncher({ groupId }: WorkbenchLauncherProps) {
   const { open: openFilePicker } = useFilePicker();
+  const launcherRef = useRef<HTMLDivElement>(null);
+  // Its keys only work while it holds the focus, e.g. right after a split.
+  const focusLauncher = useCallback(
+    () => launcherRef.current?.focus({ preventScroll: true }),
+    [],
+  );
+  useWorkbenchPanelFocusTarget(focusLauncher);
 
   const runAction = (actionId: LauncherActionId) => {
     switch (actionId) {
@@ -82,6 +95,7 @@ export function WorkbenchLauncher({ groupId }: WorkbenchLauncherProps) {
 
   return (
     <div
+      ref={launcherRef}
       role="group"
       aria-label="New tab"
       tabIndex={0}

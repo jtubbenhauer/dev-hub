@@ -77,9 +77,22 @@ export function WorkbenchDockview({
       }, LAYOUT_SAVE_DEBOUNCE_MS);
     });
 
-    // Replays the current active panel on subscribe, so restore-time focus is seen.
-    const activePanelSubscription = api.onDidActivePanelChange(({ panel }) => {
-      const panelRef = panel ? layoutApi.getPanel(panel.id) : null;
+    // A tab click in an inactive group first activates the group — firing this
+    // event with the group's PREVIOUS panel — and activates the clicked panel
+    // only afterwards (one animation frame later with dockview's html5 dnd
+    // backend, see Tab._activateOnPointerDown). One pending frame coalesces the
+    // burst so only the panel still active at its end is recorded; a transient
+    // panel never rewrites lastFocused or the global chat session. The event
+    // replays on subscribe, so restore-time focus is still seen.
+    let isDockviewDisposed = false;
+    let isFocusFrameScheduled = false;
+    let focusFrameHandle = 0;
+    const recordActivePanel = () => {
+      isFocusFrameScheduled = false;
+      if (isDockviewDisposed) return;
+      const activePanelId = layoutApi.getActivePanelId();
+      const panelRef =
+        activePanelId === null ? null : layoutApi.getPanel(activePanelId);
       const { setFocusedPanel } = useWorkbenchStore.getState();
       if (!panelRef) {
         setFocusedPanel(null);
@@ -96,6 +109,11 @@ export function WorkbenchDockview({
       if (panelRef.params.kind === "chat") {
         syncGlobalChatSessionToTab(workspaceId, panelRef.params.sessionId);
       }
+    };
+    const activePanelSubscription = api.onDidActivePanelChange(() => {
+      if (isFocusFrameScheduled) return;
+      isFocusFrameScheduled = true;
+      focusFrameHandle = requestAnimationFrame(recordActivePanel);
     });
 
     useWorkbenchStore.getState().setLayoutReadyWorkspaceId(workspaceId);
@@ -107,6 +125,8 @@ export function WorkbenchDockview({
       saveLayoutNow();
       layoutSubscription.dispose();
       activePanelSubscription.dispose();
+      isDockviewDisposed = true;
+      if (isFocusFrameScheduled) cancelAnimationFrame(focusFrameHandle);
       stopChatTargetSync();
       unregisterController();
       useWorkbenchStore.getState().setFocusedPanel(null);

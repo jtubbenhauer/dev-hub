@@ -70,6 +70,9 @@ function ChatTabBody({ api, containerApi, params }: ChatTabBodyProps) {
   );
 
   // A focused tab whose session (re)appears takes the global session too.
+  // Deferred one frame: a tab click in another group transiently focuses this
+  // tab (group activation) before dockview activates the clicked panel, and
+  // that transient focus must not steal the global session.
   useEffect(() => {
     if (!isFocused) return;
     const { activeWorkspaceId, activeSessionId } = useChatStore.getState();
@@ -79,8 +82,12 @@ function ChatTabBody({ api, containerApi, params }: ChatTabBodyProps) {
     ) {
       return;
     }
-    syncGlobalChatSessionToTab(workspaceId, effectiveSessionId);
-  }, [isFocused, workspaceId, effectiveSessionId]);
+    const frameHandle = requestAnimationFrame(() => {
+      if (containerApi.activePanel?.id !== panelId) return;
+      syncGlobalChatSessionToTab(workspaceId, effectiveSessionId);
+    });
+    return () => cancelAnimationFrame(frameHandle);
+  }, [isFocused, workspaceId, effectiveSessionId, containerApi, panelId]);
 
   return (
     <ChatInterface

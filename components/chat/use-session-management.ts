@@ -1,26 +1,14 @@
-import type { ChatEngine } from "@/lib/engine/types";
+import {
+  useSessionCreate,
+  type UseSessionCreateArgs,
+} from "@/components/chat/use-session-create";
 import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { useChatStore } from "@/stores/chat-store";
-import { getNewChatEngineChoice } from "@/stores/new-chat-engine-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { Workspace } from "@/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-interface UseSessionManagementArgs {
-  activeWorkspaceId: string | null;
-  allWorkspaces: Workspace[];
-  healthStatus: string | undefined;
-  // Tells a workbench chat tab which session to show after a pick or create.
-  onSessionChosen?: (workspaceId: string, sessionId: string) => void;
-  // Opens a new chat in another workspace's layout instead of this tab.
-  onNewChatInWorkspace?: (workspaceId: string, engine?: ChatEngine) => void;
-}
-
-interface PendingSessionCreation {
-  workspaceId: string;
-  engine: ChatEngine | undefined;
-}
+type UseSessionManagementArgs = UseSessionCreateArgs;
 
 export function useSessionManagement({
   activeWorkspaceId,
@@ -34,7 +22,6 @@ export function useSessionManagement({
     setActiveWorkspaceId,
     setActiveWorkspaceSession,
     fetchSessions,
-    createSession,
     deleteSession,
     removeSessionLocal,
     restoreSessionLocal,
@@ -47,8 +34,19 @@ export function useSessionManagement({
     clearSessionNote,
   } = useChatStore.getState();
 
-  const [pendingSessionCreation, setPendingSessionCreation] =
-    useState<PendingSessionCreation | null>(null);
+  const {
+    pendingSessionCreationWorkspaceId,
+    resumeWorkspace,
+    handleCreateSession,
+    handleCreateSessionInWorkspace,
+  } = useSessionCreate({
+    activeWorkspaceId,
+    allWorkspaces,
+    healthStatus,
+    onSessionChosen,
+    onNewChatInWorkspace,
+  });
+
   const [isUnifiedMode, setIsUnifiedMode] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("dev-hub:chat-unified-mode") === "true";
@@ -79,128 +77,6 @@ export function useSessionManagement({
       return {};
     }
   });
-  const [isMobileSessionsOpen, setIsMobileSessionsOpen] = useState(false);
-  // A ref keeps createChat stable, so the pending-creation effect below never
-  // re-runs (and creates a second chat) because the caller's callback changed.
-  const onSessionChosenRef = useRef(onSessionChosen);
-  useEffect(() => {
-    onSessionChosenRef.current = onSessionChosen;
-  }, [onSessionChosen]);
-
-  const resumeWorkspace = useCallback(async (workspaceId: string) => {
-    try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/start`, {
-        method: "POST",
-      });
-      if (!res.ok && res.status !== 409) {
-        const err = await res
-          .json()
-          .catch(() => ({ error: "Failed to resume workspace" }));
-        throw new Error(err.error || "Failed to resume workspace");
-      }
-      toast.success("Starting workspace...");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to resume workspace",
-      );
-    }
-  }, []);
-
-  const createChat = useCallback(
-    async (workspaceId: string, engine: ChatEngine | undefined) => {
-      const session = await createSession(
-        workspaceId,
-        engine ?? getNewChatEngineChoice(workspaceId),
-      );
-      if (!session) {
-        toast.error("Couldn't create a new chat");
-        return null;
-      }
-      onSessionChosenRef.current?.(workspaceId, session.id);
-      return session;
-    },
-    [createSession],
-  );
-
-  // Create session once workspace becomes healthy after resume
-  useEffect(() => {
-    if (!pendingSessionCreation) return;
-    if (healthStatus !== "healthy") return;
-
-    const ws = allWorkspaces.find(
-      (w) => w.id === pendingSessionCreation.workspaceId,
-    );
-    if (!ws || ws.backend !== "remote") {
-      setPendingSessionCreation(null);
-      return;
-    }
-
-    (async () => {
-      await createChat(
-        pendingSessionCreation.workspaceId,
-        pendingSessionCreation.engine,
-      );
-      setPendingSessionCreation(null);
-    })();
-  }, [pendingSessionCreation, healthStatus, allWorkspaces, createChat]);
-
-  const handleCreateSession = useCallback(
-    (engine?: ChatEngine) => {
-      if (!activeWorkspaceId) return;
-
-      const ws = allWorkspaces.find((w) => w.id === activeWorkspaceId);
-      if (ws?.backend === "remote" && healthStatus !== "healthy") {
-        setPendingSessionCreation({ workspaceId: activeWorkspaceId, engine });
-        resumeWorkspace(activeWorkspaceId);
-        return;
-      }
-
-      void createChat(activeWorkspaceId, engine);
-    },
-    [
-      activeWorkspaceId,
-      allWorkspaces,
-      healthStatus,
-      createChat,
-      resumeWorkspace,
-    ],
-  );
-
-  const handleCreateSessionInWorkspace = useCallback(
-    (workspaceId: string, engine?: ChatEngine) => {
-      const ws = allWorkspaces.find((w) => w.id === workspaceId);
-      const isResumeNeeded =
-        ws?.backend === "remote" && healthStatus !== "healthy";
-
-      // Switching workspaces remounts the workbench layout and unmounts this
-      // tab, so a pending creation here would never run.
-      if (onNewChatInWorkspace && workspaceId !== activeWorkspaceId) {
-        if (isResumeNeeded) void resumeWorkspace(workspaceId);
-        onNewChatInWorkspace(workspaceId, engine);
-        return;
-      }
-
-      useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
-      setActiveWorkspaceId(workspaceId);
-
-      if (isResumeNeeded) {
-        setPendingSessionCreation({ workspaceId, engine });
-        resumeWorkspace(workspaceId);
-        return;
-      }
-
-      void createChat(workspaceId, engine);
-    },
-    [
-      activeWorkspaceId,
-      setActiveWorkspaceId,
-      allWorkspaces,
-      healthStatus,
-      createChat,
-      onNewChatInWorkspace,
-      resumeWorkspace,
-    ],
-  );
 
   const pendingDeletions = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
@@ -247,28 +123,11 @@ export function useSessionManagement({
     [activeWorkspaceId, deleteSession, removeSessionLocal, restoreSessionLocal],
   );
 
-  // A pick never focuses this tab's prompt: the chosen session may open in
+  // A pick never focuses a chat prompt: the chosen session may open in
   // another tab, and focusing here would steal the cursor from it.
   const handleSelectSession = useCallback(
     (sessionId: string) => setActiveSession(sessionId),
     [setActiveSession],
-  );
-
-  const handleMobileSelectSession = useCallback(
-    (sessionId: string) => {
-      setActiveSession(sessionId);
-      setIsMobileSessionsOpen(false);
-    },
-    [setActiveSession],
-  );
-
-  const handleMobileCreateSession = useCallback(
-    (engine?: ChatEngine) => {
-      if (!activeWorkspaceId) return;
-      void createChat(activeWorkspaceId, engine);
-      setIsMobileSessionsOpen(false);
-    },
-    [activeWorkspaceId, createChat],
   );
 
   const handleSelectUnifiedSession = useCallback(
@@ -278,7 +137,6 @@ export function useSessionManagement({
 
       useWorkspaceStore.getState().setActiveWorkspaceId(workspaceId);
       setActiveWorkspaceSession(workspaceId, sessionId);
-      setIsMobileSessionsOpen(false);
 
       if (isSleeping) {
         toast("Waking workspace…", {
@@ -449,18 +307,13 @@ export function useSessionManagement({
     groupByWorkspace,
     workspaceOrder,
     expandedWorkspaces,
-    isMobileSessionsOpen,
-    setIsMobileSessionsOpen,
-    pendingSessionCreationWorkspaceId:
-      pendingSessionCreation?.workspaceId ?? null,
+    pendingSessionCreationWorkspaceId,
 
     resumeWorkspace,
     handleCreateSession,
     handleCreateSessionInWorkspace,
     handleDeleteSession,
     handleSelectSession,
-    handleMobileSelectSession,
-    handleMobileCreateSession,
     handleSelectUnifiedSession,
     handleToggleUnifiedMode,
     handleToggleGroupByWorkspace,

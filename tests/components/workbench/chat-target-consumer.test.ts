@@ -169,6 +169,30 @@ describe("consumeChatTarget", () => {
     expect(layoutApi.mutations).toEqual(["updatePanelParams"]);
   });
 
+  it("activates the retargeted tab when the target asks for it", () => {
+    // Given: a session-list pick names the last-focused chat tab.
+    const layoutApi = twoGroupLayout(
+      chatPanel("tab-left", "s1"),
+      chatPanel("tab-right", null),
+      "left",
+    );
+    requestTarget({
+      workspaceId: WORKSPACE_ID,
+      sessionId: "s3",
+      panelId: "tab-right",
+      shouldActivate: true,
+    });
+
+    // When
+    const panelId = consume(layoutApi);
+
+    // Then
+    expect(panelId).toBe("tab-right");
+    expect(layoutApi.getPanel("tab-right")?.params).toEqual(chatParams("s3"));
+    expect(layoutApi.getActivePanelId()).toBe("tab-right");
+    expect(layoutApi.mutations).toEqual(["updatePanelParams", "activatePanel"]);
+  });
+
   it("opens a new chat tab when no tab matches", () => {
     // Given
     const layoutApi = twoGroupLayout(

@@ -673,6 +673,48 @@ describe("applyChatTarget", () => {
     expect(api.getActivePanelId()).toBe("a");
   });
 
+  it("activates the retargeted panel when the target asks for it", () => {
+    // Given
+    const api = chatLayout();
+
+    // When
+    const panelId = applyChatTarget(
+      api,
+      {
+        workspaceId: WORKSPACE_ID,
+        sessionId: "ses-2",
+        panelId: "chat-new",
+        shouldActivate: true,
+      },
+      "New session",
+    );
+
+    // Then
+    expect(panelId).toBe("chat-new");
+    expect(api.getPanel("chat-new")?.params).toEqual(chatParams("ses-2"));
+    expect(api.getActivePanelId()).toBe("chat-new");
+  });
+
+  it("keeps a retarget in the background when shouldActivate is false", () => {
+    // Given
+    const api = chatLayout();
+
+    // When
+    applyChatTarget(
+      api,
+      {
+        workspaceId: WORKSPACE_ID,
+        sessionId: "ses-2",
+        panelId: "chat-new",
+        shouldActivate: false,
+      },
+      "New session",
+    );
+
+    // Then
+    expect(api.getActivePanelId()).toBe("a");
+  });
+
   it("opens and activates a new chat panel", () => {
     const api = chatLayout();
 

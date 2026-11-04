@@ -87,12 +87,16 @@ export const BUILTIN_ACTIONS: LeaderAction[] = [
     label: "Toggle context sidebar",
     page: "workbench",
   },
+  {
+    id: "chat:toggle-sessions",
+    label: "Toggle session list",
+    page: "workbench",
+  },
 
   // Chat page
   { id: "chat:switch-model", label: "Switch model", page: "chat" },
   { id: "chat:switch-agent", label: "Switch agent", page: "chat" },
   { id: "chat:new-session", label: "New session", page: "chat" },
-  { id: "chat:toggle-sessions", label: "Toggle session list", page: "chat" },
   { id: "chat:toggle-plan", label: "Toggle plan panel", page: "chat" },
   { id: "chat:focus-prompt", label: "Focus prompt input", page: "chat" },
   { id: "chat:toggle-variant", label: "Toggle variant selector", page: "chat" },
@@ -222,6 +226,7 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "workbench:new-terminal": "o t",
   "workbench:new-chat": "o c",
   "workbench:toggle-context-sidebar": "B",
+  "chat:toggle-sessions": "s",
 
   // Files page
   "files:save": "S",
@@ -233,7 +238,6 @@ export const DEFAULT_LEADER_BINDINGS: LeaderBindingsMap = {
   "chat:switch-model": "m",
   "chat:switch-agent": "a",
   "chat:new-session": "n",
-  "chat:toggle-sessions": "s",
   "chat:toggle-plan": "p",
   "chat:focus-prompt": "i",
   "chat:toggle-variant": "v",

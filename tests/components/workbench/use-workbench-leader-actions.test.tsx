@@ -6,6 +6,7 @@ import { LeaderKeyProvider } from "@/components/providers/leader-key-provider";
 import { useWorkbenchLeaderActions } from "@/components/workbench/use-workbench-leader-actions";
 import type { WorkbenchCommand } from "@/lib/workbench/workbench-controller-registry";
 import { useContextSidebarStore } from "@/stores/context-sidebar-store";
+import { useSessionSidebarStore } from "@/stores/session-sidebar-store";
 import {
   mountFakeWorkbench,
   type FakeWorkbenchController,
@@ -45,6 +46,10 @@ beforeEach(() => {
   localStorage.clear();
   useContextSidebarStore.setState(
     useContextSidebarStore.getInitialState(),
+    true,
+  );
+  useSessionSidebarStore.setState(
+    useSessionSidebarStore.getInitialState(),
     true,
   );
   workbench = mountFakeWorkbench("ws-1");
@@ -159,6 +164,34 @@ describe("useWorkbenchLeaderActions", () => {
 
     // Then
     expect(useContextSidebarStore.getState()).toMatchObject({
+      isOpen: true,
+      isMobileSheetOpen: true,
+    });
+  });
+
+  it("hides the session sidebar on leader s", () => {
+    // Given
+    renderWorkbenchLeader();
+    pressLeader();
+
+    // When
+    pressKeys(["s"]);
+
+    // Then
+    expect(useSessionSidebarStore.getState().isOpen).toBe(false);
+  });
+
+  it("opens the session sheet on leader s on a phone", () => {
+    // Given
+    vi.stubGlobal("innerWidth", 390);
+    renderWorkbenchLeader();
+    pressLeader();
+
+    // When
+    pressKeys(["s"]);
+
+    // Then
+    expect(useSessionSidebarStore.getState()).toMatchObject({
       isOpen: true,
       isMobileSheetOpen: true,
     });

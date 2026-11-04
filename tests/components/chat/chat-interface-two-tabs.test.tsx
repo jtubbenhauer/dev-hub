@@ -8,7 +8,6 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,6 +29,7 @@ import {
   type WorkspaceState,
 } from "@/stores/chat-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useSessionSidebarStore } from "@/stores/session-sidebar-store";
 import type { Workspace } from "@/types";
 
 HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
@@ -305,14 +305,6 @@ function renderTwoTabs(tabA: ChatInterfaceProps, tabB: ChatInterfaceProps) {
   };
 }
 
-function sessionRow(container: HTMLElement, sessionId: string): HTMLElement {
-  const row = container.querySelector<HTMLElement>(
-    `[data-session-id="${sessionId}"]`,
-  );
-  if (!row) throw new Error(`no session row for ${sessionId}`);
-  return row;
-}
-
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
@@ -338,6 +330,10 @@ afterEach(() => {
   localStorage.clear();
   useChatStore.setState(initialChatState, true);
   useWorkspaceStore.setState(initialWorkspaceState, true);
+  useSessionSidebarStore.setState(
+    useSessionSidebarStore.getInitialState(),
+    true,
+  );
   _resetModuleCaches();
 });
 
@@ -366,25 +362,6 @@ describe("ChatInterface in two side-by-side chat tabs", () => {
 
     expect(within(tabA).getByText("Thinking...")).toBeInTheDocument();
     expect(within(tabB).queryByText("Thinking...")).not.toBeInTheDocument();
-  });
-
-  it("tells only the tab whose list was clicked which session to show", () => {
-    seedStores({ activeSessionId: "s1" });
-    const onTabAChosen = vi.fn();
-    const onTabBChosen = vi.fn();
-    const { tabA } = renderTwoTabs(
-      tabProps("tab-a", {
-        sessionId: "s1",
-        isFocused: true,
-        onSessionChosen: onTabAChosen,
-      }),
-      tabProps("tab-b", { sessionId: "s2", onSessionChosen: onTabBChosen }),
-    );
-
-    fireEvent.click(sessionRow(tabA, "s2"));
-
-    expect(onTabAChosen).toHaveBeenCalledExactlyOnceWith("w1", "s2");
-    expect(onTabBChosen).not.toHaveBeenCalled();
   });
 
   it("reports the session a slash command creates in a new-chat tab", async () => {
@@ -429,63 +406,6 @@ describe("ChatInterface in two side-by-side chat tabs", () => {
     ]);
     expect(onNewTabChosen).toHaveBeenCalledExactlyOnceWith("w1", "s3");
     expect(onFocusedTabChosen).not.toHaveBeenCalled();
-  });
-
-  it("switches the workspace before reporting a pick from another workspace in the unified list", () => {
-    localStorage.setItem("dev-hub:chat-unified-mode", "true");
-    seedStores({ activeSessionId: "s1" });
-    const setActiveWorkspaceId = vi
-      .spyOn(useWorkspaceStore.getState(), "setActiveWorkspaceId")
-      .mockImplementation(() => {});
-    const onTabAChosen = vi.fn();
-    const { tabA } = renderTwoTabs(
-      tabProps("tab-a", {
-        sessionId: "s1",
-        isFocused: true,
-        onSessionChosen: onTabAChosen,
-      }),
-      tabProps("tab-b", { sessionId: "s2" }),
-    );
-
-    fireEvent.click(sessionRow(tabA, "s5"));
-
-    expect(setActiveWorkspaceId).toHaveBeenCalledWith("w2");
-    expect(onTabAChosen).toHaveBeenCalledExactlyOnceWith("w2", "s5");
-    expect(setActiveWorkspaceId.mock.invocationCallOrder[0]).toBeLessThan(
-      onTabAChosen.mock.invocationCallOrder[0],
-    );
-  });
-
-  it("hands a new chat in another workspace to the workbench and wakes that workspace", async () => {
-    localStorage.setItem("dev-hub:chat-unified-mode", "true");
-    localStorage.setItem("dev-hub:chat-group-by-workspace", "true");
-    seedStores({ activeSessionId: "s1", w2Backend: "remote" });
-    const setActiveWorkspaceId = vi.spyOn(
-      useWorkspaceStore.getState(),
-      "setActiveWorkspaceId",
-    );
-    const onNewChatInWorkspace = vi.fn();
-    const user = userEvent.setup();
-    const { tabA } = renderTwoTabs(
-      tabProps("tab-a", {
-        sessionId: "s1",
-        isFocused: true,
-        onNewChatInWorkspace,
-      }),
-      tabProps("tab-b", { sessionId: "s2" }),
-    );
-
-    await user.click(within(tabA).getByTitle("New chat in w2"));
-    await user.click(
-      await screen.findByRole("menuitem", { name: /OMO Native/ }),
-    );
-
-    expect(onNewChatInWorkspace).toHaveBeenCalledExactlyOnceWith("w2", "omo");
-    expect(storeStubs.createSession).not.toHaveBeenCalled();
-    expect(setActiveWorkspaceId).not.toHaveBeenCalled();
-    expect(fetch).toHaveBeenCalledWith("/api/workspaces/w2/start", {
-      method: "POST",
-    });
   });
 
   it("cycles the agent of the focused tab's session only", async () => {
@@ -565,5 +485,57 @@ describe("ChatInterface without the legacy side panel", () => {
     });
 
     expect(wasDefaultAllowed).toBe(true);
+  });
+});
+
+describe("ChatInterface without an in-tab session list", () => {
+  it("renders no session list inside a chat tab", () => {
+    // Given
+    seedStores({ activeSessionId: "s1" });
+
+    // When
+    renderWithProviders(
+      <ChatInterface
+        {...tabProps("tab-a", { sessionId: "s1", isFocused: true })}
+      />,
+    );
+
+    // Then
+    expect(document.querySelector("[data-session-id]")).toBeNull();
+  });
+
+  it("toggles the workbench session sidebar from the toolbar hamburger", () => {
+    // Given
+    seedStores({ activeSessionId: "s1" });
+    renderWithProviders(
+      <ChatInterface
+        {...tabProps("tab-a", { sessionId: "s1", isFocused: true })}
+      />,
+    );
+    const hamburger = screen.getByRole("button", {
+      name: "Toggle session list",
+    });
+
+    // When / Then
+    fireEvent.click(hamburger);
+    expect(useSessionSidebarStore.getState().isOpen).toBe(false);
+    fireEvent.click(hamburger);
+    expect(useSessionSidebarStore.getState().isOpen).toBe(true);
+  });
+
+  it("opens the mobile session sheet from the toolbar", () => {
+    // Given
+    seedStores({ activeSessionId: "s1" });
+    renderWithProviders(
+      <ChatInterface
+        {...tabProps("tab-a", { sessionId: "s1", isFocused: true })}
+      />,
+    );
+
+    // When
+    fireEvent.click(screen.getByRole("button", { name: "Open session list" }));
+
+    // Then
+    expect(useSessionSidebarStore.getState().isMobileSheetOpen).toBe(true);
   });
 });

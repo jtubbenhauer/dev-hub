@@ -22,7 +22,6 @@ import { useCallback, useMemo } from "react";
 export interface ChatCommandRefs {
   handleCreateSession: RefObject<() => void>;
   setIsPlanPanelOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
-  setIsSessionListOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
   setIsModelSelectorOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
   setIsAgentSelectorOpen: RefObject<Dispatch<SetStateAction<boolean>>>;
   promptInput: RefObject<PromptInputHandle | null>;
@@ -241,14 +240,6 @@ export function useChatCommands(
       },
       {
         action: {
-          id: "chat:toggle-sessions",
-          label: "Toggle session list",
-          page: "chat" as const,
-        },
-        handler: () => refs.setIsSessionListOpen.current((prev) => !prev),
-      },
-      {
-        action: {
           id: "chat:toggle-plan",
           label: "Toggle plan panel",
           page: "chat" as const,
@@ -356,7 +347,6 @@ export function useChatCommands(
     refs.setIsModelSelectorOpen,
     refs.setIsAgentSelectorOpen,
     refs.handleCreateSession,
-    refs.setIsSessionListOpen,
     refs.setIsPlanPanelOpen,
     refs.promptInput,
     refs.jumpToNextUserMessage,

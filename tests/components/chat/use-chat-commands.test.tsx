@@ -37,7 +37,6 @@ function renderChatCommands() {
       {
         handleCreateSession: { current: vi.fn() },
         setIsPlanPanelOpen: { current: vi.fn() },
-        setIsSessionListOpen: { current: vi.fn() },
         setIsModelSelectorOpen: { current: vi.fn() },
         setIsAgentSelectorOpen: { current: vi.fn() },
         promptInput: { current: null },

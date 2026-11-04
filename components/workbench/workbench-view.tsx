@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { FolderOpen } from "lucide-react";
 import { WorkspaceChatEffectsHost } from "@/components/chat/workspace-chat-effects-host";
 import { ContextSidebar } from "@/components/workbench/context-sidebar/context-sidebar";
+import { WorkbenchSessionSheet } from "@/components/workbench/session-sidebar/workbench-session-sheet";
+import { WorkbenchSessionSidebar } from "@/components/workbench/session-sidebar/workbench-session-sidebar";
 import { useWorkbenchChords } from "@/components/workbench/use-workbench-chords";
 import { useWorkbenchIntent } from "@/components/workbench/use-workbench-intent";
 import { useWorkbenchLeaderActions } from "@/components/workbench/use-workbench-leader-actions";
@@ -80,6 +82,11 @@ export function WorkbenchView() {
     <WorkbenchModeProvider isMobile={isMobile}>
       <div className="flex h-full min-h-0">
         <WorkspaceChatEffectsHost onSessionStarted={requestStartedChatTarget} />
+        {isMobile ? (
+          <WorkbenchSessionSheet workspaceId={activeWorkspace.id} />
+        ) : (
+          <WorkbenchSessionSidebar workspaceId={activeWorkspace.id} />
+        )}
         <div className="min-w-0 flex-1">
           <WorkbenchDockview
             key={`${activeWorkspace.id}:${isMobile}`}

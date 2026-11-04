@@ -1,4 +1,5 @@
 import { toggleWorkbenchContextSidebar } from "@/components/workbench/toggle-workbench-context-sidebar";
+import { toggleWorkbenchSessionSidebar } from "@/components/workbench/toggle-workbench-session-sidebar";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import {
   getWorkbenchController,
@@ -112,6 +113,16 @@ const WORKBENCH_LEADER_ACTIONS: WorkbenchLeaderRegistration[] = [
       page: "workbench",
     },
     handler: toggleWorkbenchContextSidebar,
+  },
+  {
+    // Keeps its historical id (and the user's key overrides) although it now
+    // lives at workbench level, toggling the shared session sidebar.
+    action: {
+      id: "chat:toggle-sessions",
+      label: "Toggle session list",
+      page: "workbench",
+    },
+    handler: toggleWorkbenchSessionSidebar,
   },
 ];
 

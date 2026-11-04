@@ -116,7 +116,7 @@ describe("KeybindingsSettings leader groups", () => {
     stubSettingsFetch({});
     renderKeybindingsSettings();
     const workbenchGroup = await screen.findByRole("button", {
-      name: /^Workbench\s*23 bindings$/,
+      name: /^Workbench\s*24 bindings$/,
     });
 
     // When
@@ -124,5 +124,6 @@ describe("KeybindingsSettings leader groups", () => {
 
     // Then
     expect(screen.getByText("Toggle context sidebar")).toBeInTheDocument();
+    expect(screen.getByText("Toggle session list")).toBeInTheDocument();
   });
 });

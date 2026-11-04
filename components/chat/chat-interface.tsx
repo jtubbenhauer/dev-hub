@@ -19,7 +19,6 @@ import {
   QuestionBanner,
   QuestionErrorBoundary,
 } from "@/components/chat/question-banner";
-import { SessionList } from "@/components/chat/session-list";
 import {
   EMPTY_COMPONENTS,
   STREAMING_COMPONENTS,
@@ -27,9 +26,8 @@ import {
 import { ChatCommandsRegistrar } from "@/components/chat/chat-commands-registrar";
 import { useChatTabSessionEffects } from "@/components/chat/use-chat-tab-session-effects";
 import { useChatScrollMemory } from "@/components/chat/use-chat-scroll-memory";
-import { useSessionManagement } from "@/components/chat/use-session-management";
+import { useSessionCreate } from "@/components/chat/use-session-create";
 import { useSessionNavigation } from "@/components/chat/use-session-navigation";
-import { useSessionListActivity } from "@/components/chat/use-session-list-activity";
 import { useRefocusPromptOnTerminalClose } from "@/components/chat/use-refocus-prompt-on-terminal-close";
 import { RunningSubAgentsBanner } from "@/components/chat/running-sub-agents-banner";
 import { ActiveChatEngineBadge } from "@/components/chat/chat-engine-badge";
@@ -46,12 +44,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
   computeFirstUserMessageIndex,
@@ -59,38 +51,28 @@ import {
   computeNextUserMessageIndex,
   computePrevUserMessageIndex,
 } from "@/lib/chat-navigation";
-import { shouldSSEConnect } from "@/lib/workspaces/behaviour";
 import { getQueuedUserMessageIds } from "@/lib/chat/queued-messages";
 import {
   selectSessionMessages,
   selectSessionStreamingStatus,
 } from "@/lib/chat/session-scoped-selectors";
 import type { ChatEngine } from "@/lib/engine/types";
-import {
-  countRootSessions,
-  filterSessionsByAge,
-  isSessionListLoading,
-  parseSessionAgeFilter,
-  type SessionAgeFilter,
-} from "@/lib/session-filters";
-import { useAgentHealth, useGitStatus } from "@/hooks/use-git";
+import { useAgentHealth } from "@/hooks/use-git";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOpencodeRestart } from "@/hooks/use-opencode-restart";
-import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useExternalEditorSetting } from "@/hooks/use-settings";
 import { EDITOR_FLAVOR_LABELS, resolveVscodeTarget } from "@/lib/vscode";
 import { toast } from "sonner";
 
 import type { Command } from "@/lib/opencode/types";
 import { useChatStore } from "@/stores/chat-store";
+import { useSessionSidebarStore } from "@/stores/session-sidebar-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { useQueries } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowDown,
   ChevronDown,
   ChevronRight,
-  GripVertical,
   LayoutList,
   Loader2,
   MessageCircleQuestion,
@@ -125,7 +107,6 @@ interface AvailableVariants {
   values: string[];
 }
 
-const EMPTY_LAST_VIEWED: Record<string, number> = {};
 const EMPTY_ID_SET = new Set<string>();
 
 // ChatInterface re-renders on every streamed frame; with stable props the
@@ -197,7 +178,6 @@ function ChatInterfaceContent({
     },
     [],
   );
-  const [isSessionListOpen, setIsSessionListOpen] = useState(true);
   const [questionViewMode, setQuestionViewMode] = useState<"list" | "tabs">(
     () => {
       if (typeof window === "undefined") return "list";
@@ -207,15 +187,6 @@ function ChatInterfaceContent({
   );
   const [isQuestionsMinimized, setIsQuestionsMinimized] = useState(false);
 
-  const {
-    width: sessionListWidth,
-    handleDragStart: handleSessionListDragStart,
-  } = useResizablePanel({
-    minWidth: 160,
-    maxWidth: 400,
-    defaultWidth: 240,
-    storageKey: "dev-hub:chat-panel-width",
-  });
   const [showThinking, setShowThinking] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("dev-hub:chat-show-thinking") !== "false";
@@ -240,19 +211,6 @@ function ChatInterfaceContent({
         "true"
       );
     });
-  const [sessionAgeFilter, setSessionAgeFilterState] =
-    useState<SessionAgeFilter>(() => {
-      if (typeof window === "undefined") return "all";
-      return parseSessionAgeFilter(
-        localStorage.getItem("dev-hub:chat-session-age-filter"),
-      );
-    });
-  const handleSetSessionAgeFilter = useCallback((filter: SessionAgeFilter) => {
-    setSessionAgeFilterState(filter);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("dev-hub:chat-session-age-filter", filter);
-    }
-  }, []);
   const chatDisplaySettings = useMemo(
     () => ({
       showThinking,
@@ -280,7 +238,6 @@ function ChatInterfaceContent({
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const promptInputRef = useRef<PromptInputHandle>(null);
-  const sessionListFocusRef = useRef<HTMLDivElement>(null);
   const messagesPanelFocusRef = useRef<HTMLDivElement>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const visibleRangeRef = useRef({ startIndex: 0, endIndex: 0 });
@@ -303,12 +260,6 @@ function ChatInterfaceContent({
   );
   const activeWorkspaceName = activeWorkspace?.name ?? "";
 
-  const activeWorkspaceColor = useMemo(() => {
-    if (!activeWorkspaceId) return undefined;
-    const ws = allWorkspaces.find((w) => w.id === activeWorkspaceId);
-    return ws?.color ?? undefined;
-  }, [allWorkspaces, activeWorkspaceId]);
-
   const { externalEditor } = useExternalEditorSetting();
   const vscodeTarget = useMemo(
     () =>
@@ -318,43 +269,6 @@ function ChatInterfaceContent({
     [activeWorkspace, externalEditor],
   );
   const externalEditorLabel = EDITOR_FLAVOR_LABELS[externalEditor];
-
-  const workspaceNames = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const ws of allWorkspaces) map[ws.id] = ws.name;
-    return map;
-  }, [allWorkspaces]);
-
-  const workspaceColors = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const ws of allWorkspaces) {
-      if (ws.color) map[ws.id] = ws.color;
-    }
-    return map;
-  }, [allWorkspaces]);
-
-  const workspaceOptions = useMemo(() => {
-    return allWorkspaces.map((ws) => ({
-      id: ws.id,
-      name: ws.name,
-      backend: ws.backend,
-    }));
-  }, [allWorkspaces]);
-
-  const workspaceIds = useMemo(
-    () => new Set(allWorkspaces.map((workspace) => workspace.id)),
-    [allWorkspaces],
-  );
-
-  const sleepingWorkspaceIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const ws of allWorkspaces) {
-      if (!shouldSSEConnect(ws, activeWorkspaceId)) {
-        ids.add(ws.id);
-      }
-    }
-    return ids;
-  }, [allWorkspaces, activeWorkspaceId]);
 
   const { orderedAgents, primaryAgents } = useAgentModelSync({
     activeWorkspaceId,
@@ -383,15 +297,8 @@ function ChatInterfaceContent({
     getActiveWorkspaceSessions,
     getActivePermissions,
     getActiveQuestions,
-    getActiveSessionStatuses,
-    getUnifiedSessionStatuses,
-    getActiveQuestionSessionIds,
-    getUnifiedQuestionSessionIds,
-    getUnifiedLastViewedAt,
-    getUnifiedPinnedSessionIds,
-    getActivePinnedSessionIds,
     getActiveSessionNotes,
-    getUnifiedSessionNotes,
+    setSessionNote,
     clearSessionNote,
     setSessionAgent,
     clearSessionModel,
@@ -412,86 +319,12 @@ function ChatInterfaceContent({
     isActiveWorkspaceRemote,
   );
 
-  const {
-    isUnifiedMode,
-    groupByWorkspace,
-    workspaceOrder,
-    expandedWorkspaces,
-    isMobileSessionsOpen,
-    setIsMobileSessionsOpen,
-    handleCreateSession,
-    handleCreateSessionInWorkspace,
-    handleDeleteSession,
-    handleSelectSession,
-    handleMobileSelectSession,
-    handleMobileCreateSession,
-    handleSelectUnifiedSession,
-    handleToggleUnifiedMode,
-    handleToggleGroupByWorkspace,
-    handleWakeWorkspace,
-    handleWorkspaceOrderChange,
-    handleToggleWorkspaceExpanded,
-    handlePinSession,
-    handleUnpinSession,
-    handleSetSessionNote,
-    handleClearSessionNote,
-  } = useSessionManagement({
+  const { handleCreateSession } = useSessionCreate({
     activeWorkspaceId,
     allWorkspaces,
     healthStatus,
     onSessionChosen,
     onNewChatInWorkspace,
-  });
-
-  // A workbench tab learns which session to show through onSessionChosen; the
-  // chosen session may open in another tab.
-  const handleSelectSessionInTab = useCallback(
-    (sessionId: string) => {
-      handleSelectSession(sessionId);
-      if (activeWorkspaceId) onSessionChosen?.(activeWorkspaceId, sessionId);
-    },
-    [activeWorkspaceId, handleSelectSession, onSessionChosen],
-  );
-  const handleMobileSelectSessionInTab = useCallback(
-    (sessionId: string) => {
-      handleMobileSelectSession(sessionId);
-      if (activeWorkspaceId) onSessionChosen?.(activeWorkspaceId, sessionId);
-    },
-    [activeWorkspaceId, handleMobileSelectSession, onSessionChosen],
-  );
-  const handleSelectUnifiedSessionInTab = useCallback(
-    (sessionId: string, workspaceId: string) => {
-      handleSelectUnifiedSession(sessionId, workspaceId);
-      onSessionChosen?.(workspaceId, sessionId);
-    },
-    [handleSelectUnifiedSession, onSessionChosen],
-  );
-
-  // combine's result is structurally shared, so the map keeps its identity
-  // until a branch changes; the raw results array is new on every render.
-  const workspaceBranches = useQueries({
-    queries: allWorkspaces.map((ws) => ({
-      queryKey: ["git-status", ws.id],
-      queryFn: async () => {
-        const params = new URLSearchParams({ action: "status" });
-        const res = await fetch(`/api/workspaces/${ws.id}/git?${params}`);
-        if (!res.ok) return null;
-        return res.json() as Promise<{ branch: string }>;
-      },
-      enabled: isUnifiedMode,
-      staleTime: 30_000,
-      retry: false,
-    })),
-    combine: (results) => {
-      const branches: Record<string, string> = {};
-      results.forEach((result, index) => {
-        const workspace = allWorkspaces[index];
-        if (workspace && result.data?.branch) {
-          branches[workspace.id] = result.data.branch;
-        }
-      });
-      return branches;
-    },
   });
 
   const sessions = useChatStore(getActiveWorkspaceSessions);
@@ -501,25 +334,6 @@ function ChatInterfaceContent({
   const activeSessionTitle = activeSessionId
     ? (sessions[activeSessionId]?.title ?? "")
     : "";
-  useGitStatus(activeWorkspaceId);
-  const [unifiedLimit, setUnifiedLimit] = useState(20);
-  // In grouped mode, we still cap per-workspace to avoid sorting thousands of sessions.
-  // WorkspaceGroup already collapses to ~3 visible per group, so 50 per workspace is generous.
-  const MAX_GROUPED_PER_WORKSPACE = 50;
-  const effectiveUnifiedLimit = groupByWorkspace
-    ? allWorkspaces.length * MAX_GROUPED_PER_WORKSPACE
-    : unifiedLimit;
-  const allUnifiedSessions = useChatStore((state) =>
-    state.getRecentSessionsAcrossWorkspaces(effectiveUnifiedLimit),
-  );
-  const unifiedSessions = useMemo(
-    () => allUnifiedSessions.filter((s) => workspaceIds.has(s.workspaceId)),
-    [allUnifiedSessions, workspaceIds],
-  );
-  const totalUnifiedCount = useChatStore((state) =>
-    countRootSessions(state.workspaceStates),
-  );
-  const hasMoreUnifiedSessions = totalUnifiedCount > unifiedLimit;
   const commands: Command[] = useChatStore((state) => state.commands);
   // getActivePermissions / getActiveQuestions return raw workspace arrays (stable refs).
   // We filter by sessionID here with useMemo so we never create a new array reference
@@ -527,60 +341,10 @@ function ChatInterfaceContent({
   // cause "Maximum update depth exceeded" via the ScrollArea ref cascade.
   const allPermissions = useChatStore(getActivePermissions);
   const allQuestions = useChatStore(getActiveQuestions);
-  const activeWsSessionStatuses = useChatStore(getActiveSessionStatuses);
-  const activeWsLastViewedAt = useChatStore((s) => {
-    if (!activeWorkspaceId) return EMPTY_LAST_VIEWED;
-    return (
-      s.workspaceStates[activeWorkspaceId]?.lastViewedAt ?? EMPTY_LAST_VIEWED
-    );
-  });
-  const unifiedStatuses = useChatStore(getUnifiedSessionStatuses);
-  const unifiedLastViewed = useChatStore(getUnifiedLastViewedAt);
-  const sessionStatuses = isUnifiedMode
-    ? unifiedStatuses
-    : activeWsSessionStatuses;
-  const lastViewedAt = isUnifiedMode ? unifiedLastViewed : activeWsLastViewedAt;
-  const fetchSessionTodos = useChatStore((state) => state.fetchSessionTodos);
-  const {
-    taskProgressBySessionId,
-    taskActiveSessionIds,
-    subAgentCountBySessionId,
-    subAgentTodoHydration,
-  } = useSessionListActivity({ isUnifiedMode, activeWorkspaceId });
-  // Hydrate once per session: a todo fetch that keeps failing would otherwise
-  // be retried on every store change.
-  const hydratedSubAgentTodosRef = useRef(new Set<string>());
-  useEffect(() => {
-    for (const { sessionId, workspaceId } of subAgentTodoHydration) {
-      const key = `${workspaceId}:${sessionId}`;
-      if (hydratedSubAgentTodosRef.current.has(key)) continue;
-      hydratedSubAgentTodosRef.current.add(key);
-      void fetchSessionTodos(sessionId, workspaceId);
-    }
-  }, [fetchSessionTodos, subAgentTodoHydration]);
-  const unifiedPinnedIds = useChatStore(getUnifiedPinnedSessionIds);
-  const activePinnedIds = useChatStore(getActivePinnedSessionIds);
-  const pinnedSessionIds = isUnifiedMode ? unifiedPinnedIds : activePinnedIds;
-  const filteredUnifiedSessions = useMemo(
-    () =>
-      filterSessionsByAge(unifiedSessions, sessionAgeFilter, unifiedPinnedIds),
-    [unifiedSessions, sessionAgeFilter, unifiedPinnedIds],
-  );
-  const unifiedSessionNotes = useChatStore(getUnifiedSessionNotes);
-  const activeSessionNotes = useChatStore(getActiveSessionNotes);
-  const sessionNotes = isUnifiedMode ? unifiedSessionNotes : activeSessionNotes;
+  const sessionNotes = useChatStore(getActiveSessionNotes);
   const activeNote = activeSessionId
     ? sessionNotes[activeSessionId]
     : undefined;
-  const activeQuestionSessionIds = useChatStore(getActiveQuestionSessionIds);
-  const unifiedQuestionSessionIds = useChatStore(getUnifiedQuestionSessionIds);
-  const questionSessionIds = isUnifiedMode
-    ? unifiedQuestionSessionIds
-    : activeQuestionSessionIds;
-
-  const isSessionsLoading = useChatStore((s) => {
-    return isSessionListLoading(s.workspaceStates, activeWorkspaceId);
-  });
 
   const childSessionIds = useMemo(() => {
     if (!activeSessionId) return new Set<string>();
@@ -998,9 +762,9 @@ function ChatInterfaceContent({
     }
     const trimmed = sessionNoteValue.trim();
     if (trimmed) {
-      handleSetSessionNote(activeSessionId, trimmed);
+      setSessionNote(activeSessionId, activeWorkspaceId, trimmed);
     } else if (activeNote) {
-      handleClearSessionNote(activeSessionId);
+      clearSessionNote(activeSessionId, activeWorkspaceId);
     }
     setIsEditingSessionNote(false);
   }, [
@@ -1008,8 +772,8 @@ function ChatInterfaceContent({
     activeWorkspaceId,
     sessionNoteValue,
     activeNote,
-    handleSetSessionNote,
-    handleClearSessionNote,
+    setSessionNote,
+    clearSessionNote,
   ]);
 
   const handleAbort = useCallback(() => {
@@ -1037,8 +801,6 @@ function ChatInterfaceContent({
   handleCreateSessionRef.current = handleCreateSession;
   const setIsPlanPanelOpenRef = useRef(setIsPlanPanelOpen);
   setIsPlanPanelOpenRef.current = setIsPlanPanelOpen;
-  const setIsSessionListOpenRef = useRef(setIsSessionListOpen);
-  setIsSessionListOpenRef.current = setIsSessionListOpen;
   const setIsModelSelectorOpenRef = useRef(setIsModelSelectorOpen);
   setIsModelSelectorOpenRef.current = setIsModelSelectorOpen;
   const setIsAgentSelectorOpenRef = useRef(setIsAgentSelectorOpen);
@@ -1058,7 +820,6 @@ function ChatInterfaceContent({
       refs={{
         handleCreateSession: handleCreateSessionRef,
         setIsPlanPanelOpen: setIsPlanPanelOpenRef,
-        setIsSessionListOpen: setIsSessionListOpenRef,
         setIsModelSelectorOpen: setIsModelSelectorOpenRef,
         setIsAgentSelectorOpen: setIsAgentSelectorOpenRef,
         promptInput: promptInputRef,
@@ -1117,11 +878,6 @@ function ChatInterfaceContent({
     [activeSessionId, activeWorkspaceId, setSessionVariant],
   );
 
-  const handleLoadMoreUnifiedSessions = useCallback(
-    () => setUnifiedLimit((limit) => limit + 20),
-    [],
-  );
-
   if (!activeWorkspaceId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -1135,127 +891,9 @@ function ChatInterfaceContent({
     );
   }
 
-  const sharedUnifiedProps = {
-    mode: "unified" as const,
-    sessions: filteredUnifiedSessions,
-    sessionAgeFilter,
-    onSetSessionAgeFilter: handleSetSessionAgeFilter,
-    workspaceNames,
-    workspaceBranches,
-    workspaceColors,
-    hasMore: hasMoreUnifiedSessions,
-    onLoadMore: handleLoadMoreUnifiedSessions,
-    workspaces: workspaceOptions,
-    activeWorkspaceId,
-    onCreateSessionInWorkspace: handleCreateSessionInWorkspace,
-    activeSessionId,
-    sessionStatuses,
-    questionSessionIds,
-    lastViewedAt,
-    isLoading: isSessionsLoading,
-    pinnedSessionIds,
-    taskProgressBySessionId,
-    taskActiveSessionIds,
-    subAgentCountBySessionId,
-    sessionNotes,
-    onDeleteSession: handleDeleteSession,
-    onPinSession: handlePinSession,
-    onUnpinSession: handleUnpinSession,
-    onSetSessionNote: handleSetSessionNote,
-    onClearSessionNote: handleClearSessionNote,
-    isUnifiedMode,
-    onToggleMode: handleToggleUnifiedMode,
-    groupByWorkspace,
-    onToggleGroupByWorkspace: handleToggleGroupByWorkspace,
-    workspaceOrder,
-    onWorkspaceOrderChange: handleWorkspaceOrderChange,
-    expandedWorkspaces,
-    onToggleWorkspaceExpanded: handleToggleWorkspaceExpanded,
-    onWakeWorkspace: handleWakeWorkspace,
-    sleepingWorkspaceIds,
-  };
-
-  const sharedWorkspaceProps = {
-    mode: "workspace" as const,
-    sessions,
-    workspaceColor: activeWorkspaceColor,
-    activeSessionId,
-    sessionStatuses,
-    questionSessionIds,
-    lastViewedAt,
-    pinnedSessionIds,
-    taskProgressBySessionId,
-    taskActiveSessionIds,
-    subAgentCountBySessionId,
-    sessionNotes,
-    isLoading: isSessionsLoading,
-    onDeleteSession: handleDeleteSession,
-    onPinSession: handlePinSession,
-    onUnpinSession: handleUnpinSession,
-    onSetSessionNote: handleSetSessionNote,
-    onClearSessionNote: handleClearSessionNote,
-    isUnifiedMode,
-    onToggleMode: handleToggleUnifiedMode,
-  };
-
   return (
     <div data-chat-interface className="flex h-full min-h-0 w-full min-w-0">
       {chatCommandsRegistrar}
-      {/* Mobile session sheet */}
-      <Sheet open={isMobileSessionsOpen} onOpenChange={setIsMobileSessionsOpen}>
-        <SheetContent side="left" className="w-72 p-0" showCloseButton={false}>
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sessions</SheetTitle>
-          </SheetHeader>
-          {isUnifiedMode ? (
-            <SessionList
-              {...sharedUnifiedProps}
-              onSelectSession={handleSelectUnifiedSessionInTab}
-              onCreateSession={handleMobileCreateSession}
-            />
-          ) : (
-            <SessionList
-              {...sharedWorkspaceProps}
-              onSelectSession={handleMobileSelectSessionInTab}
-              onCreateSession={handleMobileCreateSession}
-            />
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Session sidebar — hidden on mobile by default */}
-      {isSessionListOpen && (
-        <>
-          <div
-            ref={(el) => {
-              sessionListFocusRef.current = el;
-            }}
-            tabIndex={-1}
-            className="relative hidden shrink-0 overflow-hidden md:block"
-            style={{ width: sessionListWidth }}
-          >
-            {isUnifiedMode ? (
-              <SessionList
-                {...sharedUnifiedProps}
-                onSelectSession={handleSelectUnifiedSessionInTab}
-                onCreateSession={handleCreateSession}
-              />
-            ) : (
-              <SessionList
-                {...sharedWorkspaceProps}
-                onSelectSession={handleSelectSessionInTab}
-                onCreateSession={handleCreateSession}
-              />
-            )}
-          </div>
-          <div
-            className="hover:bg-accent/50 active:bg-accent hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors md:flex"
-            onMouseDown={handleSessionListDragStart}
-          >
-            <GripVertical className="text-muted-foreground/30 size-3.5" />
-          </div>
-        </>
-      )}
 
       {/* Main chat area */}
       <ChatDisplayContext.Provider value={chatDisplaySettings}>
@@ -1268,20 +906,25 @@ function ChatInterfaceContent({
         >
           {/* Chat toolbar */}
           <div className="bg-background sticky top-0 z-30 flex h-10 shrink-0 items-center gap-1.5 border-b px-3 md:gap-2 md:px-4">
-            {/* Mobile: open session sheet */}
+            {/* Mobile: open the workbench session sheet */}
             <Button
               size="icon-xs"
               variant="ghost"
-              onClick={() => setIsMobileSessionsOpen(true)}
+              aria-label="Open session list"
+              onClick={() =>
+                useSessionSidebarStore.getState().setMobileSheetOpen(true)
+              }
               className="mr-1 md:hidden"
             >
               <MessageSquare className="size-4" />
             </Button>
-            {/* Desktop: toggle session sidebar */}
+            {/* Desktop: toggle the workbench session sidebar */}
             <Button
               size="icon-xs"
               variant="ghost"
-              onClick={() => setIsSessionListOpen(!isSessionListOpen)}
+              aria-label="Toggle session list"
+              title="Toggle session list"
+              onClick={() => useSessionSidebarStore.getState().toggle()}
               className="hidden md:inline-flex"
             >
               <svg
@@ -1456,7 +1099,7 @@ function ChatInterfaceContent({
                     variant="ghost"
                     onClick={() => {
                       if (activeSessionId && activeWorkspaceId) {
-                        handleClearSessionNote(activeSessionId);
+                        clearSessionNote(activeSessionId, activeWorkspaceId);
                       }
                     }}
                     title="Dismiss note"

@@ -70,6 +70,7 @@ import type {
   ChatFileOpenMode,
 } from "@/hooks/use-settings";
 import { useTheme } from "@/components/providers/theme-provider";
+import { AccountSettingsCard } from "@/components/settings/account-settings-card";
 import { ChatSuggestionSettingsCard } from "@/components/settings/chat-suggestion-settings";
 import { ChatEngineSettingsCard } from "@/components/settings/chat-engine-settings";
 import { EditorSettingsSection } from "@/components/settings/editor-settings-section";
@@ -92,6 +93,7 @@ export function GeneralSettings() {
       <ChatSuggestionSettingsCard />
       <NotificationSettingsCard />
       <SoundSettingsCard />
+      <AccountSettingsCard />
     </div>
   );
 }

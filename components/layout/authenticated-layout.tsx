@@ -7,6 +7,10 @@ import { useQuery } from "@tanstack/react-query";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Header } from "@/components/layout/header";
+import {
+  LayoutSlotHost,
+  LayoutSlotsProvider,
+} from "@/components/layout/layout-slots";
 import { WorkspaceCommands } from "@/components/command-palette/workspace-commands";
 import { SoundSettingsSync } from "@/components/providers/sound-settings-sync";
 import { AttentionBridge } from "@/components/layout/attention-bridge";
@@ -131,29 +135,32 @@ export function AuthenticatedLayout({
   if (status === "unauthenticated") return null;
 
   return (
-    <SidebarProvider
-      open={sidebarOpen}
-      onOpenChange={setSidebarOpen}
-      className="h-dvh"
-      style={{ "--sidebar-width": "4rem" } as React.CSSProperties}
-    >
-      <AppSidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main
-          className={cn(
-            "flex min-w-0 flex-1 flex-col overflow-hidden",
-            !isKeyboardVisible && "pb-16 md:pb-0",
-          )}
-        >
-          {children}
-        </main>
-      </div>
-      <MobileNav />
-      <WorkspaceCommands />
-      <SoundSettingsSync />
-      <AttentionBridge />
-      <TabStatusFavicon />
-    </SidebarProvider>
+    <LayoutSlotsProvider>
+      <SidebarProvider
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
+        className="h-dvh"
+        style={{ "--sidebar-width": "4rem" } as React.CSSProperties}
+      >
+        <AppSidebar />
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <Header />
+          <main
+            className={cn(
+              "flex min-w-0 flex-1 flex-col overflow-hidden",
+              !isKeyboardVisible && "pb-16 md:pb-0",
+            )}
+          >
+            {children}
+          </main>
+        </div>
+        <LayoutSlotHost slot="right-panel" className="flex h-full shrink-0" />
+        <MobileNav />
+        <WorkspaceCommands />
+        <SoundSettingsSync />
+        <AttentionBridge />
+        <TabStatusFavicon />
+      </SidebarProvider>
+    </LayoutSlotsProvider>
   );
 }

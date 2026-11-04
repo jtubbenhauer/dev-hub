@@ -1,7 +1,7 @@
 "use client";
 
-import { signOut } from "next-auth/react";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { LayoutSlotHost } from "@/components/layout/layout-slots";
 import { GitStatusBar } from "@/components/layout/git-status-bar";
 import { SystemIndicator } from "@/components/layout/system-indicator";
 import { CommandDrawer } from "@/components/command-runner/command-drawer";
@@ -13,13 +13,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCommandStore } from "@/stores/command-store";
-import {
-  LogOut,
-  Terminal,
-  Search,
-  PanelLeftOpen,
-  PanelLeftClose,
-} from "lucide-react";
+import { Terminal, Search, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 
 export function Header() {
   const { toggleSidebar, open: sidebarOpen } = useSidebar();
@@ -32,7 +26,7 @@ export function Header() {
 
   return (
     <>
-      <header className="bg-background sticky top-0 z-40 flex h-12 shrink-0 items-center justify-between border-b px-4">
+      <header className="bg-background @container sticky top-0 z-40 flex h-12 shrink-0 items-center border-b px-4">
         <div className="flex items-center gap-3">
           <Button
             data-sidebar="trigger"
@@ -52,16 +46,16 @@ export function Header() {
             <span className="text-lg font-semibold">Dev Hub</span>
           </div>
           <WorkspaceSwitcher />
-          <div className="bg-border hidden h-4 w-px sm:block" />
-          <div className="hidden sm:block">
+          <div className="bg-border hidden h-4 w-px sm:@xl:block" />
+          <div className="hidden sm:@xl:block">
             <GitStatusBar />
           </div>
-          <div className="bg-border hidden h-4 w-px lg:block" />
-          <div className="hidden lg:block">
+          <div className="bg-border hidden h-4 w-px lg:@3xl:block" />
+          <div className="hidden lg:@3xl:block">
             <SystemIndicator />
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1 md:justify-center">
           <ProviderCreationIndicator />
           <Button
             variant="ghost"
@@ -88,14 +82,11 @@ export function Header() {
               </Badge>
             )}
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => signOut({ callbackUrl: "/login" })}
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
         </div>
+        <LayoutSlotHost
+          slot="header-trailing"
+          className="flex shrink-0 items-center"
+        />
       </header>
       <CommandDrawer />
       <TerminalDrawer />

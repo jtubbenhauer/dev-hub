@@ -3,11 +3,6 @@ import { render, screen } from "@testing-library/react";
 import { Header } from "@/components/layout/header";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
-vi.mock("next-auth/react", () => ({
-  signOut: vi.fn(),
-  useSession: vi.fn(() => ({ data: null, status: "unauthenticated" })),
-}));
-
 vi.mock("@/stores/command-store", () => ({
   useCommandStore: vi.fn(
     (
@@ -100,12 +95,25 @@ describe("Header", () => {
     expect(searchBtn).toBeInTheDocument();
   });
 
-  it("renders logout button", () => {
+  it("renders no logout button", () => {
     renderHeader();
-    const logoutBtns = screen.getAllByRole("button");
-    const hasLogoutIcon = logoutBtns.some(
-      (btn) => btn.querySelector("svg") !== null,
-    );
-    expect(hasLogoutIcon).toBe(true);
+    expect(document.querySelector(".lucide-log-out")).not.toBeInTheDocument();
+  });
+
+  it("centers the action cluster between the left cluster and the trailing slot", () => {
+    renderHeader();
+    const actions = screen
+      .getByTitle("Command palette (Ctrl+,)")
+      .closest("div");
+    expect(actions).toHaveClass("flex-1");
+    expect(actions).toHaveClass("md:justify-center");
+  });
+
+  it("renders the header-trailing slot host at the far right", () => {
+    renderHeader();
+    const header = document.querySelector("header");
+    const slot = document.querySelector('[data-layout-slot="header-trailing"]');
+    expect(slot).toBeInTheDocument();
+    expect(header?.lastElementChild).toBe(slot);
   });
 });

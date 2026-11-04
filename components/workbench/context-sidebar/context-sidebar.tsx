@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { GripVertical } from "lucide-react";
+import { LayoutSlotPortal } from "@/components/layout/layout-slots";
 import { ContextSidebarContent } from "@/components/workbench/context-sidebar/context-sidebar-content";
 import { ContextSidebarMobileSheet } from "@/components/workbench/context-sidebar/context-sidebar-mobile-sheet";
-import { ContextSidebarRail } from "@/components/workbench/context-sidebar/context-sidebar-rail";
+import { ContextSidebarTabs } from "@/components/workbench/context-sidebar/context-sidebar-tabs";
 import { useIsWorkbenchMobile } from "@/components/workbench/workbench-mode-context";
 import { useGitStatus } from "@/hooks/use-git";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
@@ -60,41 +61,53 @@ function DesktopContextSidebar({
     reverse: true,
   });
 
+  if (!isOpen) {
+    return (
+      <LayoutSlotPortal slot="header-trailing">
+        <ContextSidebarTabs
+          shownView={null}
+          changedPathCount={changedPathCount}
+          onSelectView={toggleView}
+        />
+      </LayoutSlotPortal>
+    );
+  }
+
   return (
-    <aside
-      aria-label="Context sidebar"
-      className="flex h-full min-h-0 shrink-0"
-    >
-      {isOpen && (
-        <>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize context sidebar"
-            className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
-            onMouseDown={handleDragStart}
-          >
-            <GripVertical className="text-muted-foreground/30 size-3.5" />
-          </div>
-          <div
-            data-testid="context-sidebar-content"
-            className="flex min-h-0 shrink-0 flex-col border-l"
-            style={{ width }}
-          >
-            <ContextSidebarContent
-              view={view}
-              workspaceId={workspaceId}
-              workspace={workspace}
+    <LayoutSlotPortal slot="right-panel">
+      <aside
+        aria-label="Context sidebar"
+        className="flex h-full min-h-0 shrink-0"
+      >
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize context sidebar"
+          className="hover:bg-accent/50 active:bg-accent flex w-1.5 shrink-0 cursor-col-resize items-center justify-center transition-colors"
+          onMouseDown={handleDragStart}
+        >
+          <GripVertical className="text-muted-foreground/30 size-3.5" />
+        </div>
+        <div
+          data-testid="context-sidebar-content"
+          className="flex h-full min-h-0 shrink-0 flex-col border-l"
+          style={{ width }}
+        >
+          <div className="flex h-12 shrink-0 items-center justify-end border-b px-2">
+            <ContextSidebarTabs
+              shownView={view}
+              changedPathCount={changedPathCount}
+              onSelectView={toggleView}
             />
           </div>
-        </>
-      )}
-      <ContextSidebarRail
-        shownView={isOpen ? view : null}
-        changedPathCount={changedPathCount}
-        onSelectView={toggleView}
-      />
-    </aside>
+          <ContextSidebarContent
+            view={view}
+            workspaceId={workspaceId}
+            workspace={workspace}
+          />
+        </div>
+      </aside>
+    </LayoutSlotPortal>
   );
 }
 

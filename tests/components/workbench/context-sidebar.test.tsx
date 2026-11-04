@@ -15,6 +15,10 @@ import { WorkbenchModeProvider } from "@/components/workbench/workbench-mode-con
 import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 import { useWorkbenchStore } from "@/stores/workbench-store";
 import type { GitStatusResult } from "@/types";
+import {
+  LayoutSlotsFixture,
+  getLayoutSlotHost,
+} from "../../helpers/layout-slots";
 import { createWorkspace } from "./workspace-fixture";
 
 const gitStatus = vi.hoisted(() => ({
@@ -73,12 +77,14 @@ function makeStatus(overrides: Partial<GitStatusResult>): GitStatusResult {
 function renderContextSidebar({ isMobile }: { readonly isMobile: boolean }) {
   return render(
     <TooltipProvider>
-      <WorkbenchModeProvider isMobile={isMobile}>
-        <ContextSidebar
-          workspaceId={WORKSPACE_ID}
-          workspace={createWorkspace(WORKSPACE_ID)}
-        />
-      </WorkbenchModeProvider>
+      <LayoutSlotsFixture>
+        <WorkbenchModeProvider isMobile={isMobile}>
+          <ContextSidebar
+            workspaceId={WORKSPACE_ID}
+            workspace={createWorkspace(WORKSPACE_ID)}
+          />
+        </WorkbenchModeProvider>
+      </LayoutSlotsFixture>
     </TooltipProvider>,
   );
 }
@@ -99,7 +105,7 @@ afterEach(() => {
 });
 
 describe("ContextSidebar on desktop", () => {
-  it("shows a rail button for each view", () => {
+  it("shows a tab button for each view", () => {
     // When
     renderContextSidebar({ isMobile: false });
 
@@ -109,21 +115,27 @@ describe("ContextSidebar on desktop", () => {
     }
   });
 
-  it("shows the open view left of the rail", () => {
+  it("shows the horizontal tabs row above the view inside the right panel", () => {
     // Given
     useContextSidebarStore.setState({ isOpen: true, view: "explorer" });
 
     // When
     renderContextSidebar({ isMobile: false });
 
-    // Then
-    const content = screen.getByTestId("explorer-view");
+    // Then the whole open sidebar lives in the right-panel slot
+    const rightPanel = getLayoutSlotHost("right-panel");
+    const tabs = within(rightPanel).getByRole("group", {
+      name: "Context sidebar views",
+    });
+    const content = within(rightPanel).getByTestId("explorer-view");
     expect(content).toHaveTextContent(`explorer:${WORKSPACE_ID}`);
+    // ... with the tabs row before the view content
     expect(
-      content.compareDocumentPosition(
-        screen.getByRole("button", { name: "Explorer" }),
-      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+      tabs.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    expect(
+      within(tabs).getByRole("button", { name: "Explorer" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("hides the sidebar when the active view is clicked while open", async () => {
@@ -172,6 +184,27 @@ describe("ContextSidebar on desktop", () => {
       isOpen: true,
       view: "compare",
     });
+  });
+
+  it("moves the tabs into the header-trailing slot while collapsed", () => {
+    // Given
+    useContextSidebarStore.setState({ isOpen: false, view: "explorer" });
+
+    // When
+    renderContextSidebar({ isMobile: false });
+
+    // Then the tabs sit in the header and the right panel stays empty
+    const trailing = getLayoutSlotHost("header-trailing");
+    const tabs = within(trailing).getByRole("group", {
+      name: "Context sidebar views",
+    });
+    for (const label of VIEW_LABELS) {
+      expect(within(tabs).getByRole("button", { name: label })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    }
+    expect(getLayoutSlotHost("right-panel")).toBeEmptyDOMElement();
   });
 
   it("counts each changed path once on the Changes button", () => {

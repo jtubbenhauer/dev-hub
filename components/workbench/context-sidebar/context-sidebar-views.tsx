@@ -24,12 +24,12 @@ export interface ContextSidebarViewItem {
   readonly icon: LucideIcon;
 }
 
-// The order of the desktop rail and of the mobile switcher row.
+// The order of the sidebar's view tabs and of the mobile switcher row.
 export const CONTEXT_SIDEBAR_VIEW_ITEMS: readonly ContextSidebarViewItem[] = [
+  { view: "status", label: "Status", icon: Activity },
   { view: "explorer", label: "Explorer", icon: FolderTree },
   { view: "changes", label: "Changes", icon: FileDiff },
   { view: "compare", label: "Compare", icon: GitCompare },
-  { view: "status", label: "Status", icon: Activity },
 ];
 
 export const CONTEXT_SIDEBAR_VIEW_COMPONENTS: Record<

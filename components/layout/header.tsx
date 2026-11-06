@@ -26,7 +26,7 @@ export function Header() {
 
   return (
     <>
-      <header className="bg-background @container sticky top-0 z-40 flex h-12 shrink-0 items-center border-b px-4">
+      <header className="bg-background @container sticky top-0 z-40 flex h-12 shrink-0 items-center border-b px-4 md:pr-2">
         <div className="flex items-center gap-3">
           <Button
             data-sidebar="trigger"
@@ -55,7 +55,7 @@ export function Header() {
             <SystemIndicator />
           </div>
         </div>
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-1 md:justify-center">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
           <ProviderCreationIndicator />
           <Button
             variant="ghost"

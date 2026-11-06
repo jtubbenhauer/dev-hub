@@ -100,13 +100,16 @@ describe("Header", () => {
     expect(document.querySelector(".lucide-log-out")).not.toBeInTheDocument();
   });
 
-  it("centers the action cluster between the left cluster and the trailing slot", () => {
+  it("right-aligns the action cluster against the trailing slot", () => {
     renderHeader();
     const actions = screen
       .getByTitle("Command palette (Ctrl+,)")
       .closest("div");
-    expect(actions).toHaveClass("flex-1");
-    expect(actions).toHaveClass("md:justify-center");
+    expect(actions).toHaveClass("flex-1", "justify-end");
+    expect(actions).not.toHaveClass("md:justify-center");
+    expect(actions?.nextElementSibling).toBe(
+      document.querySelector('[data-layout-slot="header-trailing"]'),
+    );
   });
 
   it("renders the header-trailing slot host at the far right", () => {

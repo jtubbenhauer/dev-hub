@@ -56,7 +56,7 @@ vi.mock("@/components/workbench/context-sidebar/status-view", () => ({
 }));
 
 const WORKSPACE_ID = "ws-1";
-const VIEW_LABELS = ["Explorer", "Changes", "Compare", "Status"];
+const VIEW_LABELS = ["Status", "Explorer", "Changes", "Compare"];
 
 function makeStatus(overrides: Partial<GitStatusResult>): GitStatusResult {
   return {
@@ -115,6 +115,19 @@ describe("ContextSidebar on desktop", () => {
     }
   });
 
+  it("orders the view tabs Status, Explorer, Changes, Compare", () => {
+    // When
+    renderContextSidebar({ isMobile: false });
+
+    // Then
+    const tabs = screen.getByRole("group", { name: "Context sidebar views" });
+    expect(
+      within(tabs)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual(VIEW_LABELS);
+  });
+
   it("shows the horizontal tabs row above the view inside the right panel", () => {
     // Given
     useContextSidebarStore.setState({ isOpen: true, view: "explorer" });
@@ -136,6 +149,8 @@ describe("ContextSidebar on desktop", () => {
     expect(
       within(tabs).getByRole("button", { name: "Explorer" }),
     ).toHaveAttribute("aria-pressed", "true");
+    // ... left-aligned in the panel's top row
+    expect(tabs.parentElement).toHaveClass("justify-start");
   });
 
   it("hides the sidebar when the active view is clicked while open", async () => {
@@ -205,6 +220,8 @@ describe("ContextSidebar on desktop", () => {
       );
     }
     expect(getLayoutSlotHost("right-panel")).toBeEmptyDOMElement();
+    // ... set apart from the header actions by a divider
+    expect(tabs.previousElementSibling).toHaveClass("bg-border");
   });
 
   it("counts each changed path once on the Changes button", () => {

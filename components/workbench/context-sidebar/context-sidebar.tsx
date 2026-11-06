@@ -64,11 +64,14 @@ function DesktopContextSidebar({
   if (!isOpen) {
     return (
       <LayoutSlotPortal slot="header-trailing">
-        <ContextSidebarTabs
-          shownView={null}
-          changedPathCount={changedPathCount}
-          onSelectView={toggleView}
-        />
+        <div className="flex items-center gap-1">
+          <div aria-hidden className="bg-border mx-1 h-4 w-px" />
+          <ContextSidebarTabs
+            shownView={null}
+            changedPathCount={changedPathCount}
+            onSelectView={toggleView}
+          />
+        </div>
       </LayoutSlotPortal>
     );
   }
@@ -93,7 +96,7 @@ function DesktopContextSidebar({
           className="flex h-full min-h-0 shrink-0 flex-col border-l"
           style={{ width }}
         >
-          <div className="flex h-12 shrink-0 items-center justify-end border-b px-2">
+          <div className="flex h-12 shrink-0 items-center justify-start border-b px-2">
             <ContextSidebarTabs
               shownView={view}
               changedPathCount={changedPathCount}

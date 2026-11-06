@@ -37,6 +37,10 @@ const SOURCE_BADGE: Record<AutocompleteSuggestion["source"], string> = {
   workspace: "bg-zinc-500/10 text-zinc-500",
 };
 
+// Stable fallback: a fresh `[]` per render would retrigger the render-time
+// suggestion sync below on every render and loop forever.
+const NO_SUGGESTIONS: AutocompleteSuggestion[] = [];
+
 export function CommandInput({
   workspaceId,
   isRunning,
@@ -56,7 +60,7 @@ export function CommandInput({
     return () => clearTimeout(timer);
   }, [value]);
 
-  const { data: suggestions = [] } = useQuery({
+  const { data: suggestions = NO_SUGGESTIONS } = useQuery({
     queryKey: ["command-autocomplete", workspaceId, debouncedQuery],
     queryFn: () => fetchSuggestions(workspaceId!, debouncedQuery),
     enabled: !!workspaceId && debouncedQuery.length > 0,

@@ -103,38 +103,42 @@ export function CommandDrawer() {
           {/* Tabs */}
           <div className="flex items-center gap-1 overflow-x-auto border-b pb-1">
             {sessionTabs.map((tab) => (
-              <button
+              <div
                 key={tab.sessionId}
-                onClick={() => setActiveSessionId(tab.sessionId)}
                 className={cn(
-                  "flex shrink-0 items-center gap-1.5 rounded-t-md px-3 py-1.5 font-mono text-xs transition-colors",
+                  "flex shrink-0 items-center rounded-t-md font-mono text-xs transition-colors",
                   tab.sessionId === activeSessionId
                     ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {tab.isRunning && (
-                  <span className="size-1.5 animate-pulse rounded-full bg-green-500" />
-                )}
-                <span className="max-w-32 truncate">{tab.command}</span>
-                {tab.exitCode !== null && (
-                  <Badge
-                    variant={tab.exitCode === 0 ? "default" : "destructive"}
-                    className="px-1 py-0 text-[8px]"
-                  >
-                    {tab.exitCode}
-                  </Badge>
-                )}
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCloseTab(tab.sessionId, tab.isRunning);
-                  }}
-                  className="hover:bg-muted-foreground/20 ml-1 rounded-sm p-0.5"
+                  type="button"
+                  onClick={() => setActiveSessionId(tab.sessionId)}
+                  className="flex items-center gap-1.5 py-1.5 pl-3"
+                >
+                  {tab.isRunning && (
+                    <span className="size-1.5 animate-pulse rounded-full bg-green-500" />
+                  )}
+                  <span className="max-w-32 truncate">{tab.command}</span>
+                  {tab.exitCode !== null && (
+                    <Badge
+                      variant={tab.exitCode === 0 ? "default" : "destructive"}
+                      className="px-1 py-0 text-[8px]"
+                    >
+                      {tab.exitCode}
+                    </Badge>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Close ${tab.command}`}
+                  onClick={() => handleCloseTab(tab.sessionId, tab.isRunning)}
+                  className="hover:bg-muted-foreground/20 mr-2 ml-1 rounded-sm p-0.5"
                 >
                   <X className="size-2.5" />
                 </button>
-              </button>
+              </div>
             ))}
 
             <Button

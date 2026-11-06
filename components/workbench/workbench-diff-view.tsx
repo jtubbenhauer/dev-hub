@@ -16,7 +16,8 @@ const MonacoReviewEditor = dynamic(
   },
 );
 
-// Read-only diff surface for workbench diff tabs and the chat Git panels.
+// Read-only diff surface for diff tabs, file tabs in diff mode and the git diff
+// dialog; each of them already shows the file path in its own header.
 // filePath MUST be repo-relative — callers guarantee this; we never forward an
 // absolute path.
 export function WorkbenchDiffView({
@@ -66,24 +67,15 @@ export function WorkbenchDiffView({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div
-        className="text-muted-foreground truncate border-b px-3 py-1.5 font-mono text-xs"
-        data-testid="diff-header"
-        title={filePath}
-      >
-        {filePath}
-      </div>
-      <div className="min-h-0 flex-1">
-        <MonacoReviewEditor
-          fileContent={data}
-          workspaceId={workspaceId}
-          isLoading={isLoading}
-          showToolbar={false}
-          forceSideBySide={true}
-          readOnly={true}
-        />
-      </div>
+    <div className="h-full min-h-0">
+      <MonacoReviewEditor
+        fileContent={data}
+        workspaceId={workspaceId}
+        isLoading={isLoading}
+        showToolbar={false}
+        forceSideBySide={true}
+        readOnly={true}
+      />
     </div>
   );
 }

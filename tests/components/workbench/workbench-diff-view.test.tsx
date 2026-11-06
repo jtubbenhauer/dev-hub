@@ -106,6 +106,21 @@ describe("WorkbenchDiffView", () => {
     expect(passed.path).toBe("a.ts");
   });
 
+  it("leaves the file path to its container instead of repeating it", async () => {
+    // The diff tab, the git diff dialog and the file tab each show the path.
+    mockHook({ data: fileContent("src/a.ts") });
+    render(
+      <WorkbenchDiffView
+        workspaceId="ws1"
+        filePath="src/a.ts"
+        staged={false}
+      />,
+    );
+    await screen.findByTestId("monaco-review-editor");
+    expect(screen.queryByTestId("diff-header")).not.toBeInTheDocument();
+    expect(screen.queryByText("src/a.ts")).not.toBeInTheDocument();
+  });
+
   it("shows loading (not the diff) on a rapid switch with placeholder data", () => {
     // keepPreviousData hands us the PREVIOUS file (a.ts) while we asked for b.ts.
     mockHook({ data: fileContent("a.ts"), isPlaceholderData: true });

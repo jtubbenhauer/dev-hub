@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Orientation, type SerializedDockview } from "dockview-react";
 import type { ComponentProps } from "react";
 
@@ -294,6 +295,44 @@ describe("WorkbenchView", () => {
 
     // Then
     expect(useWorkbenchStore.getState().focusedPanel?.params.kind).toBe("chat");
+  });
+
+  it("lists every tab in the tab switcher on a phone", async () => {
+    // Given a phone layout with a chat and a terminal open
+    vi.stubGlobal("innerWidth", 390);
+    const user = userEvent.setup();
+    renderWorkbenchView();
+    act(() => {
+      getWorkbenchController()?.openNewTerminal();
+    });
+
+    // When the user picks the chat from the switcher
+    await user.click(
+      screen.getByRole("button", { name: "Switch tab, 2 open" }),
+    );
+    expect(
+      screen.getAllByRole("menuitemradio").map((item) => item.textContent),
+    ).toEqual(["New chat", "Terminal 1"]);
+    await user.click(screen.getByRole("menuitemradio", { name: "New chat" }));
+
+    // Then the chat is the focused tab, and the strip scrolls natively so
+    // dockview can bring the selected tab into view
+    expect(useWorkbenchStore.getState().focusedPanel?.params.kind).toBe("chat");
+    expect(document.querySelector(".dv-scrollable")).toBeNull();
+  });
+
+  it("keeps dockview's own tab strip on desktop", () => {
+    // Given a desktop layout with a chat and a terminal open
+    renderWorkbenchView();
+    act(() => {
+      getWorkbenchController()?.openNewTerminal();
+    });
+
+    // Then there is no tab switcher and dockview keeps its custom scrollbar
+    expect(
+      screen.queryByRole("button", { name: /^Switch tab/ }),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector(".dv-scrollable")).not.toBeNull();
   });
 
   it("registers the workbench leader actions while mounted", () => {

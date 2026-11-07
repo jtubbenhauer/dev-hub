@@ -17,8 +17,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useActiveTabInView } from "@/components/workbench/use-active-tab-in-view";
 import { createDockviewLayoutApi } from "@/components/workbench/dockview-layout-api";
 import { useIsWorkbenchMobile } from "@/components/workbench/workbench-mode-context";
+import { WorkbenchTabSwitcher } from "@/components/workbench/workbench-tab-switcher";
 import { splitActiveGroup } from "@/lib/workbench/workbench-commands";
 import { getWorkbenchController } from "@/lib/workbench/workbench-controller-registry";
 import { useContextSidebarStore } from "@/stores/context-sidebar-store";
@@ -26,10 +28,13 @@ import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 export function WorkbenchGroupActions({
   containerApi,
   group,
+  panels,
+  activePanel,
 }: IDockviewHeaderActionsProps) {
   const isMobile = useIsWorkbenchMobile();
   const { open: openFilePicker } = useFilePicker();
   const groupId = group.id;
+  useActiveTabInView(group.element, isMobile);
 
   // The menu belongs to its own group, which need not be the active one.
   const splitGroup = (direction: "right" | "below") => {
@@ -39,7 +44,16 @@ export function WorkbenchGroupActions({
   };
 
   return (
-    <div className="flex h-full items-center px-1">
+    <div className="flex h-full items-center gap-0.5 px-1">
+      {isMobile && (
+        <WorkbenchTabSwitcher
+          panels={panels}
+          activePanelId={activePanel?.id ?? null}
+          onSelectPanel={(panelId) =>
+            createDockviewLayoutApi(containerApi).activatePanel(panelId)
+          }
+        />
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

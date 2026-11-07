@@ -148,6 +148,12 @@ export function WorkbenchDockview({
           rightHeaderActionsComponent={WorkbenchGroupActions}
           disableFloatingGroups
           disableDnd={isMobile}
+          // A phone strip fits about one tab, so dockview's list of clipped tabs
+          // named tabs already on screen; the group actions list every tab
+          // instead. Native scrolling lets dockview scroll the active tab into
+          // view (its custom scrollbar overwrites that scroll).
+          disableTabsOverflowList={isMobile}
+          scrollbars={isMobile ? "native" : "custom"}
           defaultRenderer="always"
           onReady={handleReady}
         />

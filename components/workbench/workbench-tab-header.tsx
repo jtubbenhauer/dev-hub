@@ -30,7 +30,7 @@ import { useChatStore, type StreamingStatus } from "@/stores/chat-store";
 import { useEditorStore } from "@/stores/editor-store";
 import type { OpenFile } from "@/types";
 
-const TAB_KIND_ICONS: Record<WorkbenchTabKind, LucideIcon> = {
+export const TAB_KIND_ICONS: Record<WorkbenchTabKind, LucideIcon> = {
   terminal: TerminalSquare,
   file: FileCode2,
   chat: MessageSquare,

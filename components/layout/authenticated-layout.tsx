@@ -11,6 +11,7 @@ import {
   LayoutSlotHost,
   LayoutSlotsProvider,
 } from "@/components/layout/layout-slots";
+import { GitCommands } from "@/components/command-palette/git-commands";
 import { WorkspaceCommands } from "@/components/command-palette/workspace-commands";
 import { WorkspaceDialogs } from "@/components/workspace/workspace-dialogs";
 import { SoundSettingsSync } from "@/components/providers/sound-settings-sync";
@@ -158,6 +159,7 @@ export function AuthenticatedLayout({
         <LayoutSlotHost slot="right-panel" className="flex h-full shrink-0" />
         <MobileNav />
         <WorkspaceCommands />
+        <GitCommands />
         <WorkspaceDialogs />
         <SoundSettingsSync />
         <AttentionBridge />

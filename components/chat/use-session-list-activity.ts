@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { SessionSubAgentCount } from "@/components/chat/session-sub-agent-count";
 import type { SessionTaskProgress } from "@/components/chat/session-task-progress";
+import { findRootSessionId } from "@/lib/attention/session-tree";
 import {
   buildChildSessionIndex,
   getDescendantActivity,
@@ -55,6 +56,8 @@ export interface SessionListActivity {
     Record<string, SessionTaskProgress>
   >;
   readonly taskActiveSessionIds: ReadonlySet<string>;
+  // Root chats blocked on a permission request, their own or a sub-agent's.
+  readonly permissionBlockedSessionIds: ReadonlySet<string>;
   readonly subAgentCountBySessionId: Readonly<
     Record<string, SessionSubAgentCount>
   >;
@@ -63,6 +66,7 @@ export interface SessionListActivity {
 
 interface WorkspaceSessionActivity {
   readonly taskActiveSessionIds: readonly string[];
+  readonly permissionBlockedSessionIds: readonly string[];
   readonly subAgentCountBySessionId: SessionListActivity["subAgentCountBySessionId"];
   readonly subAgentTodoHydration: readonly SubAgentTodoHydration[];
 }
@@ -178,13 +182,23 @@ function summarizeWorkspaceSessionActivity(
   }
 
   const taskActiveSessionIds: string[] = [];
+  const permissionBlockedSessionIds: string[] = [];
   const subAgentCountBySessionId: Record<string, SessionSubAgentCount> = {};
   const subAgentTodoHydration: SubAgentTodoHydration[] = [];
   const now = Date.now();
   const childSessionIndex = buildChildSessionIndex(inputs.sessions);
+  // A sub-agent's permission request blocks the chat that started it.
+  const permissionRootSessionIds = new Set(
+    inputs.permissions.map((permission) =>
+      findRootSessionId(inputs.sessions, permission.sessionID),
+    ),
+  );
 
   for (const session of Object.values(inputs.sessions)) {
     if (session.parentID) continue;
+    if (permissionRootSessionIds.has(session.id)) {
+      permissionBlockedSessionIds.push(session.id);
+    }
     const status = inputs.sessionStatuses[session.id];
     const hasDirectActivity =
       status?.type === "busy" ||
@@ -235,6 +249,7 @@ function summarizeWorkspaceSessionActivity(
 
   const activity = {
     taskActiveSessionIds,
+    permissionBlockedSessionIds,
     subAgentCountBySessionId,
     subAgentTodoHydration,
   };
@@ -276,6 +291,7 @@ function summarizeSessionActivity(
     }
   }
   const taskActiveSessionIds = new Set<string>();
+  const permissionBlockedSessionIds = new Set<string>();
   const subAgentCountBySessionId: Record<string, SessionSubAgentCount> = {};
   const subAgentTodoHydration: SubAgentTodoHydration[] = [];
   for (const [workspaceId, sessions] of Object.entries(workspaces.sessions)) {
@@ -289,12 +305,16 @@ function summarizeSessionActivity(
     for (const sessionId of activity.taskActiveSessionIds) {
       taskActiveSessionIds.add(sessionId);
     }
+    for (const sessionId of activity.permissionBlockedSessionIds) {
+      permissionBlockedSessionIds.add(sessionId);
+    }
     Object.assign(subAgentCountBySessionId, activity.subAgentCountBySessionId);
     subAgentTodoHydration.push(...activity.subAgentTodoHydration);
   }
 
   return {
     taskActiveSessionIds,
+    permissionBlockedSessionIds,
     subAgentCountBySessionId,
     subAgentTodoHydration,
   };

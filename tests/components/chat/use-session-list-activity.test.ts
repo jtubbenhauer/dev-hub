@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useSessionListActivity } from "@/components/chat/use-session-list-activity";
 import { buildChildSessionIndex } from "@/lib/chat/descendant-activity";
-import type { Session } from "@/lib/opencode/types";
+import type {
+  PermissionRequest,
+  QuestionRequest,
+  Session,
+} from "@/lib/opencode/types";
 import { useChatStore, type WorkspaceState } from "@/stores/chat-store";
 
 vi.mock("@/lib/chat/descendant-activity", async (importOriginal) => {
@@ -24,6 +28,25 @@ function makeSession(id: string, parentID?: string): Session {
     title: id,
     version: "1",
     time: { created: 1, updated: 1 },
+  };
+}
+
+function makePermission(id: string, sessionID: string): PermissionRequest {
+  return {
+    id,
+    sessionID,
+    permission: "bash",
+    patterns: [],
+    metadata: {},
+    always: [],
+  };
+}
+
+function makeQuestion(id: string, sessionID: string): QuestionRequest {
+  return {
+    id,
+    sessionID,
+    questions: [{ question: "Continue?", header: "Confirm", options: [] }],
   };
 }
 
@@ -151,6 +174,42 @@ describe("useSessionListActivity", () => {
 
     // Then
     expect(result.current.taskActiveSessionIds).toEqual(new Set());
+  });
+
+  it("marks a chat blocked when it or one of its sub-agents waits on a permission", () => {
+    // Given
+    useChatStore.setState({
+      workspaceStates: {
+        "ws-a": makeWorkspace({
+          sessions: {
+            asking: makeSession("asking"),
+            parent: makeSession("parent"),
+            child: makeSession("child", "parent"),
+            grandchild: makeSession("grandchild", "child"),
+            questioning: makeSession("questioning"),
+            quiet: makeSession("quiet"),
+          },
+          permissions: [
+            makePermission("perm-1", "asking"),
+            makePermission("perm-2", "grandchild"),
+          ],
+          questions: [makeQuestion("question-1", "questioning")],
+        }),
+      },
+    });
+
+    // When
+    const { result } = renderHook(() =>
+      useSessionListActivity({
+        isUnifiedMode: false,
+        activeWorkspaceId: "ws-a",
+      }),
+    );
+
+    // Then
+    expect(result.current.permissionBlockedSessionIds).toEqual(
+      new Set(["asking", "parent"]),
+    );
   });
 
   it("summarizes only the active workspace outside unified mode", () => {

@@ -36,10 +36,12 @@ export function WorkbenchDiffView({
     filePath,
     staged,
   );
+  // Like the compare file list, a branch compare shows committed work only.
   const branchCompareQuery = useGitFileContentAtRef(
     baseRef ? workspaceId : null,
     filePath,
     baseRef,
+    "HEAD",
   );
   const { data, isLoading, isPlaceholderData, error } = baseRef
     ? branchCompareQuery

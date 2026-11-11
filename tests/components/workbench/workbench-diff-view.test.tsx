@@ -186,7 +186,7 @@ describe("WorkbenchDiffView", () => {
     expect(screen.queryByTestId("diff-error")).not.toBeInTheDocument();
   });
 
-  it("uses the ref-based query (and disables the working query) when baseRef is set", async () => {
+  it("diffs baseRef against HEAD (and disables the working query) when baseRef is set", async () => {
     mockHook({ data: fileContent("a.ts") });
     useGitFileContentAtRefMock.mockReturnValue({
       data: {
@@ -207,6 +207,7 @@ describe("WorkbenchDiffView", () => {
       "ws1",
       "a.ts",
       "main",
+      "HEAD",
     );
     expect(useGitFileContentMock).toHaveBeenCalledWith(null, "a.ts", false);
     const passed = capturedProps?.fileContent as { original: string };
@@ -216,6 +217,11 @@ describe("WorkbenchDiffView", () => {
   it("disables the ref-based query when baseRef is not set", () => {
     mockHook({ isLoading: true });
     render(<WorkbenchDiffView workspaceId="ws1" filePath="a.ts" />);
-    expect(useGitFileContentAtRefMock).toHaveBeenCalledWith(null, "a.ts", null);
+    expect(useGitFileContentAtRefMock).toHaveBeenCalledWith(
+      null,
+      "a.ts",
+      null,
+      "HEAD",
+    );
   });
 });

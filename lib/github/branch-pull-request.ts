@@ -410,18 +410,18 @@ export function summarizePullRequestChecks(
 
 // headRefName matches by branch name only, so PRs opened from forks that
 // happen to use the same branch name are dropped. An open PR wins; otherwise
-// the most recently updated merged or closed one (the query orders by update).
+// the most recently updated PR if it was merged. A PR closed without merging
+// is history, so the branch then shows no PR rather than an older one.
 export function selectBranchPullRequestNode(
   nodes: ReadonlyArray<PullRequestNode | null>,
 ): PullRequestNode | null {
   const sameRepositoryNodes = nodes.filter(
     (node): node is PullRequestNode => node !== null && !node.isCrossRepository,
   );
-  return (
-    sameRepositoryNodes.find((node) => node.state === "OPEN") ??
-    sameRepositoryNodes[0] ??
-    null
-  );
+  const openNode = sameRepositoryNodes.find((node) => node.state === "OPEN");
+  if (openNode) return openNode;
+  const latestNode = sameRepositoryNodes[0];
+  return latestNode?.state === "MERGED" ? latestNode : null;
 }
 
 function toBranchPullRequest(node: PullRequestNode): BranchPullRequest {
@@ -624,8 +624,8 @@ export const MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, string> = {
 
 // Open PRs, also while checks run (CI takes minutes, so polling faster only
 // reports a finish a little sooner), and branches that may get a PR soon:
-// every minute. Merged or closed PRs, and a default branch with no PR of its
-// own, rarely change: every five minutes.
+// every minute. Merged PRs, and a default branch with no PR of its own,
+// rarely change: every five minutes.
 const ACTIVE_REFETCH_INTERVAL_MS = 60_000;
 const QUIET_REFETCH_INTERVAL_MS = 300_000;
 

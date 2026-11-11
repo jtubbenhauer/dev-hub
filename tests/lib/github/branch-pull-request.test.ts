@@ -151,11 +151,27 @@ describe("selectBranchPullRequestNode", () => {
     expect(selectBranchPullRequestNode([fromFork, merged])?.number).toBe(4);
   });
 
-  it("falls back to the most recently updated closed or merged pull request", () => {
+  it("prefers a newly opened pull request over the closed one it replaces", () => {
+    const closed = makePullRequestNode({ number: 5, state: "CLOSED" });
+    const replacement = makePullRequestNode({ number: 8, state: "OPEN" });
+
+    expect(selectBranchPullRequestNode([closed, replacement])?.number).toBe(8);
+  });
+
+  it("falls back to the most recently updated pull request when it was merged", () => {
+    const merged = makePullRequestNode({ number: 5, state: "MERGED" });
+    const olderClosed = makePullRequestNode({ number: 3, state: "CLOSED" });
+
+    expect(selectBranchPullRequestNode([merged, olderClosed])?.number).toBe(5);
+  });
+
+  it("shows no pull request once the latest one was closed without merging", () => {
     const closed = makePullRequestNode({ number: 5, state: "CLOSED" });
     const olderMerged = makePullRequestNode({ number: 3, state: "MERGED" });
+    const olderClosed = makePullRequestNode({ number: 2, state: "CLOSED" });
 
-    expect(selectBranchPullRequestNode([closed, olderMerged])?.number).toBe(5);
+    expect(selectBranchPullRequestNode([closed, olderMerged])).toBeNull();
+    expect(selectBranchPullRequestNode([closed, olderClosed])).toBeNull();
   });
 
   it("returns null when the branch has no pull request of its own", () => {
@@ -412,19 +428,16 @@ describe("getBranchPullRequestRefetchInterval", () => {
     );
   });
 
-  it.each(["MERGED", "CLOSED"] as const)(
-    "checks a %s pull request every five minutes",
-    (state) => {
-      const result = toBranchPullRequestResult(
-        makeQueryData([makePullRequestNode({ state })]),
-        "acme/web",
-      );
+  it("checks a merged pull request every five minutes", () => {
+    const result = toBranchPullRequestResult(
+      makeQueryData([makePullRequestNode({ state: "MERGED" })]),
+      "acme/web",
+    );
 
-      expect(
-        getBranchPullRequestRefetchInterval(result, "feat/pr-button"),
-      ).toBe(300_000);
-    },
-  );
+    expect(getBranchPullRequestRefetchInterval(result, "feat/pr-button")).toBe(
+      300_000,
+    );
+  });
 
   it("checks the default branch every five minutes while it has no pull request", () => {
     const noPullRequest = toBranchPullRequestResult(
@@ -444,14 +457,21 @@ describe("getBranchPullRequestRefetchInterval", () => {
     ).toBe(60_000);
   });
 
-  it("checks other branches without a pull request every minute", () => {
+  it("checks other branches every minute while they have no open or merged pull request", () => {
     const noPullRequest = toBranchPullRequestResult(
       makeQueryData([]),
+      "acme/web",
+    );
+    const closedPullRequest = toBranchPullRequestResult(
+      makeQueryData([makePullRequestNode({ state: "CLOSED" })]),
       "acme/web",
     );
 
     expect(
       getBranchPullRequestRefetchInterval(noPullRequest, "feat/pr-button"),
+    ).toBe(60_000);
+    expect(
+      getBranchPullRequestRefetchInterval(closedPullRequest, "feat/pr-button"),
     ).toBe(60_000);
     expect(getBranchPullRequestRefetchInterval(undefined, "main")).toBe(60_000);
   });

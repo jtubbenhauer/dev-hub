@@ -71,6 +71,7 @@ describe("OmoSessionRegistry buffered replay", () => {
     await fixture.runtime.registry.attach({
       workspace: fixture.workspace,
       durableId: "mid-turn",
+      sessionPath: "/sessions/mid-turn.jsonl",
     });
 
     const assistantEvent = rekeyEvents(events).find(
@@ -106,6 +107,7 @@ describe("OmoSessionRegistry buffered replay", () => {
     await fixture.runtime.registry.attach({
       workspace: fixture.workspace,
       durableId: "chain",
+      sessionPath: "/sessions/chain.jsonl",
     });
 
     const events = rekeyEvents(rawEvents);

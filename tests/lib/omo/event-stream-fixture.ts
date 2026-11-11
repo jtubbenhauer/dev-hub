@@ -29,6 +29,7 @@ export async function attachFixtureSession(
   await fixture.runtime.registry.attach({
     workspace: fixture.workspace,
     durableId,
+    sessionPath: `/sessions/${durableId}.jsonl`,
   });
 }
 

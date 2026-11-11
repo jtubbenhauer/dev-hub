@@ -96,6 +96,7 @@ describe("createOmoWorkspaceEventStream lifecycle", () => {
     await fixture.runtime.registry.attach({
       workspace: fixture.workspace,
       durableId: "cancel",
+      sessionPath: "/sessions/cancel.jsonl",
     });
     const listenerCount = fixture.runtime.client.listenerCount();
     const eventStream = createOmoWorkspaceEventStream({
@@ -175,10 +176,12 @@ describe("createOmoWorkspaceEventStream lifecycle", () => {
     const subscribed = await reconnectFixture.runtime.registry.attach({
       workspace: reconnectFixture.workspace,
       durableId: "subscribed",
+      sessionPath: `${reconnectFixture.workspacePath}/subscribed.jsonl`,
     });
     const quiet = await reconnectFixture.runtime.registry.attach({
       workspace: quietWorkspace,
       durableId: "quiet",
+      sessionPath: `${reconnectFixture.workspacePath}/quiet/quiet.jsonl`,
     });
     const eventStream = createOmoWorkspaceEventStream({
       workspace: reconnectFixture.workspace,

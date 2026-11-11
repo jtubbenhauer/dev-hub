@@ -60,6 +60,7 @@ describe("OmoSessionRegistry lifecycle reopening", () => {
     const binding = await fixture.runtime.registry.attach({
       workspace: fixture.workspace,
       durableId: "parked",
+      sessionPath: "/sessions/parked.jsonl",
     });
     fixture.host.emit({
       type: "session_parked",
@@ -112,6 +113,7 @@ describe("OmoSessionRegistry lifecycle reopening", () => {
     const binding = await fixture.runtime.registry.attach({
       workspace: fixture.workspace,
       durableId: "retry-read",
+      sessionPath: "/sessions/retry-read.jsonl",
     });
 
     // When
@@ -145,6 +147,7 @@ describe("OmoSessionRegistry lifecycle reopening", () => {
     const binding = await fixture.runtime.registry.attach({
       workspace: fixture.workspace,
       durableId: "unsafe-write",
+      sessionPath: "/sessions/unsafe-write.jsonl",
     });
 
     // When
@@ -281,10 +284,12 @@ describe("OmoSessionRegistry lifecycle reopening", () => {
     const subscribed = await registry.attach({
       workspace: reconnectFixture.workspace,
       durableId: "subscribed",
+      sessionPath: "/sessions/subscribed.jsonl",
     });
     const quiet = await registry.attach({
       workspace: quietWorkspace,
       durableId: "quiet",
+      sessionPath: "/sessions/quiet.jsonl",
     });
 
     // When

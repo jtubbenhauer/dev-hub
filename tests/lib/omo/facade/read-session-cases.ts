@@ -222,6 +222,32 @@ describe("handleOmoRead session routes", () => {
     expect(row).toBeUndefined();
   });
 
+  it("does not list or index a live worker the index has not caught yet", async () => {
+    // Given
+    const fixture = await useReadFixture();
+    fixture.client.isConnected = true;
+    fixture.client.request.mockResolvedValue({
+      data: {
+        sessions: [
+          { durableSessionId: "probe", cwd: "/workspace", kind: "worker" },
+        ],
+      },
+    });
+
+    // When
+    const response = await fixture.request("/session");
+
+    // Then
+    const body = await readJson(response);
+    expect(Array.isArray(body) ? body.map((s) => s.id) : body).toEqual([]);
+    const row = fixture.sqlite
+      .prepare(
+        "SELECT durable_id FROM omo_session_index WHERE durable_id = 'probe'",
+      )
+      .get();
+    expect(row).toBeUndefined();
+  });
+
   it("returns not found for a session index row marked replaced", async () => {
     // Given
     const fixture = await useReadFixture();

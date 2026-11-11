@@ -67,8 +67,9 @@ function titleFromState(
 }
 
 // Cwd rule matches refreshOmoIndexFromHost: never index/list a foreign cwd.
-// Workers are included so the banner can show them under their parent — they
-// are filtered from the root list by listOmoHiddenIds, same as child interactives.
+// Workers are never roots: one the index has not caught yet, such as dev-hub's
+// own catalog probe, would be listed and indexed as an untitled chat. The
+// banner reads workers from the index instead.
 function liveSessionIds(
   response: Readonly<Record<string, unknown>>,
   workspacePath: string,
@@ -77,7 +78,7 @@ function liveSessionIds(
   const data = response["data"];
   if (!isJsonObject(data) || !Array.isArray(data["sessions"])) return [];
   return data["sessions"].flatMap((value) => {
-    if (!isJsonObject(value)) return [];
+    if (!isJsonObject(value) || value["kind"] === "worker") return [];
     const cwd = value["cwd"];
     if (
       typeof cwd !== "string" ||
@@ -101,7 +102,7 @@ async function liveSummaries(
     );
     const response = await context.runtime.client.request({
       type: "list_sessions",
-      include_workers: true,
+      include_workers: false,
     });
     const summaries: OmoSessionOnDiskSummary[] = [];
     for (const durableId of liveSessionIds(

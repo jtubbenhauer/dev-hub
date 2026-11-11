@@ -17,6 +17,7 @@ import {
   openOmoSessionWithPathRetry,
   wait,
 } from "@/lib/omo/session-registry-reopen";
+import { OmoNotFoundError } from "@/lib/omo/session-source";
 import type {
   OmoAttachAliases,
   OmoAttachRequest,
@@ -179,6 +180,9 @@ async function performAttach(
         });
       });
     if (sessionPath === null) {
+      // A pathless open_session always starts a new session, so it can never
+      // reopen a known durable id; opening one would only leak a stray chat.
+      if (rawId !== undefined) throw new OmoNotFoundError(rawId);
       await open();
     } else {
       const resolvedSessionPath = sessionPath;

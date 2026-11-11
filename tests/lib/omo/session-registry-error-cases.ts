@@ -59,6 +59,25 @@ describe("OmoSessionRegistry attach errors", () => {
     expect(recordsOfType(fixture, "open_session")).toHaveLength(0);
   });
 
+  it("rejects a known durable id without a session path instead of opening a new session", async () => {
+    fixture = await createRegistryFixture([]);
+    insertIndexRow(fixture.sqlite, {
+      durableId: "pathless",
+      sessionPath: null,
+    });
+
+    await expect(
+      fixture.runtime.registry.attach({
+        workspace: fixture.workspace,
+        durableId: "pathless",
+      }),
+    ).rejects.toMatchObject({
+      name: "OmoNotFoundError",
+      durableId: "pathless",
+    });
+    expect(recordsOfType(fixture, "open_session")).toHaveLength(0);
+  });
+
   it("rejects an opened file whose durable identity differs", async () => {
     fixture = await createRegistryFixture([
       openFixture({

@@ -145,7 +145,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             { status: 400 },
           );
         }
-        const files = await backend.getChangedFiles(baseRef);
+        const currentRef = url.searchParams.get("currentRef") ?? undefined;
+        const files = await backend.getChangedFiles(baseRef, currentRef);
         return NextResponse.json(files);
       }
 

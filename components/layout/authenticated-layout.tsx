@@ -12,6 +12,7 @@ import {
   LayoutSlotsProvider,
 } from "@/components/layout/layout-slots";
 import { WorkspaceCommands } from "@/components/command-palette/workspace-commands";
+import { WorkspaceDialogs } from "@/components/workspace/workspace-dialogs";
 import { SoundSettingsSync } from "@/components/providers/sound-settings-sync";
 import { AttentionBridge } from "@/components/layout/attention-bridge";
 import { TabStatusFavicon } from "@/components/layout/tab-status-favicon";
@@ -157,6 +158,7 @@ export function AuthenticatedLayout({
         <LayoutSlotHost slot="right-panel" className="flex h-full shrink-0" />
         <MobileNav />
         <WorkspaceCommands />
+        <WorkspaceDialogs />
         <SoundSettingsSync />
         <AttentionBridge />
         <TabStatusFavicon />

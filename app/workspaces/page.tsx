@@ -1,27 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { FolderGit2, Plus, FolderSearch, Palette } from "lucide-react";
-import { DirectoryBrowser } from "@/components/workspace/directory-browser";
+import { FolderGit2, Palette } from "lucide-react";
 import { WorkspaceCard } from "@/components/workspace/workspace-card";
-import { CreateWorktreeDialog } from "@/components/workspace/create-worktree-dialog";
-import { CloneRepoDialog } from "@/components/workspace/clone-repo-dialog";
-import { ConnectRemoteDialog } from "@/components/workspace/connect-remote-dialog";
+import { AddWorkspaceButton } from "@/components/workspace/add-workspace-dialog";
+import { CreateWorktreeButton } from "@/components/workspace/create-worktree-dialog";
+import { CloneRepoButton } from "@/components/workspace/clone-repo-dialog";
+import { ConnectRemoteButton } from "@/components/workspace/connect-remote-dialog";
 import { CreateProviderWorkspaceDialog } from "@/components/workspace/create-provider-workspace-dialog";
 import { toast } from "sonner";
 import type { Workspace } from "@/types";
@@ -35,10 +26,6 @@ import {
 export default function WorkspacesPage() {
   const queryClient = useQueryClient();
   const { setWorkspaces } = useWorkspaceStore();
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [newPath, setNewPath] = useState("");
-  const [newName, setNewName] = useState("");
-  const [browseMode, setBrowseMode] = useState(true);
 
   const { data: workspaces = [], isLoading } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
@@ -52,32 +39,6 @@ export default function WorkspacesPage() {
   useEffect(() => {
     if (workspaces.length > 0) setWorkspaces(workspaces);
   }, [workspaces, setWorkspaces]);
-
-  const addMutation = useMutation({
-    mutationFn: async (data: { name: string; path: string }) => {
-      const res = await fetch("/api/workspaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to add workspace");
-      }
-      return res.json();
-    },
-    onSuccess: (workspace) => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      setAddDialogOpen(false);
-      setNewPath("");
-      setNewName("");
-      setBrowseMode(true);
-      toast.success(`Added workspace "${workspace.name}"`);
-    },
-    onError: (err: Error) => {
-      toast.error(err.message);
-    },
-  });
 
   const deleteMutation = useMutation({
     mutationFn: async ({
@@ -148,11 +109,6 @@ export default function WorkspacesPage() {
     },
   });
 
-  function handleAdd() {
-    if (!newPath) return;
-    addMutation.mutate({ name: newName, path: newPath });
-  }
-
   return (
     <AuthenticatedLayout>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto p-4 md:p-6">
@@ -177,89 +133,11 @@ export default function WorkspacesPage() {
                 </TooltipContent>
               </Tooltip>
             )}
-            <CloneRepoDialog />
-            <ConnectRemoteDialog />
+            <CloneRepoButton />
+            <ConnectRemoteButton />
             <CreateProviderWorkspaceDialog workspaces={workspaces} />
-            <CreateWorktreeDialog workspaces={workspaces} />
-            <Dialog
-              open={addDialogOpen}
-              onOpenChange={(open) => {
-                setAddDialogOpen(open);
-                if (!open) {
-                  setNewPath("");
-                  setNewName("");
-                  setBrowseMode(true);
-                }
-              }}
-            >
-              <DialogTrigger asChild>
-                <Button size="icon" className="sm:size-auto sm:px-3 sm:py-2">
-                  <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Add Workspace</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[550px]">
-                <DialogHeader>
-                  <DialogTitle>
-                    {browseMode ? "Browse for Directory" : "Add Workspace"}
-                  </DialogTitle>
-                </DialogHeader>
-                {browseMode ? (
-                  <DirectoryBrowser
-                    onSelect={(selectedPath) => {
-                      setNewPath(selectedPath);
-                      const defaultName =
-                        selectedPath.split("/").filter(Boolean).pop() ?? "";
-                      setNewName(defaultName);
-                      setBrowseMode(false);
-                    }}
-                  />
-                ) : (
-                  <div className="space-y-4 pt-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="path">Directory Path</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="path"
-                          value={newPath}
-                          onChange={(e) => setNewPath(e.target.value)}
-                          placeholder="/home/user/dev/my-project"
-                          className="font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="shrink-0"
-                          onClick={() => setBrowseMode(true)}
-                          title="Browse directories"
-                        >
-                          <FolderSearch className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Display Name</Label>
-                      <Input
-                        id="name"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        placeholder="Defaults to directory name"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && newPath) handleAdd();
-                        }}
-                      />
-                    </div>
-                    <Button
-                      onClick={handleAdd}
-                      disabled={addMutation.isPending || !newPath}
-                      className="w-full"
-                    >
-                      {addMutation.isPending ? "Adding..." : "Add Workspace"}
-                    </Button>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
+            <CreateWorktreeButton />
+            <AddWorkspaceButton />
           </div>
         </div>
 

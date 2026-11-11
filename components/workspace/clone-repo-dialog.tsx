@@ -10,10 +10,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Download, Loader2, FolderOpen } from "lucide-react";
 import { useCloneRepo } from "@/hooks/use-git";
+import {
+  useIsWorkspaceDialogOpen,
+  useWorkspaceDialogStore,
+} from "@/stores/workspace-dialog-store";
 
 /**
  * Extract repo name from a git URL for preview purposes.
@@ -52,8 +55,26 @@ function extractOwnerRepo(url: string): string {
 
 const DEFAULT_BASE_DIR = "~/dev";
 
+// Opens the one dialog that CloneRepoDialog renders.
+export function CloneRepoButton() {
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className="sm:size-auto sm:px-3 sm:py-2"
+      onClick={() =>
+        useWorkspaceDialogStore.getState().open({ kind: "clone-repo" })
+      }
+    >
+      <Download className="h-4 w-4 sm:mr-2" />
+      <span className="hidden sm:inline">Clone Repo</span>
+    </Button>
+  );
+}
+
+// Mounted once by the authenticated layout; opened through its store.
 export function CloneRepoDialog() {
-  const [open, setOpen] = useState(false);
+  const isOpen = useIsWorkspaceDialogOpen("clone-repo");
   const [url, setUrl] = useState("");
   const [customDir, setCustomDir] = useState("");
   const [customName, setCustomName] = useState("");
@@ -94,7 +115,7 @@ export function CloneRepoDialog() {
       },
       {
         onSuccess: () => {
-          setOpen(false);
+          useWorkspaceDialogStore.getState().close();
           resetState();
         },
       },
@@ -111,22 +132,13 @@ export function CloneRepoDialog() {
 
   return (
     <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        setOpen(isOpen);
-        if (!isOpen) resetState();
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (open) return;
+        useWorkspaceDialogStore.getState().close();
+        resetState();
       }}
     >
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          className="sm:size-auto sm:px-3 sm:py-2"
-        >
-          <Download className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Clone Repo</span>
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Clone Repository</DialogTitle>

@@ -12,7 +12,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   GitBranch,
@@ -31,18 +30,44 @@ import {
   useWorktreeSymlinks,
 } from "@/hooks/use-git";
 import { sanitizeBranchName } from "@/lib/utils";
+import {
+  useIsWorkspaceDialogOpen,
+  useWorkspaceDialogStore,
+} from "@/stores/workspace-dialog-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Workspace, GitBranch as GitBranchType } from "@/types";
 
 const SYMLINK_SUGGESTIONS = [".npmrc", ".env", ".env.local", ".opencode/plans"];
 
-interface CreateWorktreeDialogProps {
-  workspaces: Workspace[];
+// Opens the one dialog that CreateWorktreeDialog renders.
+export function CreateWorktreeButton() {
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className="sm:size-auto sm:px-3 sm:py-2"
+      onClick={() =>
+        useWorkspaceDialogStore
+          .getState()
+          .open({ kind: "create-worktree", initialRepoId: null })
+      }
+    >
+      <GitFork className="h-4 w-4 sm:mr-2" />
+      <span className="hidden sm:inline">Create Worktree</span>
+    </Button>
+  );
 }
 
-export function CreateWorktreeDialog({
-  workspaces,
-}: CreateWorktreeDialogProps) {
-  const [open, setOpen] = useState(false);
+// Mounted once by the authenticated layout, so the workspaces page and the
+// command palette open the same dialog through the workspace dialog store.
+export function CreateWorktreeDialog() {
+  const isOpen = useIsWorkspaceDialogOpen("create-worktree");
+  const initialRepoId = useWorkspaceDialogStore((state) =>
+    state.openDialog?.kind === "create-worktree"
+      ? state.openDialog.initialRepoId
+      : null,
+  );
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
   const [step, setStep] = useState<"select-repo" | "configure">("select-repo");
   const [selectedRepo, setSelectedRepo] = useState<Workspace | null>(null);
   const [branchName, setBranchName] = useState("");
@@ -71,6 +96,15 @@ export function CreateWorktreeDialog({
     () => workspaces.filter((w) => w.type === "repo"),
     [workspaces],
   );
+
+  // Start every opening fresh, on the requested repo if there is one (during render)
+  const [wasOpen, setWasOpen] = useState(false);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      resetState(repoWorkspaces.find((w) => w.id === initialRepoId) ?? null);
+    }
+  }
 
   // Fetch branches for the selected repo
   const { data: branches = [], isLoading: branchesLoading } = useGitBranches(
@@ -126,43 +160,31 @@ export function CreateWorktreeDialog({
         symlinkPaths: symlinkPaths.length > 0 ? symlinkPaths : undefined,
       },
       {
-        onSuccess: () => {
-          setOpen(false);
-          resetState();
-        },
+        onSuccess: () => useWorkspaceDialogStore.getState().close(),
       },
     );
   }
 
-  function resetState() {
-    setStep("select-repo");
-    setSelectedRepo(null);
+  function resetState(initialRepo: Workspace | null) {
+    setStep(initialRepo ? "configure" : "select-repo");
+    setSelectedRepo(initialRepo);
     setBranchName("");
     setIsNewBranch(true);
     setStartPoint("");
     setCustomName("");
     setBranchFilter("");
     setSymlinkPaths([]);
+    // Lets the repo's saved symlinks fill in again on this opening.
+    setPrevSavedSymlinks(undefined);
   }
 
   return (
     <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        setOpen(isOpen);
-        if (!isOpen) resetState();
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) useWorkspaceDialogStore.getState().close();
       }}
     >
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          className="sm:size-auto sm:px-3 sm:py-2"
-        >
-          <GitFork className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Create Worktree</span>
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <DialogTitle>

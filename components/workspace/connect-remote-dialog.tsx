@@ -10,16 +10,37 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Globe, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  useIsWorkspaceDialogOpen,
+  useWorkspaceDialogStore,
+} from "@/stores/workspace-dialog-store";
 
 type HealthStatus = "idle" | "checking" | "healthy" | "unreachable";
 
+// Opens the one dialog that ConnectRemoteDialog renders.
+export function ConnectRemoteButton() {
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className="sm:size-auto sm:px-3 sm:py-2"
+      onClick={() =>
+        useWorkspaceDialogStore.getState().open({ kind: "connect-remote" })
+      }
+    >
+      <Globe className="h-4 w-4 sm:mr-2" />
+      <span className="hidden sm:inline">Connect Remote</span>
+    </Button>
+  );
+}
+
+// Mounted once by the authenticated layout; opened through its store.
 export function ConnectRemoteDialog() {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const isOpen = useIsWorkspaceDialogOpen("connect-remote");
   const [agentUrl, setAgentUrl] = useState("");
   const [opencodeUrl, setOpencodeUrl] = useState("");
   const [name, setName] = useState("");
@@ -93,7 +114,7 @@ export function ConnectRemoteDialog() {
     },
     onSuccess: (workspace) => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      setOpen(false);
+      useWorkspaceDialogStore.getState().close();
       resetState();
       toast.success(`Connected remote workspace "${workspace.name}"`);
     },
@@ -122,22 +143,13 @@ export function ConnectRemoteDialog() {
 
   return (
     <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        setOpen(isOpen);
-        if (!isOpen) resetState();
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (open) return;
+        useWorkspaceDialogStore.getState().close();
+        resetState();
       }}
     >
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          className="sm:size-auto sm:px-3 sm:py-2"
-        >
-          <Globe className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Connect Remote</span>
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Connect Remote Workspace</DialogTitle>

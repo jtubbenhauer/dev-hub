@@ -187,7 +187,7 @@ API routes live in `app/api/` and follow Next.js App Router conventions:
 
 ### GitHub API Proxy
 
-`app/api/github/[...path]/route.ts` proxies arbitrary GitHub API requests. It supports all HTTP methods and forwards the path to the GitHub API with authentication.
+`app/api/github/[...path]/route.ts` forwards GitHub API requests, but only the method and path pairs listed in `lib/github/github-proxy-allowlist.ts`; anything else gets a 403, so add new GitHub calls there. It signs requests with the GitHub CLI login on the machine running dev-hub (`gh auth token`, see `lib/github/github-token.ts`), else with the token saved in Settings. `GET /api/github-auth` reports which login is in use.
 
 ## State Management
 

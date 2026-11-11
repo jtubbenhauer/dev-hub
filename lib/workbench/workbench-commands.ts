@@ -223,12 +223,7 @@ export function resolveChatTarget(
 
 export function applyChatTarget(
   api: WorkbenchLayoutApi,
-  target: {
-    workspaceId: string;
-    sessionId: string;
-    panelId: string | null;
-    shouldActivate?: boolean;
-  },
+  target: { workspaceId: string; sessionId: string; panelId: string | null },
   title: string,
 ): string {
   const params: WorkbenchTabParams = {
@@ -242,12 +237,8 @@ export function applyChatTarget(
       api.activatePanel(resolution.panelId);
       return resolution.panelId;
     case "retarget":
+      // No activation: a background tab finishing createSession must not steal focus.
       api.updatePanelParams(resolution.panelId, params, title);
-      // Only an explicit ask activates: a background tab finishing
-      // createSession must not steal focus.
-      if (target.shouldActivate === true) {
-        api.activatePanel(resolution.panelId);
-      }
       return resolution.panelId;
     case "open":
       return openOrFocusTab(api, params, title);

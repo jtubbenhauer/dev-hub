@@ -57,7 +57,7 @@ export function ModelSettings({ workspaceId }: ModelSettingsProps) {
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const { allowlist, isLoading: isLoadingAllowlist } = useModelAllowlist();
   const { bindings, isLoading: isLoadingBindings } = useModelAgentBindings();
-  const { primaryAgents, isLoading: isLoadingAgents } = useAgents(
+  const { visiblePrimaryAgents, isLoading: isLoadingAgents } = useAgents(
     workspaceId ?? "",
   );
   const mutation = useSettingsMutation();
@@ -132,7 +132,7 @@ export function ModelSettings({ workspaceId }: ModelSettingsProps) {
       />
 
       <AgentBindingsCard
-        agents={primaryAgents}
+        agents={visiblePrimaryAgents}
         providers={providers}
         bindings={bindings}
         onSave={(next) =>

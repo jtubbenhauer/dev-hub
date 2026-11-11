@@ -964,7 +964,8 @@ export function useGitHubIssueComments(
 interface WorkflowRun {
   id: number;
   name: string;
-  conclusion: string;
+  status: string;
+  conclusion: string | null;
   created_at: string;
 }
 
@@ -981,7 +982,9 @@ export function useGitHubWorkflowRuns(
     queryKey: ["github", "workflow-runs", owner, repo, branch],
     queryFn: () =>
       githubFetch<WorkflowRunsResponse>(
-        `repos/${owner}/${repo}/actions/runs?branch=${branch}&event=pull_request&per_page=5&status=completed`,
+        // Every status, so a run that is re-running keeps its place at the
+        // top instead of an older completed run taking it.
+        `repos/${owner}/${repo}/actions/runs?branch=${branch}&event=pull_request&per_page=5`,
       ),
     enabled: !!(owner && repo && branch),
     staleTime: 300_000,
@@ -1005,7 +1008,7 @@ export function useRerunWorkflow(owner: string | null, repo: string | null) {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["github", "issue-comments", owner, repo],
+        queryKey: ["github", "workflow-runs", owner, repo],
       });
     },
     onError: (err: Error) => {

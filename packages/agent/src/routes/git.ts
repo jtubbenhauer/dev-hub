@@ -566,17 +566,20 @@ export function gitRoutes(workspacePath: string): Hono {
     }
   });
 
-  // GET /git/changed-files?baseRef=<ref>
+  // GET /git/changed-files?baseRef=<ref>[&currentRef=<ref>]
   app.get("/changed-files", async (c) => {
     const git = createGit(workspacePath);
     const baseRef = c.req.query("baseRef");
     if (!baseRef) {
       return c.json({ error: "baseRef query parameter required" }, 400);
     }
+    // With a currentRef, compares two commits and leaves uncommitted work out.
+    const currentRef = c.req.query("currentRef");
+    const refs = currentRef ? [baseRef, currentRef] : [baseRef];
 
     const [nameStatusOutput, numstatOutput] = await Promise.all([
-      git.raw(["diff", "--name-status", baseRef]),
-      git.raw(["diff", "--numstat", baseRef]),
+      git.raw(["diff", "--name-status", ...refs]),
+      git.raw(["diff", "--numstat", ...refs]),
     ]);
 
     const stats = parseNumstat(numstatOutput);

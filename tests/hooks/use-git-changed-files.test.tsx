@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useGitChangedFiles } from "@/hooks/use-git";
+import { useGitChangedFiles, useGitCommit } from "@/hooks/use-git";
 
 const COMMITTED_CHANGES_URL =
   "/api/workspaces/ws-1/git?action=changed-files&baseRef=main&currentRef=HEAD";
@@ -45,5 +45,32 @@ describe("useGitChangedFiles", () => {
     // Then
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(fetchMock).toHaveBeenCalledExactlyOnceWith(COMMITTED_CHANGES_URL);
+  });
+
+  it("refetches the changed files after a commit", async () => {
+    // Given
+    const fetchMock = stubGitApi();
+    const { result } = renderHook(
+      () => ({
+        changedFiles: useGitChangedFiles("ws-1", "main", "HEAD"),
+        commit: useGitCommit("ws-1"),
+      }),
+      { wrapper: createWrapper() },
+    );
+    await waitFor(() =>
+      expect(result.current.changedFiles.isSuccess).toBe(true),
+    );
+
+    // When
+    await act(() =>
+      result.current.commit.mutateAsync({ action: "commit", message: "Add" }),
+    );
+
+    // Then
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(([url]) => url === COMMITTED_CHANGES_URL),
+      ).toHaveLength(2),
+    );
   });
 });

@@ -381,7 +381,7 @@ export function useGitDiscard(workspaceId: string | null) {
 export function useGitCommit(workspaceId: string | null) {
   return useGitMutation<{ action: string; message: string }>(
     workspaceId,
-    ["git-status", "git-log"],
+    ["git-status", "git-log", "git-changed-files"],
     "Committed successfully",
   );
 }

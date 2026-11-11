@@ -95,10 +95,10 @@ describe("getDefaultCompareBranch", () => {
 });
 
 describe("GitBranchComparePanel", () => {
-  it("defaults the base to main and lists changed files with totals", () => {
+  it("defaults the base to main and lists the files committed since it, with totals", () => {
     renderPanel();
 
-    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "main");
+    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "main", "HEAD");
     expect(screen.getByText("a.ts")).toBeInTheDocument();
     expect(screen.getByText("new.ts")).toBeInTheDocument();
     const summary = screen.getByTestId("compare-summary");
@@ -118,7 +118,7 @@ describe("GitBranchComparePanel", () => {
     renderPanel();
 
     // Then
-    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "dev");
+    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "dev", "HEAD");
   });
 
   it("falls back to the default when the stored base branch is gone", () => {
@@ -131,7 +131,7 @@ describe("GitBranchComparePanel", () => {
     renderPanel();
 
     // Then
-    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "main");
+    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", "main", "HEAD");
   });
 
   it("stores the picked base branch for the workspace", async () => {
@@ -147,7 +147,11 @@ describe("GitBranchComparePanel", () => {
     expect(useContextSidebarStore.getState().branchCompareBaseRefs).toEqual({
       "ws-1": "dev",
     });
-    expect(useGitChangedFilesMock).toHaveBeenLastCalledWith("ws-1", "dev");
+    expect(useGitChangedFilesMock).toHaveBeenLastCalledWith(
+      "ws-1",
+      "dev",
+      "HEAD",
+    );
   });
 
   it("hands a clicked file and the base branch to onSelectFile", async () => {
@@ -230,7 +234,7 @@ describe("GitBranchComparePanel", () => {
     });
     renderPanel();
 
-    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", null);
+    expect(useGitChangedFilesMock).toHaveBeenCalledWith("ws-1", null, "HEAD");
     expect(
       screen.getByText("Select a branch to compare against"),
     ).toBeInTheDocument();

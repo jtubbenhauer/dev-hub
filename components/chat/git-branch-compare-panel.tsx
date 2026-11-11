@@ -72,13 +72,14 @@ export function GitBranchComparePanel({
     ? storedBaseRef
     : getDefaultCompareBranch(comparableBranches);
 
+  // HEAD, not the working tree: uncommitted edits belong to the Changes view.
   const {
     data: changedFiles = [],
     isLoading: isChangedFilesLoading,
     isFetching: isChangedFilesFetching,
     error: changedFilesError,
     refetch: refetchChangedFiles,
-  } = useGitChangedFiles(workspaceId, baseRef);
+  } = useGitChangedFiles(workspaceId, baseRef, "HEAD");
 
   const [sortMode, setSortMode] = useState<SortMode>("path");
   const {

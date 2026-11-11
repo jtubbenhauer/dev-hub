@@ -4,7 +4,7 @@ Personal development command center — a self-hosted web app for managing works
 
 ## Features
 
-- **Workbench** (the landing page at `/`): tabs for chats, files, diffs and terminals in split panes. Chats are powered by [OpenCode](https://opencode.ai) or OmO Native, and several can stream side by side. Files open in Monaco or Neovim. A right sidebar has Explorer (file tree and find in files), Changes, Compare (branch diff) and Status (workspace context, task progress, MCP servers, files the focused chat touched). The terminal drawer still opens with ``Ctrl+` ``.
+- **Workbench** (the landing page at `/`): tabs for chats, files, diffs and terminals in split panes. Chats are powered by [OpenCode](https://opencode.ai) or OmO Native, and several can stream side by side. Files open in Monaco or Neovim. A right sidebar has Explorer (file tree and find in files), Changes, Compare (branch diff), Status (workspace context, task progress, MCP servers, files the focused chat touched) and PR (the branch's pull request, see GitHub Integration). The terminal drawer still opens with ``Ctrl+` ``.
 - **Dashboard** (at `/dashboard`): live system stats (CPU, memory, disk, network) with sparkline charts, process list, quick-action grid, workspace overview, and ClickUp task widget
 - **Git** — branch, commit, push, pull, fetch, stash, diff viewer, branch management, and commit log — all from the UI
 - **Code Review** — side-by-side diff viewer for branch diffs, uncommitted changes, or last commit. Track reviewed files with persistent checkmarks, auto-detect when files change underneath a review.
@@ -12,7 +12,7 @@ Personal development command center — a self-hosted web app for managing works
 - **Remote Workspaces** — operate on workspaces running in Docker containers on other machines. All file, git, and command operations work transparently over HTTP via a lightweight sidecar agent.
 - **Workspace Providers** — pluggable CLI tools (e.g., `rig-cli`) for creating and destroying remote workspaces. Register providers in settings, create workspaces with a click.
 - **ClickUp Integration** — browse tasks by view, search, view task details and comments, link tasks to workspaces
-- **GitHub Integration** — PR review via GitHub API proxy with personal access token
+- **GitHub Integration** — PR review via GitHub API proxy with personal access token. The workbench's right sidebar has a PR tab for the active workspace's branch; its icon shows the PR's state and a dot for failing, running or passing checks. The tab lists the PR's checks, review and merge status, and comments. Send any comment (or every unresolved thread) into the chat, merge, enable or disable auto-merge, close or reopen, toggle draft, update the branch, or open it on GitHub or on the PRs page
 - **Command Palette** — `Cmd+Shift+P` / `Ctrl+Shift+P` (or `Ctrl+,`) runs any command by name: new chat (any engine) or terminal, git fetch / pull / push, the workspace's quick commands, add / clone / connect a workspace, create worktree, switch workspace, the pickers, and every leader action registered on the current page, each shown with its leader keys. Recently run commands stay on top; type `tab 3` to jump to a tab
 - **Find in Files** — `Cmd+Shift+F` / `Ctrl+Shift+F` searches file contents across the current repo (match case, whole word, regex, include/exclude globs); click a result to jump to it
 - **Leader Key** — Vim-style `<leader>` key sequences with a which-key overlay showing available bindings. 40+ built-in actions, customizable via settings.

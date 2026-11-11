@@ -1,24 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
-import { db } from "@/lib/db";
-import { settings } from "@/drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { GITHUB_NOT_CONNECTED_MESSAGE } from "@/lib/github/github-auth-status";
+import { forgetGhToken, resolveGitHubToken } from "@/lib/github/github-token";
 
 const GITHUB_API_BASE = "https://api.github.com";
 
 interface RouteParams {
   params: Promise<{ path: string[] }>;
-}
-
-async function getGitHubToken(userId: string): Promise<string | null> {
-  const [row] = await db
-    .select()
-    .from(settings)
-    .where(
-      and(eq(settings.userId, userId), eq(settings.key, "github-api-token")),
-    );
-  const value = row?.value;
-  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 async function proxyToGitHub(
@@ -29,39 +17,56 @@ async function proxyToGitHub(
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const token = await getGitHubToken(session.user.id);
-  if (!token) {
-    return NextResponse.json(
-      { error: "GitHub API token not configured" },
-      { status: 422 },
-    );
-  }
+  const userId = session.user.id;
 
   const { path } = await params;
   const githubPath = path.join("/");
 
   const incomingUrl = new URL(request.url);
   const targetUrl = new URL(`${GITHUB_API_BASE}/${githubPath}`);
+
+  const token = await resolveGitHubToken(userId);
+  if (!token) {
+    return NextResponse.json(
+      { error: GITHUB_NOT_CONNECTED_MESSAGE },
+      { status: 422 },
+    );
+  }
+
   incomingUrl.searchParams.forEach((value, key) => {
     targetUrl.searchParams.set(key, value);
   });
 
-  const headers = new Headers({
-    Authorization: `Bearer ${token}`,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-  });
   const contentType = request.headers.get("content-type");
-  if (contentType) headers.set("content-type", contentType);
-
-  const fetchOptions: RequestInit = { method: request.method, headers };
-  if (request.method !== "GET" && request.method !== "HEAD" && contentType) {
-    fetchOptions.body = await request.text();
-  }
+  const body =
+    request.method !== "GET" && request.method !== "HEAD" && contentType
+      ? await request.text()
+      : undefined;
+  const requestGitHub = (tokenValue: string) => {
+    const headers = new Headers({
+      Authorization: `Bearer ${tokenValue}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    });
+    if (contentType) headers.set("content-type", contentType);
+    return fetch(targetUrl.toString(), {
+      method: request.method,
+      headers,
+      body,
+    });
+  };
 
   try {
-    const upstream = await fetch(targetUrl.toString(), fetchOptions);
+    let upstream = await requestGitHub(token.value);
+    // gh hands out a new token after `gh auth login` or `gh auth refresh`;
+    // read it again once when GitHub rejects the cached one.
+    if (upstream.status === 401 && token.source === "gh") {
+      forgetGhToken();
+      const refreshedToken = await resolveGitHubToken(userId);
+      if (refreshedToken && refreshedToken.value !== token.value) {
+        upstream = await requestGitHub(refreshedToken.value);
+      }
+    }
 
     if (upstream.status === 204 || upstream.status === 304) {
       return new Response(null, { status: upstream.status });

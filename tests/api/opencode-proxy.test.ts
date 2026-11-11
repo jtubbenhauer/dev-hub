@@ -262,6 +262,47 @@ describe("OpenCode proxy route retry", () => {
     expect(response.status).toBe(504);
   });
 
+  it.each(["command", "mcp"])(
+    "never aborts GET /%s, which starts the workspace's MCP servers",
+    async (path) => {
+      vi.useFakeTimers();
+      const mcpStartLongerThanHeaderTimeoutMs = 20_000;
+      let isUpstreamAborted = false;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          (_url: string, opts?: RequestInit) =>
+            new Promise<Response>((resolve, reject) => {
+              const mcpStartTimer = setTimeout(
+                () => resolve(Response.json({})),
+                mcpStartLongerThanHeaderTimeoutMs,
+              );
+              opts?.signal?.addEventListener("abort", () => {
+                isUpstreamAborted = true;
+                clearTimeout(mcpStartTimer);
+                reject((opts.signal as AbortSignal).reason);
+              });
+            }),
+        ),
+      );
+
+      mockWhere.mockResolvedValueOnce([makeRemoteWorkspaceRow()]);
+
+      const promise = GET(
+        new NextRequest(
+          `http://localhost:3000/api/opencode/${path}?workspaceId=ws-1`,
+        ),
+        { params: Promise.resolve({ path: [path] }) },
+      );
+
+      await vi.advanceTimersByTimeAsync(mcpStartLongerThanHeaderTimeoutMs);
+      const response = await promise;
+
+      expect(isUpstreamAborted).toBe(false);
+      expect(response.status).toBe(200);
+    },
+  );
+
   it("does not time out a large prompt while its body is still uploading", async () => {
     vi.useFakeTimers();
     const uploadSlowerThanHeaderTimeoutMs = 20_000;

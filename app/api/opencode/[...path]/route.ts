@@ -39,6 +39,11 @@ const SECONDARY_ENGINE_READ_BUDGET_MS = 8_000;
 
 const DEV_HUB_QUERY_PARAMS = new Set(["workspaceId", "engine"]);
 
+// Both reads start the workspace's MCP servers, which can outlast the header
+// timeout. OpenCode keeps an aborted start for the directory and then aborts
+// every prompt there the moment it starts, so these two never time out.
+const MCP_STARTING_OPENCODE_PATHS = new Set(["/command", "/mcp"]);
+
 async function proxyToOmo(input: EngineProxyRequest): Promise<Response> {
   const { request, userId, workspaceId, pathSegments } = input;
   if (pathSegments.join("/") === "global/health") {
@@ -135,6 +140,8 @@ async function proxyToOpenCodeServer(
     accept?.includes("text/event-stream") ||
     opencodePath === "/event" ||
     opencodePath === "/global/event";
+  const isMcpStartingRead =
+    request.method === "GET" && MCP_STARTING_OPENCODE_PATHS.has(opencodePath);
 
   const fetchOptions: RequestInit = {
     method: request.method,
@@ -146,13 +153,14 @@ async function proxyToOpenCodeServer(
   }
 
   try {
-    const upstream = isSSE
-      ? await fetch(targetUrl.toString(), fetchOptions)
-      : await fetchWithHeaderTimeout(
-          targetUrl.toString(),
-          fetchOptions,
-          15_000,
-        );
+    const upstream =
+      isSSE || isMcpStartingRead
+        ? await fetch(targetUrl.toString(), fetchOptions)
+        : await fetchWithHeaderTimeout(
+            targetUrl.toString(),
+            fetchOptions,
+            15_000,
+          );
     return proxyResponse(upstream, isSSE);
   } catch (error) {
     if (workspace?.backend === "remote" && !isSSE && request.method !== "GET") {

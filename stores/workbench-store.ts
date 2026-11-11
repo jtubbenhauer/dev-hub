@@ -29,9 +29,6 @@ export interface PendingChatTarget {
   workspaceId: string;
   sessionId: string;
   panelId: string | null;
-  // A retarget normally keeps the panel in the background (createSession in a
-  // background tab must not steal focus); a session-list pick asks to activate.
-  shouldActivate?: boolean;
 }
 
 interface PersistedWorkbenchState {

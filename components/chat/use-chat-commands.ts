@@ -110,7 +110,8 @@ export function useChatCommands(
   const chatCommands = useMemo(
     () => [
       {
-        id: "chat:toggle-plan-panel",
+        // Same id as the leader action, so the palette lists it once.
+        id: "chat:toggle-plan",
         label: labels.isPlanPanelOpen ? "Hide Plan Panel" : "Show Plan Panel",
         group: "Chat",
         icon: ScrollText,

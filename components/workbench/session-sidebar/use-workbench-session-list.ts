@@ -302,6 +302,7 @@ export function useWorkbenchSessionList(
   const {
     taskProgressBySessionId,
     taskActiveSessionIds,
+    permissionBlockedSessionIds,
     subAgentCountBySessionId,
     subAgentTodoHydration,
   } = useSessionListActivity({ isUnifiedMode, activeWorkspaceId: workspaceId });
@@ -342,6 +343,7 @@ export function useWorkbenchSessionList(
     activeSessionId,
     sessionStatuses,
     questionSessionIds,
+    permissionBlockedSessionIds,
     lastViewedAt,
     isLoading: isSessionsLoading,
     pinnedSessionIds,

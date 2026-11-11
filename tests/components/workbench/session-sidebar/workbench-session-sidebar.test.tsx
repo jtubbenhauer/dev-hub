@@ -12,6 +12,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { createFakeLayoutApi } from "../../../lib/workbench/fake-layout-api";
 import {
   chatStoreStubs,
+  makeSession,
   renderWithProviders,
   seedSessionStores,
   sessionRow,
@@ -275,5 +276,46 @@ describe("WorkbenchSessionSidebar", () => {
     expect(fetch).toHaveBeenCalledWith("/api/workspaces/w2/start", {
       method: "POST",
     });
+  });
+
+  it("shows the permission icon on a chat whose sub-agent waits on a permission", () => {
+    // Given
+    const { workspaceStates } = useChatStore.getState();
+    useChatStore.setState({
+      workspaceStates: {
+        ...workspaceStates,
+        w1: {
+          ...workspaceStates.w1,
+          sessions: {
+            ...workspaceStates.w1.sessions,
+            "s2-sub-agent": {
+              ...makeSession("s2-sub-agent", "Sub-agent", 11),
+              parentID: "s2",
+            },
+          },
+          permissions: [
+            {
+              id: "perm-1",
+              sessionID: "s2-sub-agent",
+              permission: "bash",
+              patterns: [],
+              metadata: {},
+              always: [],
+            },
+          ],
+        },
+      },
+    });
+
+    // When
+    renderSidebar();
+
+    // Then
+    expect(
+      sessionRow("s2").querySelector("svg.lucide-shield-alert"),
+    ).toBeInTheDocument();
+    expect(
+      sessionRow("s1").querySelector("svg.lucide-shield-alert"),
+    ).not.toBeInTheDocument();
   });
 });

@@ -136,7 +136,10 @@ export interface WorkspaceBackend {
   getCurrentContent(filePath: string): Promise<string>;
   getContentAtRef(ref: string, filePath: string): Promise<string>;
   getStagedContent(filePath: string): Promise<string>;
-  getChangedFiles(baseRef: string): Promise<ReviewChangedFile[]>;
+  getChangedFiles(
+    baseRef: string,
+    currentRef?: string,
+  ): Promise<ReviewChangedFile[]>;
   getUncommittedFiles(): Promise<ReviewChangedFile[]>;
   getRefDiff(baseRef: string, filePath: string): Promise<string>;
   getUncommittedDiff(filePath: string): Promise<string>;
@@ -317,8 +320,8 @@ export class LocalBackend implements WorkspaceBackend {
     return getStagedContent(this.workspacePath, filePath);
   }
 
-  getChangedFiles(baseRef: string) {
-    return getChangedFiles(this.workspacePath, baseRef);
+  getChangedFiles(baseRef: string, currentRef?: string) {
+    return getChangedFiles(this.workspacePath, baseRef, currentRef);
   }
 
   getUncommittedFiles() {
@@ -656,9 +659,10 @@ export class RemoteBackend implements WorkspaceBackend {
     return result.content;
   }
 
-  async getChangedFiles(baseRef: string) {
+  async getChangedFiles(baseRef: string, currentRef?: string) {
     return this.agentGet<ReviewChangedFile[]>("/git/changed-files", {
       baseRef,
+      ...(currentRef ? { currentRef } : {}),
     });
   }
 

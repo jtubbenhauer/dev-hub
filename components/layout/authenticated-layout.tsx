@@ -13,6 +13,7 @@ import {
 } from "@/components/layout/layout-slots";
 import { GitCommands } from "@/components/command-palette/git-commands";
 import { WorkspaceCommands } from "@/components/command-palette/workspace-commands";
+import { WorkspaceQuickCommands } from "@/components/command-palette/workspace-quick-commands";
 import { WorkspaceDialogs } from "@/components/workspace/workspace-dialogs";
 import { SoundSettingsSync } from "@/components/providers/sound-settings-sync";
 import { AttentionBridge } from "@/components/layout/attention-bridge";
@@ -160,6 +161,7 @@ export function AuthenticatedLayout({
         <MobileNav />
         <WorkspaceCommands />
         <GitCommands />
+        <WorkspaceQuickCommands />
         <WorkspaceDialogs />
         <SoundSettingsSync />
         <AttentionBridge />

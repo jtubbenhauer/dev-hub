@@ -86,7 +86,7 @@ interface GraphQLResponse<T> {
   errors?: { message: string }[];
 }
 
-async function githubGraphQL<T>(
+export async function githubGraphQL<T>(
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {

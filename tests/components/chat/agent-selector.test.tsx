@@ -147,4 +147,48 @@ describe("useAgents", () => {
     expect(result.current.primaryAgents).toEqual([]);
     expect(result.current.isLoading).toBe(true);
   });
+
+  describe("when OpenCode also returns hidden agents", () => {
+    // OmO 5 adds a hidden copy of each of its agents under the agent's config
+    // key, and compaction is one of OpenCode's own hidden agents.
+    const sisyphus = makeAgent("Sisyphus - ultraworker");
+    const prometheus = makeAgent("Prometheus - Plan Builder");
+    const agentsWithHiddenEntries: Agent[] = [
+      sisyphus,
+      { ...sisyphus, hidden: true },
+      prometheus,
+      { ...prometheus, hidden: true },
+      { ...makeAgent("compaction"), hidden: true },
+    ];
+
+    async function renderLoadedAgents() {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(JSON.stringify(agentsWithHiddenEntries), {
+              status: 200,
+            }),
+        ),
+      );
+      const { result } = renderHook(() => useAgents("workspace-a"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      return result.current;
+    }
+
+    it("lists each agent once in visiblePrimaryAgents", async () => {
+      const { visiblePrimaryAgents } = await renderLoadedAgents();
+
+      expect(visiblePrimaryAgents.map((agent) => agent.name)).toEqual([
+        "Sisyphus - ultraworker",
+        "Prometheus - Plan Builder",
+      ]);
+    });
+
+    it("keeps the hidden compaction agent in primaryAgents for /compact", async () => {
+      const { primaryAgents } = await renderLoadedAgents();
+
+      expect(primaryAgents.map((agent) => agent.name)).toContain("compaction");
+    });
+  });
 });

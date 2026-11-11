@@ -26,6 +26,7 @@ const EMPTY_AGENTS: Agent[] = [];
 interface UseAgentsResult {
   agents: Agent[];
   primaryAgents: Agent[];
+  visiblePrimaryAgents: Agent[];
   isLoading: boolean;
 }
 
@@ -89,7 +90,15 @@ export function useAgents(
     [agents],
   );
 
-  return { agents, primaryAgents, isLoading };
+  // The agents a user can pick, by the rule OpenCode's own clients use. OmO
+  // adds a hidden copy of each agent under its config key. Hidden utility
+  // agents such as compaction stay in primaryAgents, where /compact finds them.
+  const visiblePrimaryAgents = useMemo(
+    () => primaryAgents.filter((agent) => agent.hidden !== true),
+    [primaryAgents],
+  );
+
+  return { agents, primaryAgents, visiblePrimaryAgents, isLoading };
 }
 
 interface AgentSelectorProps {

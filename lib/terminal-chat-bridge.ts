@@ -35,16 +35,22 @@ export function appendToComposerText(
   return `${current.replace(/\s+$/, "")}\n\n${addition}`;
 }
 
+// Queues text for the workspace's last focused chat composer, which appends it
+// to the draft. Terminal output and GitHub PR comments both arrive this way.
+export function queueTextForChat(workspaceId: string, text: string): void {
+  const pending = localStorage.getItem(storageKey(workspaceId));
+  localStorage.setItem(
+    storageKey(workspaceId),
+    pending ? appendToComposerText(pending, text) : text,
+  );
+  window.dispatchEvent(new CustomEvent(TERMINAL_OUTPUT_TO_CHAT_EVENT));
+}
+
 export function queueTerminalOutputForChat(
   workspaceId: string,
   formattedOutput: string,
 ): void {
-  const pending = localStorage.getItem(storageKey(workspaceId));
-  localStorage.setItem(
-    storageKey(workspaceId),
-    pending ? appendToComposerText(pending, formattedOutput) : formattedOutput,
-  );
-  window.dispatchEvent(new CustomEvent(TERMINAL_OUTPUT_TO_CHAT_EVENT));
+  queueTextForChat(workspaceId, formattedOutput);
 }
 
 export function takePendingTerminalOutput(workspaceId: string): string | null {

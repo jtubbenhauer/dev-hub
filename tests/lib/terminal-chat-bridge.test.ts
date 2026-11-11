@@ -4,6 +4,7 @@ import {
   formatTerminalOutputForChat,
   MAX_TERMINAL_OUTPUT_CHARS,
   queueTerminalOutputForChat,
+  queueTextForChat,
   takePendingTerminalOutput,
   TERMINAL_OUTPUT_TO_CHAT_EVENT,
 } from "@/lib/terminal-chat-bridge";
@@ -55,5 +56,16 @@ describe("pending terminal output", () => {
     expect(takePendingTerminalOutput("ws-2")).toBeNull();
     expect(takePendingTerminalOutput("ws-1")).toBe("first\n\nsecond");
     expect(takePendingTerminalOutput("ws-1")).toBeNull();
+  });
+
+  it("queues other text, such as PR comments, into the same composer queue", () => {
+    const listener = vi.fn();
+    window.addEventListener(TERMINAL_OUTPUT_TO_CHAT_EVENT, listener);
+    queueTextForChat("ws-1", "PR comment");
+    queueTerminalOutputForChat("ws-1", "terminal");
+    window.removeEventListener(TERMINAL_OUTPUT_TO_CHAT_EVENT, listener);
+
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(takePendingTerminalOutput("ws-1")).toBe("PR comment\n\nterminal");
   });
 });

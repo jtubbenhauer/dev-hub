@@ -42,8 +42,12 @@ interface LeaderKeyContextValue {
   // Keys that fire without the leader until the repeat window closes.
   repeatNode: TrieNode | null;
   bindings: LeaderBindingsMap;
+  activationKey: ActivationKeyConfig;
   registerAction: (action: LeaderAction, handler: () => void) => void;
   deregisterAction: (actionId: string) => void;
+  // The command palette lists what is registered right now and runs it.
+  getRegisteredActions: () => LeaderAction[];
+  runAction: (actionId: string) => void;
   cancel: () => void;
 }
 
@@ -110,6 +114,11 @@ export function LeaderKeyProvider({
     registryRef.current.delete(actionId);
     setRegistryVersion((v) => v + 1);
   }, []);
+
+  const getRegisteredActions = useCallback(
+    () => Array.from(registryRef.current.values(), (entry) => entry.action),
+    [],
+  );
 
   // Rebuild trie whenever bindings or registry changes
   const trie = useMemo(() => {
@@ -335,8 +344,11 @@ export function LeaderKeyProvider({
       currentNode,
       repeatNode,
       bindings,
+      activationKey,
       registerAction,
       deregisterAction,
+      getRegisteredActions,
+      runAction: fireAction,
       cancel,
     }),
     [
@@ -346,8 +358,11 @@ export function LeaderKeyProvider({
       currentNode,
       repeatNode,
       bindings,
+      activationKey,
       registerAction,
       deregisterAction,
+      getRegisteredActions,
+      fireAction,
       cancel,
     ],
   );

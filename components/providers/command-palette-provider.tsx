@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import type { LucideIcon } from "lucide-react";
+import { getIsMac } from "@/lib/utils";
 
 export interface PaletteCommand {
   id: string;
@@ -16,6 +17,11 @@ export interface PaletteCommand {
   group: string;
   icon?: LucideIcon | React.ComponentType<{ className?: string }>;
   shortcut?: string;
+  // Muted text after the label, e.g. the shell command a quick command runs.
+  detail?: string;
+  // Other names to find it by, as whole phrases ("add worktree", not "add"):
+  // the fuzzy search matches the typed letters in order.
+  keywords?: string[];
   onSelect: () => void;
 }
 
@@ -39,6 +45,16 @@ export function useCommandPalette() {
       "useCommandPalette must be used within CommandPaletteProvider",
     );
   return context;
+}
+
+// Cmd+Shift+P (Ctrl+Shift+P elsewhere), as in VS Code, or the older Ctrl+,.
+// Cmd held makes macOS report the letter in lowercase.
+function isCommandPaletteShortcut(e: KeyboardEvent, isMac: boolean): boolean {
+  const hasPrimaryShift = isMac
+    ? e.metaKey && e.shiftKey && !e.ctrlKey && !e.altKey
+    : e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey;
+  if (hasPrimaryShift && e.key.toLowerCase() === "p") return true;
+  return e.key === "," && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey;
 }
 
 export function CommandPaletteProvider({
@@ -76,23 +92,20 @@ export function CommandPaletteProvider({
   const close = useCallback(() => setIsOpen(false), []);
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
 
-  // Global Ctrl+, trigger
+  // Capture phase, so editors and terminals that stop keydown never see it.
   useEffect(() => {
+    const isMac = getIsMac();
     function handleKeyDown(e: KeyboardEvent) {
-      if (
-        e.key === "," &&
-        e.ctrlKey &&
-        !e.shiftKey &&
-        !e.altKey &&
-        !e.metaKey
-      ) {
-        e.preventDefault();
-        toggle();
-      }
+      if (!isCommandPaletteShortcut(e, isMac)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // A held shortcut would flicker the palette open and shut.
+      if (!e.repeat) toggle();
     }
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [toggle]);
 
   return (

@@ -190,6 +190,18 @@ describe("persistence", () => {
     expect(state.branchCompareBaseRefs).toEqual({ a: "main" });
   });
 
+  it("restores the pull request view on rehydrate", async () => {
+    localStorage.setItem(
+      PERSIST_NAME,
+      JSON.stringify({
+        version: 1,
+        state: { isOpen: true, view: "pull-request" },
+      }),
+    );
+    await useContextSidebarStore.persist.rehydrate();
+    expect(useContextSidebarStore.getState().view).toBe("pull-request");
+  });
+
   it("sanitizes corrupt persisted values on rehydrate", async () => {
     localStorage.setItem(
       PERSIST_NAME,

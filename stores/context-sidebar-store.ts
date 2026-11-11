@@ -7,6 +7,7 @@ const CONTEXT_SIDEBAR_VIEWS = [
   "changes",
   "compare",
   "status",
+  "pull-request",
 ] as const;
 
 export type ContextSidebarView = (typeof CONTEXT_SIDEBAR_VIEWS)[number];

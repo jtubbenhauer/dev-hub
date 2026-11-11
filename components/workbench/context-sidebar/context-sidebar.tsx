@@ -5,6 +5,11 @@ import { ContextSidebarContent } from "@/components/workbench/context-sidebar/co
 import { ContextSidebarMobileSheet } from "@/components/workbench/context-sidebar/context-sidebar-mobile-sheet";
 import { ContextSidebarTabs } from "@/components/workbench/context-sidebar/context-sidebar-tabs";
 import { useIsWorkbenchMobile } from "@/components/workbench/workbench-mode-context";
+import {
+  getPullRequestTabAppearance,
+  type PullRequestTabAppearance,
+} from "@/components/git/workspace-pr/workspace-pr-presentation";
+import { useWorkspacePullRequest } from "@/hooks/use-branch-pull-request";
 import { useGitStatus } from "@/hooks/use-git";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import {
@@ -20,6 +25,7 @@ interface ContextSidebarProps {
 
 interface ContextSidebarLayoutProps extends ContextSidebarProps {
   readonly changedPathCount: number;
+  readonly pullRequestAppearance: PullRequestTabAppearance;
 }
 
 function getMaxSidebarWidth(): number {
@@ -50,6 +56,7 @@ function DesktopContextSidebar({
   workspaceId,
   workspace,
   changedPathCount,
+  pullRequestAppearance,
 }: ContextSidebarLayoutProps) {
   const isOpen = useContextSidebarStore((state) => state.isOpen);
   const view = useContextSidebarStore((state) => state.view);
@@ -69,6 +76,7 @@ function DesktopContextSidebar({
           <ContextSidebarTabs
             shownView={null}
             changedPathCount={changedPathCount}
+            pullRequestAppearance={pullRequestAppearance}
             onSelectView={toggleView}
           />
         </div>
@@ -100,6 +108,7 @@ function DesktopContextSidebar({
             <ContextSidebarTabs
               shownView={view}
               changedPathCount={changedPathCount}
+              pullRequestAppearance={pullRequestAppearance}
               onSelectView={toggleView}
             />
           </div>
@@ -124,6 +133,9 @@ export function ContextSidebar({
     () => countChangedPaths(gitStatus),
     [gitStatus],
   );
+  const workspacePullRequest = useWorkspacePullRequest(workspaceId);
+  const pullRequestAppearance =
+    getPullRequestTabAppearance(workspacePullRequest);
 
   if (isMobile) {
     return (
@@ -131,6 +143,7 @@ export function ContextSidebar({
         workspaceId={workspaceId}
         workspace={workspace}
         changedPathCount={changedPathCount}
+        pullRequestAppearance={pullRequestAppearance}
       />
     );
   }
@@ -139,6 +152,7 @@ export function ContextSidebar({
       workspaceId={workspaceId}
       workspace={workspace}
       changedPathCount={changedPathCount}
+      pullRequestAppearance={pullRequestAppearance}
     />
   );
 }

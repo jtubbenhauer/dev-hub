@@ -4,11 +4,13 @@ import {
   FileDiff,
   FolderTree,
   GitCompare,
+  GitPullRequest,
   type LucideIcon,
 } from "lucide-react";
 import { ChangesView } from "@/components/workbench/context-sidebar/changes-view";
 import { CompareView } from "@/components/workbench/context-sidebar/compare-view";
 import { ExplorerView } from "@/components/workbench/context-sidebar/explorer-view";
+import { PullRequestView } from "@/components/workbench/context-sidebar/pull-request-view";
 import { StatusView } from "@/components/workbench/context-sidebar/status-view";
 import type { ContextSidebarView } from "@/stores/context-sidebar-store";
 import type { Workspace } from "@/types";
@@ -30,6 +32,7 @@ export const CONTEXT_SIDEBAR_VIEW_ITEMS: readonly ContextSidebarViewItem[] = [
   { view: "explorer", label: "Explorer", icon: FolderTree },
   { view: "changes", label: "Changes", icon: FileDiff },
   { view: "compare", label: "Compare", icon: GitCompare },
+  { view: "pull-request", label: "PR", icon: GitPullRequest },
 ];
 
 export const CONTEXT_SIDEBAR_VIEW_COMPONENTS: Record<
@@ -40,4 +43,5 @@ export const CONTEXT_SIDEBAR_VIEW_COMPONENTS: Record<
   changes: ChangesView,
   compare: CompareView,
   status: StatusView,
+  "pull-request": PullRequestView,
 };

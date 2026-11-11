@@ -9,6 +9,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ContextSidebarContent } from "@/components/workbench/context-sidebar/context-sidebar-content";
+import type { PullRequestTabAppearance } from "@/components/git/workspace-pr/workspace-pr-presentation";
 import { CONTEXT_SIDEBAR_VIEW_ITEMS } from "@/components/workbench/context-sidebar/context-sidebar-views";
 import { cn } from "@/lib/utils";
 import { useContextSidebarStore } from "@/stores/context-sidebar-store";
@@ -19,12 +20,14 @@ interface ContextSidebarMobileSheetProps {
   readonly workspaceId: string;
   readonly workspace: Workspace;
   readonly changedPathCount: number;
+  readonly pullRequestAppearance: PullRequestTabAppearance;
 }
 
 export function ContextSidebarMobileSheet({
   workspaceId,
   workspace,
   changedPathCount,
+  pullRequestAppearance,
 }: ContextSidebarMobileSheetProps) {
   const isMobileSheetOpen = useContextSidebarStore(
     (state) => state.isMobileSheetOpen,
@@ -63,7 +66,7 @@ export function ContextSidebarMobileSheet({
           <div
             role="group"
             aria-label="Context sidebar views"
-            className="flex items-center gap-1"
+            className="flex min-w-0 items-center gap-1 overflow-x-auto"
           >
             {CONTEXT_SIDEBAR_VIEW_ITEMS.map(({ view, label }) => {
               const isShown = view === shownView;
@@ -75,7 +78,7 @@ export function ContextSidebarMobileSheet({
                   aria-label={label}
                   aria-pressed={isShown}
                   className={cn(
-                    "focus-visible:ring-ring/50 inline-flex h-8 items-center gap-1 rounded-sm border-b-2 px-1.5 text-xs transition-colors outline-none focus-visible:ring-[3px]",
+                    "focus-visible:ring-ring/50 inline-flex h-8 shrink-0 items-center gap-1 rounded-sm border-b-2 px-1 text-xs transition-colors outline-none focus-visible:ring-[3px]",
                     isShown
                       ? "text-foreground border-primary font-medium"
                       : "text-muted-foreground hover:text-foreground/70 border-transparent",
@@ -85,6 +88,16 @@ export function ContextSidebarMobileSheet({
                   }
                 >
                   {label}
+                  {view === "pull-request" &&
+                    pullRequestAppearance.dotClassName && (
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          pullRequestAppearance.dotClassName,
+                        )}
+                      />
+                    )}
                   {badgeCount > 0 && (
                     <span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[10px] tabular-nums">
                       {badgeCount}
@@ -100,7 +113,7 @@ export function ContextSidebarMobileSheet({
               variant="ghost"
               size="icon-xs"
               aria-label="Close panels"
-              className="ml-auto"
+              className="ml-auto shrink-0"
             >
               <X />
             </Button>

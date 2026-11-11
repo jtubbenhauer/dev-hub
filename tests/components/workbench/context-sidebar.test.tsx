@@ -14,12 +14,20 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { WorkbenchModeProvider } from "@/components/workbench/workbench-mode-context";
 import { useContextSidebarStore } from "@/stores/context-sidebar-store";
 import { useWorkbenchStore } from "@/stores/workbench-store";
+import type { UseQueryResult } from "@tanstack/react-query";
+import type { WorkspacePullRequest } from "@/hooks/use-branch-pull-request";
+import type { BranchPullRequestResult } from "@/lib/github/branch-pull-request";
 import type { GitStatusResult } from "@/types";
 import {
   LayoutSlotsFixture,
   getLayoutSlotHost,
 } from "../../helpers/layout-slots";
 import { createWorkspace } from "./workspace-fixture";
+import {
+  makeCheck,
+  makePullRequest,
+  makeRepository,
+} from "../git/workspace-pr/workspace-pr-fixtures";
 
 const gitStatus = vi.hoisted(() => ({
   useGitStatus:
@@ -29,6 +37,15 @@ const gitStatus = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/use-git", () => ({ useGitStatus: gitStatus.useGitStatus }));
+
+const workspacePullRequest = vi.hoisted(() => ({
+  useWorkspacePullRequest:
+    vi.fn<(workspaceId: string | null) => WorkspacePullRequest>(),
+}));
+
+vi.mock("@/hooks/use-branch-pull-request", () => ({
+  useWorkspacePullRequest: workspacePullRequest.useWorkspacePullRequest,
+}));
 
 // The explorer has its own tests; here it only marks where the view renders.
 vi.mock("@/components/workbench/context-sidebar/explorer-view", () => ({
@@ -55,8 +72,31 @@ vi.mock("@/components/workbench/context-sidebar/status-view", () => ({
   ),
 }));
 
+vi.mock("@/components/workbench/context-sidebar/pull-request-view", () => ({
+  PullRequestView: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="pull-request-view">pull-request:{workspaceId}</div>
+  ),
+}));
+
 const WORKSPACE_ID = "ws-1";
-const VIEW_LABELS = ["Status", "Explorer", "Changes", "Compare"];
+const VIEW_LABELS = ["Status", "Explorer", "Changes", "Compare", "PR"];
+
+function makeWorkspacePullRequest(
+  lookup: WorkspacePullRequest["lookup"],
+  data?: BranchPullRequestResult,
+): WorkspacePullRequest {
+  return {
+    owner: "acme",
+    repo: "widgets",
+    branch: "feat-x",
+    lookup,
+    // The PR tab reads only data and isError from the lookup query.
+    query: {
+      data,
+      isError: false,
+    } as unknown as UseQueryResult<BranchPullRequestResult>,
+  };
+}
 
 function makeStatus(overrides: Partial<GitStatusResult>): GitStatusResult {
   return {
@@ -93,6 +133,10 @@ beforeEach(() => {
   localStorage.clear();
   gitStatus.useGitStatus.mockReset();
   gitStatus.useGitStatus.mockReturnValue({ data: makeStatus({}) });
+  workspacePullRequest.useWorkspacePullRequest.mockReset();
+  workspacePullRequest.useWorkspacePullRequest.mockReturnValue(
+    makeWorkspacePullRequest("loading"),
+  );
   useContextSidebarStore.setState(
     useContextSidebarStore.getInitialState(),
     true,
@@ -115,7 +159,7 @@ describe("ContextSidebar on desktop", () => {
     }
   });
 
-  it("orders the view tabs Status, Explorer, Changes, Compare", () => {
+  it("orders the view tabs Status, Explorer, Changes, Compare, PR", () => {
     // When
     renderContextSidebar({ isMobile: false });
 
@@ -273,6 +317,69 @@ describe("ContextSidebar on desktop", () => {
     // Then
     expect(screen.getByRole("button", { name: "Changes" })).toHaveTextContent(
       /^$/,
+    );
+  });
+
+  it("shows the linked pull request's state and failing checks on the PR tab", async () => {
+    // Given
+    workspacePullRequest.useWorkspacePullRequest.mockReturnValue(
+      makeWorkspacePullRequest("ready", {
+        repository: makeRepository(),
+        pullRequest: makePullRequest({
+          number: 7,
+          checks: [makeCheck({ id: "lint", state: "failure" })],
+        }),
+      }),
+    );
+
+    // When
+    renderContextSidebar({ isMobile: false });
+    const pullRequestTab = screen.getByRole("button", { name: "PR" });
+    act(() => pullRequestTab.focus());
+
+    // Then
+    expect(
+      within(pullRequestTab).getByTestId("pull-request-checks-dot"),
+    ).toHaveClass("bg-red-500");
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Pull request #7: Open, checks failing",
+    );
+    expect(workspacePullRequest.useWorkspacePullRequest).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+    );
+  });
+
+  it("shows no checks dot when the branch has no pull request", () => {
+    // Given
+    workspacePullRequest.useWorkspacePullRequest.mockReturnValue(
+      makeWorkspacePullRequest("ready", {
+        repository: makeRepository(),
+        pullRequest: null,
+      }),
+    );
+
+    // When
+    renderContextSidebar({ isMobile: false });
+
+    // Then
+    expect(screen.queryByTestId("pull-request-checks-dot")).toBeNull();
+  });
+
+  it("opens the pull request view from the PR tab", async () => {
+    // Given
+    useContextSidebarStore.setState({ isOpen: false, view: "explorer" });
+    renderContextSidebar({ isMobile: false });
+
+    // When
+    await userEvent.click(screen.getByRole("button", { name: "PR" }));
+
+    // Then
+    expect(useContextSidebarStore.getState()).toMatchObject({
+      isOpen: true,
+      view: "pull-request",
+    });
+    expect(screen.getByTestId("pull-request-view")).toHaveTextContent(
+      `pull-request:${WORKSPACE_ID}`,
     );
   });
 

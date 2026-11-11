@@ -11,6 +11,7 @@ import {
   LayoutSlotHost,
   LayoutSlotsProvider,
 } from "@/components/layout/layout-slots";
+import { AppCommands } from "@/components/command-palette/app-commands";
 import { GitCommands } from "@/components/command-palette/git-commands";
 import { WorkspaceCommands } from "@/components/command-palette/workspace-commands";
 import { WorkspaceQuickCommands } from "@/components/command-palette/workspace-quick-commands";
@@ -160,6 +161,7 @@ export function AuthenticatedLayout({
         <LayoutSlotHost slot="right-panel" className="flex h-full shrink-0" />
         <MobileNav />
         <WorkspaceCommands />
+        <AppCommands />
         <GitCommands />
         <WorkspaceQuickCommands />
         <WorkspaceDialogs />

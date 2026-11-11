@@ -24,6 +24,7 @@ import {
   StickyNote,
   Pencil,
   Sparkles,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -72,6 +73,7 @@ interface BaseSessionListProps {
   activeSessionId: string | null;
   sessionStatuses: Record<string, SessionStatus>;
   questionSessionIds?: Set<string>;
+  permissionBlockedSessionIds?: ReadonlySet<string>;
   taskActiveSessionIds?: ReadonlySet<string>;
   lastViewedAt: Record<string, number>;
   pinnedSessionIds?: Set<string>;
@@ -136,6 +138,7 @@ export const SessionList = memo(function SessionList(props: SessionListProps) {
     activeSessionId,
     sessionStatuses,
     questionSessionIds,
+    permissionBlockedSessionIds,
     taskActiveSessionIds,
     lastViewedAt,
     pinnedSessionIds,
@@ -459,6 +462,7 @@ export const SessionList = memo(function SessionList(props: SessionListProps) {
                     activeSessionId={activeSessionId}
                     sessionStatuses={sessionStatuses}
                     questionSessionIds={questionSessionIds}
+                    permissionBlockedSessionIds={permissionBlockedSessionIds}
                     taskActiveSessionIds={taskActiveSessionIds}
                     lastViewedAt={lastViewedAt}
                     isExpanded={
@@ -519,6 +523,9 @@ export const SessionList = memo(function SessionList(props: SessionListProps) {
                     isActive={session.id === activeSessionId}
                     isPinned={pinnedSessionIds?.has(session.id) ?? false}
                     hasQuestion={questionSessionIds?.has(session.id) ?? false}
+                    isBlockedOnPermission={
+                      permissionBlockedSessionIds?.has(session.id) ?? false
+                    }
                     isTaskActive={
                       taskActiveSessionIds?.has(session.id) ?? false
                     }
@@ -589,6 +596,7 @@ interface WorkspaceGroupProps {
   activeSessionId: string | null;
   sessionStatuses: Record<string, SessionStatus>;
   questionSessionIds?: Set<string>;
+  permissionBlockedSessionIds?: ReadonlySet<string>;
   taskActiveSessionIds?: ReadonlySet<string>;
   lastViewedAt: Record<string, number>;
   pinnedSessionIds?: Set<string>;
@@ -618,6 +626,7 @@ function WorkspaceGroup({
   activeSessionId,
   sessionStatuses,
   questionSessionIds,
+  permissionBlockedSessionIds,
   taskActiveSessionIds,
   lastViewedAt,
   pinnedSessionIds,
@@ -736,6 +745,9 @@ function WorkspaceGroup({
             isActive={session.id === activeSessionId}
             isPinned={pinnedSessionIds?.has(session.id) ?? false}
             hasQuestion={questionSessionIds?.has(session.id) ?? false}
+            isBlockedOnPermission={
+              permissionBlockedSessionIds?.has(session.id) ?? false
+            }
             isTaskActive={taskActiveSessionIds?.has(session.id) ?? false}
             status={sessionStatuses[session.id] ?? null}
             isUnread={
@@ -813,6 +825,7 @@ interface SessionItemProps {
   isActive: boolean;
   isPinned: boolean;
   hasQuestion: boolean;
+  isBlockedOnPermission: boolean;
   isTaskActive: boolean;
   status: SessionStatus | null;
   isUnread: boolean;
@@ -836,6 +849,7 @@ const SessionItem = memo(function SessionItem({
   isActive,
   isPinned,
   hasQuestion,
+  isBlockedOnPermission,
   isTaskActive,
   status,
   isUnread,
@@ -903,6 +917,15 @@ const SessionItem = memo(function SessionItem({
             className="text-muted-foreground size-3.5"
             style={workspaceColor ? { color: workspaceColor } : undefined}
           />
+        ) : isBlockedOnPermission ? (
+          <ShieldAlert
+            className="size-3.5 animate-pulse"
+            style={
+              workspaceColor
+                ? { color: workspaceColor }
+                : { color: "var(--color-red-500)" }
+            }
+          />
         ) : hasQuestion ? (
           <MessageCircleQuestion
             className="size-3.5 animate-pulse"
@@ -963,7 +986,12 @@ const SessionItem = memo(function SessionItem({
           {taskProgress && taskProgress.total > 0 && (
             <SessionTaskProgressIndicator
               progress={taskProgress}
-              isSessionActive={isTaskActive || isWorking || hasQuestion}
+              isSessionActive={
+                isTaskActive ||
+                isWorking ||
+                hasQuestion ||
+                isBlockedOnPermission
+              }
             />
           )}
           {subAgentCount && (

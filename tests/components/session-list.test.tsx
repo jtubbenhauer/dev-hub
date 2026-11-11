@@ -277,6 +277,50 @@ describe("SessionList — unified mode workspace picker", () => {
     expect(questionIcon).toBeNull();
   });
 
+  it("shows the permission icon instead of the brain and question icons when the session is blocked on a permission", () => {
+    render(
+      <SessionList
+        {...baseProps}
+        mode="workspace"
+        sessions={{ "sess-1": makeUnifiedSession("sess-1", "ws-1") }}
+        sessionStatuses={{ "sess-1": { type: "busy" } }}
+        questionSessionIds={new Set(["sess-1"])}
+        permissionBlockedSessionIds={new Set(["sess-1"])}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    const sessionRow = getSessionRow("sess-1");
+    expect(
+      sessionRow.querySelector("svg.lucide-shield-alert"),
+    ).toBeInTheDocument();
+    expect(
+      sessionRow.querySelector("svg.lucide-brain"),
+    ).not.toBeInTheDocument();
+    expect(
+      sessionRow.querySelector("svg.lucide-message-circle-question-mark"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the permission icon in grouped workspace mode", () => {
+    render(
+      <SessionList
+        {...baseProps}
+        mode="unified"
+        sessions={[makeUnifiedSession("sess-1", "ws-1")]}
+        workspaceNames={{ "ws-1": "Workspace" }}
+        workspaceBranches={{}}
+        groupByWorkspace
+        permissionBlockedSessionIds={new Set(["sess-1"])}
+        onSelectSession={vi.fn()}
+      />,
+    );
+
+    expect(
+      getSessionRow("sess-1").querySelector("svg.lucide-shield-alert"),
+    ).toBeInTheDocument();
+  });
+
   it("renders session items with workspace badges in unified mode", () => {
     render(
       <SessionList

@@ -134,38 +134,37 @@ describe("WorkbenchSessionSidebar", () => {
     expect(sessionRow("s1").classList).not.toContain("bg-muted");
   });
 
-  it("retargets the last-focused chat tab with activation on a pick", () => {
+  it("adds a tab for a picked chat instead of replacing the focused chat tab", () => {
     // Given
     focusChatTab("tab-1", "s1");
     renderSidebar();
+    const layoutApi = createFakeLayoutApi({
+      groups: [
+        {
+          id: "main",
+          rect: { left: 0, top: 0, width: 1000, height: 1000 },
+          panels: [{ id: "tab-1", params: chatParams("s1") }],
+        },
+      ],
+      activeGroupId: "main",
+    });
 
     // When
     fireEvent.click(sessionRow("s2"));
+    const panelId = consumeChatTarget(
+      layoutApi,
+      useWorkbenchStore.getState(),
+      "w1",
+      () => "Second chat",
+    );
 
     // Then
     expect(chatStoreStubs.setActiveSession).toHaveBeenCalledWith("s2");
-    expect(useWorkbenchStore.getState().pendingChatTarget).toEqual({
-      workspaceId: "w1",
-      sessionId: "s2",
-      panelId: "tab-1",
-      shouldActivate: true,
-    });
-  });
-
-  it("requests a new chat tab when no chat tab was focused yet", () => {
-    // Given
-    renderSidebar();
-
-    // When
-    fireEvent.click(sessionRow("s2"));
-
-    // Then
-    expect(useWorkbenchStore.getState().pendingChatTarget).toEqual({
-      workspaceId: "w1",
-      sessionId: "s2",
-      panelId: null,
-      shouldActivate: true,
-    });
+    expect(panelId).not.toBe("tab-1");
+    expect(layoutApi.getPanel("tab-1")?.params).toEqual(chatParams("s1"));
+    expect(layoutApi.getPanel(panelId ?? "")?.params).toEqual(chatParams("s2"));
+    expect(layoutApi.getActivePanelId()).toBe(panelId);
+    expect(layoutApi.mutations).toEqual(["addPanel"]);
   });
 
   it("focuses the tab already showing the picked session instead of duplicating it", () => {
@@ -203,7 +202,7 @@ describe("WorkbenchSessionSidebar", () => {
     expect(layoutApi.mutations).toEqual(["activatePanel"]);
   });
 
-  it("switches the workspace and queues an activated target on a unified cross-workspace pick", () => {
+  it("switches the workspace and requests a chat tab on a unified cross-workspace pick", () => {
     // Given
     localStorage.setItem("dev-hub:chat-unified-mode", "true");
     const setActiveWorkspaceId = vi
@@ -225,11 +224,10 @@ describe("WorkbenchSessionSidebar", () => {
       workspaceId: "w2",
       sessionId: "s5",
       panelId: null,
-      shouldActivate: true,
     });
   });
 
-  it("creates a session from + and retargets the last-focused chat tab", async () => {
+  it("creates a session from + and opens it in a new tab", async () => {
     // Given
     focusChatTab("tab-1", "s1");
     const user = userEvent.setup();
@@ -244,8 +242,7 @@ describe("WorkbenchSessionSidebar", () => {
       expect(useWorkbenchStore.getState().pendingChatTarget).toEqual({
         workspaceId: "w1",
         sessionId: "s3",
-        panelId: "tab-1",
-        shouldActivate: true,
+        panelId: null,
       }),
     );
     expect(chatStoreStubs.createSession).toHaveBeenCalledWith("w1", "opencode");

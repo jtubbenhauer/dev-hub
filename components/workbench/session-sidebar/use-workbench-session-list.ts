@@ -34,25 +34,12 @@ interface UseWorkbenchSessionListOptions {
   readonly onPick?: () => void;
 }
 
-// Retargets (and activates) the workspace's last-focused chat tab; with no
-// chat tab open, the consumer opens a new one.
-function requestActivatedChatTarget(
-  targetWorkspaceId: string,
-  sessionId: string,
-  layoutWorkspaceId: string,
-): void {
-  const workbench = useWorkbenchStore.getState();
-  const panelId =
-    targetWorkspaceId === layoutWorkspaceId
-      ? (workbench.lastFocusedPanelByWorkspace[targetWorkspaceId]?.chat
-          ?.panelId ?? null)
-      : null;
-  workbench.requestChatTarget({
-    workspaceId: targetWorkspaceId,
-    sessionId,
-    panelId,
-    shouldActivate: true,
-  });
+// Focuses the tab already showing the session, or adds a tab for it the way
+// opening a file does; a pick never replaces another chat tab.
+function requestChatTab(workspaceId: string, sessionId: string): void {
+  useWorkbenchStore
+    .getState()
+    .requestChatTarget({ workspaceId, sessionId, panelId: null });
 }
 
 export function useWorkbenchSessionList(
@@ -79,13 +66,6 @@ export function useWorkbenchSessionList(
       state.workspaceStates[workspaceId],
       lastFocusedSessionId,
     ),
-  );
-
-  const handleSessionChosen = useCallback(
-    (chosenWorkspaceId: string, sessionId: string) => {
-      requestActivatedChatTarget(chosenWorkspaceId, sessionId, workspaceId);
-    },
-    [workspaceId],
   );
 
   const handleNewChatInWorkspace = useCallback(
@@ -126,14 +106,14 @@ export function useWorkbenchSessionList(
     activeWorkspaceId: workspaceId,
     allWorkspaces,
     healthStatus,
-    onSessionChosen: handleSessionChosen,
+    onSessionChosen: requestChatTab,
     onNewChatInWorkspace: handleNewChatInWorkspace,
   });
 
   const handleSelectSessionInWorkbench = useCallback(
     (sessionId: string) => {
       handleSelectSession(sessionId);
-      requestActivatedChatTarget(workspaceId, sessionId, workspaceId);
+      requestChatTab(workspaceId, sessionId);
       onPick?.();
     },
     [handleSelectSession, workspaceId, onPick],
@@ -146,7 +126,7 @@ export function useWorkbenchSessionList(
         return;
       }
       handleSelectUnifiedSession(sessionId, sessionWorkspaceId);
-      requestActivatedChatTarget(sessionWorkspaceId, sessionId, workspaceId);
+      requestChatTab(sessionWorkspaceId, sessionId);
       onPick?.();
     },
     [

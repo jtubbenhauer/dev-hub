@@ -85,7 +85,6 @@ describe("WorkbenchSessionSheet", () => {
       workspaceId: "w1",
       sessionId: "s2",
       panelId: null,
-      shouldActivate: true,
     });
   });
 

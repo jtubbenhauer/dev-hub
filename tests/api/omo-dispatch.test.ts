@@ -207,6 +207,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   const { disposeOmoRuntime } = await import("@/lib/omo/session-registry");
   disposeOmoRuntime("/tmp/devhub-omo-dispatch-agent/none.sock");
@@ -416,6 +417,49 @@ describe("opencode proxy dispatch", () => {
     // Then
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([{ id: "ses_1" }]);
+  });
+
+  it("reads the default engine's body before waiting on a slow other engine", async () => {
+    // Given: undici drops an unread OpenCode body once its fetch Response is
+    // garbage collected (here: 10ms after the fetch), and omo answers after 1s.
+    await import("@/lib/opencode/server-pool");
+    const { GET } = await import("@/app/api/opencode/[...path]/route");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('[{"id":"ses_1"}]'));
+            controller.close();
+          },
+        });
+        setTimeout(() => {
+          if (!body.locked) void body.cancel();
+        }, 10);
+        return new Response(body, {
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+    mockHandleOmoRead.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve(Response.json([{ id: "omo_1" }])), 1_000),
+        ),
+    );
+
+    // When
+    const responsePromise = GET(
+      request(`/api/opencode/session?workspaceId=${OC_WS}`),
+      { params: Promise.resolve({ path: ["session"] }) },
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+    const response = await responsePromise;
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([{ id: "ses_1" }, { id: "omo_1" }]);
   });
 
   it.each([

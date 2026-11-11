@@ -263,18 +263,21 @@ async function mergeEngineReads(
   } catch (error) {
     if (!(error instanceof OpenCodeTargetError)) throw error;
   }
-  const [primaryResponse, secondaryResponse] = await Promise.all([
-    proxyToEngine(primaryEngine, input),
-    canReachSecondary
-      ? settleWithin(
-          proxyToEngine(secondaryEngine, input),
-          SECONDARY_ENGINE_READ_BUDGET_MS,
-        )
-      : Promise.resolve(undefined),
-  ]);
+  // Each body is read as soon as its response arrives. A proxied OpenCode
+  // response only wraps the fetch body, and undici cancels that body once the
+  // original fetch Response is garbage collected, so a body left unread while
+  // the other engine answers can fail with "Body is unusable".
+  const primaryResponsePromise = proxyToEngine(primaryEngine, input);
+  const secondaryBodyPromise = canReachSecondary
+    ? settleWithin(
+        proxyToEngine(secondaryEngine, input).then(readOkJson),
+        SECONDARY_ENGINE_READ_BUDGET_MS,
+      )
+    : Promise.resolve(undefined);
+  const primaryResponse = await primaryResponsePromise;
   if (!primaryResponse.ok) return primaryResponse;
   const primaryBody: unknown = await primaryResponse.json();
-  const secondaryBody = await readOkJson(secondaryResponse);
+  const secondaryBody = await secondaryBodyPromise;
   return NextResponse.json(
     secondaryBody === undefined
       ? primaryBody

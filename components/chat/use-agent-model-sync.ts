@@ -66,10 +66,11 @@ export function useAgentModelSync({
 }: UseAgentModelSyncArgs): UseAgentModelSyncResult {
   const { engine, isLoading: isEngineLoading } =
     useActiveChatEngine(activeWorkspaceId);
-  const { primaryAgents, isLoading: isAgentListLoading } = useAgents(
-    isEngineLoading ? null : activeWorkspaceId,
-    engine,
-  );
+  const {
+    primaryAgents,
+    visiblePrimaryAgents,
+    isLoading: isAgentListLoading,
+  } = useAgents(isEngineLoading ? null : activeWorkspaceId, engine);
   // An omo workspace without skills has no modes at all, so for omo an empty
   // list that has finished loading still counts as ready to restore.
   const isRestoreReady =
@@ -91,10 +92,10 @@ export function useAgentModelSync({
   );
   const orderedAgents = useMemo(() => {
     const utilityNames = new Set(["compaction", "title", "summary"]);
-    return primaryAgents.filter(
+    return visiblePrimaryAgents.filter(
       (agent) => !utilityNames.has(agent.name.toLowerCase()),
     );
-  }, [primaryAgents]);
+  }, [visiblePrimaryAgents]);
 
   const { bindings: agentModelBindings } = useModelAgentBindings();
   const { model: availableVariantsModel, values: availableVariantValues } =

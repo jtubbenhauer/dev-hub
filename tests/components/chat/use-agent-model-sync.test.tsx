@@ -43,8 +43,13 @@ const useAgentsMock = vi.hoisted(() =>
     (
       _workspaceId: string | null,
       _engine?: string,
-    ): { primaryAgents: Agent[]; isLoading?: boolean } => ({
+    ): {
+      primaryAgents: Agent[];
+      visiblePrimaryAgents: Agent[];
+      isLoading?: boolean;
+    } => ({
       primaryAgents,
+      visiblePrimaryAgents: primaryAgents,
     }),
   ),
 );
@@ -102,7 +107,7 @@ function useHarness({
     values: variants,
   });
 
-  useAgentModelSync({
+  const { orderedAgents } = useAgentModelSync({
     activeWorkspaceId: "ws-a",
     activeSessionId,
     selectedAgent,
@@ -115,6 +120,7 @@ function useHarness({
   });
 
   return {
+    orderedAgents,
     selectedAgent,
     selectedModel,
     selectedVariant,
@@ -216,7 +222,10 @@ describe("useAgentModelSync", () => {
     activeEngineState.value = { engine: "opencode", isLoading: false };
     sessionSelectionState.value = null;
     useAgentsMock.mockClear();
-    useAgentsMock.mockImplementation(() => ({ primaryAgents }));
+    useAgentsMock.mockImplementation(() => ({
+      primaryAgents,
+      visiblePrimaryAgents: primaryAgents,
+    }));
   });
 
   it("loads the open chat's engine agents and waits while the engine is unknown", () => {
@@ -233,6 +242,27 @@ describe("useAgentModelSync", () => {
     rerender({ activeSessionId: "sess-a", variants: noVariants });
 
     expect(useAgentsMock).toHaveBeenLastCalledWith(null, "opencode");
+  });
+
+  it("lists each agent once when hidden copies are among the primary agents", () => {
+    const hiddenCopies = primaryAgents.map((agent) => ({
+      ...agent,
+      hidden: true,
+    }));
+    useAgentsMock.mockImplementation(() => ({
+      primaryAgents: [...primaryAgents, ...hiddenCopies],
+      visiblePrimaryAgents: primaryAgents,
+    }));
+    seedWorkspace({});
+
+    const { result } = renderHook((props: HarnessProps) => useHarness(props), {
+      initialProps: { activeSessionId: "sess-a", variants: noVariants },
+    });
+
+    expect(result.current.orderedAgents.map((agent) => agent.name)).toEqual([
+      "code",
+      "build",
+    ]);
   });
 
   it("preserves a stored variant when switching to a session with a different agent", () => {
@@ -495,6 +525,7 @@ describe("useAgentModelSync", () => {
     it("restores even when the workspace has no skill modes", () => {
       useAgentsMock.mockImplementation(() => ({
         primaryAgents: noModes,
+        visiblePrimaryAgents: noModes,
         isLoading: false,
       }));
       sessionSelectionState.value = { model: haiku, variant: "medium" };
@@ -519,6 +550,7 @@ describe("useAgentModelSync", () => {
     it("keeps a fallback model picked in the same commit instead of clearing it", () => {
       useAgentsMock.mockImplementation(() => ({
         primaryAgents: noModes,
+        visiblePrimaryAgents: noModes,
         isLoading: true,
       }));
       seedWorkspace({});
@@ -527,6 +559,7 @@ describe("useAgentModelSync", () => {
 
       useAgentsMock.mockImplementation(() => ({
         primaryAgents: noModes,
+        visiblePrimaryAgents: noModes,
         isLoading: false,
       }));
       rerender(<ComposerHarness isReady />);
@@ -537,6 +570,7 @@ describe("useAgentModelSync", () => {
     it("waits while the mode list is still loading", () => {
       useAgentsMock.mockImplementation(() => ({
         primaryAgents: noModes,
+        visiblePrimaryAgents: noModes,
         isLoading: true,
       }));
       sessionSelectionState.value = { model: haiku, variant: "medium" };

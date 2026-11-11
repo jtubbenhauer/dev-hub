@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { GITHUB_NOT_CONNECTED_MESSAGE } from "@/lib/github/github-auth-status";
+import { isAllowedGitHubRequest } from "@/lib/github/github-proxy-allowlist";
 import { forgetGhToken, resolveGitHubToken } from "@/lib/github/github-token";
 
 const GITHUB_API_BASE = "https://api.github.com";
@@ -24,6 +25,16 @@ async function proxyToGitHub(
 
   const incomingUrl = new URL(request.url);
   const targetUrl = new URL(`${GITHUB_API_BASE}/${githubPath}`);
+  // Checked after URL parsing has resolved any ".." segments.
+  const isAllowed =
+    targetUrl.origin === GITHUB_API_BASE &&
+    isAllowedGitHubRequest(request.method, targetUrl.pathname.slice(1));
+  if (!isAllowed) {
+    return NextResponse.json(
+      { error: `dev-hub does not proxy ${request.method} /${githubPath}` },
+      { status: 403 },
+    );
+  }
 
   const token = await resolveGitHubToken(userId);
   if (!token) {

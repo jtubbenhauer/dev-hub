@@ -83,6 +83,42 @@ describe("GitHub proxy", () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "POST", body });
   });
 
+  it.each([
+    ["a path dev-hub never calls", ["user", "keys"]],
+    [
+      "dot segments that climb out of an allowed path",
+      ["repos", "acme", "web", "pulls", "..", "..", "..", "..", "user", "keys"],
+    ],
+    [
+      "encoded dot segments",
+      [
+        "repos",
+        "acme",
+        "web",
+        "pulls",
+        "%2E%2E",
+        "%2e%2e",
+        "..",
+        "..",
+        "user",
+        "keys",
+      ],
+    ],
+  ])("refuses %s before reading a token", async (_label, path) => {
+    const response = await POST(
+      new NextRequest(`http://localhost:3000/api/github/${path.join("/")}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title: "laptop", key: "ssh-ed25519 AAAA" }),
+      }),
+      routeContext(path),
+    );
+
+    expect(response.status).toBe(403);
+    expect(mocks.resolveGitHubToken).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("explains how to connect when there is no GitHub login", async () => {
     mocks.resolveGitHubToken.mockResolvedValue(null);
 

@@ -61,7 +61,7 @@ export function Header() {
             variant="ghost"
             size="icon"
             onClick={toggleCommandPalette}
-            title="Command palette (Ctrl+,)"
+            title="Command palette (Cmd+Shift+P / Ctrl+Shift+P)"
           >
             <Search className="h-4 w-4" />
           </Button>

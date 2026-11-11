@@ -91,7 +91,9 @@ describe("Header", () => {
 
   it("renders search button with command palette title", () => {
     renderHeader();
-    const searchBtn = screen.getByTitle("Command palette (Ctrl+,)");
+    const searchBtn = screen.getByTitle(
+      "Command palette (Cmd+Shift+P / Ctrl+Shift+P)",
+    );
     expect(searchBtn).toBeInTheDocument();
   });
 
@@ -103,7 +105,7 @@ describe("Header", () => {
   it("right-aligns the action cluster against the trailing slot", () => {
     renderHeader();
     const actions = screen
-      .getByTitle("Command palette (Ctrl+,)")
+      .getByTitle("Command palette (Cmd+Shift+P / Ctrl+Shift+P)")
       .closest("div");
     expect(actions).toHaveClass("flex-1", "justify-end");
     expect(actions).not.toHaveClass("md:justify-center");

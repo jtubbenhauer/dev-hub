@@ -216,6 +216,17 @@ describe("createWorkbenchDockviewController", () => {
     expect(layoutApi.getPanels()).toHaveLength(3);
   });
 
+  it("hands the keyboard focus to a new chat tab so its composer takes typing", () => {
+    // Given
+    const { controller } = setUp();
+
+    // When
+    const panelId = controller.openNewChat();
+
+    // Then
+    expect(useWorkbenchStore.getState().panelFocusRequest).toBe(panelId);
+  });
+
   it("closes matching tabs through the close flow, ending terminal sessions", () => {
     // Given
     const { layoutApi, controller, endTerminalSession } = setUp(

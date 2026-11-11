@@ -142,12 +142,16 @@ export function createWorkbenchDockviewController(
         target,
       );
     },
-    openNewChat: (target) =>
-      openInTarget(
+    openNewChat: (target) => {
+      const panelId = openInTarget(
         { kind: "chat", workspaceId, sessionId: null },
         NEW_CHAT_TAB_TITLE,
         target,
-      ),
+      );
+      // A new chat is opened to type into, so its composer takes the focus.
+      useWorkbenchStore.getState().requestPanelFocus(panelId);
+      return panelId;
+    },
     closeTabs: (predicate) => {
       for (const panel of layoutApi.getPanels()) {
         if (!predicate(panel.params)) continue;

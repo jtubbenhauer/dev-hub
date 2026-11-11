@@ -14,6 +14,7 @@ import {
   openChatInWorkbench,
   openDiffInWorkbench,
   openFileInWorkbench,
+  createNewChatInWorkbench,
   openNewChatInWorkbench,
   openTerminalInWorkbench,
 } from "@/lib/workbench/open-in-workbench";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/workbench/workbench-href";
 import { useChatStore } from "@/stores/chat-store";
 import { useEditorStore } from "@/stores/editor-store";
+import { useNewChatEngineStore } from "@/stores/new-chat-engine-store";
 import { useWorkbenchStore } from "@/stores/workbench-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -497,6 +499,91 @@ describe("openNewChatInWorkbench", () => {
 
     expect(navigate).toHaveBeenCalledExactlyOnceWith(
       createWorkbenchHref({ open: "new-chat", workspaceId: WORKSPACE_ID }),
+    );
+  });
+});
+
+describe("createNewChatInWorkbench", () => {
+  const originalCreateSession = useChatStore.getState().createSession;
+
+  function stubCreateSession(sessionId: string | null) {
+    const createSession = vi.fn(async (workspaceId: string) =>
+      sessionId === null
+        ? null
+        : {
+            id: sessionId,
+            title: "",
+            directory: workspaceId,
+            projectID: "project",
+            version: "1",
+            time: { created: 0, updated: 0 },
+          },
+    );
+    useChatStore.setState({ createSession });
+    return createSession;
+  }
+
+  afterEach(() => {
+    useChatStore.setState({ createSession: originalCreateSession });
+    useNewChatEngineStore.setState({ engineByWorkspace: {} });
+  });
+
+  it("creates the session first and opens a focused tab bound to it", async () => {
+    const createSession = stubCreateSession("ses-new");
+    useNewChatEngineStore.getState().setNewChatEngine(WORKSPACE_ID, "omo");
+    const controller = register(createFakeController(WORKSPACE_ID));
+    const navigate = vi.fn();
+
+    await createNewChatInWorkbench({ workspaceId: WORKSPACE_ID, navigate });
+
+    expect(createSession).toHaveBeenCalledExactlyOnceWith(WORKSPACE_ID, "omo");
+    expect(controller.openTab).toHaveBeenCalledExactlyOnceWith({
+      kind: "chat",
+      workspaceId: WORKSPACE_ID,
+      sessionId: "ses-new",
+    });
+    expect(controller.openNewChat).not.toHaveBeenCalled();
+    expect(useWorkbenchStore.getState().panelFocusRequest).toBe("tab-opened");
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the created chat when not direct", async () => {
+    stubCreateSession("ses-new");
+    const navigate = vi.fn();
+
+    await createNewChatInWorkbench({ workspaceId: WORKSPACE_ID, navigate });
+
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(
+      createWorkbenchHref({
+        open: "chat",
+        workspaceId: WORKSPACE_ID,
+        sessionId: "ses-new",
+      }),
+    );
+  });
+
+  it("falls back to an empty new chat tab when the create fails", async () => {
+    stubCreateSession(null);
+    const controller = register(createFakeController(WORKSPACE_ID));
+
+    await createNewChatInWorkbench({
+      workspaceId: WORKSPACE_ID,
+      navigate: vi.fn(),
+    });
+
+    expect(controller.openNewChat).toHaveBeenCalledOnce();
+    expect(controller.openTab).not.toHaveBeenCalled();
+  });
+
+  it("opens the new-chat intent without a workspace", async () => {
+    const createSession = stubCreateSession("ses-new");
+    const navigate = vi.fn();
+
+    await createNewChatInWorkbench({ workspaceId: null, navigate });
+
+    expect(createSession).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(
+      createWorkbenchHref({ open: "new-chat", workspaceId: null }),
     );
   });
 });

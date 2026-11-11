@@ -11,6 +11,7 @@ import {
 } from "@/lib/workbench/workbench-href";
 import { useChatStore } from "@/stores/chat-store";
 import { useEditorStore } from "@/stores/editor-store";
+import { getNewChatEngineChoice } from "@/stores/new-chat-engine-store";
 import { useWorkbenchStore } from "@/stores/workbench-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -122,6 +123,39 @@ export function openNewChatInWorkbench(
     return;
   }
   navigate(createWorkbenchHref({ open: "new-chat", workspaceId }));
+}
+
+// Creates the session up front (like the session list's New Chat), so the chat
+// is in the sidebar before the first message. If the create fails, it opens
+// the usual empty tab, which creates the session on first send.
+export async function createNewChatInWorkbench(
+  input: OpenWorkspaceTabInWorkbenchInput,
+): Promise<void> {
+  const { workspaceId, navigate } = input;
+  if (workspaceId === null) {
+    openNewChatInWorkbench(input);
+    return;
+  }
+  const session = await useChatStore
+    .getState()
+    .createSession(workspaceId, getNewChatEngineChoice(workspaceId));
+  if (!session) {
+    openNewChatInWorkbench(input);
+    return;
+  }
+  const controller = getDirectController(workspaceId);
+  if (!controller) {
+    navigate(
+      createWorkbenchHref({ open: "chat", workspaceId, sessionId: session.id }),
+    );
+    return;
+  }
+  const panelId = controller.openTab({
+    kind: "chat",
+    workspaceId,
+    sessionId: session.id,
+  });
+  useWorkbenchStore.getState().requestPanelFocus(panelId);
 }
 
 export function openTerminalInWorkbench(

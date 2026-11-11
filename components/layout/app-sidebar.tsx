@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { GitCompare } from "lucide-react";
-import { useMemo, useRef } from "react";
-import { useCommand } from "@/hooks/use-command";
+import { useEffect, useMemo, useRef } from "react";
 import { useLeaderAction } from "@/hooks/use-leader-action";
 import { useCommandPalette } from "@/components/providers/command-palette-provider";
 import { useFilePicker } from "@/components/file-picker/file-picker";
@@ -35,66 +34,38 @@ export function AppSidebar() {
   const { open: openGitPicker } = useGitPicker();
   const { open: openWorkspacePicker } = useWorkspacePicker();
 
-  const navCommands = useMemo(
-    () =>
-      NAV_ITEMS.map((item) => ({
-        id: `nav:${item.href}`,
-        label: `Go to ${item.label}`,
-        group: "Navigation",
-        icon: item.icon,
-        onSelect: () => router.push(item.href),
-      })),
-    // router is stable; NAV_ITEMS is a module-level constant
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  useCommand(navCommands);
-
-  const pickerCommands = useMemo(
-    () => [
-      {
-        id: "picker:git-files",
-        label: "Open Git Files",
-        group: "Pickers",
-        icon: GitCompare,
-        shortcut: "⎵ d",
-        onSelect: () => openGitPicker(),
-      },
-    ],
-    // openGitPicker is stable (useCallback in context)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  useCommand(pickerCommands);
-
   // Stable refs so the leader action useMemo stays stable
   const routerRef = useRef(router);
-  routerRef.current = router;
   const pathnameRef = useRef(pathname);
-  pathnameRef.current = pathname;
   const openCommandPaletteRef = useRef(openCommandPalette);
-  openCommandPaletteRef.current = openCommandPalette;
   const openFilePickerRef = useRef(openFilePicker);
-  openFilePickerRef.current = openFilePicker;
   const openSessionPickerRef = useRef(openSessionPicker);
-  openSessionPickerRef.current = openSessionPicker;
   const openTaskPickerRef = useRef(openTaskPicker);
-  openTaskPickerRef.current = openTaskPicker;
   const openGitPickerRef = useRef(openGitPicker);
-  openGitPickerRef.current = openGitPicker;
   const openWorkspacePickerRef = useRef(openWorkspacePicker);
-  openWorkspacePickerRef.current = openWorkspacePicker;
+  useEffect(() => {
+    routerRef.current = router;
+    pathnameRef.current = pathname;
+    openCommandPaletteRef.current = openCommandPalette;
+    openFilePickerRef.current = openFilePicker;
+    openSessionPickerRef.current = openSessionPicker;
+    openTaskPickerRef.current = openTaskPicker;
+    openGitPickerRef.current = openGitPicker;
+    openWorkspacePickerRef.current = openWorkspacePicker;
+  });
 
   const globalLeaderActions = useMemo(() => {
     const navigate = (href: string) => routerRef.current.push(href);
+    // The command palette lists these, with the sidebar link's icon.
+    const navIcon = (href: string) =>
+      NAV_ITEMS.find((item) => item.href === href)?.icon;
     return [
       {
         action: {
           id: "nav:workbench",
           label: "Go to Workbench",
           page: "global" as const,
+          icon: navIcon(WORKBENCH_PATH),
         },
         handler: () => navigate(WORKBENCH_PATH),
       },
@@ -115,11 +86,21 @@ export function AppSidebar() {
         handler: () => focusRecentInWorkbench({ kind: "file", navigate }),
       },
       {
-        action: { id: "nav:git", label: "Go to Git", page: "global" as const },
+        action: {
+          id: "nav:git",
+          label: "Go to Git",
+          page: "global" as const,
+          icon: navIcon("/git"),
+        },
         handler: () => navigate("/git"),
       },
       {
-        action: { id: "nav:prs", label: "Go to PRs", page: "global" as const },
+        action: {
+          id: "nav:prs",
+          label: "Go to PRs",
+          page: "global" as const,
+          icon: navIcon("/prs"),
+        },
         handler: () => navigate("/prs"),
       },
       {
@@ -127,6 +108,7 @@ export function AppSidebar() {
           id: "nav:tasks",
           label: "Go to Tasks",
           page: "global" as const,
+          icon: navIcon("/tasks"),
         },
         handler: () => navigate("/tasks"),
       },
@@ -135,6 +117,7 @@ export function AppSidebar() {
           id: "nav:dashboard",
           label: "Go to Dashboard",
           page: "global" as const,
+          icon: navIcon("/dashboard"),
         },
         handler: () => navigate("/dashboard"),
       },
@@ -143,6 +126,7 @@ export function AppSidebar() {
           id: "nav:repos",
           label: "Go to Repos",
           page: "global" as const,
+          icon: navIcon("/workspaces"),
         },
         handler: () => navigate("/workspaces"),
       },
@@ -151,6 +135,7 @@ export function AppSidebar() {
           id: "nav:settings",
           label: "Go to Settings",
           page: "global" as const,
+          icon: navIcon("/settings"),
         },
         handler: () => navigate("/settings"),
       },
@@ -200,6 +185,7 @@ export function AppSidebar() {
           id: "global:git-picker",
           label: "Open git files picker",
           page: "global" as const,
+          icon: GitCompare,
         },
         handler: () => openGitPickerRef.current(),
       },

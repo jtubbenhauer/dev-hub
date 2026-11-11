@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import type { LucideIcon } from "lucide-react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { NAV_ITEMS } from "@/components/layout/nav-items";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import type { FocusRecentInWorkbenchInput } from "@/lib/workbench/open-in-workbench";
 
@@ -24,11 +26,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-const mockUseCommand = vi.fn();
 const mockUseLeaderAction = vi.fn();
-vi.mock("@/hooks/use-command", () => ({
-  useCommand: (...args: unknown[]) => mockUseCommand(...args),
-}));
 vi.mock("@/hooks/use-leader-action", () => ({
   useLeaderAction: (...args: unknown[]) => mockUseLeaderAction(...args),
 }));
@@ -86,7 +84,11 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 interface LeaderRegistration {
-  readonly action: { readonly id: string; readonly label: string };
+  readonly action: {
+    readonly id: string;
+    readonly label: string;
+    readonly icon?: LucideIcon;
+  };
   readonly handler: () => void;
 }
 
@@ -98,6 +100,16 @@ const NAV_LINKS = [
   { label: "Tasks", href: "/tasks" },
   { label: "Repos", href: "/workspaces" },
   { label: "Settings", href: "/settings" },
+];
+
+const NAV_LEADER_ACTIONS = [
+  { actionId: "nav:workbench", href: "/" },
+  { actionId: "nav:dashboard", href: "/dashboard" },
+  { actionId: "nav:git", href: "/git" },
+  { actionId: "nav:prs", href: "/prs" },
+  { actionId: "nav:tasks", href: "/tasks" },
+  { actionId: "nav:repos", href: "/workspaces" },
+  { actionId: "nav:settings", href: "/settings" },
 ];
 
 function renderSidebar() {
@@ -112,12 +124,16 @@ function leaderRegistrations(): LeaderRegistration[] {
   return mockUseLeaderAction.mock.calls[0][0];
 }
 
-function leaderHandler(actionId: string): () => void {
+function leaderRegistration(actionId: string): LeaderRegistration {
   const registration = leaderRegistrations().find(
     (candidate) => candidate.action.id === actionId,
   );
   if (!registration) throw new Error(`${actionId} was never registered`);
-  return registration.handler;
+  return registration;
+}
+
+function leaderHandler(actionId: string): () => void {
+  return leaderRegistration(actionId).handler;
 }
 
 function activeNavLabels(): string[] {
@@ -129,7 +145,6 @@ function activeNavLabels(): string[] {
 describe("AppSidebar", () => {
   beforeEach(() => {
     mockPathname.mockReturnValue("/");
-    mockUseCommand.mockClear();
     mockUseLeaderAction.mockClear();
     pushMock.mockClear();
     workbenchOpeners.focusRecentInWorkbench.mockClear();
@@ -161,30 +176,27 @@ describe("AppSidebar", () => {
     },
   );
 
-  it("offers a palette command for every navigation link", () => {
-    renderSidebar();
+  it.each(NAV_LEADER_ACTIONS)(
+    "routes the $actionId leader action to $href",
+    ({ actionId, href }) => {
+      renderSidebar();
 
-    const commands: { id: string; onSelect: () => void }[] =
-      mockUseCommand.mock.calls[0][0];
-    commands.find((command) => command.id === "nav:/dashboard")?.onSelect();
+      leaderHandler(actionId)();
 
-    expect(commands.map((command) => command.id)).toEqual(
-      NAV_LINKS.map((link) => `nav:${link.href}`),
-    );
-    expect(pushMock).toHaveBeenCalledExactlyOnceWith("/dashboard");
-  });
+      expect(pushMock).toHaveBeenCalledExactlyOnceWith(href);
+    },
+  );
 
-  it.each([
-    { actionId: "nav:workbench", href: "/" },
-    { actionId: "nav:dashboard", href: "/dashboard" },
-    { actionId: "nav:prs", href: "/prs" },
-  ])("routes the $actionId leader action to $href", ({ actionId, href }) => {
-    renderSidebar();
+  it.each(NAV_LEADER_ACTIONS)(
+    "gives the $actionId leader action the icon of the $href link for the palette",
+    ({ actionId, href }) => {
+      renderSidebar();
 
-    leaderHandler(actionId)();
-
-    expect(pushMock).toHaveBeenCalledExactlyOnceWith(href);
-  });
+      expect(leaderRegistration(actionId).action.icon).toBe(
+        NAV_ITEMS.find((item) => item.href === href)?.icon,
+      );
+    },
+  );
 
   it.each([
     { actionId: "nav:chat", kind: "chat" },

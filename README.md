@@ -13,7 +13,7 @@ Personal development command center — a self-hosted web app for managing works
 - **Workspace Providers** — pluggable CLI tools (e.g., `rig-cli`) for creating and destroying remote workspaces. Register providers in settings, create workspaces with a click.
 - **ClickUp Integration** — browse tasks by view, search, view task details and comments, link tasks to workspaces
 - **GitHub Integration** — PR review via GitHub API proxy with personal access token
-- **Command Palette** — `Ctrl+K` for fuzzy-search navigation across the app
+- **Command Palette** — `Cmd+Shift+P` / `Ctrl+Shift+P` (or `Ctrl+,`) runs any command by name: new chat (any engine) or terminal, git fetch / pull / push, the workspace's quick commands, add / clone / connect a workspace, create worktree, switch workspace, the pickers, and every leader action registered on the current page, each shown with its leader keys. Recently run commands stay on top; type `tab 3` to jump to a tab
 - **Find in Files** — `Cmd+Shift+F` / `Ctrl+Shift+F` searches file contents across the current repo (match case, whole word, regex, include/exclude globs); click a result to jump to it
 - **Leader Key** — Vim-style `<leader>` key sequences with a which-key overlay showing available bindings. 40+ built-in actions, customizable via settings.
 - **Settings** — General preferences, AI model config, keybinding customization, per-workspace settings, integration tokens (GitHub, ClickUp), workspace provider management

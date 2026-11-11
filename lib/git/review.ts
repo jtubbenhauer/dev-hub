@@ -57,14 +57,18 @@ export async function getMergeBase(
   return result.trim();
 }
 
+// With a currentRef, compares two commits and leaves uncommitted work out;
+// without one, compares baseRef against the working tree.
 export async function getChangedFiles(
   workspacePath: string,
   baseRef: string,
+  currentRef?: string,
 ): Promise<ReviewChangedFile[]> {
   const git = createGit(workspacePath);
+  const refs = currentRef ? [baseRef, currentRef] : [baseRef];
   const [nameStatusOutput, numstatOutput] = await Promise.all([
-    git.raw(["diff", "--name-status", baseRef]),
-    git.raw(["diff", "--numstat", baseRef]),
+    git.raw(["diff", "--name-status", ...refs]),
+    git.raw(["diff", "--numstat", ...refs]),
   ]);
 
   const stats = parseNumstat(numstatOutput);

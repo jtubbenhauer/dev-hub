@@ -154,15 +154,19 @@ export function useGitFileContentAtRef(
   });
 }
 
+// Without a currentRef the diff runs against the working tree, so uncommitted
+// edits are included.
 export function useGitChangedFiles(
   workspaceId: string | null,
   baseRef: string | null,
+  currentRef: string | null = null,
 ) {
   return useQuery<ReviewChangedFile[]>({
-    queryKey: ["git-changed-files", workspaceId, baseRef],
+    queryKey: ["git-changed-files", workspaceId, baseRef, currentRef],
     queryFn: () =>
       gitGet<ReviewChangedFile[]>(workspaceId!, "changed-files", {
         baseRef: baseRef!,
+        ...(currentRef ? { currentRef } : {}),
       }),
     enabled: !!workspaceId && !!baseRef,
   });

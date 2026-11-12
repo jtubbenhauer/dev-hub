@@ -53,10 +53,16 @@ async function proxyToGitHub(
     request.method !== "GET" && request.method !== "HEAD" && contentType
       ? await request.text()
       : undefined;
+  // A GitHub media type picks the response format, such as a pull request's
+  // diff; anything else, like the browser's default */*, gets GitHub's JSON.
+  const requestedAccept = request.headers.get("accept");
+  const githubAccept = requestedAccept?.startsWith("application/vnd.github")
+    ? requestedAccept
+    : "application/vnd.github+json";
   const requestGitHub = (tokenValue: string) => {
     const headers = new Headers({
       Authorization: `Bearer ${tokenValue}`,
-      Accept: "application/vnd.github+json",
+      Accept: githubAccept,
       "X-GitHub-Api-Version": "2022-11-28",
     });
     if (contentType) headers.set("content-type", contentType);

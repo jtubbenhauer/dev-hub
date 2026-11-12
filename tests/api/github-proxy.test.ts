@@ -30,6 +30,10 @@ function authorizationOf(call: number): string | null {
   );
 }
 
+function upstreamAcceptOf(call: number): string | null {
+  return new Headers(fetchMock.mock.calls[call]?.[1]?.headers).get("Accept");
+}
+
 beforeEach(() => {
   mocks.auth.mockReset();
   mocks.auth.mockResolvedValue({ user: { id: "user-1" } });
@@ -82,6 +86,49 @@ describe("GitHub proxy", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.github.com/graphql");
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "POST", body });
   });
+
+  it("asks GitHub for a pull request's diff when the client accepts one", async () => {
+    const diff = "diff --git a/app.ts b/app.ts\n+export const answer = 42;\n";
+    // Like GitHub: the diff for its diff media type, JSON for anything else.
+    fetchMock.mockImplementation(async (_url, init) =>
+      new Headers(init?.headers).get("Accept") ===
+      "application/vnd.github.v3.diff"
+        ? new Response(diff, {
+            headers: { "content-type": "application/vnd.github.v3.diff" },
+          })
+        : Response.json({ number: 7 }),
+    );
+
+    const response = await GET(
+      new NextRequest(
+        "http://localhost:3000/api/github/repos/acme/web/pulls/7",
+        {
+          headers: { Accept: "application/vnd.github.v3.diff" },
+        },
+      ),
+      routeContext(["repos", "acme", "web", "pulls", "7"]),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(diff);
+  });
+
+  it.each([
+    ["the browser's default", "*/*"],
+    ["plain JSON", "application/json"],
+  ])(
+    "asks GitHub for its JSON when the client accepts %s",
+    async (_label, accept) => {
+      await GET(
+        new NextRequest("http://localhost:3000/api/github/user", {
+          headers: { Accept: accept },
+        }),
+        routeContext(["user"]),
+      );
+
+      expect(upstreamAcceptOf(0)).toBe("application/vnd.github+json");
+    },
+  );
 
   it.each([
     ["a path dev-hub never calls", ["user", "keys"]],

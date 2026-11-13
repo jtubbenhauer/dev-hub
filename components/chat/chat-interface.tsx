@@ -110,6 +110,10 @@ interface AvailableVariants {
 
 const EMPTY_ID_SET = new Set<string>();
 
+// How many messages from the top of the loaded window the next older page
+// starts loading, so reaching the top doesn't stall on the request.
+const OLDER_MESSAGES_PREFETCH_DISTANCE = 20;
+
 // ChatInterface re-renders on every streamed frame; with stable props the
 // composer skips those renders, so typing stays responsive while replies stream.
 const MemoizedPromptInput = memo(PromptInput);
@@ -454,19 +458,10 @@ function ChatInterfaceContent({
     return s.isLoadingOlderBySession[`${activeWorkspaceId}:${activeSessionId}`];
   });
 
-  const virtuosoComponents = useMemo(() => {
-    const base =
-      streamingStatus === "streaming" ? STREAMING_COMPONENTS : EMPTY_COMPONENTS;
-    if (!isLoadingOlder) return base;
-    return {
-      ...base,
-      Header: () => (
-        <div className="flex justify-center py-4">
-          <Loader2 className="text-muted-foreground size-5 animate-spin" />
-        </div>
-      ),
-    };
-  }, [streamingStatus, isLoadingOlder]);
+  // The loading spinner is an overlay, not a list header: a header changes
+  // the list height above the visible messages, which Virtuoso can't offset.
+  const virtuosoComponents =
+    streamingStatus === "streaming" ? STREAMING_COMPONENTS : EMPTY_COMPONENTS;
 
   const [chatListWindow, setChatListWindow] = useState(() =>
     advanceChatListWindow(null, activeSessionId, activeMessages),
@@ -678,12 +673,14 @@ function ChatInterfaceContent({
 
   const handleRangeChanged = useCallback(
     (range: { startIndex: number; endIndex: number }) => {
+      const startIndex = range.startIndex - firstItemIndex;
       visibleRangeRef.current = {
-        startIndex: range.startIndex - firstItemIndex,
+        startIndex,
         endIndex: range.endIndex - firstItemIndex,
       };
+      if (startIndex <= OLDER_MESSAGES_PREFETCH_DISTANCE) handleStartReached();
     },
-    [firstItemIndex],
+    [firstItemIndex, handleStartReached],
   );
 
   const jumpToMessageAt = useCallback(
@@ -1197,6 +1194,20 @@ function ChatInterfaceContent({
                 )}
               </div>
             )}
+
+            {isLoadingOlder &&
+              activeMessages.length > 0 &&
+              !isPlanPanelOpen && (
+                <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+                  <div
+                    role="status"
+                    className="bg-background rounded-full border p-1.5 shadow-md"
+                  >
+                    <Loader2 className="text-muted-foreground size-4 animate-spin" />
+                    <span className="sr-only">Loading older messages</span>
+                  </div>
+                </div>
+              )}
 
             {/* Jump-to-bottom pill — shown when user has scrolled up during streaming or after */}
             {showJumpToBottom &&

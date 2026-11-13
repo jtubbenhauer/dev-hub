@@ -1,12 +1,38 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { useChatScrollMemory } from "@/components/chat/use-chat-scroll-memory";
+import type { VirtuosoHandle } from "react-virtuoso";
+import {
+  CHAT_SCROLL_IDLE_MS,
+  useChatScrollMemory,
+} from "@/components/chat/use-chat-scroll-memory";
+import {
+  DEFAULT_CHAT_ITEM_HEIGHT_PX,
+  estimateChatItemHeights,
+  getRememberedChatScrollPosition,
+} from "@/lib/chat/session-scroll-memory";
 
 const messages = [
   { info: { id: "msg-a" } },
   { info: { id: "msg-b" } },
   { info: { id: "msg-c" } },
 ];
+
+const noVirtuoso = { current: null };
+
+function virtuosoReporting(
+  ranges: Array<{ startIndex: number; endIndex: number; size: number }>,
+): { current: VirtuosoHandle } {
+  return {
+    current: {
+      autoscrollToBottom: vi.fn(),
+      getState: (callback) => callback({ ranges, scrollTop: 0 }),
+      scrollBy: vi.fn(),
+      scrollIntoView: vi.fn(),
+      scrollTo: vi.fn(),
+      scrollToIndex: vi.fn(),
+    },
+  };
+}
 
 function setRect(element: Element, top: number, bottom: number) {
   element.getBoundingClientRect = () =>
@@ -44,21 +70,26 @@ function buildScrolledScroller(options: {
   return scroller;
 }
 
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   document.body.innerHTML = "";
 });
 
 describe("useChatScrollMemory", () => {
   it("anchors to the latest message for a session never scrolled", () => {
     const { result } = renderHook(() =>
-      useChatScrollMemory("ws:fresh", messages),
+      useChatScrollMemory("ws:fresh", messages, noVirtuoso),
     );
     expect(result.current.initialScrollLocation).toBeNull();
   });
 
   it("restores a mid-list position after switching away and back", () => {
     const { result, rerender } = renderHook(
-      ({ sessionKey }) => useChatScrollMemory(sessionKey, messages),
+      ({ sessionKey }) => useChatScrollMemory(sessionKey, messages, noVirtuoso),
       { initialProps: { sessionKey: "ws:review" } },
     );
     const scroller = buildScrolledScroller({
@@ -72,6 +103,7 @@ describe("useChatScrollMemory", () => {
     act(() => result.current.handleScrollerRef(scroller));
     act(() => {
       scroller.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersByTime(CHAT_SCROLL_IDLE_MS);
     });
 
     rerender({ sessionKey: "ws:other" });
@@ -87,7 +119,7 @@ describe("useChatScrollMemory", () => {
 
   it("anchors to the latest message when the session was left at the bottom", () => {
     const { result, rerender } = renderHook(
-      ({ sessionKey }) => useChatScrollMemory(sessionKey, messages),
+      ({ sessionKey }) => useChatScrollMemory(sessionKey, messages, noVirtuoso),
       { initialProps: { sessionKey: "ws:bottom" } },
     );
     const midListScroller = buildScrolledScroller({
@@ -97,6 +129,7 @@ describe("useChatScrollMemory", () => {
     act(() => result.current.handleScrollerRef(midListScroller));
     act(() => {
       midListScroller.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersByTime(CHAT_SCROLL_IDLE_MS);
     });
     const bottomScroller = buildScrolledScroller({
       scrollTop: 1500,
@@ -105,10 +138,75 @@ describe("useChatScrollMemory", () => {
     act(() => result.current.handleScrollerRef(bottomScroller));
     act(() => {
       bottomScroller.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersByTime(CHAT_SCROLL_IDLE_MS);
     });
 
     rerender({ sessionKey: "ws:other" });
     rerender({ sessionKey: "ws:bottom" });
     expect(result.current.initialScrollLocation).toBeNull();
+  });
+
+  it("records the position only once scrolling settles", () => {
+    const { result } = renderHook(() =>
+      useChatScrollMemory("ws:settle", messages, noVirtuoso),
+    );
+    const scroller = buildScrolledScroller({
+      scrollTop: 400,
+      itemRects: [[-20, 600]],
+    });
+    act(() => result.current.handleScrollerRef(scroller));
+
+    act(() => {
+      scroller.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersByTime(CHAT_SCROLL_IDLE_MS - 1);
+      scroller.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersByTime(CHAT_SCROLL_IDLE_MS - 1);
+    });
+    expect(getRememberedChatScrollPosition("ws:settle")).toBeUndefined();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(getRememberedChatScrollPosition("ws:settle")).toEqual({
+      isAtBottom: false,
+      messageId: "msg-a",
+      offsetPx: 20,
+    });
+  });
+
+  it("remembers the list's measured heights by message id once scrolling settles", () => {
+    const { result } = renderHook(() =>
+      useChatScrollMemory(
+        "ws:heights",
+        messages,
+        virtuosoReporting([
+          { startIndex: 0, endIndex: 0, size: 640 },
+          { startIndex: 1, endIndex: 1, size: DEFAULT_CHAT_ITEM_HEIGHT_PX },
+          { startIndex: 2, endIndex: Infinity, size: 88 },
+        ]),
+      ),
+    );
+    const scroller = buildScrolledScroller({
+      scrollTop: 400,
+      itemRects: [[-20, 600]],
+    });
+    act(() => result.current.handleScrollerRef(scroller));
+
+    act(() => {
+      scroller.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersByTime(CHAT_SCROLL_IDLE_MS);
+    });
+
+    expect(
+      estimateChatItemHeights("ws:heights", [
+        { info: { id: "msg-new-older" } },
+        ...messages,
+      ]),
+    ).toEqual([
+      DEFAULT_CHAT_ITEM_HEIGHT_PX,
+      640,
+      DEFAULT_CHAT_ITEM_HEIGHT_PX,
+      88,
+    ]);
   });
 });

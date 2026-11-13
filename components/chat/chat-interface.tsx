@@ -53,6 +53,7 @@ import {
 } from "@/lib/chat-navigation";
 import { advanceChatListWindow } from "@/lib/chat/chat-list-window";
 import { getQueuedUserMessageIds } from "@/lib/chat/queued-messages";
+import { estimateChatItemHeights } from "@/lib/chat/session-scroll-memory";
 import {
   selectSessionMessages,
   selectSessionStreamingStatus,
@@ -476,11 +477,19 @@ function ChatInterfaceContent({
   }
   const { firstItemIndex } = currentChatListWindow;
 
-  const { handleScrollerRef, initialScrollLocation } = useChatScrollMemory(
+  const scrollMemoryKey =
     activeWorkspaceId && activeSessionId
       ? `${activeWorkspaceId}:${activeSessionId}`
-      : null,
+      : null;
+  const { handleScrollerRef, initialScrollLocation } = useChatScrollMemory(
+    scrollMemoryKey,
     activeMessages,
+    virtuosoRef,
+  );
+  // Virtuoso reads these only when it mounts; later values are ignored.
+  const messageHeightEstimates = useMemo(
+    () => estimateChatItemHeights(scrollMemoryKey, activeMessages),
+    [scrollMemoryKey, activeMessages],
   );
 
   const handleStartReached = useCallback(() => {
@@ -1149,6 +1158,7 @@ function ChatInterfaceContent({
                     firstItemIndex={firstItemIndex}
                     startReached={handleStartReached}
                     computeItemKey={(_, msg) => msg.info.id}
+                    heightEstimates={messageHeightEstimates}
                     skipAnimationFrameInResizeObserver
                     scrollerRef={handleScrollerRef}
                     initialTopMostItemIndex={

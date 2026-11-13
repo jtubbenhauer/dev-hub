@@ -23,6 +23,14 @@ import { MarkdownContent } from "@/components/chat/markdown-content";
 import { MessageToolUse } from "@/components/chat/message-tool-use";
 import { parseCommentRefs } from "@/lib/comment-chat-bridge";
 import { CommentRefBadge } from "@/components/chat/comment-ref-badge";
+import {
+  InjectedContextDisclosure,
+  InjectedNotice,
+} from "@/components/chat/injected-context";
+import {
+  splitUserMessageParts,
+  type InlinedAttachment,
+} from "@/lib/chat/user-message-parts";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useWorkspaceGitHub } from "@/hooks/use-git";
 import type { MessageWithParts } from "@/lib/opencode/types";
@@ -124,12 +132,14 @@ interface FilePartData {
 function UserMessageBubble({
   textContent,
   fileParts,
+  attachments,
   workspaceId,
   owner,
   repo,
 }: {
   textContent: string;
   fileParts: FilePartData[];
+  attachments: InlinedAttachment[];
   workspaceId: string | null;
   owner?: string;
   repo?: string;
@@ -149,7 +159,7 @@ function UserMessageBubble({
           ))}
         </div>
       )}
-      {fileParts.length > 0 && (
+      {(fileParts.length > 0 || attachments.length > 0) && (
         <div className="flex flex-col items-end gap-1.5 pb-1">
           {fileParts.map((fp) => {
             const isImage = fp.mime.startsWith("image/");
@@ -173,18 +183,29 @@ function UserMessageBubble({
               </span>
             );
           })}
+          {attachments.map((attachment) => (
+            <span
+              key={attachment.id}
+              className="bg-muted/80 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
+            >
+              <FileText className="size-4 shrink-0" />
+              <span className="truncate">{attachment.filename}</span>
+            </span>
+          ))}
         </div>
       )}
-      <div className="bg-primary text-primary-foreground max-w-full rounded-2xl rounded-br-md px-4 py-2.5">
-        <div className="user-bubble-prose prose prose-sm prose-p:my-1 prose-pre:my-1 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-1.5 max-w-full overflow-hidden break-words">
-          <MarkdownContent
-            content={cleanedText || textContent}
-            variant="bubble"
-            owner={owner}
-            repo={repo}
-          />
+      {textContent && (
+        <div className="bg-primary text-primary-foreground max-w-full rounded-2xl rounded-br-md px-4 py-2.5">
+          <div className="user-bubble-prose prose prose-sm prose-p:my-1 prose-pre:my-1 prose-ol:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-1.5 max-w-full overflow-hidden break-words">
+            <MarkdownContent
+              content={cleanedText || textContent}
+              variant="bubble"
+              owner={owner}
+              repo={repo}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
@@ -215,11 +236,18 @@ export const ChatMessage = memo(
     const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
     const githubRepo = useWorkspaceGitHub(activeWorkspaceId);
 
+    const userContent = useMemo(
+      () => (isUser ? splitUserMessageParts(parts) : null),
+      [isUser, parts],
+    );
+
     const { textContent, inlineThinkingParts } = useMemo(() => {
-      const raw = parts
-        .filter((p): p is TextPart => p.type === "text" && !p.ignored)
-        .map((p) => p.text)
-        .join("");
+      const raw =
+        userContent?.text ??
+        parts
+          .filter((p): p is TextPart => p.type === "text" && !p.ignored)
+          .map((p) => p.text)
+          .join("");
 
       const extracted: ReasoningPart[] = [];
       const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
@@ -280,7 +308,7 @@ export const ChatMessage = memo(
         textContent: stripSoleCodeFence(cleaned),
         inlineThinkingParts: extracted,
       };
-    }, [parts, info.id, info.sessionID, info.time.created]);
+    }, [parts, userContent, info.id, info.sessionID, info.time.created]);
 
     const toolParts = useMemo(
       () => parts.filter((p): p is ToolPart => p.type === "tool"),
@@ -376,27 +404,40 @@ export const ChatMessage = memo(
               : "max-w-full min-w-0 items-start overflow-hidden md:max-w-[85%]",
           )}
         >
-          {isUser ? (
+          {userContent ? (
             <>
-              <div className="flex max-w-full items-end gap-1">
-                {onRevert && (
-                  <button
-                    type="button"
-                    onClick={() => onRevert(info.id)}
-                    className="text-muted-foreground/0 hover:bg-muted hover:text-muted-foreground group-hover:text-muted-foreground/60 mb-1 flex size-6 shrink-0 items-center justify-center rounded-md transition-colors"
-                    title="Revert to before this message"
-                  >
-                    <Undo2 className="size-3.5" />
-                  </button>
-                )}
-                <UserMessageBubble
-                  textContent={textContent}
-                  fileParts={fileParts}
-                  workspaceId={activeWorkspaceId}
-                  owner={githubRepo?.owner}
-                  repo={githubRepo?.repo}
+              {(textContent ||
+                fileParts.length > 0 ||
+                userContent.attachments.length > 0) && (
+                <div className="flex max-w-full items-end gap-1">
+                  {onRevert && (
+                    <button
+                      type="button"
+                      onClick={() => onRevert(info.id)}
+                      className="text-muted-foreground/0 hover:bg-muted hover:text-muted-foreground group-hover:text-muted-foreground/60 mb-1 flex size-6 shrink-0 items-center justify-center rounded-md transition-colors"
+                      title="Revert to before this message"
+                    >
+                      <Undo2 className="size-3.5" />
+                    </button>
+                  )}
+                  <UserMessageBubble
+                    textContent={textContent}
+                    fileParts={fileParts}
+                    attachments={userContent.attachments}
+                    workspaceId={activeWorkspaceId}
+                    owner={githubRepo?.owner}
+                    repo={githubRepo?.repo}
+                  />
+                </div>
+              )}
+              {userContent.notices.map((notice) => (
+                <InjectedNotice key={notice} notice={notice} />
+              ))}
+              {userContent.injectedBlocks.length > 0 && (
+                <InjectedContextDisclosure
+                  blocks={userContent.injectedBlocks}
                 />
-              </div>
+              )}
               {isQueued && (
                 <Badge
                   variant="secondary"

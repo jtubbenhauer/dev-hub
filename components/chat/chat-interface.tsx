@@ -51,6 +51,7 @@ import {
   computeNextUserMessageIndex,
   computePrevUserMessageIndex,
 } from "@/lib/chat-navigation";
+import { advanceChatListWindow } from "@/lib/chat/chat-list-window";
 import { getQueuedUserMessageIds } from "@/lib/chat/queued-messages";
 import {
   selectSessionMessages,
@@ -467,33 +468,18 @@ function ChatInterfaceContent({
     };
   }, [streamingStatus, isLoadingOlder]);
 
-  // firstItemIndex lets Virtuoso keep the scroll position stable when older
-  // pages are prepended on scroll-up: it starts high and drops by the number
-  // of messages added at the head.
-  const START_ITEM_INDEX = 100_000;
-  const [firstItemIndex, setFirstItemIndex] = useState(START_ITEM_INDEX);
-  const prevFirstMessageIdRef = useRef<string | null>(null);
-  const windowSessionRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const newFirstId = activeMessages[0]?.info.id ?? null;
-    if (windowSessionRef.current !== activeSessionId) {
-      windowSessionRef.current = activeSessionId;
-      prevFirstMessageIdRef.current = newFirstId;
-      setFirstItemIndex(START_ITEM_INDEX);
-      return;
-    }
-    const prevFirstId = prevFirstMessageIdRef.current;
-    if (newFirstId && prevFirstId && newFirstId !== prevFirstId) {
-      const prependedCount = activeMessages.findIndex(
-        (m) => m.info.id === prevFirstId,
-      );
-      if (prependedCount > 0) {
-        setFirstItemIndex((prev) => prev - prependedCount);
-      }
-    }
-    prevFirstMessageIdRef.current = newFirstId;
-  }, [activeMessages, activeSessionId]);
+  const [chatListWindow, setChatListWindow] = useState(() =>
+    advanceChatListWindow(null, activeSessionId, activeMessages),
+  );
+  const currentChatListWindow = advanceChatListWindow(
+    chatListWindow,
+    activeSessionId,
+    activeMessages,
+  );
+  if (currentChatListWindow !== chatListWindow) {
+    setChatListWindow(currentChatListWindow);
+  }
+  const { firstItemIndex } = currentChatListWindow;
 
   const { handleScrollerRef, initialScrollLocation } = useChatScrollMemory(
     activeWorkspaceId && activeSessionId

@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  DEFAULT_CHAT_ITEM_HEIGHT_PX,
+  estimateChatItemHeights,
   getRememberedChatScrollPosition,
   readChatScrollPosition,
+  rememberChatItemHeights,
   rememberChatScrollPosition,
   resolveInitialScrollLocation,
 } from "@/lib/chat/session-scroll-memory";
@@ -154,5 +157,41 @@ describe("resolveInitialScrollLocation", () => {
         messages,
       ),
     ).toBeNull();
+  });
+});
+
+describe("rememberChatItemHeights", () => {
+  it("keeps heights from earlier captures when a later one covers other messages", () => {
+    rememberChatItemHeights(
+      "ws:windows",
+      [{ startIndex: 0, endIndex: Infinity, size: 300 }],
+      [{ info: { id: "msg-a" } }],
+    );
+    rememberChatItemHeights(
+      "ws:windows",
+      [{ startIndex: 0, endIndex: Infinity, size: 45 }],
+      [{ info: { id: "msg-c" } }],
+    );
+
+    expect(estimateChatItemHeights("ws:windows", messages)).toEqual([
+      300,
+      DEFAULT_CHAT_ITEM_HEIGHT_PX,
+      45,
+    ]);
+  });
+
+  it("forgets the least recently captured session past the cap", () => {
+    for (let index = 0; index <= 50; index++) {
+      rememberChatItemHeights(
+        `ws:height-cap-${index}`,
+        [{ startIndex: 0, endIndex: 0, size: 300 }],
+        messages,
+      );
+    }
+
+    expect(estimateChatItemHeights("ws:height-cap-0", messages)[0]).toBe(
+      DEFAULT_CHAT_ITEM_HEIGHT_PX,
+    );
+    expect(estimateChatItemHeights("ws:height-cap-50", messages)[0]).toBe(300);
   });
 });

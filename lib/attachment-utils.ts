@@ -159,6 +159,17 @@ export function createAttachmentPromptPart(
   };
 }
 
+// Reads back the filename from a text part createAttachmentPromptPart built,
+// so the chat can show it as an attachment instead of its whole content.
+const INLINED_ATTACHMENT_HEADER =
+  /^(?:Attached file|Text extracted from) "((?:[^"\\]|\\.)*)"/;
+
+export function getInlinedAttachmentFilename(text: string): string | null {
+  const match = INLINED_ATTACHMENT_HEADER.exec(text);
+  if (!match) return null;
+  return match[1].replace(/\\(["\\])/g, "$1");
+}
+
 export function validateAttachment(file: File): {
   valid: boolean;
   error?: string;

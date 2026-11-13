@@ -1166,6 +1166,7 @@ function ChatInterfaceContent({
                     firstItemIndex={firstItemIndex}
                     startReached={handleStartReached}
                     computeItemKey={(_, msg) => msg.info.id}
+                    skipAnimationFrameInResizeObserver
                     scrollerRef={handleScrollerRef}
                     initialTopMostItemIndex={
                       initialScrollLocation ??

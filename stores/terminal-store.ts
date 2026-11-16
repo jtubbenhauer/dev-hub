@@ -24,6 +24,9 @@ interface TerminalState {
   activeTabByWorkspace: Record<string, string>;
   unseenActivityKeys: Record<string, true>;
   endedSessionKeys: Record<string, true>;
+  // Workspace whose tabs the /terminal page is showing, or null when the page
+  // isn't open. The activity watcher counts that page's active tab as seen.
+  pageWorkspaceId: string | null;
   // Lives in the store so it survives the header remounting on navigation.
   activityBaseline: TerminalActivityBaseline;
   setOpen: (open: boolean) => void;
@@ -34,6 +37,7 @@ interface TerminalState {
   addTab: (workspaceId: string, sessionId?: string) => string;
   closeTab: (workspaceId: string, sessionId: string) => void;
   setActiveTab: (workspaceId: string, sessionId: string) => void;
+  setPageWorkspaceId: (workspaceId: string | null) => void;
   setUnseenActivityKeys: (keys: Record<string, true>) => void;
   setActivityBaseline: (baseline: TerminalActivityBaseline) => void;
 }
@@ -69,6 +73,7 @@ export const useTerminalStore = create<TerminalState>()(
       activeTabByWorkspace: {},
       unseenActivityKeys: {},
       endedSessionKeys: {},
+      pageWorkspaceId: null,
       activityBaseline: EMPTY_ACTIVITY_BASELINE,
       setOpen: (open) => set({ isOpen: open }),
       toggle: () => set((s) => ({ isOpen: !s.isOpen })),
@@ -143,6 +148,8 @@ export const useTerminalStore = create<TerminalState>()(
             [workspaceId]: sessionId,
           },
         })),
+      setPageWorkspaceId: (workspaceId) =>
+        set({ pageWorkspaceId: workspaceId }),
       setUnseenActivityKeys: (keys) => set({ unseenActivityKeys: keys }),
       setActivityBaseline: (baseline) => set({ activityBaseline: baseline }),
     }),

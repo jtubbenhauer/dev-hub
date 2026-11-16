@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useTerminalStore } from "@/stores/terminal-store";
@@ -72,6 +72,19 @@ async function pollWith(sessions: TerminalSessionInfo[]) {
   );
 }
 
+function clickToastAction() {
+  const action: unknown = vi.mocked(toast.success).mock.calls[0]?.[1]?.action;
+  if (
+    typeof action !== "object" ||
+    action === null ||
+    !("onClick" in action) ||
+    typeof action.onClick !== "function"
+  ) {
+    throw new Error("Expected the toast to offer an action");
+  }
+  action.onClick();
+}
+
 async function waitForBaseline() {
   await waitFor(() =>
     expect(
@@ -95,8 +108,13 @@ beforeEach(() => {
     activeTabByWorkspace: { "ws-1": "default" },
     unseenActivityKeys: {},
     endedSessionKeys: {},
+    pageWorkspaceId: null,
     activityBaseline: EMPTY_ACTIVITY_BASELINE,
   });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("TerminalActivityWatcher", () => {
@@ -152,5 +170,74 @@ describe("TerminalActivityWatcher", () => {
         description: expect.stringContaining("took 1m 30s"),
       }),
     );
+  });
+
+  it("counts the terminal page's tab as seen while the drawer is closed", async () => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    useTerminalStore.setState({ isOpen: false, pageWorkspaceId: "ws-1" });
+    renderWatcher();
+    await waitForBaseline();
+
+    await pollWith([
+      defaultSession({
+        lastOutputAt: Date.now() + 60_000,
+        lastFinishedCommand: {
+          name: "make",
+          durationMs: 90_000,
+          finishedAt: Date.now(),
+        },
+      }),
+    ]);
+    expect(useTerminalStore.getState().unseenActivityKeys).toEqual({});
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("shows a finished command on the terminal page without opening the drawer", async () => {
+    useTerminalStore.setState({
+      isOpen: false,
+      pageWorkspaceId: "ws-1",
+      tabsByWorkspace: {
+        "ws-1": [
+          { sessionId: "default", title: "Terminal 1" },
+          { sessionId: "term-2", title: "Terminal 2" },
+        ],
+      },
+    });
+    serverSessions = [
+      defaultSession({}),
+      defaultSession({ sessionId: "term-2" }),
+    ];
+    renderWatcher();
+    await waitFor(() =>
+      expect(
+        useTerminalStore.getState().activityBaseline.notifiedFinishAt[
+          "ws-1:term-2"
+        ],
+      ).toBeDefined(),
+    );
+
+    await pollWith([
+      defaultSession({}),
+      defaultSession({
+        sessionId: "term-2",
+        lastFinishedCommand: {
+          name: "make",
+          durationMs: 90_000,
+          finishedAt: Date.now(),
+        },
+      }),
+    ]);
+    expect(toast.success).toHaveBeenCalledWith(
+      "make finished",
+      expect.objectContaining({
+        action: expect.objectContaining({ label: "Show" }),
+      }),
+    );
+
+    act(() => clickToastAction());
+    expect(useTerminalStore.getState().activeTabByWorkspace["ws-1"]).toBe(
+      "term-2",
+    );
+    expect(useTerminalStore.getState().isOpen).toBe(false);
   });
 });

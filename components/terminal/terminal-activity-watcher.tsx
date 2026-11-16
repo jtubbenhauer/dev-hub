@@ -38,19 +38,24 @@ function announceFinishedCommand({
   const description = `${workspaceName} · ${tabTitle} · took ${formatCommandDuration(command.durationMs)}`;
   const isActiveWorkspace =
     workspaceState.activeWorkspaceId === session.workspaceId;
+  const isOnTerminalPage =
+    terminalState.pageWorkspaceId === session.workspaceId;
 
   toast.success(title, {
     description,
-    action: isActiveWorkspace
-      ? {
-          label: "Show",
-          onClick: () => {
-            const state = useTerminalStore.getState();
-            state.setActiveTab(session.workspaceId, session.sessionId);
-            state.setOpen(true);
-          },
-        }
-      : undefined,
+    action:
+      isActiveWorkspace || isOnTerminalPage
+        ? {
+            label: "Show",
+            onClick: () => {
+              const state = useTerminalStore.getState();
+              state.setActiveTab(session.workspaceId, session.sessionId);
+              if (state.pageWorkspaceId !== session.workspaceId) {
+                state.setOpen(true);
+              }
+            },
+          }
+        : undefined,
   });
   sendBrowserNotification(title, { body: description });
 }
@@ -64,12 +69,18 @@ export function TerminalActivityWatcher() {
   const activeKey = useTerminalStore((s) =>
     getActiveTerminalKey(s, activeWorkspaceId),
   );
-  const visibleKey = isOpen ? activeKey : null;
+  const pageKey = useTerminalStore((s) =>
+    getActiveTerminalKey(s, s.pageWorkspaceId),
+  );
+  // The /terminal page drops its connection while the drawer covers it.
+  const visibleKey = isOpen ? activeKey : pageKey;
   const previousVisibleKeyRef = useRef<string | null>(null);
 
   const { data: sessions } = useTerminalSessions({
     isEnabled: hasAnyTabs,
-    refetchIntervalMs: isOpen ? OPEN_POLL_INTERVAL_MS : CLOSED_POLL_INTERVAL_MS,
+    refetchIntervalMs: visibleKey
+      ? OPEN_POLL_INTERVAL_MS
+      : CLOSED_POLL_INTERVAL_MS,
   });
 
   // Output the user watched until the moment they looked away is not "new".

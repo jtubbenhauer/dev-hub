@@ -18,3 +18,37 @@ export function getProviderUpgradeCommand(
 export function lastOutputLines(output: string, lineCount: number): string {
   return output.trim().split("\n").slice(-lineCount).join("\n");
 }
+
+export interface UpgradedEndpoints {
+  opencode: string;
+  agent: string;
+}
+
+// `rig-cli upgrade --json` prints only a JSON array of
+// { id, status, endpoints? } on stdout; progress goes to stderr.
+export function parseUpgradeJsonOutput(stdout: string): unknown[] | null {
+  try {
+    const parsed: unknown = JSON.parse(stdout);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function findUpgradedEndpoints(
+  upgradeResults: unknown[],
+  providerWorkspaceId: string,
+): UpgradedEndpoints | null {
+  for (const result of upgradeResults) {
+    if (!result || typeof result !== "object") continue;
+    const { id, endpoints } = result as Record<string, unknown>;
+    if (id !== providerWorkspaceId) continue;
+    if (!endpoints || typeof endpoints !== "object") return null;
+    const { opencode, agent } = endpoints as Record<string, unknown>;
+    if (typeof opencode !== "string" || typeof agent !== "string") {
+      return null;
+    }
+    return { opencode, agent };
+  }
+  return null;
+}

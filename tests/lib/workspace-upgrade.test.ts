@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  findUpgradedEndpoints,
   getProviderUpgradeCommand,
   lastOutputLines,
+  parseUpgradeJsonOutput,
 } from "@/lib/workspaces/upgrade";
 import type { Workspace, WorkspaceProvider } from "@/types";
 
@@ -97,5 +99,55 @@ describe("lastOutputLines", () => {
       lastOutputLines("one\ntwo\nUpgrade complete: 1 upgraded, 0 failed.\n", 1),
     ).toBe("Upgrade complete: 1 upgraded, 0 failed.");
     expect(lastOutputLines("one\ntwo\nthree", 2)).toBe("two\nthree");
+  });
+});
+
+describe("parseUpgradeJsonOutput", () => {
+  it("returns the results array printed by upgrade --json", () => {
+    expect(
+      parseUpgradeJsonOutput(
+        '[\n  {"id": "69-oc-a", "status": "upgraded"}\n]\n',
+      ),
+    ).toEqual([{ id: "69-oc-a", status: "upgraded" }]);
+  });
+
+  it.each([
+    ["plain text output", "Upgrade complete: 1 upgraded, 0 failed.\n"],
+    ["empty output", ""],
+    ["a JSON object", '{"id": "69-oc-a"}'],
+  ])("returns null for %s", (_description, stdout) => {
+    expect(parseUpgradeJsonOutput(stdout)).toBeNull();
+  });
+});
+
+describe("findUpgradedEndpoints", () => {
+  const endpoints = {
+    opencode: "https://rig.example.ts.net:15004",
+    agent: "http://rig.example:10004",
+  };
+
+  it("returns the endpoints of the matching container", () => {
+    expect(
+      findUpgradedEndpoints(
+        [
+          { id: "69-oc-other", endpoints: { opencode: "x", agent: "y" } },
+          { id: "69-oc-fix-invoices", endpoints },
+        ],
+        "69-oc-fix-invoices",
+      ),
+    ).toEqual(endpoints);
+  });
+
+  it.each([
+    ["no result matches the container", [{ id: "69-oc-other", endpoints }]],
+    ["the match has no endpoints", [{ id: "69-oc-fix-invoices" }]],
+    [
+      "the match has incomplete endpoints",
+      [{ id: "69-oc-fix-invoices", endpoints: { opencode: "https://x" } }],
+    ],
+  ])("returns null when %s", (_description, upgradeResults) => {
+    expect(
+      findUpgradedEndpoints(upgradeResults, "69-oc-fix-invoices"),
+    ).toBeNull();
   });
 });

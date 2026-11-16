@@ -11,6 +11,9 @@ const {
   mockSelect,
   mockToWorkspace,
   mockSpawn,
+  mockUpdate,
+  mockSet,
+  mockUpdateWhere,
 } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockWhere: vi.fn(),
@@ -18,13 +21,18 @@ const {
   mockSelect: vi.fn(),
   mockToWorkspace: vi.fn(),
   mockSpawn: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockSet: vi.fn(),
+  mockUpdateWhere: vi.fn(),
 }));
 
 const mockDbChain = { from: mockFrom, where: mockWhere };
 
 vi.mock("@/lib/auth/config", () => ({ auth: mockAuth }));
 
-vi.mock("@/lib/db", () => ({ db: { select: mockSelect } }));
+vi.mock("@/lib/db", () => ({
+  db: { select: mockSelect, update: mockUpdate },
+}));
 
 vi.mock("@/drizzle/schema", () => ({
   workspaces: { id: "id", userId: "userId" },
@@ -134,6 +142,9 @@ beforeEach(() => {
   mockSelect.mockReturnValue(mockDbChain);
   mockFrom.mockReturnValue(mockDbChain);
   mockWhere.mockResolvedValue([]);
+  mockUpdate.mockReturnValue({ set: mockSet });
+  mockSet.mockReturnValue({ where: mockUpdateWhere });
+  mockUpdateWhere.mockResolvedValue(undefined);
 });
 
 describe("POST /api/workspaces/[id]/upgrade", () => {
@@ -197,6 +208,72 @@ describe("POST /api/workspaces/[id]/upgrade", () => {
       ["-c", "/usr/local/bin/rig-cli upgrade 69-oc-fix-invoices"],
       expect.objectContaining({ timeout: expect.any(Number) }),
     );
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("saves the endpoints that upgrade --json reports for the workspace's container", async () => {
+    givenWorkspaceAndProviders([rigProvider]);
+    mockSpawn.mockImplementationOnce(() =>
+      makeChildProcess(
+        {
+          stdout: JSON.stringify([
+            {
+              id: "69-oc-other",
+              status: "upgraded",
+              endpoints: {
+                opencode: "https://rig.example.ts.net:15002",
+                agent: "http://rig.example:10002",
+              },
+            },
+            {
+              id: "69-oc-fix-invoices",
+              status: "upgraded",
+              endpoints: {
+                opencode: "https://rig.example.ts.net:15004",
+                agent: "http://rig.example:10004",
+              },
+            },
+          ]),
+          stderr:
+            "- 69-oc-fix-invoices: recreating...\nUpgrade complete: 1 upgraded, 0 failed.\n",
+        },
+        0,
+      ),
+    );
+
+    const response = await callUpgrade("ws-remote");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      status: "upgraded",
+      summary: "Upgrade complete: 1 upgraded, 0 failed.",
+    });
+    expect(mockSet).toHaveBeenCalledWith({
+      opencodeUrl: "https://rig.example.ts.net:15004",
+      agentUrl: "http://rig.example:10004",
+    });
+    expect(mockUpdateWhere).toHaveBeenCalledWith({ eq: ["id", "ws-remote"] });
+  });
+
+  it("keeps the stored endpoints when upgrade --json reports none for the container", async () => {
+    givenWorkspaceAndProviders([rigProvider]);
+    mockSpawn.mockImplementationOnce(() =>
+      makeChildProcess(
+        {
+          stdout: JSON.stringify([
+            { id: "69-oc-fix-invoices", status: "upgraded" },
+          ]),
+          stderr: "Upgrade complete: 1 upgraded, 0 failed.\n",
+        },
+        0,
+      ),
+    );
+
+    const response = await callUpgrade("ws-remote");
+    expect(response.status).toBe(200);
+    expect((await response.json()).summary).toBe(
+      "Upgrade complete: 1 upgraded, 0 failed.",
+    );
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("returns 500 with the command's error when the upgrade fails", async () => {

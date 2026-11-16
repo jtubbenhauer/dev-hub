@@ -6,7 +6,11 @@ import { eq, and } from "drizzle-orm";
 import { toWorkspace } from "@/lib/workspaces/backend";
 import { spawn } from "node:child_process";
 import { interpolateProviderCommand } from "@/lib/workspaces/resume";
-import { lastOutputLines } from "@/lib/workspaces/upgrade";
+import {
+  findUpgradedEndpoints,
+  lastOutputLines,
+  parseUpgradeJsonOutput,
+} from "@/lib/workspaces/upgrade";
 import type { WorkspaceProvider } from "@/types";
 
 export const maxDuration = 600;
@@ -44,8 +48,10 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const providerId = (workspace.providerMeta as Record<string, unknown>)
-    .providerId;
+  const { providerId, providerWorkspaceId } = workspace.providerMeta as Record<
+    string,
+    unknown
+  >;
   if (typeof providerId !== "string") {
     return NextResponse.json(
       { error: "Workspace has no provider ID" },
@@ -107,9 +113,24 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       provider,
     );
     const output = await runUpgradeCommand(command);
+    const upgradeResults = parseUpgradeJsonOutput(output.stdout);
+    const endpoints =
+      upgradeResults && typeof providerWorkspaceId === "string"
+        ? findUpgradedEndpoints(upgradeResults, providerWorkspaceId)
+        : null;
+    // An upgrade can move the container's endpoints (e.g. OpenCode moving
+    // behind Tailscale Serve HTTPS), so save what the provider now reports.
+    if (endpoints) {
+      await db
+        .update(workspaces)
+        .set({ opencodeUrl: endpoints.opencode, agentUrl: endpoints.agent })
+        .where(eq(workspaces.id, id));
+    }
+    const summarySource =
+      upgradeResults || !output.stdout.trim() ? output.stderr : output.stdout;
     return NextResponse.json({
       status: "upgraded",
-      summary: lastOutputLines(output, 1),
+      summary: lastOutputLines(summarySource, 1),
     });
   } catch (err) {
     const message =
@@ -120,7 +141,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   }
 }
 
-function runUpgradeCommand(command: string): Promise<string> {
+interface UpgradeCommandOutput {
+  stdout: string;
+  stderr: string;
+}
+
+function runUpgradeCommand(command: string): Promise<UpgradeCommandOutput> {
   return new Promise((resolve, reject) => {
     const child = spawn("sh", ["-c", command], {
       timeout: UPGRADE_TIMEOUT_MS,
@@ -139,7 +165,7 @@ function runUpgradeCommand(command: string): Promise<string> {
     child.on("error", (err) => reject(err));
     child.on("close", (code) => {
       if (code === 0) {
-        resolve(stdout);
+        resolve({ stdout, stderr });
         return;
       }
       const detail = lastOutputLines(stderr || stdout, 3);

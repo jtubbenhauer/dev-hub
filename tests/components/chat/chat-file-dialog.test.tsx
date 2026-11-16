@@ -159,3 +159,31 @@ describe("ChatFileDialog download button", () => {
     );
   });
 });
+
+describe("ChatFileDialog layout", () => {
+  beforeEach(() => {
+    useChatFileDialogStore.getState().reset();
+  });
+
+  it("fills 90% of the viewport width and height", () => {
+    useChatFileDialogStore.setState({
+      isOpen: true,
+      isLoading: false,
+      file: {
+        path: "src/lib/example.ts",
+        instanceId: 5,
+        content: "content",
+        language: "typescript",
+        workspaceId: "ws-1",
+      },
+      originalContent: "content",
+    });
+
+    renderDialog();
+
+    expect(screen.getByRole("dialog")).toHaveClass(
+      "h-[90dvh]",
+      "sm:max-w-[90vw]",
+    );
+  });
+});

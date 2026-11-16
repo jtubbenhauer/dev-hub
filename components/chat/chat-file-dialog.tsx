@@ -121,7 +121,7 @@ export function ChatFileDialog() {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex h-[85dvh] max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl">
+      <DialogContent className="flex h-[90dvh] max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[90vw]">
         <DialogHeader className="flex shrink-0 flex-row items-center gap-2 border-b px-4 py-3 pr-12 text-left">
           <FileCode2 className="text-muted-foreground size-4 shrink-0" />
           <DialogTitle

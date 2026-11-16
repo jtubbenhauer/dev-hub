@@ -233,6 +233,7 @@ describe("GitTabPanel", () => {
     const dialog = await screen.findByTestId("git-diff-dialog");
     const diffView = screen.getByTestId("workbench-diff-view");
     expect(dialog).toContainElement(diffView);
+    expect(dialog).toHaveClass("h-[90dvh]", "sm:max-w-[90vw]");
     expect(diffView).toHaveAttribute("data-file-path", "src/staged.ts");
     expect(diffView).toHaveAttribute("data-staged", "true");
   });

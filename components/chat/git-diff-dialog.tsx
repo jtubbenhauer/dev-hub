@@ -65,7 +65,7 @@ function GitDiffDialog({
   return (
     <Dialog open={target !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex h-[85dvh] max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
+        className="flex h-[90dvh] max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[90vw]"
         data-testid="git-diff-dialog"
       >
         <DialogHeader className="flex shrink-0 flex-row items-center gap-2 border-b px-4 py-3 pr-12 text-left">

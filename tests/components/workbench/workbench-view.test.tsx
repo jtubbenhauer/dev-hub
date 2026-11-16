@@ -566,7 +566,9 @@ describe("WorkbenchView", () => {
         workspaceId: "w1",
         sessionId: "s1",
       });
-      expect(fakeUrl.router.replace).toHaveBeenCalledWith(WORKBENCH_PATH);
+      expect(fakeUrl.router.replace).not.toHaveBeenCalledWith(WORKBENCH_PATH);
+      expect(fakeUrl.router.push).not.toHaveBeenCalled();
+      expect(fakeUrl.getSearch()).toBe("workspaceId=w1&open=chat&sessionId=s1");
     });
 
     it("drops a linked session the session list turns out to lack", () => {
@@ -613,6 +615,79 @@ describe("WorkbenchView", () => {
         workspaceId: "w1",
         sessionId: null,
       });
+    });
+  });
+
+  describe("chat URL sync", () => {
+    function loadSessions(...sessionIds: string[]) {
+      useChatStore.setState({
+        workspaceStates: {
+          w1: {
+            ...createLoadedChatWorkspaceState(),
+            sessions: Object.fromEntries(
+              sessionIds.map((id) => [id, makeSession(id)]),
+            ),
+          },
+        },
+      });
+    }
+
+    function startSession(sessionId: string) {
+      const onSessionStarted = chatEffectsHost.latestProps?.onSessionStarted;
+      if (!onSessionStarted) throw new Error("expected onSessionStarted");
+      act(() => onSessionStarted("w1", sessionId));
+    }
+
+    it("replaces the URL when the first chat session gets focus", () => {
+      // Given
+      loadSessions("s1");
+      renderWorkbenchView();
+
+      // When
+      startSession("s1");
+
+      // Then
+      expect(fakeUrl.router.replace).toHaveBeenCalledWith(
+        "/?workspaceId=w1&open=chat&sessionId=s1",
+      );
+      expect(fakeUrl.router.push).not.toHaveBeenCalled();
+    });
+
+    it("pushes a history entry when focus moves to another chat", () => {
+      // Given
+      loadSessions("s1", "s2");
+      renderWorkbenchView();
+      startSession("s1");
+
+      // When
+      startSession("s2");
+
+      // Then
+      expect(fakeUrl.router.push).toHaveBeenCalledWith(
+        "/?workspaceId=w1&open=chat&sessionId=s2",
+      );
+      expect(fakeUrl.getSearch()).toBe("workspaceId=w1&open=chat&sessionId=s2");
+    });
+
+    it("focuses the previous chat's tab when history goes back", () => {
+      // Given
+      loadSessions("s1", "s2");
+      renderWorkbenchView();
+      startSession("s1");
+      startSession("s2");
+      fakeUrl.router.push.mockClear();
+
+      // When
+      act(() => fakeUrl.setSearch("workspaceId=w1&open=chat&sessionId=s1"));
+
+      // Then
+      expect(useWorkbenchStore.getState().focusedPanel?.params).toEqual({
+        kind: "chat",
+        workspaceId: "w1",
+        sessionId: "s1",
+      });
+      expect(fakeUrl.getSearch()).toBe("workspaceId=w1&open=chat&sessionId=s1");
+      expect(fakeUrl.router.push).not.toHaveBeenCalled();
     });
   });
 });

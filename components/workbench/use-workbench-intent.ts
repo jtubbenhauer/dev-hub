@@ -15,6 +15,7 @@ import {
   type WorkbenchController,
 } from "@/lib/workbench/workbench-controller-registry";
 import {
+  createWorkbenchHref,
   parseWorkbenchIntent,
   WORKBENCH_PATH,
 } from "@/lib/workbench/workbench-href";
@@ -66,7 +67,9 @@ function createIntentDeps(input: IntentDepsInput): ApplyWorkbenchIntentDeps {
 }
 
 // Applies a `?open=` workbench intent from the URL once the target workspace's
-// layout is ready, then clears the query. Each query string is processed once.
+// layout is ready. Each query string is processed once. A live chat link stays
+// in the URL; the focused chat tab's session is then mirrored back into it, so
+// switching chats adds history entries and a reload reopens the same chat.
 export function useWorkbenchIntent({
   activeWorkspaceId,
   workspaces,
@@ -85,6 +88,17 @@ export function useWorkbenchIntent({
       state.workspaceStates[activeWorkspaceId]?.sessionsLoaded === true,
   );
   const lastProcessedQueryRef = useRef("");
+  const lastSyncedFocusRef = useRef("");
+  const focusedChatWorkspaceId = useWorkbenchStore((state) =>
+    state.focusedPanel?.params.kind === "chat"
+      ? state.focusedPanel.params.workspaceId
+      : null,
+  );
+  const focusedChatSessionId = useWorkbenchStore((state) =>
+    state.focusedPanel?.params.kind === "chat"
+      ? state.focusedPanel.params.sessionId
+      : null,
+  );
 
   useEffect(() => {
     // An empty query re-arms the ref, so following the same link again acts again.
@@ -93,9 +107,9 @@ export function useWorkbenchIntent({
       return;
     }
     if (lastProcessedQueryRef.current === queryString) return;
-    const finishIntent = () => {
+    const finishIntent = (shouldKeepQuery = false) => {
       lastProcessedQueryRef.current = queryString;
-      router.replace(WORKBENCH_PATH);
+      if (!shouldKeepQuery) router.replace(WORKBENCH_PATH);
     };
 
     const intent = parseWorkbenchIntent(new URLSearchParams(queryString));
@@ -131,16 +145,18 @@ export function useWorkbenchIntent({
     }
     const controller = getWorkbenchController();
     if (controller?.workspaceId !== workspaceId) return;
-    applyWorkbenchIntent(
-      intent,
-      createIntentDeps({
-        workspaceId,
-        controller,
-        isFileTabsDisabled,
-        navigate: (href) => router.push(href),
-      }),
+    const deps = createIntentDeps({
+      workspaceId,
+      controller,
+      isFileTabsDisabled,
+      navigate: (href) => router.push(href),
+    });
+    applyWorkbenchIntent(intent, deps);
+    finishIntent(
+      intent.open === "chat" &&
+        intent.sessionId !== null &&
+        !deps.isKnownMissingSession(workspaceId, intent.sessionId),
     );
-    finishIntent();
   }, [
     activeWorkspaceId,
     isActiveSessionListLoaded,
@@ -150,4 +166,43 @@ export function useWorkbenchIntent({
     router,
     workspaces,
   ]);
+
+  // Declared after the intent effect so a just-applied link counts as processed.
+  useEffect(() => {
+    if (focusedChatWorkspaceId === null || focusedChatSessionId === null) {
+      return;
+    }
+    // A link still waiting to apply owns the URL until it lands.
+    if (queryString !== "" && lastProcessedQueryRef.current !== queryString) {
+      return;
+    }
+    // Only a focus change writes the URL; a URL change alone (back/forward)
+    // is applied by the intent effect and its focus change lands later.
+    const focusKey = `${focusedChatWorkspaceId}\u0000${focusedChatSessionId}`;
+    if (lastSyncedFocusRef.current === focusKey) return;
+    lastSyncedFocusRef.current = focusKey;
+    const currentIntent = parseWorkbenchIntent(
+      new URLSearchParams(queryString),
+    );
+    const currentSessionId =
+      currentIntent?.open === "chat" ? currentIntent.sessionId : null;
+    if (
+      currentSessionId === focusedChatSessionId &&
+      currentIntent?.workspaceId === focusedChatWorkspaceId
+    ) {
+      return;
+    }
+    const href = createWorkbenchHref({
+      open: "chat",
+      workspaceId: focusedChatWorkspaceId,
+      sessionId: focusedChatSessionId,
+    });
+    // Our own write must not be re-applied as an incoming link.
+    lastProcessedQueryRef.current = href.slice(href.indexOf("?") + 1);
+    // Switching chats is a history step; a new chat getting its id, or a
+    // link being canonicalised, is not.
+    if (currentSessionId === null || currentSessionId === focusedChatSessionId)
+      router.replace(href);
+    else router.push(href);
+  }, [focusedChatSessionId, focusedChatWorkspaceId, queryString, router]);
 }

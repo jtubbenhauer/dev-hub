@@ -296,9 +296,13 @@ export function fileRoutes(workspacePath: string): Hono {
     });
   });
 
-  // POST /files/write { path, content }
+  // POST /files/write { path, content, encoding? }; "base64" carries binary files.
   app.post("/write", async (c) => {
-    const body = await c.req.json<{ path: string; content: string }>();
+    const body = await c.req.json<{
+      path: string;
+      content: string;
+      encoding?: "utf-8" | "base64";
+    }>();
     if (!body.path || body.content === undefined) {
       return c.json({ error: "path and content required" }, 400);
     }
@@ -309,7 +313,11 @@ export function fileRoutes(workspacePath: string): Hono {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    fs.writeFileSync(resolvedPath, body.content, "utf-8");
+    if (body.encoding === "base64") {
+      fs.writeFileSync(resolvedPath, Buffer.from(body.content, "base64"));
+    } else {
+      fs.writeFileSync(resolvedPath, body.content, "utf-8");
+    }
     return c.json({ ok: true });
   });
 

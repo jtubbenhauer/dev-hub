@@ -217,18 +217,32 @@ function getInlinedTextBytes(
   return Math.floor((base64.length * 3) / 4) - paddingLength;
 }
 
+function isImageDataUrl(dataUrl: string): boolean {
+  return dataUrl.startsWith("data:image/");
+}
+
 // Text attachments are inlined in order while they fit the budget; the rest
-// are uploaded. Images and PDFs are always sent as file parts.
+// are uploaded. Images are always sent as file parts, and so are PDFs unless
+// the engine only accepts images (omo), in which case they are uploaded.
 export function splitAttachmentsForUpload<
   T extends Pick<Attachment, "filename" | "dataUrl">,
 >(
   attachments: readonly T[],
+  options: { readonly isImageOnlyEngine?: boolean } = {},
 ): { attachmentsToSend: T[]; attachmentsToUpload: T[] } {
   const attachmentsToSend: T[] = [];
   const attachmentsToUpload: T[] = [];
   let inlinedBytes = 0;
   for (const attachment of attachments) {
     const textBytes = getInlinedTextBytes(attachment);
+    if (
+      options.isImageOnlyEngine === true &&
+      textBytes === 0 &&
+      !isImageDataUrl(attachment.dataUrl)
+    ) {
+      attachmentsToUpload.push(attachment);
+      continue;
+    }
     if (textBytes > 0 && inlinedBytes + textBytes > MAX_INLINE_TEXT_BYTES) {
       attachmentsToUpload.push(attachment);
       continue;
@@ -302,7 +316,7 @@ export function buildWorkspaceUploadsContext(
     (upload) =>
       `- ${JSON.stringify(upload.filename)} (${formatByteSize(upload.sizeBytes)}): ${upload.path}`,
   );
-  return `${WORKSPACE_UPLOADS_CONTEXT_PREFIX} (too large to include in this message; read them with your tools, paths are relative to the workspace root):\n${fileLines.join("\n")}\n\n`;
+  return `${WORKSPACE_UPLOADS_CONTEXT_PREFIX} (not included in this message; read them with your tools, paths are relative to the workspace root):\n${fileLines.join("\n")}\n\n`;
 }
 
 function encodeTextAsDataUrl(text: string): string {

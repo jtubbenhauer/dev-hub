@@ -12,6 +12,9 @@ function createRecordingBackend() {
       writeFile: async (path: string, content: string) => {
         writes.push({ path, content });
       },
+      writeFileBytes: async (path: string, bytes: Uint8Array) => {
+        writes.push({ path, content: Buffer.from(bytes).toString("utf8") });
+      },
     },
   };
 }
@@ -29,7 +32,7 @@ describe("saveWorkspaceUpload", () => {
     const uploadPath = await saveWorkspaceUpload(
       backend,
       "data.json",
-      '{"a":1}',
+      Buffer.from('{"a":1}'),
     );
 
     expect(uploadPath).toMatch(
@@ -44,8 +47,16 @@ describe("saveWorkspaceUpload", () => {
   it("gives repeated uploads of the same file different paths", async () => {
     const { backend } = createRecordingBackend();
 
-    const firstPath = await saveWorkspaceUpload(backend, "data.json", "1");
-    const secondPath = await saveWorkspaceUpload(backend, "data.json", "2");
+    const firstPath = await saveWorkspaceUpload(
+      backend,
+      "data.json",
+      Buffer.from("1"),
+    );
+    const secondPath = await saveWorkspaceUpload(
+      backend,
+      "data.json",
+      Buffer.from("2"),
+    );
 
     expect(firstPath).not.toBe(secondPath);
   });
@@ -60,7 +71,11 @@ describe("saveWorkspaceUpload", () => {
   ])("saves %j as %j inside the uploads folder", async (filename, expected) => {
     const { backend } = createRecordingBackend();
 
-    const uploadPath = await saveWorkspaceUpload(backend, filename, "x");
+    const uploadPath = await saveWorkspaceUpload(
+      backend,
+      filename,
+      Buffer.from("x"),
+    );
 
     expect(uploadPath.startsWith(`${WORKSPACE_UPLOADS_DIR}/`)).toBe(true);
     expect(uploadPath.endsWith(`-${expected}`)).toBe(true);
@@ -75,7 +90,7 @@ describe("saveWorkspaceUpload", () => {
     const uploadPath = await saveWorkspaceUpload(
       backend,
       `${"x".repeat(300)}.json`,
-      "x",
+      Buffer.from("x"),
     );
     const savedName = uploadPath.split("/").pop() ?? "";
 

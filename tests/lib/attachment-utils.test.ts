@@ -292,6 +292,27 @@ describe("splitAttachmentsForUpload", () => {
     });
   });
 
+  it("uploads PDFs but still sends images for an image-only engine", () => {
+    const photo = {
+      filename: "photo.png",
+      dataUrl: "data:image/png;base64,AA==",
+    };
+    const document = {
+      filename: "doc.pdf",
+      dataUrl: "data:application/pdf;base64,AA==",
+    };
+    const notes = { filename: "notes.md", dataUrl: textDataUrl(10) };
+
+    expect(
+      splitAttachmentsForUpload([photo, document, notes], {
+        isImageOnlyEngine: true,
+      }),
+    ).toEqual({
+      attachmentsToSend: [photo, notes],
+      attachmentsToUpload: [document],
+    });
+  });
+
   it("uploads Office files whose extracted text is over the limit", () => {
     const report = {
       filename: "report.docx",

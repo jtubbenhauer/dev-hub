@@ -164,6 +164,16 @@ export function writeFileContent(
   fs.writeFileSync(resolvedPath, content, "utf-8");
 }
 
+export function writeFileBytes(
+  workspacePath: string,
+  filePath: string,
+  bytes: Uint8Array,
+): void {
+  const resolvedPath = validatePathWithinWorkspace(workspacePath, filePath);
+  fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
+  fs.writeFileSync(resolvedPath, bytes);
+}
+
 export function writeFileContentIfUnchanged(
   workspacePath: string,
   filePath: string,

@@ -59,6 +59,7 @@ import {
 } from "@/lib/terminal-chat-bridge";
 import { isPrTrigger } from "@/lib/pr-mention";
 import { fetchPrContext, formatPrContextForAI } from "@/lib/pr-context";
+import { getChatEngineForSend } from "@/hooks/use-active-chat-engine";
 import { useWorkspaceGitHub } from "@/hooks/use-git";
 import { useHasCoarsePointer } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
@@ -549,8 +550,13 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
         selectedPrContexts.length > 0
           ? selectedPrContexts.map((c) => c.contextString).join("\n\n") + "\n\n"
           : "";
+      // omo takes only image attachments; other files go to the workspace.
       const { attachmentsToSend, attachmentsToUpload } =
-        splitAttachmentsForUpload(attachments);
+        splitAttachmentsForUpload(attachments, {
+          isImageOnlyEngine:
+            workspaceId !== null &&
+            getChatEngineForSend(queryClient, workspaceId, sessionId) === "omo",
+        });
       let uploadsContext = "";
       if (attachmentsToUpload.length > 0) {
         if (!workspaceId) return;

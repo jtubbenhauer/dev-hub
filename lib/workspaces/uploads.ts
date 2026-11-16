@@ -20,12 +20,12 @@ function formatUploadTimestamp(date: Date): string {
 
 // The .gitignore keeps uploads out of git status, reviews and commits.
 export async function saveWorkspaceUpload(
-  backend: Pick<WorkspaceBackend, "writeFile">,
+  backend: Pick<WorkspaceBackend, "writeFile" | "writeFileBytes">,
   filename: string,
-  content: string,
+  content: Uint8Array,
 ): Promise<string> {
   const uploadPath = `${WORKSPACE_UPLOADS_DIR}/${formatUploadTimestamp(new Date())}-${randomUUID().slice(0, 6)}-${sanitizeUploadFilename(filename)}`;
   await backend.writeFile(`${WORKSPACE_UPLOADS_DIR}/.gitignore`, "*\n");
-  await backend.writeFile(uploadPath, content);
+  await backend.writeFileBytes(uploadPath, content);
   return uploadPath;
 }

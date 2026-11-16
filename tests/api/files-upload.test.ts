@@ -199,6 +199,69 @@ describe("POST /api/files/upload", () => {
     ).toBe("*\n");
   });
 
+  // Bytes that are invalid UTF-8, so a text round-trip would corrupt them.
+  const PDF_BYTES = Buffer.from([
+    0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37, 0x0a, 0xe2, 0xe3, 0xcf,
+    0xd3, 0x0a, 0xff, 0x00, 0x80,
+  ]);
+  const pdfDataUrl = `data:application/pdf;base64,${PDF_BYTES.toString("base64")}`;
+
+  it("saves a binary file byte for byte into a local workspace", async () => {
+    const workspaceDir = makeTempDir("upload-route-pdf-local-");
+    mockWhere.mockResolvedValue([workspaceRow({ path: workspaceDir })]);
+
+    const response = await POST(
+      uploadRequest({
+        workspaceId: "ws-1",
+        filename: "report.pdf",
+        dataUrl: pdfDataUrl,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(fs.readFileSync(path.join(workspaceDir, body.path))).toEqual(
+      PDF_BYTES,
+    );
+  });
+
+  it("saves a binary file byte for byte into a remote workspace", async () => {
+    const agentWorkspaceDir = makeTempDir("upload-route-pdf-remote-");
+    const agentFileRoutes = fileRoutes(agentWorkspaceDir);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (input, init) => {
+        const url = new URL(input instanceof Request ? input.url : input);
+        return agentFileRoutes.request(
+          url.pathname.replace(/^\/files/, ""),
+          init,
+        );
+      }),
+    );
+    mockWhere.mockResolvedValue([
+      workspaceRow({
+        path: "/home/dev/code",
+        backend: "remote",
+        agentUrl: "http://agent.test:10020",
+        opencodeUrl: "http://opencode.test:15020",
+      }),
+    ]);
+
+    const response = await POST(
+      uploadRequest({
+        workspaceId: "ws-1",
+        filename: "report.pdf",
+        dataUrl: pdfDataUrl,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(fs.readFileSync(path.join(agentWorkspaceDir, body.path))).toEqual(
+      PDF_BYTES,
+    );
+  });
+
   it("reports the agent's error when the remote write fails", async () => {
     vi.stubGlobal(
       "fetch",

@@ -27,6 +27,7 @@ type WorkspaceRow = typeof workspaces.$inferSelect;
 
 import {
   readFileContent,
+  writeFileBytes,
   writeFileContent,
   readDirectoryTree,
 } from "@/lib/files/operations";
@@ -82,6 +83,7 @@ export interface WorkspaceBackend {
   // Files
   readFile(filePath: string): Promise<{ content: string; size: number }>;
   writeFile(filePath: string, content: string): Promise<void>;
+  writeFileBytes(filePath: string, bytes: Uint8Array): Promise<void>;
   listDirectory(dirPath: string, depth?: number): Promise<FileTreeEntry[]>;
   getFileStatuses(): Promise<Map<string, FileGitStatus>>;
 
@@ -171,6 +173,10 @@ export class LocalBackend implements WorkspaceBackend {
 
   async writeFile(filePath: string, content: string) {
     writeFileContent(this.workspacePath, filePath, content);
+  }
+
+  async writeFileBytes(filePath: string, bytes: Uint8Array) {
+    writeFileBytes(this.workspacePath, filePath, bytes);
   }
 
   async listDirectory(dirPath: string, depth = 1) {
@@ -464,6 +470,14 @@ export class RemoteBackend implements WorkspaceBackend {
 
   async writeFile(filePath: string, content: string) {
     await this.agentPost("/files/write", { path: filePath, content });
+  }
+
+  async writeFileBytes(filePath: string, bytes: Uint8Array) {
+    await this.agentPost("/files/write", {
+      path: filePath,
+      content: Buffer.from(bytes).toString("base64"),
+      encoding: "base64",
+    });
   }
 
   async listDirectory(dirPath: string, depth?: number) {

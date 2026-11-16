@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     const uploadPath = await saveWorkspaceUpload(
       getBackend(toWorkspace(row)),
       body.filename,
-      content.toString("utf8"),
+      content,
     );
     return NextResponse.json({
       path: uploadPath,

@@ -214,6 +214,35 @@ describe("PromptInput — large text attachments", () => {
     expect(getTextarea(container).value).toBe("");
   });
 
+  it("saves a PDF to the workspace for an omo chat, which takes only images", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => uploadResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const onSubmit = vi.fn();
+    const { container } = render(
+      <PromptInput
+        {...baseProps}
+        onSubmit={onSubmit}
+        sessionId="omo_session-pdf"
+      />,
+    );
+
+    await attachFile(
+      container,
+      new File(["%PDF-1.7"], "report.pdf", { type: "application/pdf" }),
+    );
+    typeAndPressEnter(container, "summarise the report");
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/files/upload");
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      filename: "report.pdf",
+    });
+    const [text, attachments] = onSubmit.mock.calls[0];
+    expect(text.startsWith(WORKSPACE_UPLOADS_CONTEXT_PREFIX)).toBe(true);
+    expect(attachments).toBeUndefined();
+  });
+
   it("keeps the message and files when saving to the workspace fails", async () => {
     vi.stubGlobal(
       "fetch",

@@ -25,6 +25,7 @@ import type { Provider, Model } from "@/lib/opencode/types";
 const STORAGE_KEY = "dev-hub:selected-model";
 const EMPTY_PROVIDERS: ProviderWithModels[] = [];
 const EMPTY_DEFAULT_MODELS: Record<string, string> = {};
+const PROVIDER_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000];
 
 interface SelectedModel {
   providerID: string;
@@ -139,9 +140,20 @@ export function ModelSelector({
   useEffect(() => {
     if (!workspaceId || isEngineLoading) return;
     let isCurrentRequest = true;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
 
-    const fetchProviders = async () => {
+    const showProviders = (
+      providers: ProviderWithModels[],
+      defaultModels: Record<string, string>,
+    ) => {
+      setProviderState({ workspaceId, engine, providers, defaultModels });
+      setIsLoading(false);
+    };
+
+    // A workspace that was just created or resumed can fail its first loads,
+    // so retry with backoff before settling on no models.
+    const fetchProviders = async (attempt: number) => {
       setIsLoading(true);
       try {
         const params = new URLSearchParams({ workspaceId, engine });
@@ -149,40 +161,38 @@ export function ModelSelector({
           `/api/opencode/config/providers?${params.toString()}`,
           { signal: controller.signal },
         );
-        if (!response.ok || !isCurrentRequest) return;
-
-        const data: ConfigProvidersResponse = await response.json();
-        if (!isCurrentRequest) return;
-        const providerList: ProviderWithModels[] = data.providers.map(
-          (provider) => ({
-            provider,
-            models: Object.values(provider.models),
-          }),
-        );
-        setProviderState({
-          workspaceId,
-          engine,
-          providers: providerList,
-          defaultModels: data.default ?? {},
-        });
-      } catch {
-        if (isCurrentRequest) {
-          setProviderState({
-            workspaceId,
-            engine,
-            providers: [],
-            defaultModels: {},
-          });
+        if (response.ok) {
+          const data: ConfigProvidersResponse = await response.json();
+          if (!isCurrentRequest) return;
+          showProviders(
+            data.providers.map((provider) => ({
+              provider,
+              models: Object.values(provider.models),
+            })),
+            data.default ?? {},
+          );
+          return;
         }
-      } finally {
-        if (isCurrentRequest) setIsLoading(false);
+      } catch {
+        // A failed request is retried below, like an error response.
       }
+      if (!isCurrentRequest) return;
+      const retryDelay = PROVIDER_RETRY_DELAYS_MS[attempt];
+      if (retryDelay === undefined) {
+        showProviders([], {});
+        return;
+      }
+      retryTimer = setTimeout(
+        () => void fetchProviders(attempt + 1),
+        retryDelay,
+      );
     };
 
-    void fetchProviders();
+    void fetchProviders(0);
     return () => {
       isCurrentRequest = false;
       controller.abort();
+      clearTimeout(retryTimer);
     };
   }, [workspaceId, engine, isEngineLoading]);
 

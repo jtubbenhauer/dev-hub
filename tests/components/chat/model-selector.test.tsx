@@ -495,4 +495,65 @@ describe("ModelSelector", () => {
     ).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" });
     localStorage.clear();
   });
+
+  it("retries a failed provider load until the workspace answers", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.mocked(fetch)
+      .mockReset()
+      .mockResolvedValueOnce(new Response("unavailable", { status: 502 }))
+      .mockResolvedValueOnce(
+        providerResponse("opencode", "OpenCode Zen", "kimi-k3", "Kimi K3"),
+      );
+    try {
+      render(
+        <ModelSelector
+          workspaceId="workspace-1"
+          selectedModel={AVAILABLE_MODEL}
+          onModelChange={vi.fn()}
+        />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText("Loading models...")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("combobox")).toHaveTextContent("Kimi K3");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows no models once every retry has failed", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.mocked(fetch)
+      .mockReset()
+      .mockImplementation(() =>
+        Promise.resolve(new Response("unavailable", { status: 502 })),
+      );
+    try {
+      render(
+        <ModelSelector
+          workspaceId="workspace-1"
+          selectedModel={AVAILABLE_MODEL}
+          onModelChange={vi.fn()}
+        />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+
+      expect(fetch).toHaveBeenCalledTimes(6);
+      expect(screen.getByText("No models")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

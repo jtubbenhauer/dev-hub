@@ -1,0 +1,31 @@
+lib/omo/session-registry-core.ts
+  s_ac67191d5e039d::t_53488de55d50c5 170-176
+tests/lib/omo/facade/read-message-cases.ts
+  s_34e9f2df8cbbea::t_4441481981dbda 1,436,464,467
+tests/lib/omo/session-registry-dialogs.test.ts
+  s_34e9f2df8cbbea::t_2463610d6368b8 4,6,14-52,149-225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "23755f005270b7ee600d3c16df12faa0176f14a2",
+  "prompts": {},
+  "sessions": {
+    "s_34e9f2df8cbbea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a2060a-9cd5-7e43-98b5-758f4490d724",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    },
+    "s_ac67191d5e039d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a2060d-f0cc-78e2-9134-6fd23d070c73",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

@@ -106,7 +106,7 @@ export function createDialogAdapter(
       request: mapped.request,
       upstreamQuestionIds: mapped.upstreamQuestionIds,
     });
-    return [askedEvent(entry.payload)];
+    return entry ? [askedEvent(entry.payload)] : [];
   };
 
   const send = async (

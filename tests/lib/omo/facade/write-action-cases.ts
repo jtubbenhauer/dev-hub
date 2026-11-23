@@ -137,6 +137,7 @@ describe("handleOmoWrite action routes", () => {
       },
       upstreamQuestionIds: ["choice"],
     });
+    if (!entry) throw new TypeError("Expected a ledger entry");
 
     // When
     const response = await fixture.request(
@@ -189,6 +190,7 @@ describe("handleOmoWrite action routes", () => {
         ],
       },
     });
+    if (!entry) throw new TypeError("Expected a ledger entry");
 
     // When
     const response = await fixture.request(

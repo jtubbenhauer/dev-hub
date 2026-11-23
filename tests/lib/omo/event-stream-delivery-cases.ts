@@ -167,6 +167,7 @@ describe("createOmoWorkspaceEventStream delivery", () => {
         ],
       },
     });
+    if (!entry) throw new TypeError("Expected a ledger entry");
 
     // When
     const eventStream = createOmoWorkspaceEventStream({

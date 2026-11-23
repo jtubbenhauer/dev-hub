@@ -145,5 +145,53 @@ export function registerDialogLifecycleTests(): void {
       adapter.handle({ type: "session_closed", sessionId: "rpc-question-1" });
       expect(adapter.eventsForSubscriber()).toEqual([]);
     });
+
+    it("keeps a question omo settled from coming back until the record expires", () => {
+      let now = 1_000;
+      const { adapter } = createDialogHarness(() => now);
+      adapter.handle(fixtureQuestionRequest());
+      adapter.handle({
+        type: "question_resolved",
+        id: "question-ui-1",
+        outcome: "timed_out",
+      });
+
+      const relisted = adapter.ingestPendingQuestions([
+        fixtureQuestionRequest(),
+      ]);
+      now += 24 * 60 * 60 * 1_000;
+      const afterExpiry = questionRequests(
+        adapter.ingestPendingQuestions([fixtureQuestionRequest()]),
+      );
+
+      expect(relisted).toEqual([]);
+      expect(afterExpiry).toHaveLength(1);
+    });
+
+    it("blocks a re-listed question only after omo confirms the answer", async () => {
+      const { adapter } = createDialogHarness();
+      const [request] = questionRequests(
+        adapter.handle(fixtureQuestionRequest()),
+      );
+      if (!request) throw new TypeError("Expected a question request");
+
+      await adapter.reply(request.id, [["Option A"]]);
+      const beforeConfirmation = questionRequests(
+        adapter.ingestPendingQuestions([fixtureQuestionRequest()]),
+      );
+      adapter.handle({
+        type: "question_resolved",
+        id: "question-ui-1",
+        outcome: "answered",
+        answers: { q1: { selected: ["Option A"] } },
+      });
+      const afterConfirmation = adapter.ingestPendingQuestions([
+        fixtureQuestionRequest(),
+      ]);
+
+      expect(beforeConfirmation).toHaveLength(1);
+      expect(afterConfirmation).toEqual([]);
+      expect(adapter.eventsForSubscriber()).toEqual([]);
+    });
   });
 }

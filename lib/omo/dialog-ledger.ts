@@ -58,14 +58,23 @@ type DialogLedgerOptions = {
 export class DialogLedger {
   private readonly entries = new Map<string, DialogLedgerEntry>();
   private readonly permissions = new Map<string, PermissionLedgerEntry>();
+  // Questions omo reported settled, so a stale copy cannot reopen one.
+  private readonly settledAtByUpstream = new Map<string, number>();
   private readonly now: () => number;
 
   constructor(options?: DialogLedgerOptions) {
     this.now = options?.now ?? Date.now;
   }
 
-  register(input: RegisterDialogInput): DialogLedgerEntry {
+  register(input: RegisterDialogInput): DialogLedgerEntry | undefined {
     this.pruneExpired();
+    if (
+      this.settledAtByUpstream.has(
+        upstreamKey(input.routingHandle, input.extUiId),
+      )
+    ) {
+      return undefined;
+    }
     const existing = this.findByUpstream(input.routingHandle, input.extUiId);
     if (existing) return existing;
 
@@ -108,6 +117,10 @@ export class DialogLedger {
     extUiId: string,
   ): DialogLedgerEntry | undefined {
     this.pruneExpired();
+    this.settledAtByUpstream.set(
+      upstreamKey(routingHandle, extUiId),
+      this.now(),
+    );
     const entry = this.findByUpstream(routingHandle, extUiId);
     if (entry) this.entries.delete(entry.publicId);
     return entry;
@@ -207,6 +220,7 @@ export class DialogLedger {
   clear(): void {
     this.entries.clear();
     this.permissions.clear();
+    this.settledAtByUpstream.clear();
   }
 
   private findByUpstream(
@@ -235,5 +249,12 @@ export class DialogLedger {
     for (const [publicId, entry] of this.permissions) {
       if (entry.createdAt <= cutoff) this.permissions.delete(publicId);
     }
+    for (const [key, settledAt] of this.settledAtByUpstream) {
+      if (settledAt <= cutoff) this.settledAtByUpstream.delete(key);
+    }
   }
+}
+
+function upstreamKey(routingHandle: string, extUiId: string): string {
+  return JSON.stringify([routingHandle, extUiId]);
 }

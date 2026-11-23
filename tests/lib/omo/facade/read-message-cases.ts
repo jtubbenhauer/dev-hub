@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { JsonlRecord } from "@/lib/omo/jsonl";
 import type { SessionEntry } from "@/lib/omo/sessions-on-disk";
 import {
@@ -433,7 +433,7 @@ describe("handleOmoRead message history", () => {
     expect(fixture.source.readSubAgentEntries).not.toHaveBeenCalled();
   });
 
-  it("replays pending questions into the workspace dialog ledger", async () => {
+  it("does not re-add questions from the open snapshot when messages load", async () => {
     const fixture = await useReadFixture();
     fixture.source.authorized.add("question-session");
     const pendingQuestion: JsonlRecord = {
@@ -461,23 +461,10 @@ describe("handleOmoRead message history", () => {
     const history = await fixture.request(
       "/session/omo_question-session/message",
     );
-    vi.resetModules();
-    const { handleOmoRead } = await import("@/lib/omo/facade/read");
-    const questions = await handleOmoRead({
-      method: "GET",
-      path: "/question",
-      query: new URLSearchParams(),
-      workspace: fixture.workspace,
-      userId: "user-1",
-    });
+    const questions = await fixture.request("/question");
 
     expect(history.status).toBe(200);
-    expect(await readJson(questions)).toMatchObject([
-      {
-        sessionID: "omo_question-session",
-        questions: [{ header: "Choice", question: "Pick one" }],
-      },
-    ]);
+    expect(await readJson(questions)).toEqual([]);
   });
 
   it("serves empty history for an attached session with no file yet", async () => {

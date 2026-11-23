@@ -167,6 +167,13 @@ export class OmoSessionRegistry {
       this.bySessionPath.set(binding.sessionPath, binding);
     }
     this.workspaceOwners.set(input.canonicalPath, binding.workspaceId);
+    // omo lists the questions open at this point. Buffered and live records
+    // settle them from here, so this runs once per open, never per read.
+    for (const event of binding.dialogs.ingestPendingQuestions(
+      openedState.record["pendingQuestions"],
+    )) {
+      this.emitEvent(binding.workspaceId, event);
+    }
     return binding;
   }
 

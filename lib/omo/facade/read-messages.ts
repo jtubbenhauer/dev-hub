@@ -1,4 +1,3 @@
-import { createDialogAdapter } from "@/lib/omo/adapter/dialogs";
 import {
   entriesToMessages,
   windowMessages,
@@ -23,7 +22,6 @@ import {
   responseForOmoReadError,
 } from "@/lib/omo/facade/read-errors";
 import { parseRpcEntriesResponse } from "@/lib/omo/facade/read-message-entries";
-import { getOmoDialogLedger } from "@/lib/omo/facade/read-runtime";
 import {
   jsonResponse,
   sessionNotFoundResponse,
@@ -138,23 +136,6 @@ async function fileFallback(
   );
 }
 
-function ingestPendingQuestions(
-  context: OmoReadContext,
-  rawId: string,
-  binding: Awaited<ReturnType<OmoReadContext["runtime"]["registry"]["attach"]>>,
-): void {
-  const dialogs = createDialogAdapter({
-    ledger: getOmoDialogLedger(context.runtime),
-    routingHandle: binding.routingHandle,
-    durableId: rawId,
-    workspaceId: context.workspace.id,
-    sendResponse: async () => undefined,
-  });
-  dialogs.ingestPendingQuestions(
-    binding.openedState.record["pendingQuestions"],
-  );
-}
-
 // omo describes a worker (transcript path and task id) only while it lists it,
 // and it never lists one that has finished or runs out of process.
 function shouldReadSubAgentTranscript(row: OmoSessionIndexRow | null): boolean {
@@ -194,7 +175,6 @@ export async function readOmoMessages(
       durableId: rawId,
     });
     await binding.ready;
-    ingestPendingQuestions(context, rawId, binding);
     const snapshot = parseRpcEntriesResponse(
       await requestOmoEntries({
         send: (command) => context.runtime.registry.request(binding, command),

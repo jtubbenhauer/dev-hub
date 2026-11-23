@@ -1,0 +1,27 @@
+lib/omo/adapter/dialogs.ts
+  s_c50a83c6f316d2::t_fc5b6b3cd74708 109
+lib/omo/dialog-ledger.ts
+  s_c50a83c6f316d2::t_50abcfcee48208 61-62,69,71-77,120-123,223,252-254,257-260
+tests/lib/omo/adapter/dialogs-lifecycle-cases.ts
+  s_c50a83c6f316d2::t_52bd4a7a87ca3f 148-195
+tests/lib/omo/event-stream-delivery-cases.ts
+  s_c50a83c6f316d2::t_029dfe0ac31b73 170
+tests/lib/omo/facade/write-action-cases.ts
+  s_c50a83c6f316d2::t_dabfef21fe1b67 140,193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b2d9d8cf27bac2b216716e7f5b9aadc0b7135d43",
+  "prompts": {},
+  "sessions": {
+    "s_c50a83c6f316d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a205f4-daf8-7542-be07-1873e0930593",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

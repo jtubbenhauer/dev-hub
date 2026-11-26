@@ -1,0 +1,23 @@
+components/chat/running-sub-agents-banner.tsx
+  s_bf8ff8f6b2bd16::t_698952f537e335 17-21,154-163,175-176,189-191,203-206,235-238,240-243
+tests/components/chat/running-sub-agents-banner.test.tsx
+  s_bf8ff8f6b2bd16::t_c3b3ae7874f941 319-355
+tests/components/chat/session-list-omo-ids.test.tsx
+  s_bf8ff8f6b2bd16::t_30b79dc10795ae 553-555
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9d536997fc73c8cdd6b1a143603f1e5293ded2e7",
+  "prompts": {},
+  "sessions": {
+    "s_bf8ff8f6b2bd16": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a214e9-804c-78ad-b92b-1750eb8c154e",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

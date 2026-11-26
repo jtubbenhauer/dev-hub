@@ -1,0 +1,21 @@
+lib/omo/session-registry-attach.ts
+  s_bf8ff8f6b2bd16::t_00e389a4d8cd7a 1,16-19,126-158,266
+tests/lib/omo/session-registry-attach-cases.ts
+  s_bf8ff8f6b2bd16::t_392eaf299e91e7 2,169-229
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fc74144922f87adc757b95c27abaf176b9e26862",
+  "prompts": {},
+  "sessions": {
+    "s_bf8ff8f6b2bd16": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a214e9-804c-78ad-b92b-1750eb8c154e",
+        "model": "unknown"
+      },
+      "human_author": "Shaun Smekel <shaunsmekel@gmail.com>"
+    }
+  }
+}

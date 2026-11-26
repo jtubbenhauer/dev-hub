@@ -14,7 +14,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Session, SubAgentActivity } from "@/lib/opencode/types";
+import type {
+  Session,
+  SessionStatus,
+  SubAgentActivity,
+} from "@/lib/opencode/types";
 import { cn } from "@/lib/utils";
 import {
   isSessionOwnedByOtherWorkspace,
@@ -147,6 +151,16 @@ function RunningAgentMenuItem({
   );
 }
 
+interface ReconciledStatuses {
+  readonly statuses: Readonly<Record<string, SessionStatus>>;
+  readonly storeStatusesAtFetch: Readonly<Record<string, SessionStatus>>;
+}
+
+const NO_RECONCILED_STATUSES: ReconciledStatuses = {
+  statuses: {},
+  storeStatusesAtFetch: {},
+};
+
 interface RunningSubAgentsBannerProps {
   readonly parentSessionId: string;
   readonly workspaceId: string;
@@ -158,9 +172,8 @@ export function RunningSubAgentsBanner({
 }: RunningSubAgentsBannerProps) {
   const workspace = useChatStore((state) => state.workspaceStates[workspaceId]);
   const fetchSessionTodos = useChatStore((state) => state.fetchSessionTodos);
-  const [reconciledStatuses, setReconciledStatuses] = useState<
-    Record<string, { readonly type: "idle" | "busy" | "retry" }>
-  >({});
+  const [reconciledStatuses, setReconciledStatuses] =
+    useState<ReconciledStatuses>(NO_RECONCILED_STATUSES);
   const [loadedDescendants, setLoadedDescendants] = useState<Session[]>([]);
   useEffect(() => {
     if (
@@ -173,6 +186,9 @@ export function RunningSubAgentsBanner({
       return;
     }
     const controller = new AbortController();
+    const storeStatusesAtFetch =
+      useChatStore.getState().workspaceStates[workspaceId]?.sessionStatuses ??
+      {};
     void Promise.all([
       fetch(
         `/api/opencode/session/${parentSessionId}/children?workspaceId=${workspaceId}`,
@@ -184,7 +200,10 @@ export function RunningSubAgentsBanner({
     ])
       .then(([sessions, statuses]) => {
         setLoadedDescendants(sessions as Session[]);
-        setReconciledStatuses(statuses as typeof reconciledStatuses);
+        setReconciledStatuses({
+          statuses: statuses as ReconciledStatuses["statuses"],
+          storeStatusesAtFetch,
+        });
       })
       .catch(() => {});
     return () => controller.abort();
@@ -213,8 +232,15 @@ export function RunningSubAgentsBanner({
     return [...descendants]
       .flatMap((sessionId) => {
         const session = sessions[sessionId];
+        const storeStatus = workspace.sessionStatuses[sessionId];
+        const reconciledStatus = reconciledStatuses.statuses[sessionId];
+        // The server's answer corrects a stale store status only until the
+        // store hears something newer for that session.
         const status =
-          reconciledStatuses[sessionId] ?? workspace.sessionStatuses[sessionId];
+          reconciledStatus !== undefined &&
+          storeStatus === reconciledStatuses.storeStatusesAtFetch[sessionId]
+            ? reconciledStatus
+            : (storeStatus ?? reconciledStatus);
         if (!session || (status?.type !== "busy" && status?.type !== "retry")) {
           return [];
         }

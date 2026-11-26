@@ -550,7 +550,9 @@ describe("sub-agent dialog with omo children", () => {
         ],
       ).toEqual({ type: "idle" }),
     );
-    expect(within(dialog).getByText("Idle")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
   });
 });
 

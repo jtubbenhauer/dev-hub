@@ -316,6 +316,43 @@ describe("RunningSubAgentsBanner", () => {
     ).toBeInTheDocument();
   });
 
+  it("drops an agent once the store hears it went idle after the server said busy", async () => {
+    const child = makeSession("running", "Finished agent", "parent");
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [child] })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ running: { type: "busy" } }),
+      });
+    const workspace = makeWorkspaceState(
+      { parent: makeSession("parent", "Parent"), running: child },
+      {},
+    );
+    useChatStore.setState({ workspaceStates: { "ws-1": workspace } });
+    render(
+      <RunningSubAgentsBanner parentSessionId="parent" workspaceId="ws-1" />,
+    );
+    expect(
+      await screen.findByRole("button", { name: /Finished agent/ }),
+    ).toBeInTheDocument();
+
+    act(() => {
+      useChatStore.setState({
+        workspaceStates: {
+          "ws-1": {
+            ...workspace,
+            sessionStatuses: { running: { type: "idle" } },
+          },
+        },
+      });
+    });
+
+    expect(
+      screen.queryByRole("button", { name: /Finished agent/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("closes selected detail when the agent stops running", async () => {
     global.fetch = vi
       .fn()

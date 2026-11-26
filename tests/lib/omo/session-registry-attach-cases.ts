@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { OmoRegistryEvent } from "@/lib/omo/session-registry-types";
 import {
   createRegistryFixture,
   entriesFixture,
@@ -163,6 +164,67 @@ describe("OmoSessionRegistry attach coordination", () => {
     await expect(
       fixture.runtime.registry.getIndexRow("workspace-1", "worker"),
     ).resolves.toMatchObject({ kind: "worker", contextAuthoritative: 1 });
+  });
+
+  it("replays omo's task snapshot on attach so worker statuses catch up", async () => {
+    const registryFixture = await createRegistryFixture([
+      openFixture({
+        durableId: "parent",
+        sessionPath: "/sessions/parent.jsonl",
+      }),
+      entriesFixture([], null),
+      {
+        type: "extension_request",
+        response: {
+          data: {
+            parent_session_id: "parent",
+            tasks: [
+              {
+                task_id: "st_1",
+                child_session_id: "worker-1",
+                agent_type: "explore",
+                status: "running",
+              },
+            ],
+          },
+        },
+      },
+    ]);
+    fixture = registryFixture;
+    insertIndexRow(registryFixture.sqlite, {
+      durableId: "parent",
+      sessionPath: "/sessions/parent.jsonl",
+    });
+    const workerStatus = new Promise<OmoRegistryEvent>((resolve) => {
+      registryFixture.runtime.registry.subscribe(
+        registryFixture.workspace.id,
+        (event) => {
+          if (
+            event.type === "session.status" &&
+            event.properties.sessionID === "omo_worker-1"
+          ) {
+            resolve(event);
+          }
+        },
+      );
+    });
+
+    const binding = await registryFixture.runtime.registry.attach({
+      workspace: registryFixture.workspace,
+      durableId: "parent",
+    });
+
+    await expect(workerStatus).resolves.toMatchObject({
+      properties: { status: { type: "busy" } },
+    });
+    await binding.effectTail;
+    expect(recordsOfType(registryFixture, "extension_request")).toEqual([
+      expect.objectContaining({
+        name: "omo.task.list",
+        data: { parent_session_id: "parent" },
+        sessionId: "route-parent",
+      }),
+    ]);
   });
 
   it("reuses the global runtime after a module reload", async () => {

@@ -1,3 +1,4 @@
+import { OmoCommandError } from "@/lib/omo/errors";
 import {
   OmoCorruptIndexRowError,
   OmoSessionReplacedError,
@@ -12,7 +13,10 @@ import {
 } from "@/lib/omo/session-index";
 import type { OmoSessionRegistry } from "@/lib/omo/session-registry-core";
 import { hydrateOmoBinding } from "@/lib/omo/session-registry-hydration";
-import { parseOpenedState } from "@/lib/omo/session-registry-records";
+import {
+  isJsonObject,
+  parseOpenedState,
+} from "@/lib/omo/session-registry-records";
 import {
   openOmoSessionWithPathRetry,
   wait,
@@ -117,6 +121,39 @@ async function touchOpenedBinding(
       updatedMs: existing?.updatedMs ?? 0,
     },
   );
+}
+
+// omo pushes its task snapshot only when it changes, so one is requested on
+// attach; it settles workers that finished while dev-hub was not attached.
+async function requestTaskSnapshot(
+  registry: OmoSessionRegistry,
+  binding: OmoSessionBinding,
+): Promise<void> {
+  try {
+    const response = await registry.client.request({
+      type: "extension_request",
+      name: "omo.task.list",
+      data: { parent_session_id: binding.durableId },
+      sessionId: binding.routingHandle,
+    });
+    const data = response["data"];
+    if (
+      !isJsonObject(data) ||
+      !Array.isArray(data["tasks"]) ||
+      !registry.isCurrent(binding)
+    ) {
+      return;
+    }
+    registry.dispatchBoundRecord(binding, {
+      type: "extension_event",
+      name: "omo.task.updated",
+      data,
+    });
+  } catch (error) {
+    // omo builds without the omo.task.list handler reject the request.
+    if (error instanceof OmoCommandError) return;
+    console.error("OmO task snapshot request failed", error);
+  }
 }
 
 async function performAttach(
@@ -226,6 +263,7 @@ async function performAttach(
         throwIfBindingReplaced(binding);
       })(),
     ]);
+    void requestTaskSnapshot(registry, readyBinding);
     return readyBinding;
   } catch (error) {
     binding.rejectReady(error);

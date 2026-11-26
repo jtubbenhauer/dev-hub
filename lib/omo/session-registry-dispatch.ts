@@ -115,6 +115,9 @@ export class OmoRegistryDispatcher {
   private readonly findSubAgentSessionIds: OmoRegistryDispatcherOptions["findSubAgentSessionIds"];
   private readonly sinks = new Map<string, Set<OmoRegistryEventSink>>();
   private readonly linkedTaskWorkers = new Map<string, string>();
+  // Busy workers per `${workspaceId}:${parentDurableId}`, so a worker omo
+  // stops listing (its snapshot keeps only the newest 256 tasks) is settled.
+  private readonly busyTaskWorkers = new Map<string, Set<string>>();
   // Per-session latest status only (busy/idle/retry) — bounded by session
   // count, unlike the unbounded event log this replaced.
   private readonly sessionStatuses = new Map<
@@ -146,7 +149,9 @@ export class OmoRegistryDispatcher {
     if (record["type"] === "entry_appended") this.queueLeaf(binding, record);
     for (const effect of result.effects) this.applyEffect(binding, effect);
     this.emit(binding.workspaceId, events);
-    return events;
+    const settledEvents = this.settleUnlistedTaskWorkers(binding, record);
+    this.emit(binding.workspaceId, settledEvents);
+    return [...events, ...settledEvents];
   }
 
   emitEvent(workspaceId: string, event: OmoRegistryEvent): void {
@@ -240,6 +245,7 @@ export class OmoRegistryDispatcher {
     }
     this.sinks.clear();
     this.sessionStatuses.clear();
+    this.busyTaskWorkers.clear();
     this.backgroundTexts.clear();
     this.backgroundMonitorEntries.clear();
   }
@@ -373,6 +379,69 @@ export class OmoRegistryDispatcher {
         ...binding.adapter.linkTaskChild(link.taskId, `omo_${workerDurableId}`),
       ]);
     });
+  }
+
+  // omo always lists pending and running tasks first, so a busy worker missing
+  // from its parent's snapshot has finished and is reported idle.
+  private settleUnlistedTaskWorkers(
+    binding: OmoSessionBinding,
+    record: JsonlRecord,
+  ): OmoRegistryEvent[] {
+    const data = record["data"];
+    if (
+      record["name"] !== "omo.task.updated" ||
+      !isJsonObject(data) ||
+      typeof data["parent_session_id"] !== "string" ||
+      !Array.isArray(data["tasks"])
+    ) {
+      return [];
+    }
+    const listedSessionIds = new Set<string>();
+    for (const task of data["tasks"]) {
+      if (!isJsonObject(task)) continue;
+      const workerDurableId =
+        typeof task["child_session_id"] === "string"
+          ? task["child_session_id"]
+          : typeof task["task_id"] === "string"
+            ? this.linkedTaskWorkers.get(
+                `${binding.workspaceId}:${task["task_id"]}`,
+              )
+            : undefined;
+      if (workerDurableId !== undefined) {
+        listedSessionIds.add(`omo_${workerDurableId}`);
+      }
+    }
+    const parentKey = `${binding.workspaceId}:${data["parent_session_id"]}`;
+    const busyWorkers = this.busyTaskWorkers.get(parentKey) ?? new Set();
+    const settledEvents: OmoRegistryEvent[] = [];
+    for (const sessionID of busyWorkers) {
+      if (listedSessionIds.has(sessionID)) continue;
+      busyWorkers.delete(sessionID);
+      if (this.isWorkerBusy(binding.workspaceId, sessionID)) {
+        settledEvents.push({
+          type: "session.status",
+          properties: { sessionID, status: { type: "idle" } },
+        });
+      }
+    }
+    for (const sessionID of listedSessionIds) {
+      if (this.isWorkerBusy(binding.workspaceId, sessionID)) {
+        busyWorkers.add(sessionID);
+      } else {
+        busyWorkers.delete(sessionID);
+      }
+    }
+    if (busyWorkers.size === 0) {
+      this.busyTaskWorkers.delete(parentKey);
+    } else {
+      this.busyTaskWorkers.set(parentKey, busyWorkers);
+    }
+    return settledEvents;
+  }
+
+  private isWorkerBusy(workspaceId: string, sessionID: string): boolean {
+    const type = this.sessionStatuses.get(workspaceId)?.get(sessionID)?.type;
+    return type === "busy" || type === "retry";
   }
 
   private lastWorkerStatus(

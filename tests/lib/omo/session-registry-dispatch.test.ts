@@ -533,4 +533,53 @@ describe("OmoRegistryDispatcher", () => {
     expect(liveStatuses).toEqual({ "omo_goal-1": watchingStatus });
     expect(dispatcher.backgroundStatusesForWorkspace(WORKSPACE.id)).toEqual({});
   });
+
+  it("settles a busy worker once its parent's task snapshot stops listing it", () => {
+    // Given
+    const dispatcher = new Dispatcher({
+      client: createUnconnectedClient(),
+      refreshIndex: async () => undefined,
+      findSubAgentSessionIds: async () => [],
+    });
+    const busy = (sessionID: string): OmoRegistryEvent => ({
+      type: "session.status",
+      properties: { sessionID, status: { type: "busy" } },
+    });
+    const { binding, setHandle } = createTestBinding("parent-9", () => ({
+      events: [busy("omo_worker-a"), busy("omo_worker-b")],
+      effects: [],
+    }));
+    const snapshot = (childIds: readonly string[]): JsonlRecord => ({
+      type: "extension_event",
+      name: "omo.task.updated",
+      data: {
+        parent_session_id: "parent-9",
+        tasks: childIds.map((childId) => ({
+          task_id: `task-${childId}`,
+          child_session_id: childId,
+          status: "running",
+        })),
+      },
+    });
+    dispatcher.dispatch(binding, snapshot(["worker-a", "worker-b"]));
+    const events: OmoRegistryEvent[] = [];
+    dispatcher.subscribe(WORKSPACE.id, (event) => events.push(event));
+    setHandle(() => ({ events: [], effects: [] }));
+
+    // When
+    dispatcher.dispatch(binding, snapshot(["worker-b"]));
+    dispatcher.dispatch(binding, snapshot(["worker-b"]));
+
+    // Then
+    expect(events).toEqual([
+      {
+        type: "session.status",
+        properties: { sessionID: "omo_worker-a", status: { type: "idle" } },
+      },
+    ]);
+    expect(dispatcher.sessionStatusesForWorkspace(WORKSPACE.id)).toEqual({
+      "omo_worker-a": { type: "idle" },
+      "omo_worker-b": { type: "busy" },
+    });
+  });
 });
